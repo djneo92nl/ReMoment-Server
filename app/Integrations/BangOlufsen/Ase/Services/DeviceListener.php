@@ -30,7 +30,7 @@ class DeviceListener
 
         $buffer = '';
 
-        while (! $body->eof()) {
+        while (!$body->eof()) {
             $chunk = $body->read(1024);
 
             if ($chunk === '') {
@@ -68,7 +68,7 @@ class DeviceListener
 
     protected function parseNotification(array $payload): array
     {
-        if (! isset($payload['notification'])) {
+        if (!isset($payload['notification'])) {
             return [];
         }
 

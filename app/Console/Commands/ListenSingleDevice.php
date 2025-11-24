@@ -18,7 +18,7 @@ class ListenSingleDevice extends Command
             'livingroom' => 'http://192.168.1.25:8080/BeoNotify/Notifications',
         ];
 
-        if (! isset($devices[$id])) {
+        if (!isset($devices[$id])) {
             $this->error('Unknown device.');
 
             return;

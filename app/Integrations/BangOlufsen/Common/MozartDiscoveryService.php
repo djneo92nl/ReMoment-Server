@@ -12,10 +12,10 @@ class MozartDiscoveryService
 
     public function discover(int $timeoutSeconds = 10): array
     {
-        if (! defined('IP_ADD_MEMBERSHIP')) {
+        if (!defined('IP_ADD_MEMBERSHIP')) {
             define('IP_ADD_MEMBERSHIP', 12);
         }
-        if (! defined('IPPROTO_IP')) {
+        if (!defined('IPPROTO_IP')) {
             define('IPPROTO_IP', 0);
         }
 
@@ -181,7 +181,7 @@ class MozartDiscoveryService
             }
 
             // For service instance names, prefer a readable label from rrname or TXT name
-            if (! $instance && $rrname && preg_match('/^[^\._]+/', $rrname, $m)) {
+            if (!$instance && $rrname && preg_match('/^[^\._]+/', $rrname, $m)) {
                 $instance = $m[0];
             }
 
@@ -189,7 +189,7 @@ class MozartDiscoveryService
         }
 
         // fallback: if no hostname found, attempt to infer from instance
-        if (! $hostname && $instance) {
+        if (!$hostname && $instance) {
             // normalize: replace spaces/non-alnum with '-', lower and append .local
             $hostname = strtolower(preg_replace('/[^a-z0-9\-]+/i', '-', $instance)).'.local';
         }
@@ -251,7 +251,7 @@ class MozartDiscoveryService
             if (($lenOctet & 0xC0) === 0xC0) {
                 $b2 = ord($buf[$offset + 1]);
                 $pointer = (($lenOctet & 0x3F) << 8) | $b2;
-                if (! $jumped) {
+                if (!$jumped) {
                     $offset += 2;
                     $jumped = true;
                 } else {

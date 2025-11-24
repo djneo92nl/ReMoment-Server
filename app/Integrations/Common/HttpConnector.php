@@ -17,7 +17,7 @@ class HttpConnector
     public function get(string $path, array $query = []): mixed
     {
         $url = $this->baseUrl.'/'.ltrim($path, '/');
-        if (! empty($query)) {
+        if (!empty($query)) {
             $url .= '?'.http_build_query($query);
         }
 
@@ -51,7 +51,7 @@ class HttpConnector
             CURLOPT_TIMEOUT => 10,
         ]);
 
-        if (in_array($method, ['POST', 'PUT', 'DELETE']) && ! empty($data)) {
+        if (in_array($method, ['POST', 'PUT', 'DELETE']) && !empty($data)) {
             curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
         }
 

@@ -162,13 +162,13 @@ class DeviceDiscovery extends Command
     {
         // Fetch the XML from the URL
         $xmlString = file_get_contents($url);
-        if (! $xmlString) {
+        if (!$xmlString) {
             return false;
         }
 
         // Load and convert to array
         $xml = simplexml_load_string($xmlString, 'SimpleXMLElement', LIBXML_NOCDATA);
-        if (! $xml) {
+        if (!$xml) {
             return false;
         }
 
