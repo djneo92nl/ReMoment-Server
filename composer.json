@@ -10,6 +10,10 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "ext-curl": "*",
+        "ext-sockets": "*",
+        "aerni/laravel-spotify": "^3.0",
+        "clue/mdns-react": "~0.2.0",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1"
     },
