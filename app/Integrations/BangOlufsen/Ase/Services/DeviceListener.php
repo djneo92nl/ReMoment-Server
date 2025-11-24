@@ -84,6 +84,10 @@ class DeviceListener
             dump($data);
         }
 
+        if ($n['type'] === 'NOW_PLAYING_ENDED') {
+
+        }
+
         return [
             'id' => $n['id'] ?? null,
             'timestamp' => $n['timestamp'] ?? null,
