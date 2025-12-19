@@ -24,7 +24,7 @@ class ListenSingleDevice extends Command
             return;
         }
 
-        $listener = new \App\DeviceDrivers\BangOlufsen\Ase\Services\DeviceListener($devices[$id]);
+        $listener = new \App\Integrations\BangOlufsen\Ase\Services\DeviceListener($devices[$id]);
         $listener->listen($id);
     }
 }

@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\DeviceDrivers\BangOlufsen\Common\MozartDiscoveryService;
+use App\Integrations\BangOlufsen\Common\MozartDiscoveryService;
 use Illuminate\Console\Command;
 
 class AdditionalASEDeviceDiscovery extends Command
