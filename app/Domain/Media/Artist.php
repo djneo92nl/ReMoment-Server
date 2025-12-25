@@ -4,20 +4,16 @@ namespace App\Domain\Media;
 
 class Artist
 {
-    public ?string $name;
-
-    public array $images = [];
-
-    public function __construct(array $data = [])
-    {
-        $this->name = $data['name'] ?? null;
-        $this->images = $data['images'] ?? [];
-    }
+    public function __construct(
+        public ?string $name = null,
+        public ?array $images = null
+    ) {}
 
     public function toArray(): array
     {
-        return ['
-            name' => $this->name,
-        ];
+        return array_filter([
+            'name' => $this->name,
+            'images' => $this->images,
+        ], fn ($value) => $value !== null);
     }
 }

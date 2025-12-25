@@ -4,19 +4,20 @@ namespace App\Domain\Media;
 
 class Track
 {
-    public ?string $id;
+    public function __construct(
+        public ?string $id = null,
+        public ?string $name = null,
+        public ?int $duration = null,   // seconds
+        public array $images = []        // URLs
+    ) {}
 
-    public ?string $name;
-
-    public ?int $duration;          // seconds
-
-    public array $images = [];      // URLs
-
-    public function __construct(array $data = [])
+    public function toArray(): array
     {
-        $this->id = $data['id'] ?? null;
-        $this->name = $data['name'] ?? null;
-        $this->duration = $data['duration'] ?? null;
-        $this->images = $data['images'] ?? [];
+        return array_filter([
+            'id' => $this->id,
+            'name' => $this->name,
+            'duration' => $this->duration,
+            'images' => $this->images,
+        ], fn ($value) => $value !== null);
     }
 }
