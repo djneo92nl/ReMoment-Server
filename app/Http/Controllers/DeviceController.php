@@ -12,7 +12,9 @@ class DeviceController extends Controller
      */
     public function index()
     {
-        //
+        return view('devices.index', [
+            'devices' => Device::paginate(10),
+        ]);
     }
 
     /**
