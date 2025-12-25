@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Device;
 use Illuminate\Console\Command;
 
 class GetCurrentPlayingMedia extends Command
@@ -25,12 +26,9 @@ class GetCurrentPlayingMedia extends Command
      */
     public function handle()
     {
-        $devices = [
-            'livingroom' => 'http://192.168.1.25:8080/BeoNotify/Notifications',
-            // add more devices here
-        ];
+        $devices = Device::where('device_driver_name', 'ASE')->pluck('id')->all();
 
-        foreach ($devices as $id => $url) {
+        foreach ($devices as $id) {
             $cacheKey = "listener_running_{$id}";
 
             if (cache()->get($cacheKey)) {
@@ -42,7 +40,7 @@ class GetCurrentPlayingMedia extends Command
             $this->info("Spawning listener for {$id}...");
 
             // fire-and-forget child process
-            $cmd = 'php '.base_path('artisan')." device:listen-single {$id} > /dev/null 2>&1 &";
+            $cmd = 'php '.base_path('artisan')." device-ase:listen-single '{$id}' > /dev/null 2>&1 &";
             shell_exec($cmd);
         }
     }
