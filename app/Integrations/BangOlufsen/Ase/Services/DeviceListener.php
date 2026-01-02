@@ -2,7 +2,12 @@
 
 namespace App\Integrations\BangOlufsen\Ase\Services;
 
+use App\Domain\Media\Album;
+use App\Domain\Media\Artist;
+use App\Domain\Media\NowPlaying;
+use App\Domain\Media\Track;
 use GuzzleHttp\Client;
+use Illuminate\Support\Facades\Cache;
 
 class DeviceListener
 {
@@ -23,7 +28,7 @@ class DeviceListener
     public function listen(string $deviceId)
     {
         $cacheKey = "listener_running_{$deviceId}";
-        cache()->put($cacheKey, true, now()->addMinutes(10));
+        cache()->put($cacheKey, true, now()->addMinutes(5));
 
         $response = $this->http->get($this->url, ['stream' => true]);
         $body = $response->getBody();
@@ -54,9 +59,8 @@ class DeviceListener
                 $decoded = json_decode($json, true);
 
                 if ($decoded !== null) {
-                    $parsed = $this->parseNotification($decoded);
+                    $parsed = $this->parseNotification($decoded, $deviceId);
                     cache()->put("device_data_{$deviceId}_{$parsed['type']}", $parsed);
-                    dump("device_data_{$deviceId}_{$parsed['type']}");
                 }
             }
 
@@ -66,7 +70,7 @@ class DeviceListener
         cache()->forget($cacheKey);
     }
 
-    protected function parseNotification(array $payload): array
+    protected function parseNotification(array $payload, string $deviceId): array
     {
         if (!isset($payload['notification'])) {
             return [];
@@ -75,30 +79,49 @@ class DeviceListener
         $n = $payload['notification'];
         $data = $n['data'] ?? [];
 
+        $type = $n['type'];
+
+        dump($type);
+
         if ($n['type'] === 'NOW_PLAYING_NET_RADIO') {
-            $data = $this->parseNetRadio($data);
-            dump($data);
+            $dataParsed = $this->parseNetRadio($data);
+            $type = 'now_playing';
         }
         if ($n['type'] === 'NOW_PLAYING_STORED_MUSIC') {
-            $data = $this->parseStoredMusic($data);
-            dump($data);
+            $dataParsed = $this->parseStoredMusic($data);
+            $type = 'now_playing';
+        }
+
+        if ($n['type'] === 'PROGRESS_INFORMATION') {
+            $currentPlaying = Cache::get('device_data_'.$deviceId.'_now_playing');
+            if ($currentPlaying !== null && isset($data['position'])) {
+                $currentPlaying['data']['position'] = $data['position'];
+                $currentPlaying['data']['state'] = $data['state'];
+                $dataParsed = $currentPlaying['data'];
+                $type = 'now_playing';
+
+            }
         }
 
         if ($n['type'] === 'NOW_PLAYING_ENDED') {
-
+            Cache::forget('device_data_'.$deviceId.'_now_playing');
+            $dataParsed = ['state' => 'ended'];
+            $type = 'now_playing';
         }
 
         return [
             'id' => $n['id'] ?? null,
             'timestamp' => $n['timestamp'] ?? null,
-            'type' => $n['type'] ?? null,
+            'type' => $type ?? null,
             'kind' => $n['kind'] ?? null,
-            'data' => $n['data'] ?? [],
+            'data' => $dataParsed ?? [],
         ];
     }
 
     public function parseNetRadio(array $payload): array
     {
+        $artist = new Artist(name: $payload['liveDescription']);
+
         return [
             'track_name' => $payload['name'] ?? '',
             'artist_name' => $payload['liveDescription'] ?? '',
@@ -106,15 +129,25 @@ class DeviceListener
         ];
     }
 
-    public function parseStoredMusic(array $payload): array
+    public function parseStoredMusic(array $payload)
     {
-        return [
-            'track_name' => $payload['name'] ?? '',
-            'track_duration' => $payload['duration'] ?? '',
-            'track_id' => $payload['trackId'] ?? '',
-            'artist_name' => $payload['artist'] ?? '',
-            'album_name' => $payload['album'] ?? '',
-            'album_art' => $payload['albumImage'][0]['url'] ?? '',
-        ];
+
+        $artist = new Artist(name: $payload['artist']);
+        $album = new Album(name: $payload['album'], images: $payload['albumImage'], artist: $artist);
+        $track = new Track(
+            name: $payload['name'],
+            artist: $artist,
+            duration: $payload['duration'],
+            images: $payload['trackImage'],
+            meta: ['spotifyId' => urldecode($payload['trackId'])]
+        );
+
+        $nowPlaying = new NowPlaying(
+            track: $track,
+            artist: $artist,
+            album: $album
+        );
+
+        return $nowPlaying->toArray();
     }
 }
