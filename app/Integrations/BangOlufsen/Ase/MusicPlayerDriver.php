@@ -6,10 +6,11 @@ use App\Integrations\BangOlufsen\Ase\Connectors\MediaControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\VolumeControls;
 use App\Integrations\Common\HttpConnector;
 use App\Integrations\Contracts\MediaControlsInterface;
+use App\Integrations\Contracts\MusicPlayerDriverInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
 
-class MusicPlayerDriver implements MediaControlsInterface, VolumeControlInterface
+class MusicPlayerDriver implements MediaControlsInterface, MusicPlayerDriverInterface, VolumeControlInterface
 {
     use MediaControls;
     use VolumeControls;

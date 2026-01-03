@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Integrations\Contracts\MusicPlayerDriverInterface;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -11,6 +12,8 @@ use Illuminate\Database\Eloquent\Model;
  */
 class Device extends Model
 {
+    protected $driver = null;
+
     public $fillable = [
         'ip_address',
         'uuid',
@@ -38,4 +41,35 @@ class Device extends Model
             'updated_at' => $this->updated_at,
         ];
     }
+
+    private function loadDriver()
+    {
+
+        if (!class_exists($this->device_type)) {
+            throw new \Exception('Device Product Driver Not Found');
+        }
+        if (!$this->device_type instanceof MusicPlayerDriverInterface) {
+            throw new \LogicException('Invalid driver class');
+        }
+
+        $driver = app()->make(
+            $this->device_product_type,
+            [
+                'device' => $this,
+            ]
+        );
+
+        $this->driver = $driver;
+    }
+
+    public function getDriverAttribute(): MusicPlayerDriverInterface
+    {
+        if ($this->driver === null) {
+            $this->loadDriver();
+        }
+
+        return $this->driver;
+    }
+
+    public function getStateAttribute() {}
 }
