@@ -9,17 +9,18 @@ use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
+use Illuminate\Support\Facades\Cache;
 
 class MusicPlayerDriver implements MediaControlsInterface, MusicPlayerDriverInterface, VolumeControlInterface
 {
     use MediaControls;
     use VolumeControls;
 
-    public $deviceApi;
+    public HttpConnector $deviceApi;
 
-    public function __construct(Device $device)
+    public function __construct(public Device $device)
     {
-        $this->deviceApi = new HttpConnector($device->ip_address);
+        $this->deviceApi = new HttpConnector($device->ip_address.':8080');
     }
 
     public function deviceApiClient(): HttpConnector
@@ -27,11 +28,21 @@ class MusicPlayerDriver implements MediaControlsInterface, MusicPlayerDriverInte
         return $this->deviceApi;
     }
 
-    public function getIsNowPlayingAttribute(): bool
+    public function getCurrentPlayingAttribute(): array
     {
         // Check if Listener is running
-        $cacheKey = "listener_running_{$id}";
+        $cacheKey = "listener_running_{$this->device->id}";
 
-        return false;
+        if (!cache()->has($cacheKey)) {
+            return [];
+        }
+
+        if (!cache()->has('device_data_'.$this->device->id.'_now_playing')) {
+            return [];
+        }
+
+        $data = Cache::get('device_data_'.$this->device->id.'_now_playing');
+
+        return $data['data'];
     }
 }

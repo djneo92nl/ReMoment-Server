@@ -33,7 +33,7 @@ class DeviceDiscovery extends Command
         $multicastAddr = '239.255.255.250';
         $port = 1900;
 
-        $localIp = '192.168.1.250'; // your Mac’s LAN IP
+        $localIp = '0.0.0.0'; // your Mac’s LAN IP
         $socket = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
         socket_set_option($socket, SOL_SOCKET, SO_REUSEADDR, 1);
         socket_bind($socket, $localIp, 0);
@@ -137,6 +137,7 @@ class DeviceDiscovery extends Command
                 $this->line('Found Device made by : '.$deviceInfo['manufacturer'].' : '.$deviceInfo['modelName']);
                 if (array_key_exists($deviceInfo['manufacturer'], config('devices'))) {
 
+                    $this->info('found driver');
                     $device = Device::updateOrCreate([
                         'uuid' => $deviceInfo['UDN'],
                     ], [
@@ -145,8 +146,8 @@ class DeviceDiscovery extends Command
                         'device_brand_name' => $deviceInfo['manufacturer'],
                         'device_product_type' => $deviceInfo['modelName'],
                         'device_name' => $deviceInfo['friendlyName'],
-                        'device_type' => config('devices.'.$deviceInfo['manufacturer'].'.'.$deviceInfo['modelName'])['type'],
-                        'device_driver_name' => config('devices.'.$deviceInfo['manufacturer'].'.'.$deviceInfo['modelName'])['driver'],
+                        'device_driver' => config('devices.'.$deviceInfo['manufacturer'].'.'.$deviceInfo['modelName'])['driver'],
+                        'device_driver_name' => config('devices.'.$deviceInfo['manufacturer'].'.'.$deviceInfo['modelName'])['driver_name'],
                         'last_seen' => Carbon::now(),
                     ]
                     );

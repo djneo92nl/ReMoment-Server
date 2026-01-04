@@ -2,6 +2,8 @@
 
 namespace App\Integrations\BangOlufsen\Ase\Connectors;
 
+use App\Domain\Device\Cache\Volume;
+
 trait VolumeControls
 {
     abstract protected function deviceApiClient(): \App\Integrations\Common\HttpConnector;
@@ -15,7 +17,20 @@ trait VolumeControls
 
     public function getVolume(): int
     {
-        return $this->deviceApiClient()->get('BeoZone/Zone/Speaker/Level')['level'];
+        $volume = Volume::getVolume($this->device->id);
+        if ($volume === false) {
+            $response = ($this->deviceApiClient()->get('BeoZone/Zone/Sound/Volume/Speaker/Level'));
+            if (array_key_exists('level', $response)) {
+                Volume::updateVolume($this->device->id, (int) $response['level']);
+
+                return (int) $response['level'];
+            }
+
+            return 0;
+        }
+
+        return (int) $volume;
+
     }
 
     public function incrementVolume(): void

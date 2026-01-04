@@ -16,7 +16,7 @@ class DeviceResource extends JsonResource
             'device_brand_name' => $this->device_brand_name,
             'device_driver_name' => $this->device_driver_name,
             'device_product_type' => $this->device_product_type,
-            'device_type' => $this->device_type,
+            'device_driver' => $this->device_driver,
             'last_seen' => $this->last_seen,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

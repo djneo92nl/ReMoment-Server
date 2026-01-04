@@ -8,5 +8,5 @@ interface MusicPlayerDriverInterface
 {
     public function __construct(Device $device);
 
-    public function getIsNowPlayingAttribute();
+    public function getCurrentPlayingAttribute();
 }

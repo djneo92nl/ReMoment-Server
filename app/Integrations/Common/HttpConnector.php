@@ -21,7 +21,13 @@ class HttpConnector
             $url .= '?'.http_build_query($query);
         }
 
-        return $this->request('GET', $url);
+        try {
+            $response = $this->request('GET', $url);
+        } catch (\Exception) {
+            $response = [];
+        }
+
+        return $response;
     }
 
     public function post(string $path, array $data = []): mixed
@@ -59,6 +65,7 @@ class HttpConnector
         $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 
         if (curl_errno($ch)) {
+            error_log(curl_error($ch));
             throw new \RuntimeException('HTTP request failed: '.curl_error($ch));
         }
 

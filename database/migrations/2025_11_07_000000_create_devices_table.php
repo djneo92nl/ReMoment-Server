@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('device_brand_name')->nullable();
             $table->string('device_driver_name')->nullable();
             $table->string('device_product_type')->nullable();
-            $table->string('device_type')->nullable();
+            $table->string('device_driver')->nullable();
             $table->dateTime('last_seen')->nullable();
             $table->timestamps(); // created_at & updated_at
         });

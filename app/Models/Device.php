@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Domain\Device\DeviceCache;
+use App\Domain\Device\State;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
 use Illuminate\Database\Eloquent\Model;
 
@@ -20,7 +22,7 @@ class Device extends Model
         'device_brand_name',
         'device_product_type',
         'device_name',
-        'device_type',
+        'device_driver',
         'device_driver_name',
         'last_seen',
     ];
@@ -35,7 +37,7 @@ class Device extends Model
             'device_brand_name' => $this->device_brand_name ?? '',
             'device_driver_name' => $this->device_driver_name ?? '',
             'device_product_type' => $this->device_product_type ?? '',
-            'device_type' => $this->device_type ?? '',
+            'device_driver' => $this->device_driver ?? '',
             'last_seen' => $this->last_seen ?? '',
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
@@ -45,15 +47,15 @@ class Device extends Model
     private function loadDriver()
     {
 
-        if (!class_exists($this->device_type)) {
+        if (!class_exists($this->device_driver)) {
             throw new \Exception('Device Product Driver Not Found');
         }
-        if (!$this->device_type instanceof MusicPlayerDriverInterface) {
-            throw new \LogicException('Invalid driver class');
-        }
+        //        if (!$this->device_driver instanceof MusicPlayerDriverInterface) {
+        //            throw new \LogicException('Invalid driver class');
+        //        }
 
         $driver = app()->make(
-            $this->device_product_type,
+            $this->device_driver,
             [
                 'device' => $this,
             ]
@@ -71,5 +73,20 @@ class Device extends Model
         return $this->driver;
     }
 
-    public function getStateAttribute() {}
+    public function getStateAttribute(): ?\App\Domain\Device\State
+    {
+        return DeviceCache::getState($this->id);
+    }
+
+    public function getCurrentPlayingAttribute()
+    {
+        if ($this->getStateAttribute() !== State::Unreachable) {
+            $driver = $this->getDriverAttribute();
+
+            return $driver->getCurrentPlayingAttribute();
+        }
+
+        return false;
+
+    }
 }

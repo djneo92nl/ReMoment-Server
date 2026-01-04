@@ -27,7 +27,14 @@ final class DeviceCache
     {
         $value = Cache::get(self::stateKey($deviceId));
 
-        return $value ? State::from($value) : null;
+        return $value ? State::from($value) : State::Unreachable;
+    }
+
+    public static function getLastSeen(int $deviceId)
+    {
+        $value = Cache::get(self::lastSeenKey($deviceId));
+
+        return $value ?: false;
     }
 
     public static function forget(int $deviceId): void

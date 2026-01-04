@@ -14,8 +14,10 @@
         "ext-sockets": "*",
         "aerni/laravel-spotify": "^3.0",
         "clue/mdns-react": "~0.2.0",
+        "duncan3dc/sonos": "^1.2",
         "laravel/framework": "^12.0",
-        "laravel/tinker": "^2.10.1"
+        "laravel/tinker": "^2.10.1",
+        "mikealmond/musicbrainz": "^0.2.2"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

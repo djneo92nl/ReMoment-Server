@@ -2,6 +2,9 @@
 
 namespace App\Integrations\BangOlufsen\Ase\Services;
 
+use App\Domain\Device\Cache\Volume;
+use App\Domain\Device\DeviceCache;
+use App\Domain\Device\State;
 use App\Domain\Media\Album;
 use App\Domain\Media\Artist;
 use App\Domain\Media\NowPlaying;
@@ -68,6 +71,8 @@ class DeviceListener
         }
 
         cache()->forget($cacheKey);
+        DeviceCache::updateState($deviceId, State::Unreachable);
+
     }
 
     protected function parseNotification(array $payload, string $deviceId): array
@@ -100,13 +105,20 @@ class DeviceListener
                 $dataParsed = $currentPlaying['data'];
                 $type = 'now_playing';
 
+                DeviceCache::updateState($deviceId, State::Playing);
+
             }
         }
 
         if ($n['type'] === 'NOW_PLAYING_ENDED') {
             Cache::forget('device_data_'.$deviceId.'_now_playing');
             $dataParsed = ['state' => 'ended'];
-            $type = 'now_playing';
+            $type = 'now_playing_ended';
+
+            DeviceCache::updateState($deviceId, State::Standby);
+        }
+        if ($n['type'] === 'VOLUME') {
+            Volume::updateVolume($deviceId, $data['speaker']['level']);
         }
 
         return [
