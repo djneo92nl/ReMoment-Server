@@ -9,7 +9,7 @@
 | $$  | $$|  $$$$$$$| $$ \/  | $$|  $$$$$$/| $$ | $$ | $$|  $$$$$$$| $$  | $$  |  $$$$/
 |__/  |__/ \_______/|__/     |__/ \______/ |__/ |__/ |__/ \_______/|__/  |__/   \___/  
                                                                                                                                                                            
-   ```
+```
                                                                               
 ___
 # ReMoment,
@@ -18,7 +18,7 @@ ___
 
 Based on Laravel, can control esp32 media controllers.
 
-Currently has interfaces for 
+Currently, has interfaces for 
 
 1. Bang Olufsen
    1. ASE (kinda)

@@ -73,6 +73,7 @@ class DeviceListener
 
         cache()->forget($cacheKey);
         DeviceCache::updateState($deviceId, State::Unreachable);
+        $this->listen($deviceId);
 
     }
 

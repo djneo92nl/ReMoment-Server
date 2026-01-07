@@ -17,6 +17,7 @@
         "duncan3dc/sonos": "^1.2",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
+        "livewire/livewire": "^3.7",
         "mikealmond/musicbrainz": "^0.2.2"
     },
     "require-dev": {
