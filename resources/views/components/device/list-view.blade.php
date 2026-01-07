@@ -31,21 +31,32 @@
                 @if($device->state !== \App\Domain\Device\State::Standby)
                     @php ($nowPlaying = $device->currentPlaying)
                     <img src="{{  $nowPlaying['track']['images'][0]['url'] }}" alt="Album Cover" class="w-40 h-40 rounded-lg object-cover">
-                    <div class="flex flex-col space-y-3 w-72">
+                    <div class="flex flex-col space-y-3 ">
                         <div>
                             <h1 class="text-3xl font-semibold">{{ $nowPlaying['track']['name'] }}</h1>
                             <p class="text-gray-300 text-lg">{{ $nowPlaying['artist']['name'] }}</p>
                             @isset($nowPlaying['album'])<p  class="text-gray-500">{{ $nowPlaying['album']['name'] }}</p>@endisset
                         </div>
-                        <div>
-                            <div class="w-full h-1 bg-gray-700 rounded-full">
-                                <div class="h-1 bg-white rounded-full" style="width:{{(int)( (   $nowPlaying['position'] / $nowPlaying['track']['duration'] ) *100 ) }}%"></div>
+                        @if(isset($nowPlaying['radio']))
+                            <div>
+                                <div class="w-full h-1 bg-gray-700 rounded-full">
+                                    <div class="h-1 bg-white rounded-full" style="width:100%"></div>
+                                </div>
+                                <div class="flex justify-end text-sm  text-gray-400 mt-1">
+                                    <span class="">{{ \App\Domain\Helpers\TimeHelper::class::secondsToMinutes($nowPlaying['position'])  }}</span>
+                                </div>
                             </div>
-                            <div class="flex justify-between text-sm text-gray-400 mt-1">
-                                <span>{{ $nowPlaying['position'] }}</span>
-                                <span>{{ $nowPlaying['track']['duration']  }}</span>
+                        @else
+                            <div>
+                                <div class="w-full h-1 bg-gray-700 rounded-full">
+                                    <div class="h-1 bg-white rounded-full" style="width:{{(int)( (   $nowPlaying['position'] / $nowPlaying['track']['duration'] ) *100 ) }}%"></div>
+                                </div>
+                                <div class="flex justify-between text-sm text-gray-400 mt-1">
+                                    <span>{{ $nowPlaying['position'] }}</span>
+                                    <span>{{ $nowPlaying['track']['duration']  }}</span>
+                                </div>
                             </div>
-                        </div>
+                        @endif
                         <div class="flex justify-center space-x-6 mt-2">
 {{--                            <button class="material-icons text-4xl text-gray-300 hover:text-white">skip_previous</button>--}}
 {{--                            <button class="material-icons text-5xl text-white hover:text-gray-300">play_arrow</button>--}}
@@ -55,5 +66,9 @@
                 @endif
             </div>
         </div>
+    @else
+        <h3 class="text-gray-900 dark:text-white text-base font-medium tracking-tight ">{{$device->device_name}} {{$device->id}}</h3>
+
     @endif
+
 </div>

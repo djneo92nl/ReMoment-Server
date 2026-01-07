@@ -8,6 +8,7 @@ use App\Domain\Device\State;
 use App\Domain\Media\Album;
 use App\Domain\Media\Artist;
 use App\Domain\Media\NowPlaying;
+use App\Domain\Media\Radio;
 use App\Domain\Media\Track;
 use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Cache;
@@ -132,13 +133,33 @@ class DeviceListener
 
     public function parseNetRadio(array $payload): array
     {
-        $artist = new Artist(name: $payload['liveDescription']);
+        $radio = new Radio(name: $payload['name'], images: $payload['image']);
 
-        return [
-            'track_name' => $payload['name'] ?? '',
-            'artist_name' => $payload['liveDescription'] ?? '',
-            'album_art' => $payload['image'][0]['url'] ?? '',
-        ];
+        if (str_contains($payload['liveDescription'], ' - ')) {
+            $artist = new Artist(name: explode(' - ', $payload['liveDescription'])[0]);
+
+            $track = new Track(
+                name: explode(' - ', $payload['liveDescription'])[1],
+                artist: $artist,
+                images: $payload['image']
+            );
+
+            $nowPlaying = new NowPlaying(
+                track: $track,
+                artist: $artist,
+                radio: $radio
+            );
+        } else {
+            $nowPlaying = new NowPlaying(
+                track: new Track(
+                    name: $payload['liveDescription'], images: $payload['image']
+                ),
+                radio: $radio
+            );
+        }
+
+        return $nowPlaying->toArray();
+
     }
 
     public function parseStoredMusic(array $payload)
