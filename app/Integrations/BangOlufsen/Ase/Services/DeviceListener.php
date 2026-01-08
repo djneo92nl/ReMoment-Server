@@ -9,6 +9,7 @@ use App\Domain\Media\Album;
 use App\Domain\Media\Artist;
 use App\Domain\Media\NowPlaying;
 use App\Domain\Media\Radio;
+use App\Domain\Media\Source;
 use App\Domain\Media\Track;
 use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Cache;
@@ -32,7 +33,7 @@ class DeviceListener
     public function listen(string $deviceId)
     {
         $cacheKey = "listener_running_{$deviceId}";
-        cache()->put($cacheKey, true, now()->addMinutes(5));
+        cache()->put($cacheKey, true, now()->addSeconds(10));
 
         $response = $this->http->get($this->url, ['stream' => true]);
         $body = $response->getBody();
@@ -68,7 +69,7 @@ class DeviceListener
                 }
             }
 
-            cache()->put($cacheKey, true, now()->addMinutes(10));
+            cache()->put($cacheKey, true, now()->addSeconds(10));
         }
 
         cache()->forget($cacheKey);
@@ -94,12 +95,21 @@ class DeviceListener
             $dataParsed = $this->parseNetRadio($data);
             $type = 'now_playing';
         }
+
         if ($n['type'] === 'NOW_PLAYING_STORED_MUSIC') {
             $dataParsed = $this->parseStoredMusic($data);
             $type = 'now_playing';
         }
 
+        if ($n['type'] === 'SOURCE') {
+            $dataParsed = $this->parseSource($data);
+            DeviceCache::updateState($deviceId, State::Playing);
+
+            $type = 'now_playing';
+        }
+
         if ($n['type'] === 'PROGRESS_INFORMATION') {
+            dump($data);
             $currentPlaying = Cache::get('device_data_'.$deviceId.'_now_playing');
             if ($currentPlaying !== null && isset($data['position'])) {
                 $currentPlaying['data']['position'] = $data['position'];
@@ -148,7 +158,9 @@ class DeviceListener
             $nowPlaying = new NowPlaying(
                 track: $track,
                 artist: $artist,
-                radio: $radio
+                type: 'music',
+                platform: 'radio',
+                radio: $radio,
             );
         } else {
             $nowPlaying = new NowPlaying(
@@ -179,9 +191,32 @@ class DeviceListener
         $nowPlaying = new NowPlaying(
             track: $track,
             artist: $artist,
-            album: $album
+            album: $album,
+            type: 'music',
+            platform: 'media',
+
         );
 
         return $nowPlaying->toArray();
+    }
+
+    private function parseSource(mixed $data)
+    {
+        $source = new Source(
+            name: $data['primaryExperience']['source']['friendlyName'],
+            category: $data['primaryExperience']['source']['category'],
+            jid: $data['primaryExperience']['source']['id'],
+            sourceType: $data['primaryExperience']['source']['sourceType']['type'],
+            connector: $data['primaryExperience']['source']['sourceType']['connector'],
+        );
+
+        $nowPlaying = new NowPlaying(
+            type: 'video',
+            platform: 'media',
+            source: $source
+        );
+
+        return $nowPlaying->toArray();
+
     }
 }

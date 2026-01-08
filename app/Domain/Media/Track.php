@@ -21,7 +21,7 @@ class Track
             'name' => $this->name,
             'duration' => $this->duration,
             'source' => $this->source,
-            'artist' => $this->artist->toArray(),
+            'artist' => $this->artist?->toArray(),
             'images' => $this->images,
             'meta' => $this->meta,
         ], fn ($value) => $value !== null);

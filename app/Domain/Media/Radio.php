@@ -6,6 +6,7 @@ class Radio
 {
     public function __construct(
         public ?string $name = null,
+        public ?string $genre = null,
         public array $images = [],
     ) {}
 
@@ -14,6 +15,7 @@ class Radio
         return array_filter([
             'name' => $this->name,
             'images' => $this->images,
+            'genre' => $this->genre,
         ], fn ($value) => $value !== null);
     }
 }

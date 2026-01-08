@@ -46,4 +46,9 @@ class Nowplaying extends Component
     {
         $this->device->driver->previous();
     }
+
+    public function standby()
+    {
+        $this->device->driver->standby();
+    }
 }

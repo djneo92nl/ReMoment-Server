@@ -16,7 +16,8 @@ class NowPlaying
         public ?int $position = 0,
         public ?string $type = null,
         public ?string $platform = null,
-        public ?Radio $radio = null
+        public ?Radio $radio = null,
+        public ?Source $source = null,
     ) {}
 
     public function toArray(): array
@@ -35,6 +36,7 @@ class NowPlaying
             'artist' => $this->artist?->toArray(),
             'album' => $this->album?->toArray(),
             'radio' => $this->radio?->toArray(),
+            'source' => $this->source?->toArray(),
             'state' => $this->state,
             'position' => $this->position,
             'platform' => $this->platform,

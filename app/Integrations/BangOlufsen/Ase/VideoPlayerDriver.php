@@ -12,7 +12,7 @@ use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
 use Illuminate\Support\Facades\Cache;
 
-class MusicPlayerDriver implements MediaControlsInterface, MusicPlayerDriverInterface, VolumeControlInterface
+class VideoPlayerDriver implements MediaControlsInterface, MusicPlayerDriverInterface, VolumeControlInterface
 {
     use DeviceControls;
     use MediaControls;
