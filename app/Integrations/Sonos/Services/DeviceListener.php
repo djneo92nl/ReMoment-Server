@@ -1,0 +1,173 @@
+<?php
+
+namespace App\Integrations\Sonos\Services;
+
+use App\Domain\Device\Cache\Volume;
+use App\Domain\Device\DeviceCache;
+use App\Domain\Device\State;
+use App\Domain\Media\Album;
+use App\Domain\Media\Artist;
+use App\Domain\Media\NowPlaying;
+use App\Domain\Media\Radio;
+use App\Domain\Media\Source;
+use App\Domain\Media\Track;
+use duncan3dc\Sonos\Device;
+use Illuminate\Support\Facades\Cache;
+
+class DeviceListener
+{
+    public function __construct(Device $device) {}
+
+    public function listen(string $deviceId)
+    {
+        $cacheKey = "listener_running_{$deviceId}";
+        cache()->put($cacheKey, true, now()->addSeconds(10));
+
+        cache()->forget($cacheKey);
+        DeviceCache::updateState($deviceId, State::Unreachable);
+        $this->listen($deviceId);
+
+    }
+
+    protected function parseNotification(array $payload, string $deviceId): array
+    {
+        if (!isset($payload['notification'])) {
+            return [];
+        }
+
+        $n = $payload['notification'];
+        $data = $n['data'] ?? [];
+
+        $type = $n['type'];
+
+        dump($type);
+
+        if ($n['type'] === 'NOW_PLAYING_NET_RADIO') {
+            $dataParsed = $this->parseNetRadio($data);
+            $type = 'now_playing';
+        }
+
+        if ($n['type'] === 'NOW_PLAYING_STORED_MUSIC') {
+            $dataParsed = $this->parseStoredMusic($data);
+            $type = 'now_playing';
+        }
+
+        if ($n['type'] === 'SOURCE') {
+            $dataParsed = $this->parseSource($data);
+            DeviceCache::updateState($deviceId, State::Playing);
+
+            $type = 'now_playing';
+        }
+
+        if ($n['type'] === 'PROGRESS_INFORMATION') {
+            dump($data);
+            $currentPlaying = Cache::get('device_data_'.$deviceId.'_now_playing');
+            if ($currentPlaying !== null && isset($data['position'])) {
+                $currentPlaying['data']['position'] = $data['position'];
+                $currentPlaying['data']['state'] = $data['state'];
+                $dataParsed = $currentPlaying['data'];
+                $type = 'now_playing';
+
+                DeviceCache::updateState($deviceId, State::Playing);
+
+            }
+        }
+
+        if ($n['type'] === 'NOW_PLAYING_ENDED') {
+            Cache::forget('device_data_'.$deviceId.'_now_playing');
+            $dataParsed = ['state' => 'ended'];
+            $type = 'now_playing_ended';
+
+            DeviceCache::updateState($deviceId, State::Standby);
+        }
+        if ($n['type'] === 'VOLUME') {
+            Volume::updateVolume($deviceId, $data['speaker']['level']);
+        }
+
+        return [
+            'id' => $n['id'] ?? null,
+            'timestamp' => $n['timestamp'] ?? null,
+            'type' => $type ?? null,
+            'kind' => $n['kind'] ?? null,
+            'data' => $dataParsed ?? [],
+        ];
+    }
+
+    public function parseNetRadio(array $payload): array
+    {
+        $radio = new Radio(name: $payload['name'], images: $payload['image']);
+
+        if (str_contains($payload['liveDescription'], ' - ')) {
+            $artist = new Artist(name: explode(' - ', $payload['liveDescription'])[0]);
+
+            $track = new Track(
+                name: explode(' - ', $payload['liveDescription'])[1],
+                artist: $artist,
+                images: $payload['image']
+            );
+
+            $nowPlaying = new NowPlaying(
+                track: $track,
+                artist: $artist,
+                type: 'music',
+                platform: 'radio',
+                radio: $radio,
+            );
+        } else {
+            $nowPlaying = new NowPlaying(
+                track: new Track(
+                    name: $payload['liveDescription'], images: $payload['image']
+                ),
+                radio: $radio
+            );
+        }
+
+        return $nowPlaying->toArray();
+
+    }
+
+    public function parseStoredMusic(array $payload)
+    {
+
+        $artist = new Artist(name: $payload['artist']);
+        $album = new Album(name: $payload['album'], images: $payload['albumImage'], artist: $artist);
+        $track = new Track(
+            name: $payload['name'],
+            artist: $artist,
+            duration: $payload['duration'],
+            images: $payload['trackImage'],
+            meta: ['spotifyId' => urldecode($payload['trackId'])]
+        );
+
+        $nowPlaying = new NowPlaying(
+            track: $track,
+            artist: $artist,
+            album: $album,
+            type: 'music',
+            platform: 'media',
+
+        );
+
+        return $nowPlaying->toArray();
+    }
+
+    private function parseSource(mixed $data)
+    {
+        $source = new Source(
+            name: $data['primaryExperience']['source']['friendlyName'],
+            category: $data['primaryExperience']['source']['category'],
+            jid: $data['primaryExperience']['source']['id'],
+            sourceType: $data['primaryExperience']['source']['sourceType']['type'],
+            connector: $data['primaryExperience']['source']['sourceType']['connector'],
+        );
+
+        $nowPlaying = new NowPlaying(
+            type: 'video',
+            platform: 'media',
+            source: $source
+        );
+
+        return $nowPlaying->toArray();
+
+    }
+}
