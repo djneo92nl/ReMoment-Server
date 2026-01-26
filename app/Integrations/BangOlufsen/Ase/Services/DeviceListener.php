@@ -10,7 +10,9 @@ use App\Domain\Media\NowPlaying;
 use App\Domain\Media\Radio;
 use App\Domain\Media\Source;
 use App\Domain\Media\Track;
+use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
+use App\Events\Device\ProgressUpdated;
 use App\Events\Device\VolumeUpdated;
 use GuzzleHttp\Client;
 
@@ -104,25 +106,23 @@ class DeviceListener
                 event(new NowPlayingEnded(deviceId: $deviceId));
                 break;
             case 'VOLUME':
-                event(new VolumeUpdated(deviceId: $deviceId, data: $data));
+                event(new VolumeUpdated(deviceId: $deviceId, volume: $data['speaker']['level']));
                 break;
             case 'SOURCE':
                 if ($data === []) {
                     event(new NowPlayingEnded(deviceId: $deviceId));
                 } else {
-                    $dataParsed = $this->parseSource($data);
                     event(new NowPlayingUpdated(
                         deviceId: $deviceId,
-                        nowPlaying: $this->parseStoredMusic($data),
+                        nowPlaying: $this->parseSource($data),
                         sourceType: 'media',
                         timestamp: $n['timestamp'] ?? null
                     ));
-                    $type = 'now_playing';
                 }
                 break;
             case 'PROGRESS_INFORMATION':
-                $currentPlaying['data']['position'] = $data['position'];
-                $currentPlaying['data']['state'] = $data['state'];
+                // $currentPlaying['data']['position'] = $data['position'];
+                event(new ProgressUpdated(deviceId: $deviceId, progress: $data['position']));
                 break;
         }
     }
