@@ -35,47 +35,65 @@ class DeviceListener
     public function listen(string $deviceId)
     {
         $cacheKey = "listener_running_{$deviceId}";
-        cache()->put($cacheKey, true, now()->addSeconds(10));
+        $retryDelaySeconds = 1;
+        $maxRetryDelaySeconds = 30;
 
-        $response = $this->http->get($this->url, ['stream' => true]);
-        $body = $response->getBody();
-
-        $buffer = '';
-
-        while (!$body->eof()) {
-            $chunk = $body->read(1024);
-
-            if ($chunk === '') {
-                usleep(100000);
-
-                continue;
-            }
-
-            $buffer .= $chunk;
-
-            // Notifications are separated by \r\n\r\n (empty line)
-            while (strpos($buffer, "\r\n\r\n") !== false) {
-                [$json, $buffer] = explode("\r\n\r\n", $buffer, 2);
-
-                $json = trim($json);
-
-                if ($json === '') {
-                    continue;
-                }
-
-                $decoded = json_decode($json, true);
-
-                if ($decoded !== null) {
-                    $parsed = $this->applyNotification($decoded, $deviceId);
-                }
-            }
-
+        while (true) {
             cache()->put($cacheKey, true, now()->addSeconds(10));
-        }
 
-        cache()->forget($cacheKey);
-        DeviceCache::updateState($deviceId, State::Unreachable);
-        $this->listen($deviceId);
+            $hadError = false;
+
+            try {
+                $response = $this->http->get($this->url, ['stream' => true]);
+                $body = $response->getBody();
+
+                $buffer = '';
+
+                while (!$body->eof()) {
+                    $chunk = $body->read(1024);
+
+                    if ($chunk === '') {
+                        usleep(100000);
+
+                        continue;
+                    }
+
+                    $buffer .= $chunk;
+
+                    // Notifications are separated by \r\n\r\n (empty line)
+                    while (strpos($buffer, "\r\n\r\n") !== false) {
+                        [$json, $buffer] = explode("\r\n\r\n", $buffer, 2);
+
+                        $json = trim($json);
+
+                        if ($json === '') {
+                            continue;
+                        }
+
+                        $decoded = json_decode($json, true);
+
+                        if ($decoded !== null) {
+                            $this->applyNotification($decoded, $deviceId);
+                        }
+                    }
+
+                    cache()->put($cacheKey, true, now()->addSeconds(10));
+                }
+            } catch (\Throwable $e) {
+                $hadError = true;
+            } finally {
+                cache()->forget($cacheKey);
+                DeviceCache::updateState($deviceId, State::Unreachable);
+            }
+
+            if ($hadError) {
+                $retryDelaySeconds = min($retryDelaySeconds * 2, $maxRetryDelaySeconds);
+            } else {
+                $retryDelaySeconds = 1;
+            }
+
+            sleep($retryDelaySeconds);
+        }
 
     }
 
