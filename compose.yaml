@@ -58,6 +58,18 @@ services:
                 - 'http://127.0.0.1:7700/health'
             retries: 3
             timeout: 5s
+    mosquitto:
+        image: eclipse-mosquitto:2
+        ports:
+            - '1883:1883'
+            - '9001:9001' # optional WebSocket support
+        volumes:
+            - './docker/mosquitto/config:/mosquitto/config'
+            - 'sail-mosquitto-data:/mosquitto/data'
+            - 'sail-mosquitto-log:/mosquitto/log'
+        networks:
+            - sail
+
 networks:
     sail:
         driver: bridge
@@ -65,4 +77,8 @@ volumes:
     sail-redis:
         driver: local
     sail-meilisearch:
+        driver: local
+    sail-mosquitto-data:
+        driver: local
+    sail-mosquitto-log:
         driver: local

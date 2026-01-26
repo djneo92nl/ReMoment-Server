@@ -1,7 +1,7 @@
 <div wire:poll.1s>
     @if($device->state !== \App\Domain\Device\State::Unreachable)
-        <div class="grid grid-flow-col min-w-32 grid-rows-3 gap-4">
-            <div class="row-span-3">
+        <div class="grid grid-flow-col min-w-full grid-rows-3 ml-2 gap-4">
+            <div class="row-span-3 text-slate-400">
                 <table>
                     {{--                    <caption class="caption-bottom">--}}
                     {{--                        Meta info--}}
@@ -27,9 +27,12 @@
 
                 </table>
 
-                <div class="volume">
-                    🔊 Volume: {{ $volume }}
-                    <input type="range" min="0" max="100" wire:model="volume">
+                <div class="mt-4 flex items-center gap-4">
+                    <span class="text-xs text-slate-400">Vol</span>
+
+                    <input type="range" min="0" max="100"
+                           class="h-1 w-48 appearance-none rounded-full bg-slate-200 accent-slate-800"
+                           wire:model="volume">
                 </div>
             </div>
 
@@ -38,80 +41,97 @@
 
             </div>
 
-            <div class="flex items-center col-span-2 row-span-2 min-w-full w-full space-x-6 p-6 bg-gray-600 rounded-xl shadow-lg">
+            <div class="flex items-center gap-8 col-span-2 row-span-2 min-w-full rounded-2xl bg-slate-100 px-8 py-6">
 
                 @if($device->state !== \App\Domain\Device\State::Standby)
 
-                    @if(isset($nowPlaying['type']) &&  $nowPlaying['type'] === 'music')
-                        <img src="{{  $nowPlaying['track']['images'][0]['url'] }}" alt="Album Cover" class="w-40 h-40 mr-2 rounded-lg object-cover">
-                        <div class="flex flex-col space-y-3 w-full">
-                            <div>
-                                <h1 class="text-3xl font-semibold">{{ $nowPlaying['track']['name'] }}</h1>
-                                @isset($nowPlaying['artist'])<p class="text-gray-300 text-lg">{{ $nowPlaying['artist']['name'] }}</p>@endisset
-                                @isset($nowPlaying['album'])<p  class="text-gray-500">{{ $nowPlaying['album']['name'] }}</p>@endisset
-                                @isset($nowPlaying['radio'])<p  class="text-gray-500">{{ $nowPlaying['radio']['name'] }}</p>@endisset
-                            </div>
-                            @if(isset($nowPlaying['radio']))
-                                <div>
-                                    <div class="w-full h-1 bg-gray-700 rounded-full">
-                                        <div class="h-1 bg-white rounded-full" style="width:100%"></div>
-                                    </div>
-                                    <div class="flex justify-end text-sm  text-gray-400 mt-1">
-                                        <span class="">{{ \App\Domain\Helpers\TimeHelper::class::secondsToMinutes($nowPlaying['position'])  }}</span>
-                                    </div>
-                                </div>
-                            @else
-                                <div>
-                                    <div class="w-full h-1 bg-gray-700 rounded-full">
-                                        <div class="h-1 bg-white rounded-full" style="width:{{(int)( (   $nowPlaying['position'] / $nowPlaying['track']['duration'] ) *100 ) }}%"></div>
-                                    </div>
-                                    <div class="flex justify-between text-sm text-gray-400 mt-1">
-                                        <span>{{ \App\Domain\Helpers\TimeHelper::class::secondsToMinutes($nowPlaying['position'])  }}</span>
-                                        <span>{{ \App\Domain\Helpers\TimeHelper::class::secondsToMinutes($nowPlaying['track']['duration'])  }}</span>
-                                    </div>
-                                </div>
-                            @endif
+                    @if(isset($nowPlaying['type']) && $nowPlaying['type'] === 'music')
 
-                            @isset($nowPlaying['state'])
-                                <div class="flex justify-center space-x-6 mt-2">
-                                    <button wire:click="previous" class="material-icons text-4xl text-gray-300 hover:text-white">  ⏮️</button>
-                                    @if($nowPlaying['state'] === 'pause')
-                                        <button wire:click="play" class="material-icons text-5xl text-white hover:text-gray-300"> ▶️ </button>
-                                    @else
-                                        <button wire:click="pause" class="material-icons text-5xl text-white hover:text-gray-300"> ⏸️ </button>
-                                    @endif
-                                    <button  wire:click="next" class="material-icons text-4xl text-gray-300 hover:text-white">⏭️</button>
-                                </div>
-                            @endisset
-                        </div>
-                    @endif
-                    @if(isset($nowPlaying['type']) &&  $nowPlaying['type'] === 'video')
-                        <div class="flex flex-col space-y-3 w-full">
-                            <div>
-                                <h1 class="text-3xl font-semibold">{{ $nowPlaying['source']['name'] }}</h1>
-                                @isset($nowPlaying['source'])<p class="text-gray-300 text-lg">{{ $nowPlaying['source']['sourceType'] }}  {{ $nowPlaying['source']['connector'] }}</p>@endisset
+                        <!-- Artwork -->
+                        <img
+                            src="{{ $nowPlaying['track']['images'][0]['url'] }}"
+                            alt="Album cover"
+                            class="h-20 w-20 rounded-xl object-cover shadow-sm"
+                        >
+
+                        <!-- Track info -->
+                        <div class="flex-1 min-w-0">
+                            <div class="text-base font-medium text-slate-900 truncate">
+                                {{ $nowPlaying['track']['name'] }}
                             </div>
 
-
-                            @isset($nowPlaying['state'])
-                                <div class="flex justify-center space-x-6 mt-2">
-                                    <button wire:click="previous" class="material-icons text-4xl text-gray-300 hover:text-white">  ⏮️</button>
-                                    @if($nowPlaying['state'] === 'pause')
-                                        <button wire:click="play" class="material-icons text-5xl text-white hover:text-gray-300"> ▶️ </button>
-                                    @else
-                                        <button wire:click="pause" class="material-icons text-5xl text-white hover:text-gray-300"> ⏸️ </button>
-                                    @endif
-                                    <button  wire:click="next" class="material-icons text-4xl text-gray-300 hover:text-white">⏭️</button>
+                            @isset($nowPlaying['artist'])
+                                <div class="text-sm text-slate-500 truncate">
+                                    {{ $nowPlaying['artist']['name'] }}
                                 </div>
                             @endisset
+
+                            @isset($nowPlaying['album'])
+                                <div class="text-xs text-slate-400 truncate">
+                                    {{ $nowPlaying['album']['name'] }}
+                                </div>
+                            @endisset
+
+                            <!-- Progress -->
+                            <div class="mt-3">
+                                <div class="h-[2px] w-full bg-slate-300">
+                                    <div
+                                        class="h-[2px]  bg-slate-800"
+                                        style="width:{{ (int)(($nowPlaying['position'] / $nowPlaying['track']['duration']) * 100) }}%"
+                                    ></div>
+                                </div>
+
+                                <div class="mt-1 flex justify-between text-[11px] text-slate-400">
+                                    <span>
+                                        {{ \App\Domain\Helpers\TimeHelper::secondsToMinutes($nowPlaying['position']) }}
+                                    </span>
+                                    <span>
+                                        {{ \App\Domain\Helpers\TimeHelper::secondsToMinutes($nowPlaying['track']['duration']) }}
+                                    </span>
+                                </div>
+                            </div>
                         </div>
+
+                        <!-- Controls -->
+                        @isset($nowPlaying['state'])
+                            <div class="flex items-center gap-4">
+                                <button
+                                    wire:click="previous"
+                                    class="h-10 w-10 rounded-full bg-white shadow-sm transition hover:scale-105"
+                                >
+                                    ⏮
+                                </button>
+
+                                @if($nowPlaying['state'] === 'pause')
+                                    <button
+                                        wire:click="play"
+                                        class="h-12 w-12 rounded-full bg-white shadow transition hover:scale-105"
+                                    >
+                                        ▶
+                                    </button>
+                                @else
+                                    <button
+                                        wire:click="pause"
+                                        class="h-12 w-12 rounded-full bg-white shadow transition hover:scale-105"
+                                    >
+                                        ⏸
+                                    </button>
+                                @endif
+
+                                <button
+                                    wire:click="next"
+                                    class="h-10 w-10 rounded-full bg-white shadow-sm transition hover:scale-105"
+                                >
+                                    ⏭
+                                </button>
+                            </div>
+                        @endisset
+
                     @endif
                 @endif
-
-
             </div>
         </div>
     @else
         <h3 class="text-gray-900 dark:text-white text-base font-medium tracking-tight ">{{$device->device_name}} {{$device->id}}</h3>
-
-    @endif</div>
+    @endif
+</div>

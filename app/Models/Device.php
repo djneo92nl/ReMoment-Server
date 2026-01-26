@@ -64,8 +64,9 @@ class Device extends Model
         $this->driver = $driver;
     }
 
-    public function getDriverAttribute(): MusicPlayerDriverInterface
+    public function getDriverAttribute()
     {
+
         if ($this->driver === null) {
             $this->loadDriver();
         }

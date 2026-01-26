@@ -2,7 +2,6 @@
 
 namespace App\Integrations\BangOlufsen\Ase\Services;
 
-use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
 use App\Domain\Media\Album;
@@ -11,8 +10,9 @@ use App\Domain\Media\NowPlaying;
 use App\Domain\Media\Radio;
 use App\Domain\Media\Source;
 use App\Domain\Media\Track;
+use App\Events\Device\NowPlayingUpdated;
+use App\Events\Device\VolumeUpdated;
 use GuzzleHttp\Client;
-use Illuminate\Support\Facades\Cache;
 
 class DeviceListener
 {
@@ -64,8 +64,7 @@ class DeviceListener
                 $decoded = json_decode($json, true);
 
                 if ($decoded !== null) {
-                    $parsed = $this->parseNotification($decoded, $deviceId);
-                    cache()->put("device_data_{$deviceId}_{$parsed['type']}", $parsed);
+                    $parsed = $this->applyNotification($decoded, $deviceId);
                 }
             }
 
@@ -78,71 +77,57 @@ class DeviceListener
 
     }
 
-    protected function parseNotification(array $payload, string $deviceId): array
+    protected function applyNotification(array $payload, string $deviceId): void
     {
-        if (!isset($payload['notification'])) {
-            return [];
-        }
-
         $n = $payload['notification'];
         $data = $n['data'] ?? [];
 
-        $type = $n['type'];
+        switch ($n['type']) {
+            case 'NOW_PLAYING_NET_RADIO':
+                event(new NowPlayingUpdated(
+                    deviceId: $deviceId,
+                    nowPlaying: $this->parseNetRadio($data),
+                    sourceType: 'radio',
+                    timestamp: $n['timestamp'] ?? null
+                ));
+                break;
 
-        dump($type);
-
-        if ($n['type'] === 'NOW_PLAYING_NET_RADIO') {
-            $dataParsed = $this->parseNetRadio($data);
-            $type = 'now_playing';
-        }
-
-        if ($n['type'] === 'NOW_PLAYING_STORED_MUSIC') {
-            $dataParsed = $this->parseStoredMusic($data);
-            $type = 'now_playing';
-        }
-
-        if ($n['type'] === 'SOURCE') {
-            $dataParsed = $this->parseSource($data);
-            DeviceCache::updateState($deviceId, State::Playing);
-
-            $type = 'now_playing';
-        }
-
-        if ($n['type'] === 'PROGRESS_INFORMATION') {
-            dump($data);
-            $currentPlaying = Cache::get('device_data_'.$deviceId.'_now_playing');
-            if ($currentPlaying !== null && isset($data['position'])) {
+            case 'NOW_PLAYING_STORED_MUSIC':
+                event(new NowPlayingUpdated(
+                    deviceId: $deviceId,
+                    nowPlaying: $this->parseStoredMusic($data),
+                    sourceType: 'media',
+                    timestamp: $n['timestamp'] ?? null
+                ));
+                break;
+            case 'NOW_PLAYING_ENDED':
+                event(new NowPlayingEnded(deviceId: $deviceId));
+                break;
+            case 'VOLUME':
+                event(new VolumeUpdated(deviceId: $deviceId, data: $data));
+                break;
+            case 'SOURCE':
+                if ($data === []) {
+                    event(new NowPlayingEnded(deviceId: $deviceId));
+                } else {
+                    $dataParsed = $this->parseSource($data);
+                    event(new NowPlayingUpdated(
+                        deviceId: $deviceId,
+                        nowPlaying: $this->parseStoredMusic($data),
+                        sourceType: 'media',
+                        timestamp: $n['timestamp'] ?? null
+                    ));
+                    $type = 'now_playing';
+                }
+                break;
+            case 'PROGRESS_INFORMATION':
                 $currentPlaying['data']['position'] = $data['position'];
                 $currentPlaying['data']['state'] = $data['state'];
-                $dataParsed = $currentPlaying['data'];
-                $type = 'now_playing';
-
-                DeviceCache::updateState($deviceId, State::Playing);
-
-            }
+                break;
         }
-
-        if ($n['type'] === 'NOW_PLAYING_ENDED') {
-            Cache::forget('device_data_'.$deviceId.'_now_playing');
-            $dataParsed = ['state' => 'ended'];
-            $type = 'now_playing_ended';
-
-            DeviceCache::updateState($deviceId, State::Standby);
-        }
-        if ($n['type'] === 'VOLUME') {
-            Volume::updateVolume($deviceId, $data['speaker']['level']);
-        }
-
-        return [
-            'id' => $n['id'] ?? null,
-            'timestamp' => $n['timestamp'] ?? null,
-            'type' => $type ?? null,
-            'kind' => $n['kind'] ?? null,
-            'data' => $dataParsed ?? [],
-        ];
     }
 
-    public function parseNetRadio(array $payload): array
+    public function parseNetRadio(array $payload): NowPlaying
     {
         $radio = new Radio(name: $payload['name'], images: $payload['image']);
 
@@ -171,13 +156,12 @@ class DeviceListener
             );
         }
 
-        return $nowPlaying->toArray();
+        return $nowPlaying;
 
     }
 
-    public function parseStoredMusic(array $payload)
+    public function parseStoredMusic(array $payload): NowPlaying
     {
-
         $artist = new Artist(name: $payload['artist']);
         $album = new Album(name: $payload['album'], images: $payload['albumImage'], artist: $artist);
         $track = new Track(
@@ -197,17 +181,17 @@ class DeviceListener
 
         );
 
-        return $nowPlaying->toArray();
+        return $nowPlaying;
     }
 
-    private function parseSource(mixed $data)
+    private function parseSource(mixed $data): NowPlaying
     {
         $source = new Source(
             name: $data['primaryExperience']['source']['friendlyName'],
             category: $data['primaryExperience']['source']['category'],
             jid: $data['primaryExperience']['source']['id'],
             sourceType: $data['primaryExperience']['source']['sourceType']['type'],
-            connector: $data['primaryExperience']['source']['sourceType']['connector'],
+            connector: $data['primaryExperience']['source']['sourceType']['connector'] ?? '',
         );
 
         $nowPlaying = new NowPlaying(
@@ -216,7 +200,6 @@ class DeviceListener
             source: $source
         );
 
-        return $nowPlaying->toArray();
-
+        return $nowPlaying;
     }
 }

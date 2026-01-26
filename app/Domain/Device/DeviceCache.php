@@ -2,6 +2,7 @@
 
 namespace App\Domain\Device;
 
+use App\Domain\Media\NowPlaying;
 use Illuminate\Support\Facades\Cache;
 
 final class DeviceCache
@@ -21,6 +22,22 @@ final class DeviceCache
             now(),
             self::TTL
         );
+    }
+
+    public function updateNowPlaying(int $deviceId, NowPlaying $nowPlaying): void
+    {
+        Cache::put(
+            self::nowPlayingKey($deviceId),
+            $nowPlaying,
+            self::TTL
+        );
+    }
+
+    public static function getNowPlaying(int $deviceId): ?NowPlaying
+    {
+        $value = Cache::get(self::nowPlayingKey($deviceId));
+
+        return $value ? State::from($value) : null;
     }
 
     public static function getState(int $deviceId): ?State
@@ -51,5 +68,10 @@ final class DeviceCache
     private static function lastSeenKey(int $deviceId): string
     {
         return "device:{$deviceId}:last_seen";
+    }
+
+    private static function nowPlayingKey(int $deviceId): string
+    {
+        return "device:{$deviceId}:now_playing";
     }
 }

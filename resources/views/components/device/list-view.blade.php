@@ -1,4 +1,4 @@
-<div class="bg-white  dark:bg-gray-800 rounded-lg px-6 py-4 ring shadow-xl ring-gray-900/5">
+<div class="flex items-center gap-8 rounded-2xl min-w-full  bg-white px-8 py-6 m-4 shadow-sm">
     <livewire:nowplaying
         :device="$device"
     />
