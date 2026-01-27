@@ -31,7 +31,7 @@ class AdditionalASEDeviceDiscovery extends Command
 
     /**
      * Execute the console command.
-     * _bangolufsen._tcp.local.
+     * Do note, this now Adds extra devices. but ignores already installed devices. this we need to change
      */
     public function handle()
     {
