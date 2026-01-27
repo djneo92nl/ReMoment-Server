@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Device;
+use App\Models\DeviceMeta;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 
@@ -100,10 +101,17 @@ class DeviceDiscovery extends Command
                 if (array_key_exists($deviceInfo['manufacturer'], config('devices'))) {
 
                     $this->info('found driver');
-                    $device = Device::updateOrCreate([
-                        'uuid' => $deviceInfo['UDN'],
-                    ], [
-                        'uuid' => $deviceInfo['UDN'],
+                    $deviceUuid = $deviceInfo['UDN'] ?? null;
+                    $device = null;
+
+                    if ($deviceUuid) {
+                        $device = Device::whereHas('meta', function ($query) use ($deviceUuid) {
+                            $query->where('key', 'upnp_uuid')
+                                ->where('value', $deviceUuid);
+                        })->first();
+                    }
+
+                    $deviceData = [
                         'ip_address' => $info['ip'],
                         'device_brand_name' => $deviceInfo['manufacturer'],
                         'device_product_type' => $deviceInfo['modelName'],
@@ -111,8 +119,26 @@ class DeviceDiscovery extends Command
                         'device_driver' => config('devices.'.$deviceInfo['manufacturer'].'.'.$deviceInfo['modelName'])['driver'],
                         'device_driver_name' => config('devices.'.$deviceInfo['manufacturer'].'.'.$deviceInfo['modelName'])['driver_name'],
                         'last_seen' => Carbon::now(),
-                    ]
-                    );
+                    ];
+
+                    if ($device) {
+                        $device->fill($deviceData);
+                        $device->save();
+                    } else {
+                        $device = Device::create($deviceData);
+                    }
+
+                    if ($deviceUuid) {
+                        DeviceMeta::updateOrCreate(
+                            [
+                                'device_id' => $device->id,
+                                'key' => 'upnp_uuid',
+                            ],
+                            [
+                                'value' => $deviceUuid,
+                            ]
+                        );
+                    }
 
                 }
             }

@@ -1,0 +1,16 @@
+{
+    "name": "duncan3dc/logger-aware-trait",
+    "type": "library",
+    "description": "Logger aware trait implementation",
+    "license": "Apache-2.0",
+    "require": {
+        "psr/log": "^1.1.3 || ^2.0 || ^3.0",
+        "php": "^7.3 || ^8.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "duncan3dc\\Log\\": "src/"
+        }
+    },
+    "version": "1.0.1"
+}

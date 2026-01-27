@@ -2,172 +2,194 @@
 
 namespace App\Integrations\Sonos\Services;
 
-use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
 use App\Domain\Media\Album;
 use App\Domain\Media\Artist;
 use App\Domain\Media\NowPlaying;
 use App\Domain\Media\Radio;
-use App\Domain\Media\Source;
 use App\Domain\Media\Track;
+use App\Events\Device\NowPlayingEnded;
+use App\Events\Device\NowPlayingUpdated;
+use App\Events\Device\ProgressUpdated;
+use App\Events\Device\VolumeUpdated;
+use duncan3dc\Sonos\Controller;
 use duncan3dc\Sonos\Device;
-use Illuminate\Support\Facades\Cache;
+use duncan3dc\Sonos\Network;
+use duncan3dc\Sonos\State as SonosState;
 
 class DeviceListener
 {
-    public function __construct(Device $device) {}
+    protected Network $network;
+
+    protected ?Controller $controller = null;
+
+    protected int $pollIntervalSeconds = 1;
+
+    public function __construct(protected Device $device, ?Network $network = null)
+    {
+        $this->network = $network ?? new Network();
+    }
 
     public function listen(string $deviceId)
     {
         $cacheKey = "listener_running_{$deviceId}";
-        cache()->put($cacheKey, true, now()->addSeconds(10));
+        $retryDelaySeconds = 1;
+        $maxRetryDelaySeconds = 30;
 
-        cache()->forget($cacheKey);
-        DeviceCache::updateState($deviceId, State::Unreachable);
-        $this->listen($deviceId);
+        $lastNowPlayingKey = null;
+        $lastPositionSeconds = null;
+        $lastVolume = null;
 
-    }
+        while (true) {
+            cache()->put($cacheKey, true, now()->addSeconds(10));
 
-    protected function parseNotification(array $payload, string $deviceId): array
-    {
-        if (!isset($payload['notification'])) {
-            return [];
-        }
+            try {
+                $controller = $this->getController();
 
-        $n = $payload['notification'];
-        $data = $n['data'] ?? [];
+                $state = $controller->getState();
+                $details = $controller->getStateDetails();
+                $volume = $controller->getVolume();
 
-        $type = $n['type'];
+                if ($lastVolume === null || $volume !== $lastVolume) {
+                    event(new VolumeUpdated(deviceId: $deviceId, volume: $volume));
+                    $lastVolume = $volume;
+                }
 
-        dump($type);
+                if ($state === Controller::STATE_STOPPED) {
+                    if ($lastNowPlayingKey !== null) {
+                        event(new NowPlayingEnded(deviceId: $deviceId));
+                        $lastNowPlayingKey = null;
+                        $lastPositionSeconds = null;
+                    }
+                } else {
+                    $nowPlaying = $this->buildNowPlaying($details);
+                    if ($nowPlaying !== null) {
+                        $nowPlayingKey = $this->nowPlayingKey($nowPlaying);
+                        if ($nowPlayingKey !== $lastNowPlayingKey) {
+                            event(new NowPlayingUpdated(
+                                deviceId: $deviceId,
+                                nowPlaying: $nowPlaying,
+                                sourceType: $nowPlaying->platform === 'radio' ? 'radio' : 'media',
+                                timestamp: null
+                            ));
+                            $lastNowPlayingKey = $nowPlayingKey;
+                        }
+                    }
 
-        if ($n['type'] === 'NOW_PLAYING_NET_RADIO') {
-            $dataParsed = $this->parseNetRadio($data);
-            $type = 'now_playing';
-        }
+                    $positionSeconds = $this->toSeconds($details->position ?? '');
+                    if ($positionSeconds !== null && $positionSeconds !== $lastPositionSeconds) {
+                        event(new ProgressUpdated(deviceId: $deviceId, progress: $positionSeconds));
+                        $lastPositionSeconds = $positionSeconds;
+                    }
+                }
 
-        if ($n['type'] === 'NOW_PLAYING_STORED_MUSIC') {
-            $dataParsed = $this->parseStoredMusic($data);
-            $type = 'now_playing';
-        }
+                $retryDelaySeconds = 1;
+                sleep($this->pollIntervalSeconds);
+            } catch (\Throwable $e) {
+                cache()->forget($cacheKey);
+                DeviceCache::updateState($deviceId, State::Unreachable);
+                $this->controller = null;
 
-        if ($n['type'] === 'SOURCE') {
-            $dataParsed = $this->parseSource($data);
-            DeviceCache::updateState($deviceId, State::Playing);
-
-            $type = 'now_playing';
-        }
-
-        if ($n['type'] === 'PROGRESS_INFORMATION') {
-            dump($data);
-            $currentPlaying = Cache::get('device_data_'.$deviceId.'_now_playing');
-            if ($currentPlaying !== null && isset($data['position'])) {
-                $currentPlaying['data']['position'] = $data['position'];
-                $currentPlaying['data']['state'] = $data['state'];
-                $dataParsed = $currentPlaying['data'];
-                $type = 'now_playing';
-
-                DeviceCache::updateState($deviceId, State::Playing);
-
+                $retryDelaySeconds = min($retryDelaySeconds * 2, $maxRetryDelaySeconds);
+                sleep($retryDelaySeconds);
             }
         }
 
-        if ($n['type'] === 'NOW_PLAYING_ENDED') {
-            Cache::forget('device_data_'.$deviceId.'_now_playing');
-            $dataParsed = ['state' => 'ended'];
-            $type = 'now_playing_ended';
-
-            DeviceCache::updateState($deviceId, State::Standby);
-        }
-        if ($n['type'] === 'VOLUME') {
-            Volume::updateVolume($deviceId, $data['speaker']['level']);
-        }
-
-        return [
-            'id' => $n['id'] ?? null,
-            'timestamp' => $n['timestamp'] ?? null,
-            'type' => $type ?? null,
-            'kind' => $n['kind'] ?? null,
-            'data' => $dataParsed ?? [],
-        ];
     }
 
-    public function parseNetRadio(array $payload): array
+    protected function getController(): Controller
     {
-        $radio = new Radio(name: $payload['name'], images: $payload['image']);
+        if ($this->controller === null) {
+            $this->controller = $this->network->getControllerByIp($this->device->ip);
+        }
 
-        if (str_contains($payload['liveDescription'], ' - ')) {
-            $artist = new Artist(name: explode(' - ', $payload['liveDescription'])[0]);
+        return $this->controller;
+    }
 
+    protected function buildNowPlaying(SonosState $details): ?NowPlaying
+    {
+        $title = trim((string) ($details->title ?? ''));
+        $artistName = trim((string) ($details->artist ?? ''));
+        $albumName = trim((string) ($details->album ?? ''));
+        $streamName = trim((string) ($details->stream ?? ''));
+        $albumArt = trim((string) ($details->albumArt ?? ''));
+        $images = $albumArt !== '' ? [$albumArt] : [];
+
+        if ($title === '' && $streamName === '') {
+            return null;
+        }
+
+        $durationSeconds = $this->toSeconds($details->duration ?? '');
+        $positionSeconds = $this->toSeconds($details->position ?? '');
+
+        if ($streamName !== '') {
+            $radio = new Radio(name: $streamName, images: $images);
+            $artist = $artistName !== '' ? new Artist(name: $artistName) : null;
             $track = new Track(
-                name: explode(' - ', $payload['liveDescription'])[1],
+                name: $title !== '' ? $title : $streamName,
                 artist: $artist,
-                images: $payload['image']
+                duration: $durationSeconds,
+                images: $images
             );
-
             $nowPlaying = new NowPlaying(
                 track: $track,
                 artist: $artist,
+                position: $positionSeconds,
                 type: 'music',
                 platform: 'radio',
                 radio: $radio,
             );
         } else {
+            $artist = $artistName !== '' ? new Artist(name: $artistName) : null;
+            $album = $albumName !== '' ? new Album(name: $albumName, images: $images, artist: $artist) : null;
             $nowPlaying = new NowPlaying(
                 track: new Track(
-                    name: $payload['liveDescription'], images: $payload['image']
+                    name: $title,
+                    artist: $artist,
+                    duration: $durationSeconds,
+                    images: $images
                 ),
-                radio: $radio
+                artist: $artist,
+                album: $album,
+                position: $positionSeconds,
+                type: 'music',
+                platform: 'media'
             );
         }
 
-        return $nowPlaying->toArray();
-
+        return $nowPlaying;
     }
 
-    public function parseStoredMusic(array $payload)
+    protected function nowPlayingKey(NowPlaying $nowPlaying): string
     {
-
-        $artist = new Artist(name: $payload['artist']);
-        $album = new Album(name: $payload['album'], images: $payload['albumImage'], artist: $artist);
-        $track = new Track(
-            name: $payload['name'],
-            artist: $artist,
-            duration: $payload['duration'],
-            images: $payload['trackImage'],
-            meta: ['spotifyId' => urldecode($payload['trackId'])]
-        );
-
-        $nowPlaying = new NowPlaying(
-            track: $track,
-            artist: $artist,
-            album: $album,
-            type: 'music',
-            platform: 'media',
-
-        );
-
-        return $nowPlaying->toArray();
+        return md5(json_encode([
+            'track' => $nowPlaying->track?->name,
+            'artist' => $nowPlaying->artist?->name,
+            'album' => $nowPlaying->album?->name,
+            'radio' => $nowPlaying->radio?->name,
+            'source' => $nowPlaying->source?->name,
+            'type' => $nowPlaying->type,
+            'platform' => $nowPlaying->platform,
+        ]));
     }
 
-    private function parseSource(mixed $data)
+    protected function toSeconds(string $value): ?int
     {
-        $source = new Source(
-            name: $data['primaryExperience']['source']['friendlyName'],
-            category: $data['primaryExperience']['source']['category'],
-            jid: $data['primaryExperience']['source']['id'],
-            sourceType: $data['primaryExperience']['source']['sourceType']['type'],
-            connector: $data['primaryExperience']['source']['sourceType']['connector'],
-        );
+        $value = trim($value);
+        if ($value === '') {
+            return null;
+        }
 
-        $nowPlaying = new NowPlaying(
-            type: 'video',
-            platform: 'media',
-            source: $source
-        );
+        $parts = array_map('intval', explode(':', $value));
+        if (count($parts) === 3) {
+            return ($parts[0] * 3600) + ($parts[1] * 60) + $parts[2];
+        }
 
-        return $nowPlaying->toArray();
+        if (count($parts) === 2) {
+            return ($parts[0] * 60) + $parts[1];
+        }
 
+        return is_numeric($value) ? (int) $value : null;
     }
 }

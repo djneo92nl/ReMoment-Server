@@ -6,6 +6,8 @@ use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\DeviceMeta;
 
 /**
  * $params
@@ -18,7 +20,6 @@ class Device extends Model
 
     public $fillable = [
         'ip_address',
-        'uuid',
         'device_brand_name',
         'device_product_type',
         'device_name',
@@ -32,7 +33,6 @@ class Device extends Model
         return [
             'id' => $this->id,
             'ip_address' => $this->ip_address,
-            'uuid' => $this->uuid,
             'device_name' => $this->device_name,
             'device_brand_name' => $this->device_brand_name ?? '',
             'device_driver_name' => $this->device_driver_name ?? '',
@@ -89,5 +89,10 @@ class Device extends Model
 
         return false;
 
+    }
+
+    public function meta(): HasMany
+    {
+        return $this->hasMany(DeviceMeta::class);
     }
 }
