@@ -35,7 +35,8 @@ return new class extends Migration
 
         Schema::create('tracks', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('album_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('album_id')->nullable()->constrained()->cascadeOnDelete();
+            $table->foreignId('artist_id')->nullable()->constrained()->cascadeOnDelete();
             $table->string('external_id')->nullable(); // spotify id, etc
             $table->string('name');
             $table->integer('duration')->nullable();

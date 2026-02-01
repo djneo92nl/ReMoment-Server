@@ -2,8 +2,8 @@
 
 namespace Tests\Unit;
 
-use App\Integrations\Sonos\Services\DeviceListener;
 use App\Domain\Media\NowPlaying;
+use App\Integrations\Sonos\Services\DeviceListener;
 use duncan3dc\Sonos\Device;
 use duncan3dc\Sonos\Network;
 use duncan3dc\Sonos\State as SonosState;
@@ -26,7 +26,7 @@ class SonosDeviceListenerTest extends TestCase
     {
         $listener = $this->makeListener();
 
-        $state = new SonosState("x-rincon-mp3radio://example");
+        $state = new SonosState('x-rincon-mp3radio://example');
         $state->stream = 'Station Name';
         $state->title = 'Track Name';
         $state->artist = 'Artist Name';
@@ -51,7 +51,7 @@ class SonosDeviceListenerTest extends TestCase
     {
         $listener = $this->makeListener();
 
-        $state = new SonosState("x-file-cifs://example");
+        $state = new SonosState('x-file-cifs://example');
         $state->stream = '';
         $state->title = 'Track Name';
         $state->artist = 'Artist Name';
@@ -77,7 +77,7 @@ class SonosDeviceListenerTest extends TestCase
     {
         $listener = $this->makeListener();
 
-        $state = new SonosState("x-file-cifs://example");
+        $state = new SonosState('x-file-cifs://example');
         $state->stream = '';
         $state->title = '';
 

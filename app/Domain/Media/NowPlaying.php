@@ -13,7 +13,7 @@ class NowPlaying
         public ?Artist $artist = null,
         public ?Album $album = null,
         public ?string $state = null,
-        public ?int $position = 0,
+        public int $position = 0,
         public ?string $type = null,
         public ?string $platform = null,
         public ?Radio $radio = null,

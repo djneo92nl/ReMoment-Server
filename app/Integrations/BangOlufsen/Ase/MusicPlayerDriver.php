@@ -2,6 +2,8 @@
 
 namespace App\Integrations\BangOlufsen\Ase;
 
+use App\Domain\Device\DeviceCache;
+use App\Domain\Device\State;
 use App\Integrations\BangOlufsen\Ase\Connectors\DeviceControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\MediaControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\VolumeControls;
@@ -10,7 +12,6 @@ use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
-use Illuminate\Support\Facades\Cache;
 
 class MusicPlayerDriver implements MediaControlsInterface, MusicPlayerDriverInterface, VolumeControlInterface
 {
@@ -32,19 +33,10 @@ class MusicPlayerDriver implements MediaControlsInterface, MusicPlayerDriverInte
 
     public function getCurrentPlayingAttribute(): array
     {
-        // Check if Listener is running
-        $cacheKey = "listener_running_{$this->device->id}";
-
-        if (!cache()->has($cacheKey)) {
+        if (DeviceCache::getState($this->device->id) === State::Unreachable) {
             return [];
         }
 
-        if (!cache()->has('device_data_'.$this->device->id.'_now_playing')) {
-            return [];
-        }
-
-        $data = Cache::get('device_data_'.$this->device->id.'_now_playing');
-
-        return $data['data'];
+        return DeviceCache::getNowPlaying($this->device->id)->toArray() ?? [];
     }
 }

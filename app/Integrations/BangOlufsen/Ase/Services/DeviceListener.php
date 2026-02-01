@@ -55,7 +55,7 @@ class DeviceListener
                     if ($chunk === '') {
                         usleep(100000);
 
-                        continue;
+                        // continue;
                     }
 
                     $buffer .= $chunk;
@@ -71,7 +71,6 @@ class DeviceListener
                         }
 
                         $decoded = json_decode($json, true);
-
                         if ($decoded !== null) {
                             $this->applyNotification($decoded, $deviceId);
                         }
@@ -80,6 +79,7 @@ class DeviceListener
                     cache()->put($cacheKey, true, now()->addSeconds(10));
                 }
             } catch (\Throwable $e) {
+                dump($e->getMessage());
                 $hadError = true;
             } finally {
                 cache()->forget($cacheKey);
@@ -108,7 +108,6 @@ class DeviceListener
                     deviceId: $deviceId,
                     nowPlaying: $this->parseNetRadio($data),
                     sourceType: 'radio',
-                    timestamp: $n['timestamp'] ?? null
                 ));
                 break;
 
@@ -117,11 +116,11 @@ class DeviceListener
                     deviceId: $deviceId,
                     nowPlaying: $this->parseStoredMusic($data),
                     sourceType: 'media',
-                    timestamp: $n['timestamp'] ?? null
                 ));
                 break;
             case 'NOW_PLAYING_ENDED':
                 event(new NowPlayingEnded(deviceId: $deviceId));
+
                 break;
             case 'VOLUME':
                 event(new VolumeUpdated(deviceId: $deviceId, volume: $data['speaker']['level']));
@@ -134,7 +133,6 @@ class DeviceListener
                         deviceId: $deviceId,
                         nowPlaying: $this->parseSource($data),
                         sourceType: 'media',
-                        timestamp: $n['timestamp'] ?? null
                     ));
                 }
                 break;
@@ -182,12 +180,29 @@ class DeviceListener
     {
         $artist = new Artist(name: $payload['artist']);
         $album = new Album(name: $payload['album'], images: $payload['albumImage'], artist: $artist);
+        $source = null;
+        $meta = [];
+        $trackId = urldecode($payload['trackId']);
+        if (str_contains($trackId, 'spotify:')) {
+            $source = 'spotify';
+            $meta[] = ['spotifyId' => $trackId];
+        }
+
+        if (isset($payload['sampleRate'])) {
+            $meta[] = ['sampleRate' => $payload['sampleRate']];
+        }
+
+        if (isset($payload['bitDepth'])) {
+            $meta[] = ['bitDepth' => $payload['bitDepth']];
+        }
+
         $track = new Track(
             name: $payload['name'],
+            source: $source,
             artist: $artist,
             duration: $payload['duration'],
             images: $payload['trackImage'],
-            meta: ['spotifyId' => urldecode($payload['trackId'])]
+            meta: $meta
         );
 
         $nowPlaying = new NowPlaying(

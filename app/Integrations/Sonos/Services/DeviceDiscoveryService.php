@@ -13,7 +13,7 @@ class DeviceDiscoveryService
 {
     public function __construct(private ?Network $network = null)
     {
-        $this->network = $network ?? new Network();
+        $this->network = $network ?? new Network;
     }
 
     /**

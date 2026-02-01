@@ -28,7 +28,7 @@ class DeviceListener
 
     public function __construct(protected Device $device, ?Network $network = null)
     {
-        $this->network = $network ?? new Network();
+        $this->network = $network ?? new Network;
     }
 
     public function listen(string $deviceId)

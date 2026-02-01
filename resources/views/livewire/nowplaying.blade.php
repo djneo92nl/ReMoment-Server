@@ -1,4 +1,5 @@
 <div wire:poll.1s>
+    @dump($device->state)
     @if($device->state !== \App\Domain\Device\State::Unreachable)
         <div class="grid grid-flow-col min-w-full grid-rows-3 ml-2 gap-4">
             <div class="row-span-3 text-slate-400">

@@ -24,6 +24,11 @@ final class DeviceCache
         );
     }
 
+    public static function forgetNowPlaying(int $deviceId)
+    {
+        Cache::forget(self::nowPlayingKey($deviceId));
+    }
+
     public function updateNowPlaying(int $deviceId, NowPlaying $nowPlaying): void
     {
         Cache::put(
@@ -37,7 +42,7 @@ final class DeviceCache
     {
         $value = Cache::get(self::nowPlayingKey($deviceId));
 
-        return $value ? State::from($value) : null;
+        return $value ? $value : null;
     }
 
     public static function getState(int $deviceId): ?State
