@@ -14,11 +14,13 @@
         "ext-sockets": "*",
         "aerni/laravel-spotify": "^3.0",
         "clue/mdns-react": "~0.2.0",
-        "duncan3dc/sonos": "^2.3",
+        "duncan3dc/sonos": "dev-laravel12",
+        "jwilsson/spotify-web-api-php": "^7.0",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
         "livewire/livewire": "^3.7",
-        "mikealmond/musicbrainz": "^0.2.2"
+        "mikealmond/musicbrainz": "^0.2.2",
+        "php-mqtt/client": "^2.3"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

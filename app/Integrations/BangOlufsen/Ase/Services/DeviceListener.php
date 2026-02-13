@@ -138,7 +138,7 @@ class DeviceListener
                 break;
             case 'PROGRESS_INFORMATION':
                 // $currentPlaying['data']['position'] = $data['position'];
-                event(new ProgressUpdated(deviceId: $deviceId, progress: $data['position']));
+                event(new ProgressUpdated(deviceId: $deviceId, progress: $data['position'] ?? 0));
                 break;
         }
     }

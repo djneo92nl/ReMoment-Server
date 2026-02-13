@@ -5,6 +5,8 @@ namespace App\Providers;
 use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
 use App\Events\Device\ProgressUpdated;
+use App\Listeners\Device\PublishNowPlayingToMqtt;
+use App\Listeners\Device\PublishProgressToMqtt;
 use App\Listeners\Device\StorePlaybackHistory;
 use App\Listeners\Device\UpdateDeviceCache;
 use Illuminate\Support\Facades\Event;
@@ -27,8 +29,10 @@ class AppServiceProvider extends ServiceProvider
     {
         Event::listen(NowPlayingUpdated::class, [UpdateDeviceCache::class, 'handle']);
         Event::listen(NowPlayingUpdated::class, [StorePlaybackHistory::class, 'handle']);
+        Event::listen(NowPlayingUpdated::class, PublishNowPlayingToMqtt::class);
 
         Event::listen(ProgressUpdated::class, UpdateDeviceCache::class);
+        Event::listen(ProgressUpdated::class, PublishProgressToMqtt::class);
         Event::listen(NowPlayingEnded::class, UpdateDeviceCache::class);
     }
 }
