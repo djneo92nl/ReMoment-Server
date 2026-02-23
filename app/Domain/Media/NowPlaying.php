@@ -9,9 +9,8 @@ class NowPlaying
     public Carbon $endTime;
 
     public function __construct(
-        public ?track $track = null,
-        public ?Artist $artist = null,
-        public ?Album $album = null,
+        public ?TrackData $track = null,
+        public ?AlbumData $album = null,
         public ?string $state = null,
         public int $position = 0,
         public ?string $type = null,
@@ -33,7 +32,6 @@ class NowPlaying
 
         return array_filter([
             'track' => $this->track?->toArray(),
-            'artist' => $this->artist?->toArray(),
             'album' => $this->album?->toArray(),
             'radio' => $this->radio?->toArray(),
             'source' => $this->source?->toArray(),

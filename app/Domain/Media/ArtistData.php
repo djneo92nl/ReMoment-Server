@@ -2,12 +2,11 @@
 
 namespace App\Domain\Media;
 
-class Album
+class ArtistData
 {
     public function __construct(
         public ?string $name = null,
-        public array $images = [],
-        public ?Artist $artist = null
+        public ?array $images = null
     ) {}
 
     public function toArray(): array
@@ -15,7 +14,6 @@ class Album
         return array_filter([
             'name' => $this->name,
             'images' => $this->images,
-            'artist' => $this->artist?->toArray(),
         ], fn ($value) => $value !== null);
     }
 }

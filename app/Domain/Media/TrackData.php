@@ -2,13 +2,13 @@
 
 namespace App\Domain\Media;
 
-class Track
+class TrackData
 {
     public function __construct(
         public ?string $id = null,
         public ?string $name = null,
         public ?string $source = null,
-        public ?Artist $artist = null,
+        public ?ArtistData $artist = null,
         public ?int $duration = null,   // seconds
         public array $images = [],        // URLs
         public array $meta = []        // URLs

@@ -4,12 +4,12 @@ namespace App\Integrations\BangOlufsen\Ase\Services;
 
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
-use App\Domain\Media\Album;
-use App\Domain\Media\Artist;
+use App\Domain\Media\AlbumData;
+use App\Domain\Media\ArtistData;
 use App\Domain\Media\NowPlaying;
 use App\Domain\Media\Radio;
 use App\Domain\Media\Source;
-use App\Domain\Media\Track;
+use App\Domain\Media\TrackData;
 use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
 use App\Events\Device\ProgressUpdated;
@@ -148,9 +148,9 @@ class DeviceListener
         $radio = new Radio(name: $payload['name'], images: $payload['image']);
 
         if (str_contains($payload['liveDescription'], ' - ')) {
-            $artist = new Artist(name: explode(' - ', $payload['liveDescription'])[0]);
+            $artist = new ArtistData(name: explode(' - ', $payload['liveDescription'])[0]);
 
-            $track = new Track(
+            $track = new TrackData(
                 name: explode(' - ', $payload['liveDescription'])[1],
                 artist: $artist,
                 images: $payload['image']
@@ -158,14 +158,13 @@ class DeviceListener
 
             $nowPlaying = new NowPlaying(
                 track: $track,
-                artist: $artist,
                 type: 'music',
                 platform: 'radio',
                 radio: $radio,
             );
         } else {
             $nowPlaying = new NowPlaying(
-                track: new Track(
+                track: new TrackData(
                     name: $payload['liveDescription'], images: $payload['image']
                 ),
                 radio: $radio
@@ -178,8 +177,8 @@ class DeviceListener
 
     public function parseStoredMusic(array $payload): NowPlaying
     {
-        $artist = new Artist(name: $payload['artist']);
-        $album = new Album(name: $payload['album'], images: $payload['albumImage'], artist: $artist);
+        $artist = new ArtistData(name: $payload['artist']);
+        $album = new AlbumData(name: $payload['album'], images: $payload['albumImage'], artist: $artist);
         $source = null;
         $meta = [];
         $trackId = urldecode($payload['trackId']);
@@ -196,7 +195,7 @@ class DeviceListener
             $meta[] = ['bitDepth' => $payload['bitDepth']];
         }
 
-        $track = new Track(
+        $track = new TrackData(
             name: $payload['name'],
             source: $source,
             artist: $artist,
@@ -207,11 +206,9 @@ class DeviceListener
 
         $nowPlaying = new NowPlaying(
             track: $track,
-            artist: $artist,
             album: $album,
             type: 'music',
             platform: 'media',
-
         );
 
         return $nowPlaying;

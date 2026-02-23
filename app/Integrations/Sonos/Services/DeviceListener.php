@@ -4,11 +4,11 @@ namespace App\Integrations\Sonos\Services;
 
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
-use App\Domain\Media\Album;
-use App\Domain\Media\Artist;
+use App\Domain\Media\AlbumData;
+use App\Domain\Media\ArtistData;
 use App\Domain\Media\NowPlaying;
 use App\Domain\Media\Radio;
-use App\Domain\Media\Track;
+use App\Domain\Media\TrackData;
 use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
 use App\Events\Device\ProgressUpdated;
@@ -125,8 +125,8 @@ class DeviceListener
 
         if ($streamName !== '') {
             $radio = new Radio(name: $streamName, images: $images);
-            $artist = $artistName !== '' ? new Artist(name: $artistName) : null;
-            $track = new Track(
+            $artist = $artistName !== '' ? new ArtistData(name: $artistName) : null;
+            $track = new TrackData(
                 name: $title !== '' ? $title : $streamName,
                 artist: $artist,
                 duration: $durationSeconds,
@@ -134,23 +134,21 @@ class DeviceListener
             );
             $nowPlaying = new NowPlaying(
                 track: $track,
-                artist: $artist,
                 position: $positionSeconds,
                 type: 'music',
                 platform: 'radio',
                 radio: $radio,
             );
         } else {
-            $artist = $artistName !== '' ? new Artist(name: $artistName) : null;
-            $album = $albumName !== '' ? new Album(name: $albumName, images: $images, artist: $artist) : null;
+            $artist = $artistName !== '' ? new ArtistData(name: $artistName) : null;
+            $album = $albumName !== '' ? new AlbumData(name: $albumName, images: $images, artist: $artist) : null;
             $nowPlaying = new NowPlaying(
-                track: new Track(
+                track: new TrackData(
                     name: $title,
                     artist: $artist,
                     duration: $durationSeconds,
                     images: $images
                 ),
-                artist: $artist,
                 album: $album,
                 position: $positionSeconds,
                 type: 'music',
@@ -165,7 +163,7 @@ class DeviceListener
     {
         return md5(json_encode([
             'track' => $nowPlaying->track?->name,
-            'artist' => $nowPlaying->artist?->name,
+            'artist' => $nowPlaying->track?->artist?->name,
             'album' => $nowPlaying->album?->name,
             'radio' => $nowPlaying->radio?->name,
             'source' => $nowPlaying->source?->name,

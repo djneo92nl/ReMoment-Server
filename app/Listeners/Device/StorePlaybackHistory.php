@@ -43,8 +43,7 @@ class StorePlaybackHistory implements ShouldQueue
         }
 
         // Track MUST have an artist_id, so if we can't resolve an artist name, we skip.
-        $artistName = $npTrack->artist?->name
-            ?? $nowPlaying->artist?->name;
+        $artistName = $npTrack->artist?->name;
 
         $artistName = is_string($artistName) ? trim($artistName) : '';
 

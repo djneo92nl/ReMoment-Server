@@ -24,7 +24,7 @@ class PublishNowPlayingToMqtt
 
         $data = [
             'track' => $nowPlaying->track?->name,
-            'artist' => $nowPlaying->artist?->name,
+            'artist' => $nowPlaying->track?->artist?->name,
         ];
 
         $this->mqttService->publish("remoment/player/{$deviceId}/data", json_encode($data));
