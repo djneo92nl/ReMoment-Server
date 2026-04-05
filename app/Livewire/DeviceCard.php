@@ -2,10 +2,10 @@
 
 namespace App\Livewire;
 
+use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
 use App\Integrations\Contracts\MediaControlsInterface;
-use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
 use Livewire\Component;
 
@@ -14,6 +14,7 @@ class DeviceCard extends Component
     public Device $device;
     public int $volume = 0;
     public bool $listenerRunning = false;
+    public bool $standalone = false; // disables md:col-span-2 (use on show page)
 
     public function mount(Device $device): void
     {
@@ -55,18 +56,7 @@ class DeviceCard extends Component
     private function refresh(): void
     {
         $this->listenerRunning = DeviceCache::isListenerRunning($this->device->id);
-
-        $state = $this->device->state;
-        if ($state !== State::Unreachable) {
-            try {
-                $driver = $this->device->driver;
-                if ($driver instanceof VolumeControlInterface) {
-                    $this->volume = $driver->getVolume();
-                }
-            } catch (\Throwable) {
-                $this->volume = 0;
-            }
-        }
+        $this->volume = (int) (Volume::getVolume($this->device->id) ?: 0);
     }
 
     private function withDriver(callable $callback): void

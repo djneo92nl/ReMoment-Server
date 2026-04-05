@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Device\DeviceCache;
+use App\Integrations\Contracts\MediaControlsInterface;
+use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -47,7 +50,44 @@ class DeviceController extends Controller
     public function show(Device $device)
     {
         $device->load('meta');
-        return view('devices.show', compact('device'));
+
+        $capabilities = [];
+        $volume = null;
+        try {
+            $driver = $device->driver;
+            if ($driver instanceof MediaControlsInterface) {
+                $capabilities[] = 'media_controls';
+            }
+            if ($driver instanceof VolumeControlInterface) {
+                $capabilities[] = 'volume_control';
+                $volume = $driver->getVolume();
+            }
+            if (method_exists($driver, 'getSources')) {
+                $capabilities[] = 'source_control';
+            }
+            if (method_exists($driver, 'standby')) {
+                $capabilities[] = 'standby';
+            }
+            if (method_exists($driver, 'getSpeakerGroups')) {
+                $capabilities[] = 'speaker_groups';
+            }
+            if (method_exists($driver, 'getSoundModes')) {
+                $capabilities[] = 'sound_modes';
+            }
+        } catch (\Throwable) {
+            // driver unavailable — show what we can
+        }
+
+        $listenerRunning = DeviceCache::isListenerRunning($device->id);
+        $mqttTopic = "remoment/player/{$device->id}";
+
+        return view('devices.show', compact(
+            'device',
+            'capabilities',
+            'volume',
+            'listenerRunning',
+            'mqttTopic',
+        ));
     }
 
     public function edit(Device $device)
@@ -70,6 +110,20 @@ class DeviceController extends Controller
         $device->update($validated);
 
         return redirect()->route('devices.show', $device)->with('success', 'Device updated.');
+    }
+
+    public function standby(Device $device)
+    {
+        try {
+            $driver = $device->driver;
+            if (method_exists($driver, 'standby')) {
+                $driver->standby();
+            }
+        } catch (\Throwable) {
+            // silently ignore if device is unreachable
+        }
+
+        return redirect()->route('devices.show', $device);
     }
 
     public function destroy(Device $device)

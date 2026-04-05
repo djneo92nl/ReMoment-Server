@@ -7,6 +7,7 @@ use App\Models\Media\Album;
 use App\Models\Media\Artist;
 use App\Models\Media\Metadata;
 use App\Models\Media\Track;
+use App\Models\Play;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\Facades\Cache;
 
@@ -37,14 +38,81 @@ class StorePlaybackHistory implements ShouldQueue
         $nowPlaying = $event->nowPlaying;
         $npTrack = $nowPlaying->track;
 
-        // If no track, nothing needs to be saved.
-        if ($npTrack === null) {
+        // Build signature to detect new content (prevent duplicates from repeated events)
+        $radio = $nowPlaying->radio;
+        $source = $nowPlaying->source;
+
+        if ($radio !== null && ($npTrack === null || trim((string) $npTrack->artist?->name) === '')) {
+            // --- Radio play ---
+            $signatureParts = [
+                'type'       => 'radio',
+                'sourceType' => $event->sourceType,
+                'radioName'  => $radio->name,
+                'genre'      => $radio->genre,
+            ];
+
+            $signature = hash('sha256', json_encode($signatureParts, JSON_THROW_ON_ERROR));
+            $cacheKey = "device:{$deviceId}:last_playback_signature";
+            $previous = Cache::get($cacheKey);
+
+            if (is_string($previous) && hash_equals($previous, $signature)) {
+                return;
+            }
+
+            $this->closePreviousPlay((int) $deviceId);
+            Cache::put($cacheKey, $signature, now()->addDay());
+
+            Play::create([
+                'device_id'   => (int) $deviceId,
+                'track_id'    => null,
+                'source_type' => 'radio',
+                'radio_name'  => $radio->name,
+                'played_at'   => now(),
+            ]);
+
             return;
         }
 
+        if ($npTrack === null) {
+            // --- Source/line-in play (no track, no radio) ---
+            $sourceName = $source?->name ?? $source?->connector ?? null;
+            if ($sourceName === null || trim($sourceName) === '') {
+                return;
+            }
+
+            $signatureParts = [
+                'type'        => 'source',
+                'sourceType'  => $event->sourceType,
+                'sourceName'  => $sourceName,
+                'connector'   => $source?->connector,
+            ];
+
+            $signature = hash('sha256', json_encode($signatureParts, JSON_THROW_ON_ERROR));
+            $cacheKey = "device:{$deviceId}:last_playback_signature";
+            $previous = Cache::get($cacheKey);
+
+            if (is_string($previous) && hash_equals($previous, $signature)) {
+                return;
+            }
+
+            $this->closePreviousPlay((int) $deviceId);
+            Cache::put($cacheKey, $signature, now()->addDay());
+
+            Play::create([
+                'device_id'   => (int) $deviceId,
+                'track_id'    => null,
+                'source_type' => $source?->sourceType ?? $event->sourceType ?? 'source',
+                'source_name' => trim($sourceName),
+                'played_at'   => now(),
+            ]);
+
+            return;
+        }
+
+        // --- Track play ---
+
         // Track MUST have an artist_id, so if we can't resolve an artist name, we skip.
         $artistName = $npTrack->artist?->name;
-
         $artistName = is_string($artistName) ? trim($artistName) : '';
 
         if ($artistName === '') {
@@ -53,13 +121,14 @@ class StorePlaybackHistory implements ShouldQueue
 
         // Build a stable signature so repeated "now playing" updates don't create duplicates
         $signatureParts = [
-            'sourceType' => $event->sourceType,
-            'trackId' => $npTrack->id,
-            'trackName' => $npTrack->name,
+            'type'        => 'track',
+            'sourceType'  => $event->sourceType,
+            'trackId'     => $npTrack->id,
+            'trackName'   => $npTrack->name,
             'trackSource' => $npTrack->source,
-            'artistName' => $artistName,
-            'albumName' => $nowPlaying->album?->name,
-            'duration' => $npTrack->duration,
+            'artistName'  => $artistName,
+            'albumName'   => $nowPlaying->album?->name,
+            'duration'    => $npTrack->duration,
         ];
 
         $signature = hash('sha256', json_encode($signatureParts, JSON_THROW_ON_ERROR));
@@ -71,6 +140,7 @@ class StorePlaybackHistory implements ShouldQueue
             return;
         }
 
+        $this->closePreviousPlay((int) $deviceId);
         Cache::put($cacheKey, $signature, now()->addDay());
 
         // --- Persist / upsert normalized media entities ---
@@ -144,10 +214,28 @@ class StorePlaybackHistory implements ShouldQueue
             ]
         );
 
+        // --- Record the play event ---
+        Play::create([
+            'device_id'   => (int) $deviceId,
+            'track_id'    => $track->id,
+            'source_type' => $npTrack->source ?? $nowPlaying->platform ?? $event->sourceType ?? 'music',
+            'played_at'   => now(),
+        ]);
+
         // --- Store metadata from the Track object (key/value) ---
         foreach ($npTrack->meta ?? [] as $meta) {
             $this->storeTrackMetadata($track, $meta, $trackSource);
         }
+    }
+
+    private function closePreviousPlay(int $deviceId): void
+    {
+        Play::query()
+            ->where('device_id', $deviceId)
+            ->whereNull('ended_at')
+            ->latest('played_at')
+            ->first()
+            ?->update(['ended_at' => now()]);
     }
 
     /**

@@ -18,6 +18,14 @@
             </div>
 
             <div class="flex items-center gap-3 flex-shrink-0">
+                <form method="POST" action="{{ route('devices.standby', $device) }}">
+                    @csrf
+                    <button type="submit"
+                            class="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-stone-800 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-medium hover:bg-gray-200 dark:hover:bg-stone-700 transition-colors">
+                        <i class="fa-solid fa-power-off"></i>
+                        <span class="hidden sm:inline">Standby</span>
+                    </button>
+                </form>
                 <a href="{{ route('devices.edit', $device) }}"
                    class="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-stone-800 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-medium hover:bg-gray-200 dark:hover:bg-stone-700 transition-colors">
                     <i class="fa-solid fa-pen-to-square"></i>
@@ -39,13 +47,42 @@
 
     <div class="grid gap-7 lg:grid-cols-3">
 
-        <!-- Left: Now Playing / Controls -->
-        <div class="lg:col-span-2">
-            <livewire:nowplaying :device="$device" :key="'np-show-'.$device->id" />
+        <!-- Left: Now Playing / Controls + History -->
+        <div class="lg:col-span-2 space-y-6">
+            <livewire:device-card :device="$device" :standalone="true" :key="'dc-show-'.$device->id" />
+            <livewire:device-history :device="$device" :key="'hist-'.$device->id" />
         </div>
 
-        <!-- Right: Device Info Panel -->
+        <!-- Right: Info Panel -->
         <div class="space-y-6">
+
+            <livewire:device-cache-card :device="$device" :key="'cache-'.$device->id" />
+
+            <!-- Capabilities Card -->
+            @if(!empty($capabilities))
+                @php
+                    $capMap = [
+                        'media_controls' => ['fa-play',        'Media Controls'],
+                        'volume_control' => ['fa-volume-high', 'Volume Control'],
+                        'source_control' => ['fa-input-pipe',  'Source Control'],
+                        'standby'        => ['fa-power-off',   'Standby'],
+                        'speaker_groups' => ['fa-speaker',     'Speaker Groups'],
+                        'sound_modes'    => ['fa-sliders',     'Sound Modes'],
+                    ];
+                @endphp
+                <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8">
+                    <h2 class="text-base font-medium tracking-tight text-gray-900 dark:text-gray-100 mb-5">Capabilities</h2>
+                    <div class="flex flex-wrap gap-2">
+                        @foreach($capabilities as $cap)
+                            @php [$icon, $label] = $capMap[$cap] ?? ['fa-circle-check', $cap]; @endphp
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-stone-800 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-medium">
+                                <i class="fa-solid {{ $icon }} text-gray-400 dark:text-gray-500"></i>
+                                {{ $label }}
+                            </span>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
 
             <!-- Device Info Card -->
             <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8">
@@ -69,39 +106,30 @@
                         <dd class="font-medium text-gray-800 dark:text-gray-200 text-right">{{ $device->device_driver_name ?: '—' }}</dd>
                     </div>
                     <div class="flex justify-between gap-4">
-                        <dt class="text-gray-500 dark:text-gray-500">State</dt>
-                        <dd class="text-right">
-                            @php($state = $device->state)
-                            @if($state === \App\Domain\Device\State::Playing)
-                                <span class="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-500 font-medium">
-                                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>Playing
-                                </span>
-                            @elseif($state === \App\Domain\Device\State::Paused)
-                                <span class="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-500 font-medium">
-                                    <span class="w-2 h-2 rounded-full bg-amber-500"></span>Paused
-                                </span>
-                            @elseif($state === \App\Domain\Device\State::Standby)
-                                <span class="inline-flex items-center gap-1.5 text-red-600 dark:text-red-500 font-medium">
-                                    <span class="w-2 h-2 rounded-full bg-red-500"></span>Standby
-                                </span>
-                            @else
-                                <span class="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-500 font-medium">
-                                    <span class="w-2 h-2 rounded-full bg-gray-400"></span>Unreachable
-                                </span>
-                            @endif
-                        </dd>
-                    </div>
-                    <div class="flex justify-between gap-4">
-                        <dt class="text-gray-500 dark:text-gray-500">Last seen</dt>
-                        <dd class="font-medium text-gray-800 dark:text-gray-200 text-right">
-                            {{ $device->last_seen ? $device->last_seen->diffForHumans() : 'Never' }}
-                        </dd>
+                        <dt class="text-gray-500 dark:text-gray-500">UUID</dt>
+                        <dd class="font-medium text-gray-600 dark:text-gray-400 text-right font-mono text-xs break-all">{{ $device->uuid }}</dd>
                     </div>
                     <div class="flex justify-between gap-4">
                         <dt class="text-gray-500 dark:text-gray-500">Added</dt>
                         <dd class="font-medium text-gray-800 dark:text-gray-200 text-right">
                             {{ $device->created_at->format('M j, Y') }}
                         </dd>
+                    </div>
+                </dl>
+            </div>
+
+            <!-- MQTT Card -->
+            <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8">
+                <h2 class="text-base font-medium tracking-tight text-gray-900 dark:text-gray-100 mb-5">MQTT</h2>
+                <dl class="space-y-3 text-sm">
+                    <div>
+                        <dt class="text-gray-500 dark:text-gray-500 mb-1.5">Topic prefix</dt>
+                        <dd class="font-mono text-xs text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-stone-800 rounded-xl px-3 py-2 break-all">{{ $mqttTopic }}</dd>
+                    </div>
+                    <div class="pt-1 space-y-1.5">
+                        @foreach(['state', 'now_playing', 'progress'] as $subtopic)
+                            <div class="font-mono text-xs text-gray-400 dark:text-gray-600">{{ $mqttTopic }}/{{ $subtopic }}</div>
+                        @endforeach
                     </div>
                 </dl>
             </div>
@@ -113,7 +141,7 @@
                     <dl class="space-y-3 text-sm">
                         @foreach($device->meta as $meta)
                             <div class="flex justify-between gap-4">
-                                <dt class="text-gray-500 dark:text-gray-500 font-mono">{{ $meta->key }}</dt>
+                                <dt class="text-gray-500 dark:text-gray-500 font-mono text-xs">{{ $meta->key }}</dt>
                                 <dd class="font-medium text-gray-800 dark:text-gray-200 text-right font-mono text-xs break-all">{{ $meta->value }}</dd>
                             </div>
                         @endforeach
@@ -123,9 +151,10 @@
 
             <!-- Driver Details Card -->
             <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8">
-                <h2 class="text-base font-medium tracking-tight text-gray-900 dark:text-gray-100 mb-5">Driver</h2>
+                <h2 class="text-base font-medium tracking-tight text-gray-900 dark:text-gray-100 mb-5">Driver Class</h2>
                 <p class="text-xs text-gray-400 dark:text-gray-600 font-mono break-all leading-relaxed">{{ $device->device_driver ?: '—' }}</p>
             </div>
+
         </div>
     </div>
 </x-app-layout>

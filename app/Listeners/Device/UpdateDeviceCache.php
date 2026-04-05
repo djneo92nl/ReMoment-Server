@@ -2,12 +2,14 @@
 
 namespace App\Listeners\Device;
 
+use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
 use App\Domain\Media\NowPlaying;
 use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
 use App\Events\Device\ProgressUpdated;
+use App\Events\Device\VolumeUpdated;
 
 class UpdateDeviceCache
 {
@@ -37,7 +39,6 @@ class UpdateDeviceCache
 
             return;
         }
-        dump('hi');
 
         if ($event instanceof ProgressUpdated) {
             DeviceCache::updateState($deviceId, State::Playing);
@@ -56,6 +57,12 @@ class UpdateDeviceCache
             DeviceCache::updateState($deviceId, State::Standby);
 
             DeviceCache::forgetNowPlaying($deviceId);
+
+            return;
+        }
+
+        if ($event instanceof VolumeUpdated) {
+            Volume::updateVolume($deviceId, $event->volume);
 
             return;
         }

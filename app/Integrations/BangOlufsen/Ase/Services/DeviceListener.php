@@ -38,6 +38,8 @@ class DeviceListener
         $retryDelaySeconds = 1;
         $maxRetryDelaySeconds = 30;
 
+        DeviceCache::updateState($deviceId, State::Unreachable);
+
         while (true) {
             cache()->put($cacheKey, true, now()->addSeconds(10));
 
@@ -46,6 +48,10 @@ class DeviceListener
             try {
                 $response = $this->http->get($this->url, ['stream' => true]);
                 $body = $response->getBody();
+
+                // Connection established — device is reachable. Assume standby until
+                // a playing event arrives.
+                DeviceCache::updateState($deviceId, State::Standby);
 
                 $buffer = '';
 
@@ -79,7 +85,6 @@ class DeviceListener
                     cache()->put($cacheKey, true, now()->addSeconds(10));
                 }
             } catch (\Throwable $e) {
-                dump($e->getMessage());
                 $hadError = true;
             } finally {
                 cache()->forget($cacheKey);
@@ -115,10 +120,11 @@ class DeviceListener
                 event(new NowPlayingUpdated(
                     deviceId: $deviceId,
                     nowPlaying: $this->parseStoredMusic($data),
-                    sourceType: 'media',
+                    sourceType: 'music',
                 ));
                 break;
             case 'NOW_PLAYING_ENDED':
+                DeviceCache::updateState($deviceId, State::Standby);
                 event(new NowPlayingEnded(deviceId: $deviceId));
 
                 break;
@@ -137,7 +143,9 @@ class DeviceListener
                 }
                 break;
             case 'PROGRESS_INFORMATION':
-                // $currentPlaying['data']['position'] = $data['position'];
+                if (($data['state'] ?? '') === 'stop') {
+                    break;
+                }
                 event(new ProgressUpdated(deviceId: $deviceId, progress: $data['position'] ?? 0));
                 break;
         }

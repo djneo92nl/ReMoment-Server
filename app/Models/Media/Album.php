@@ -15,11 +15,13 @@ class Album extends Model
         'name',
         'source',
         'images',
+        'colors',
         'released_at',
     ];
 
     protected $casts = [
         'images' => 'array',
+        'colors' => 'array',
         'released_at' => 'date',
     ];
 

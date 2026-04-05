@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\DeviceController;
+use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingsController;
 use Illuminate\Support\Facades\Route;
@@ -10,6 +11,8 @@ Route::get('/', function () {
 });
 
 Route::resource('devices', DeviceController::class);
+Route::post('/devices/{device}/standby', [DeviceController::class, 'standby'])->name('devices.standby');
+Route::get('/history', [HistoryController::class, 'index'])->name('history.index');
 
 Route::get('/dashboard', function () {
     return redirect()->route('devices.index');

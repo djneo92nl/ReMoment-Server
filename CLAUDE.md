@@ -35,11 +35,11 @@ php artisan device:discovery
 
 The application is built around an event-listener pattern defined in `app/Providers/AppServiceProvider.php`:
 
-- `NowPlayingUpdated` → `UpdateDeviceCache`, `StorePlaybackHistory` (queued), `PublishNowPlayingToMqtt`
+- `NowPlayingUpdated` → `UpdateDeviceCache`, `StorePlaybackHistory` (queued), `PublishNowPlayingToMqtt`, `DispatchArtworkProcessing`
 - `ProgressUpdated` → `UpdateDeviceCache`, `PublishProgressToMqtt`
-- `NowPlayingEnded` → `UpdateDeviceCache`
+- `NowPlayingEnded` → `UpdateDeviceCache`, `ClosePlaybackHistory`
 
-Device listeners (`app/Integrations/*/Services/DeviceListener.php`) poll devices and fire these events. The queue must be running for `StorePlaybackHistory` to process.
+Device listeners (`app/Integrations/*/Services/DeviceListener.php`) poll devices and fire these events. The queue must be running for `StorePlaybackHistory` and `ProcessArtwork` to process.
 
 ### Integration Driver Pattern
 
@@ -57,7 +57,7 @@ All drivers implement interfaces from `app/Integrations/Contracts/`:
 ### Domain vs. Model Layer
 
 - `app/Domain/` – Non-Eloquent value objects used in events and cache: `NowPlaying`, `Track`, `Artist`, `Album`, `Radio`, `Source`
-- `app/Models/` – Eloquent models for persistence: `Device`, `Track`, `Album`, `Artist`, `Metadata`
+- `app/Models/` – Eloquent models for persistence: `Device`, `Track`, `Album`, `Artist`, `Metadata`, `Play`
 
 These are distinct classes; domain objects represent live state, Eloquent models represent stored history.
 
@@ -65,9 +65,32 @@ These are distinct classes; domain objects represent live state, Eloquent models
 
 `app/Domain/Device/DeviceCache.php` caches device state using keys `device:{id}:state`, `device:{id}:now_playing`, and `device:{id}:last_seen` with a 3600s TTL.
 
+### Artwork Caching & Processing
+
+When a new track starts playing, `DispatchArtworkProcessing` dispatches the `ProcessArtwork` queued job. The job:
+1. Downloads the original image URL from the music service
+2. Resizes to 512×512 and 320×320 JPEG proxies, stored under `storage/app/public/artwork/{md5(url)}/`
+3. Extracts 5 dominant colors via ColorThief
+4. Stores proxy URLs + hex colors in Redis (`artwork:{md5}`, 30-day TTL) via `ArtworkCache`
+5. Updates any matching `albums.colors` column in the database
+
+`app/Domain/Artwork/ArtworkCache.php` provides static helpers for reading/writing the cache and extracting the image URL from a `NowPlaying` object (handles both Sonos plain-string and B&O `['url' => '...']` image formats).
+
+The API (`DeviceDetailResource`) and MQTT (`PublishNowPlayingToMqtt`) include an `artwork` key with proxy URLs and colors once processed. The device card UI renders a color gradient from the dominant colors. Artwork is absent on the first play of a new URL (job is async), then present for all subsequent plays.
+
+Run `php artisan storage:link` once on new environments to create the `public/storage` symlink.
+
+### Playback History
+
+`StorePlaybackHistory` (queued) persists each play to the `plays` table via the `Play` Eloquent model. `ClosePlaybackHistory` sets `ended_at` when playback stops. Plays can be browsed at `/history`.
+
 ### MQTT Publishing
 
 `app/Services/MqttService.php` publishes to topics under `remoment/player/{deviceId}/...`. The Mosquitto broker runs in Docker on port 1883.
+
+Topics:
+- `remoment/player/{id}/data` – JSON: `{track, artist, artwork?: {proxy_512, proxy_320, colors}}`
+- `remoment/player/{id}/progress` – progress percentage (0–100)
 
 ### Local Package
 
@@ -89,7 +112,9 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 ### Livewire Components
 
 - `Nowplaying` (`app/Livewire/Nowplaying.php`) — full playback card with transport + volume controls, polls every 1s
-- `DeviceCard` (`app/Livewire/DeviceCard.php`) — compact standby/unreachable card, polls every 5s
+- `DeviceCard` (`app/Livewire/DeviceCard.php`) — compact standby/unreachable card, polls every 5s; shows a color gradient from `ArtworkCache` when artwork has been processed
+- `DeviceHistory` (`app/Livewire/DeviceHistory.php`) — last 10 unique tracks for a device
+- `PlayHistory` (`app/Livewire/PlayHistory.php`) — paginated play history with device/source filters
 
 ### Web Pages
 
@@ -97,12 +122,14 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 - `/devices/create` — add device with cascading brand→product→driver form (Alpine.js)
 - `/devices/{id}` — device detail: nowplaying + info panel with edit/delete
 - `/devices/{id}/edit` — edit device name, IP, brand, product
+- `/history` — full play history browser
 - `/settings` — overview of users, devices, MQTT config
 - `/settings/users` — user management table
 
 ### Controllers
 
 - `DeviceController` (`app/Http/Controllers/DeviceController.php`) — full CRUD
+- `HistoryController` (`app/Http/Controllers/HistoryController.php`) — play history views
 - `SettingsController` (`app/Http/Controllers/SettingsController.php`) — settings + user management
 
 ## Code Style

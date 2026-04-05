@@ -2,6 +2,7 @@
 
 namespace App\Listeners\Device;
 
+use App\Domain\Artwork\ArtworkCache;
 use App\Events\Device\NowPlayingUpdated;
 use App\Services\MqttService;
 
@@ -26,6 +27,12 @@ class PublishNowPlayingToMqtt
             'track' => $nowPlaying->track?->name,
             'artist' => $nowPlaying->track?->artist?->name,
         ];
+
+        $url = ArtworkCache::extractImageUrl($nowPlaying);
+        $artwork = $url ? ArtworkCache::get($url) : null;
+        if ($artwork !== null) {
+            $data['artwork'] = $artwork;
+        }
 
         $this->mqttService->publish("remoment/player/{$deviceId}/data", json_encode($data));
     }

@@ -41,6 +41,8 @@ class DeviceListener
         $lastPositionSeconds = null;
         $lastVolume = null;
 
+        DeviceCache::updateState($deviceId, State::Unreachable);
+
         while (true) {
             cache()->put($cacheKey, true, now()->addSeconds(10));
 
@@ -75,6 +77,10 @@ class DeviceListener
                             ));
                             $lastNowPlayingKey = $nowPlayingKey;
                         }
+                    } else {
+                        // Device is playing an unrecognised source (e.g. line-in with no metadata).
+                        // Still mark as Playing so the UI doesn't fall back to Unreachable.
+                        DeviceCache::updateState($deviceId, State::Playing);
                     }
 
                     $positionSeconds = $this->toSeconds($details->position ?? '');
