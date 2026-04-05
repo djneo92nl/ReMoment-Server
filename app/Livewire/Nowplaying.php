@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Domain\Device\DeviceCache;
 use Livewire\Component;
 
 class Nowplaying extends Component
@@ -10,14 +11,18 @@ class Nowplaying extends Component
 
     public $volume = 2; // default volume 0-100
 
+    public bool $listenerRunning = false;
+
     public function mount($device)
     {
         $this->device = $device;
         $this->volume = $device->driver->getVolume();
+        $this->listenerRunning = DeviceCache::isListenerRunning($device->id);
     }
 
     public function render()
     {
+        $this->listenerRunning = DeviceCache::isListenerRunning($this->device->id);
         return view('livewire.nowplaying');
     }
 

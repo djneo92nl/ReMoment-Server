@@ -49,10 +49,11 @@
                                     <div>
                                         <div class="flex justify-between text-sm text-gray-500 mb-2">
                                             <span>{{ \App\Domain\Helpers\TimeHelper::secondsToMinutes($nowPlaying['position']) }}</span>
-                                            <span>{{ \App\Domain\Helpers\TimeHelper::secondsToMinutes($nowPlaying['track']['duration']) }}</span>
+                                            <span>{{ \App\Domain\Helpers\TimeHelper::secondsToMinutes($nowPlaying['track']['duration'] ?? 0) }}</span>
                                         </div>
                                         <div class="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                                            <div class="h-full bg-gradient-to-r from-red-500 to-rose-600 rounded-full" style="width:{{ (int)(($nowPlaying['position'] / $nowPlaying['track']['duration']) * 100) }}%"></div>
+                                            <div class="h-full bg-gradient-to-r from-red-500 to-rose-600 rounded-full" style="width:{{ (int)(($nowPlaying['position'] / $nowPlaying['track']['duration'] ?? 0
+) * 100) }}%"></div>
                                         </div>
                                     </div>
 
@@ -84,11 +85,12 @@
                                         <span class="text-sm font-medium text-gray-700 dark:text-gray-400 w-8">{{ $volume }}</span>
                                     </div>
 
-                                    <!-- Standby Button -->
-                                    <div class="pt-4">
+                                                    <!-- Standby Button + Listener Status -->
+                                    <div class="pt-4 flex items-center justify-between gap-4">
                                         <button wire:click="standby" class="px-6 py-2 bg-red-500 hover:bg-red-600 text-white rounded-full text-sm font-medium transition-colors">
                                             <i class="fa-solid fa-power-off mr-2"></i>Standby
                                         </button>
+                                        @include('livewire.partials.listener-badge')
                                     </div>
                                 </div>
                             </div>
@@ -116,11 +118,14 @@
     @else
         <!-- Unreachable State -->
         <div class="bg-white rounded-3xl shadow-lg border border-gray-200/70 dark:bg-stone-900 dark:border-stone-900/80 p-8">
-            <div class="flex items-center gap-3 mb-4">
-                <div class="w-3.5 h-3.5 rounded-full bg-gray-400"></div>
-                <h3 class="text-xl font-medium dark:text-gray-100">{{ $device->device_name }}</h3>
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-3.5 h-3.5 rounded-full bg-gray-400"></div>
+                    <h3 class="text-xl font-medium dark:text-gray-100">{{ $device->device_name }}</h3>
+                </div>
+                @include('livewire.partials.listener-badge')
             </div>
-            <div class="text-gray-500">Device unreachable last seen at {{ $device->last_seen->toRfc850String() }}</div>
+            <div class="text-gray-500">Device unreachable — last seen {{ $device->last_seen?->diffForHumans() ?? 'never' }}</div>
         </div>
     @endif
 </div>

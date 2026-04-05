@@ -168,6 +168,39 @@ See [MQTT Integration](mqtt.md) for full topic reference.
 
 ## Frontend
 
-The UI is built with Blade templates, Livewire 3, Alpine.js, and Tailwind CSS 3. The `Nowplaying` Livewire component (`app/Livewire/Nowplaying.php`) handles real-time playback display and dispatches transport/volume commands directly to the driver.
+The UI is built with Blade templates, Livewire 3, Alpine.js, and Tailwind CSS 3. Tailwind and Font Awesome are loaded via CDN. The main layout (`resources/views/layouts/app.blade.php`) provides a persistent sidebar with navigation and flash message display.
+
+### Livewire Components
+
+| Component | File | Poll interval | Purpose |
+|-----------|------|---------------|---------|
+| `Nowplaying` | `app/Livewire/Nowplaying.php` | 1s | Full playback card with transport controls and volume slider |
+| `DeviceCard` | `app/Livewire/DeviceCard.php` | 5s | Compact card for standby/unreachable devices |
+
+### Web Routes
+
+| Route | Controller | Purpose |
+|-------|-----------|---------|
+| `GET /devices` | `DeviceController@index` | Device grid dashboard |
+| `GET /devices/create` | `DeviceController@create` | Add device form |
+| `POST /devices` | `DeviceController@store` | Save new device |
+| `GET /devices/{id}` | `DeviceController@show` | Device detail + controls |
+| `GET /devices/{id}/edit` | `DeviceController@edit` | Edit device form |
+| `PATCH /devices/{id}` | `DeviceController@update` | Save device changes |
+| `DELETE /devices/{id}` | `DeviceController@destroy` | Remove device |
+| `GET /settings` | `SettingsController@index` | Settings overview |
+| `GET /settings/users` | `SettingsController@users` | User management |
+| `DELETE /settings/users/{id}` | `SettingsController@destroyUser` | Remove user |
+
+### Device Dashboard Layout
+
+The devices index (`/devices`) renders a responsive CSS grid (`md:grid-cols-2 lg:grid-cols-3`). Devices are sorted by state before rendering:
+
+1. Playing/Paused → `Nowplaying` component wrapped in `md:col-span-2` (large card)
+2. Standby/Unreachable → `DeviceCard` component (compact card)
+
+### Device Forms
+
+The create/edit forms (`resources/views/devices/partials/form.blade.php`) use Alpine.js to cascade brand → product model → driver class selection from `config/devices.php`. The `uuid` field is auto-generated on creation (required by the `devices` table schema).
 
 The JSON API (documented in [api.md](api.md)) provides the same control surface for external clients.

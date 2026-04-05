@@ -84,7 +84,26 @@ Defined in `compose.yaml` via Laravel Sail:
 
 ## Frontend
 
-Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interactivity. Tailwind CSS 3 for styling. The `Nowplaying` Livewire component (`app/Livewire/Nowplaying.php`) handles volume and transport controls.
+Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interactivity. Tailwind CSS and Font Awesome loaded via CDN (not compiled). The layout (`resources/views/layouts/app.blade.php`) provides a persistent sidebar navigation.
+
+### Livewire Components
+
+- `Nowplaying` (`app/Livewire/Nowplaying.php`) — full playback card with transport + volume controls, polls every 1s
+- `DeviceCard` (`app/Livewire/DeviceCard.php`) — compact standby/unreachable card, polls every 5s
+
+### Web Pages
+
+- `/devices` — responsive device grid dashboard (playing devices get wide card, others get compact)
+- `/devices/create` — add device with cascading brand→product→driver form (Alpine.js)
+- `/devices/{id}` — device detail: nowplaying + info panel with edit/delete
+- `/devices/{id}/edit` — edit device name, IP, brand, product
+- `/settings` — overview of users, devices, MQTT config
+- `/settings/users` — user management table
+
+### Controllers
+
+- `DeviceController` (`app/Http/Controllers/DeviceController.php`) — full CRUD
+- `SettingsController` (`app/Http/Controllers/SettingsController.php`) — settings + user management
 
 ## Code Style
 

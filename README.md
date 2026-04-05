@@ -45,6 +45,19 @@ In addition to real-time control, ReMoment **records playback activity** and enr
 
 ---
 
+## Web Interface
+
+ReMoment includes a built-in web management interface accessible at `http://localhost`:
+
+- **Device dashboard** — live grid of all devices. Playing devices show a full now-playing card with playback controls and volume slider. Standby and unreachable devices show compact status cards.
+- **Device management** — add, edit, and remove devices. Driver selection cascades automatically from brand → product model using the `config/devices.php` registry.
+- **Device detail** — per-device view combining playback controls with device info and stored metadata.
+- **Settings** — user account management and a snapshot of integration configuration (MQTT, device counts).
+
+The UI is styled with Tailwind CSS and Font Awesome, matching the design established in the project mockup. Livewire provides real-time updates without page reloads.
+
+---
+
 ## Architecture Overview
 
 ReMoment is not only reactive, but **observant**. It captures now-playing events, device state changes, and media identifiers, then resolves and stores enriched metadata for later use.

@@ -18,6 +18,7 @@ class Device extends Model
     protected $driver = null;
 
     public $fillable = [
+        'uuid',
         'ip_address',
         'device_brand_name',
         'device_product_type',
