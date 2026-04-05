@@ -1,0 +1,95 @@
+# Device Discovery
+
+ReMomentServer can automatically discover devices on the local network using several protocols. Discovery commands create or update `Device` records in the database.
+
+---
+
+## Discovery Commands
+
+### UPnP / SSDP (General)
+
+```bash
+php artisan device:discovery
+```
+
+Uses SSDP multicast on port 1900 to find UPnP `MediaRenderer` devices. Works for Bang & Olufsen ASE devices (BeoSound Essence, Beoplay M3/M5, etc.).
+
+**What it does:**
+1. Sends an M-SEARCH multicast to `239.255.255.250:1900` for `urn:schemas-upnp-org:device:MediaRenderer:1`
+2. Fetches the UPnP XML descriptor from each responding device
+3. Parses `manufacturer`, `modelName`, and `UDN` (unique device name)
+4. Looks up the matching driver in `config/devices.php`
+5. Creates or updates the `Device` record
+6. Stores the UPnP UUID in `device_meta` with key `upnp_uuid`
+
+### Bang & Olufsen Mozart Platform
+
+```bash
+php artisan device:additional-bo-device-discovery
+```
+
+Uses mDNS (multicast DNS) on port 5353 to discover newer B&O devices on the Mozart platform that don't appear in standard UPnP scans.
+
+**What it does:**
+1. Sends an mDNS query for `_beoremote._tcp.local` service
+2. Parses DNS response packets (A, TXT, and SRV records)
+3. Extracts device info from TXT records (JID, manufacturer, modelName)
+4. Creates or updates the `Device` record
+5. Stores the JID (Jabber ID) in `device_meta` with key `jid`
+
+### Sonos
+
+```bash
+php artisan device:sonos-discovery
+```
+
+Uses the `duncan3dc/sonos` library to discover Sonos devices and store them in the database.
+
+---
+
+## Starting Device Listeners
+
+After devices are registered, start the listener processes that stream real-time state from the devices:
+
+```bash
+# Start listeners for all registered ASE devices
+php artisan app:get-current-playing-media
+```
+
+This spawns a background `device-ase:listen-single {id}` process per device, checking a cache lock (`listener_running_{id}`) to prevent duplicates.
+
+To start a listener for a single device:
+
+```bash
+php artisan device-ase:listen-single {deviceId}
+```
+
+This is a long-running process. In production it should be managed by a process supervisor (supervisord configuration is provided in `docker/8.4/supervisord.prod.conf`).
+
+---
+
+## Device Metadata
+
+Beyond the core `devices` table columns, per-device metadata is stored in the `device_meta` table as key-value pairs:
+
+| Key | Source | Description |
+|-----|--------|-------------|
+| `upnp_uuid` | UPnP discovery | Unique device identifier from UPnP |
+| `jid` | mDNS discovery | Jabber ID for B&O Mozart platform devices |
+
+---
+
+## Manual Device Registration
+
+Devices can also be added manually through the web UI at `/devices/create`, or directly in the database. Required fields:
+
+| Field | Example |
+|-------|---------|
+| `ip_address` | `192.168.1.42` |
+| `device_name` | `Kitchen Speaker` |
+| `device_brand_name` | `Bang & Olufsen` |
+| `device_product_type` | `Beoplay M5` |
+| `device_driver` | `App\Integrations\BangOlufsen\Ase\MusicPlayerDriver` |
+| `device_driver_name` | `ASE` |
+
+The `device_brand_name` + `device_product_type` combination must match an entry in `config/devices.php` for the driver to resolve correctly.

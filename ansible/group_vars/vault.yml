@@ -1,0 +1,7 @@
+# Sensitive variables — encrypt this file with:
+#   ansible-vault encrypt ansible/group_vars/vault.yml
+#
+# Generate the app key with (run once locally):
+#   php artisan key:generate --show
+#
+vault_app_key: "base64:CHANGE_ME"

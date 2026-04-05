@@ -1,0 +1,76 @@
+services:
+    app:
+        build:
+            context: './docker/8.4'
+            dockerfile: Dockerfile
+            args:
+                WWWGROUP: '${WWWGROUP:-1000}'
+        image: 'remoment/app:latest'
+        extra_hosts:
+            - 'host.docker.internal:host-gateway'
+        ports:
+            - '${APP_PORT:-80}:80'
+        environment:
+            WWWUSER: '${WWWUSER:-1000}'
+            SUPERVISOR_PHP_USER: 'sail'
+            XDEBUG_MODE: 'off'
+        volumes:
+            - '.:/var/www/html'
+            - './docker/8.4/supervisord.prod.conf:/etc/supervisor/conf.d/supervisord.conf'
+        networks:
+            - remoment
+        depends_on:
+            redis:
+                condition: service_healthy
+            meilisearch:
+                condition: service_healthy
+        restart: unless-stopped
+
+    redis:
+        image: 'redis:alpine'
+        volumes:
+            - 'remoment-redis:/data'
+        networks:
+            - remoment
+        healthcheck:
+            test: [CMD, redis-cli, ping]
+            retries: 3
+            timeout: 5s
+        restart: unless-stopped
+
+    meilisearch:
+        image: 'getmeili/meilisearch:latest'
+        environment:
+            MEILI_NO_ANALYTICS: 'true'
+        volumes:
+            - 'remoment-meilisearch:/meili_data'
+        networks:
+            - remoment
+        healthcheck:
+            test: [CMD, wget, '--no-verbose', '--spider', 'http://127.0.0.1:7700/health']
+            retries: 3
+            timeout: 5s
+        restart: unless-stopped
+
+    mosquitto:
+        image: eclipse-mosquitto:2
+        ports:
+            - '1883:1883'
+            - '9001:9001'
+        volumes:
+            - './docker/mosquitto/config:/mosquitto/config'
+            - 'remoment-mosquitto-data:/mosquitto/data'
+            - 'remoment-mosquitto-log:/mosquitto/log'
+        networks:
+            - remoment
+        restart: unless-stopped
+
+networks:
+    remoment:
+        driver: bridge
+
+volumes:
+    remoment-redis:
+    remoment-meilisearch:
+    remoment-mosquitto-data:
+    remoment-mosquitto-log:

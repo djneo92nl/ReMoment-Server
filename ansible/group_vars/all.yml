@@ -1,0 +1,15 @@
+# Application settings
+app_dir: /opt/remoment
+app_repo: git@github.com:youruser/ReMomentServer.git   # Change to your repo URL
+app_branch: main
+app_url: http://remoment.local                          # Change to your server's URL or IP
+app_port: 80
+
+# UID/GID of the deploy user on the server (run: id -u && id -g)
+app_uid: 1000
+app_gid: 1000
+
+# MQTT settings
+mqtt_host: mosquitto
+mqtt_port: 1883
+mqtt_client_id: remoment-server

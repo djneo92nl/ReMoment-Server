@@ -1,0 +1,77 @@
+---
+# One-time server preparation. Safe to re-run.
+# Usage: ansible-playbook -i ansible/inventory.yml ansible/setup.yml --ask-become-pass
+
+- name: Setup ReMoment server
+  hosts: remoment_server
+  become: true
+
+  tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+          update_cache: true
+          cache_valid_time: 3600
+
+    - name: Install prerequisites
+      ansible.builtin.apt:
+          name:
+              - apt-transport-https
+              - ca-certificates
+              - curl
+              - gnupg
+              - git
+              - acl
+          state: present
+
+    - name: Create Docker GPG keyring directory
+      ansible.builtin.file:
+          path: /etc/apt/keyrings
+          state: directory
+          mode: '0755'
+
+    - name: Add Docker GPG key
+      ansible.builtin.shell:
+          cmd: >
+              curl -fsSL https://download.docker.com/linux/ubuntu/gpg
+              | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+          creates: /etc/apt/keyrings/docker.gpg
+
+    - name: Add Docker apt repository
+      ansible.builtin.apt_repository:
+          repo: >-
+              deb [arch={{ ansible_architecture | replace('x86_64', 'amd64') }}
+              signed-by=/etc/apt/keyrings/docker.gpg]
+              https://download.docker.com/linux/ubuntu
+              {{ ansible_distribution_release }} stable
+          state: present
+          filename: docker
+
+    - name: Install Docker
+      ansible.builtin.apt:
+          name:
+              - docker-ce
+              - docker-ce-cli
+              - containerd.io
+              - docker-compose-plugin
+          state: present
+          update_cache: true
+
+    - name: Enable and start Docker service
+      ansible.builtin.systemd:
+          name: docker
+          enabled: true
+          state: started
+
+    - name: Add deploy user to docker group
+      ansible.builtin.user:
+          name: "{{ ansible_user }}"
+          groups: docker
+          append: true
+
+    - name: Create app directory
+      ansible.builtin.file:
+          path: "{{ app_dir }}"
+          state: directory
+          owner: "{{ ansible_user }}"
+          group: "{{ ansible_user }}"
+          mode: '0755'

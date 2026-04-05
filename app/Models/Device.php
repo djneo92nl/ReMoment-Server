@@ -27,6 +27,11 @@ class Device extends Model
         'last_seen',
     ];
 
+    public $casts = [
+        'last_seen' => 'datetime'
+    ];
+
+
     public function toArray(): array
     {
         return [
