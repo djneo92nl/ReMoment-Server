@@ -59,6 +59,11 @@ final class DeviceCache
         return $value ?: false;
     }
 
+    public static function isListenerRunning(int $deviceId): bool
+    {
+        return Cache::has("listener_running_{$deviceId}");
+    }
+
     public static function forget(int $deviceId): void
     {
         Cache::forget(self::stateKey($deviceId));

@@ -2,8 +2,10 @@
 
 namespace App\Integrations\BangOlufsen\Ase;
 
+use App\Integrations\BangOlufsen\Ase\Connectors\ContentControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\DeviceControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\MediaControls;
+use App\Integrations\BangOlufsen\Ase\Connectors\SourceControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\VolumeControls;
 use App\Integrations\Common\HttpConnector;
 use App\Integrations\Contracts\MediaControlsInterface;
@@ -14,8 +16,10 @@ use Illuminate\Support\Facades\Cache;
 
 class VideoPlayerDriver implements MediaControlsInterface, MusicPlayerDriverInterface, VolumeControlInterface
 {
+    use ContentControls;
     use DeviceControls;
     use MediaControls;
+    use SourceControls;
     use VolumeControls;
 
     public HttpConnector $deviceApi;

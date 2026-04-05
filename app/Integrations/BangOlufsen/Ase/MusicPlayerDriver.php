@@ -4,8 +4,10 @@ namespace App\Integrations\BangOlufsen\Ase;
 
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
+use App\Integrations\BangOlufsen\Ase\Connectors\ContentControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\DeviceControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\MediaControls;
+use App\Integrations\BangOlufsen\Ase\Connectors\SourceControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\VolumeControls;
 use App\Integrations\Common\HttpConnector;
 use App\Integrations\Contracts\MediaControlsInterface;
@@ -15,8 +17,10 @@ use App\Models\Device;
 
 class MusicPlayerDriver implements MediaControlsInterface, MusicPlayerDriverInterface, VolumeControlInterface
 {
+    use ContentControls;
     use DeviceControls;
     use MediaControls;
+    use SourceControls;
     use VolumeControls;
 
     public HttpConnector $deviceApi;
@@ -37,6 +41,6 @@ class MusicPlayerDriver implements MediaControlsInterface, MusicPlayerDriverInte
             return [];
         }
 
-        return DeviceCache::getNowPlaying($this->device->id)->toArray() ?? [];
+        return DeviceCache::getNowPlaying($this->device->id)?->toArray() ?? [];
     }
 }
