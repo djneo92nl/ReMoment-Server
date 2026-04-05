@@ -14,11 +14,22 @@ class ClosePlaybackHistory
             return;
         }
 
-        Play::query()
+        $play = Play::query()
             ->where('device_id', $deviceId)
             ->whereNull('ended_at')
             ->latest('played_at')
-            ->first()
-            ?->update(['ended_at' => now()]);
+            ->first();
+
+        if ($play === null) {
+            return;
+        }
+
+        $endedAt = now();
+        $listenedSeconds = $play->played_at->diffInSeconds($endedAt);
+
+        // Plays under 30 seconds are treated as skips
+        $skipped = $listenedSeconds < 30;
+
+        $play->update(['ended_at' => $endedAt, 'skipped' => $skipped]);
     }
 }

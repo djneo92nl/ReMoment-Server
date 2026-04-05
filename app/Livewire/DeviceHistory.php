@@ -12,15 +12,20 @@ class DeviceHistory extends Component
 
     public function render()
     {
-        $plays = Play::query()
+        $latestIds = Play::query()
+            ->selectRaw('MAX(id) as id')
             ->where('device_id', $this->device->id)
             ->whereNotNull('track_id')
+            ->groupBy('track_id')
+            ->orderByRaw('MAX(played_at) DESC')
+            ->limit(10)
+            ->pluck('id');
+
+        $plays = Play::query()
+            ->whereIn('id', $latestIds)
             ->with(['track.artist', 'track.album'])
-            ->latest('played_at')
-            ->limit(20)
-            ->get()
-            ->unique('track_id')
-            ->take(10);
+            ->orderByDesc('played_at')
+            ->get();
 
         return view('livewire.device-history', ['plays' => $plays]);
     }

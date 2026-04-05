@@ -58,6 +58,51 @@
 
             <livewire:device-cache-card :device="$device" :key="'cache-'.$device->id" />
 
+            <!-- Stats Card -->
+            @if($stats['total_plays'] > 0)
+                <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8">
+                    <h2 class="text-base font-medium tracking-tight text-gray-900 dark:text-gray-100 mb-5">Playback Stats</h2>
+                    <dl class="space-y-4 text-sm">
+                        <div class="flex justify-between gap-4">
+                            <dt class="text-gray-500 dark:text-gray-500">Total plays</dt>
+                            <dd class="font-medium text-gray-800 dark:text-gray-200 text-right">{{ number_format($stats['total_plays']) }}</dd>
+                        </div>
+                        @if($stats['total_seconds'] > 0)
+                            @php
+                                $hours = floor($stats['total_seconds'] / 3600);
+                                $minutes = floor(($stats['total_seconds'] % 3600) / 60);
+                            @endphp
+                            <div class="flex justify-between gap-4">
+                                <dt class="text-gray-500 dark:text-gray-500">Listening time</dt>
+                                <dd class="font-medium text-gray-800 dark:text-gray-200 text-right">
+                                    @if($hours > 0)
+                                        {{ $hours }}h {{ $minutes }}m
+                                    @else
+                                        {{ $minutes }}m
+                                    @endif
+                                </dd>
+                            </div>
+                        @endif
+                        @if($stats['top_artist'])
+                            <div class="flex justify-between gap-4">
+                                <dt class="text-gray-500 dark:text-gray-500">Top artist</dt>
+                                <dd class="font-medium text-gray-800 dark:text-gray-200 text-right truncate max-w-32">
+                                    <a href="{{ route('artists.show', $stats['top_artist']->id) }}" class="hover:underline">
+                                        {{ $stats['top_artist']->name }}
+                                    </a>
+                                </dd>
+                            </div>
+                        @endif
+                    </dl>
+                    <div class="mt-5 pt-4 border-t border-gray-100 dark:border-stone-800">
+                        <a href="{{ route('history.index', ['deviceId' => $device->id]) }}"
+                           class="text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors">
+                            View full history &rarr;
+                        </a>
+                    </div>
+                </div>
+            @endif
+
             <!-- Capabilities Card -->
             @if(!empty($capabilities))
                 @php

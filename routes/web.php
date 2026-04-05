@@ -1,9 +1,12 @@
 <?php
 
+use App\Http\Controllers\AlbumController;
+use App\Http\Controllers\ArtistController;
 use App\Http\Controllers\DeviceController;
 use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\StatsController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -13,6 +16,10 @@ Route::get('/', function () {
 Route::resource('devices', DeviceController::class);
 Route::post('/devices/{device}/standby', [DeviceController::class, 'standby'])->name('devices.standby');
 Route::get('/history', [HistoryController::class, 'index'])->name('history.index');
+Route::get('/stats', [StatsController::class, 'index'])->name('stats.index');
+Route::get('/artists', [ArtistController::class, 'index'])->name('artists.index');
+Route::get('/artists/{artist}', [ArtistController::class, 'show'])->name('artists.show');
+Route::get('/albums/{album}', [AlbumController::class, 'show'])->name('albums.show');
 
 Route::get('/dashboard', function () {
     return redirect()->route('devices.index');

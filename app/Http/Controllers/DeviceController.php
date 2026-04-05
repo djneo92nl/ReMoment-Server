@@ -6,6 +6,7 @@ use App\Domain\Device\DeviceCache;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
+use App\Models\Play;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -81,12 +82,31 @@ class DeviceController extends Controller
         $listenerRunning = DeviceCache::isListenerRunning($device->id);
         $mqttTopic = "remoment/player/{$device->id}";
 
+        $totalSeconds = Play::where('device_id', $device->id)
+            ->whereNotNull('ended_at')
+            ->get(['played_at', 'ended_at'])
+            ->sum(fn ($p) => $p->played_at->diffInSeconds($p->ended_at));
+
+        $stats = [
+            'total_plays'   => Play::where('device_id', $device->id)->count(),
+            'total_seconds' => (int) $totalSeconds,
+            'top_artist'    => Play::where('device_id', $device->id)
+                ->whereNotNull('track_id')
+                ->join('tracks', 'plays.track_id', '=', 'tracks.id')
+                ->join('artists', 'tracks.artist_id', '=', 'artists.id')
+                ->selectRaw('artists.id, artists.name, COUNT(*) as play_count')
+                ->groupBy('artists.id', 'artists.name')
+                ->orderByDesc('play_count')
+                ->first(),
+        ];
+
         return view('devices.show', compact(
             'device',
             'capabilities',
             'volume',
             'listenerRunning',
             'mqttTopic',
+            'stats',
         ));
     }
 

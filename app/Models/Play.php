@@ -9,12 +9,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Play extends Model
 {
     protected $fillable = [
-        'device_id', 'track_id', 'source_type', 'radio_name', 'source_name', 'played_at', 'ended_at',
+        'device_id', 'track_id', 'source_type', 'radio_name', 'source_name', 'played_at', 'ended_at', 'skipped',
     ];
 
     protected $casts = [
         'played_at' => 'datetime',
         'ended_at'  => 'datetime',
+        'skipped'   => 'boolean',
     ];
 
     public function device(): BelongsTo

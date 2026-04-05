@@ -1,17 +1,49 @@
 <div>
     {{-- Filter bar --}}
-    <div class="bg-white dark:bg-stone-900 rounded-2xl border border-gray-200/70 dark:border-stone-800/80 shadow-sm p-4 mb-6 flex flex-wrap gap-3 items-center">
+    <div class="bg-white dark:bg-stone-900 rounded-2xl border border-gray-200/70 dark:border-stone-800/80 shadow-sm p-4 mb-6 space-y-3">
 
-        {{-- Device filter --}}
-        <select wire:model.live="deviceId"
-                class="text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 text-gray-700 dark:text-gray-300 rounded-xl px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-stone-600 appearance-none cursor-pointer">
-            <option value="">All devices</option>
-            @foreach($devices as $device)
-                <option value="{{ $device->id }}">{{ $device->device_name }}</option>
-            @endforeach
-        </select>
+        {{-- Row 1: Search + Device + Dates --}}
+        <div class="flex flex-wrap gap-3 items-center">
 
-        {{-- Source type filter pills --}}
+            {{-- Search --}}
+            <div class="relative flex-1 min-w-48">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 dark:text-stone-600 text-xs pointer-events-none"></i>
+                <input wire:model.live.debounce.300ms="search"
+                       type="text"
+                       placeholder="Search track, artist or album…"
+                       class="w-full text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 text-gray-700 dark:text-gray-300 rounded-xl pl-8 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-stone-600 placeholder-gray-300 dark:placeholder-stone-600">
+            </div>
+
+            {{-- Device filter --}}
+            <select wire:model.live="deviceId"
+                    class="text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 text-gray-700 dark:text-gray-300 rounded-xl px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-stone-600 appearance-none cursor-pointer">
+                <option value="">All devices</option>
+                @foreach($devices as $device)
+                    <option value="{{ $device->id }}">{{ $device->device_name }}</option>
+                @endforeach
+            </select>
+
+            {{-- Date range --}}
+            <input wire:model.live="dateFrom" type="date"
+                   class="text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 text-gray-700 dark:text-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-stone-600 cursor-pointer">
+            <span class="text-xs text-gray-300 dark:text-stone-600">–</span>
+            <input wire:model.live="dateTo" type="date"
+                   class="text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 text-gray-700 dark:text-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-stone-600 cursor-pointer">
+
+            @if($search !== '' || $deviceId || $sourceFilter !== null || $dateFrom !== '' || $dateTo !== '')
+                <button wire:click="clearFilters" class="text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors whitespace-nowrap">
+                    <i class="fa-solid fa-xmark mr-1"></i>Clear
+                </button>
+            @endif
+
+            @if($plays->total() > 0)
+                <span class="ml-auto text-xs text-gray-400 dark:text-gray-600 whitespace-nowrap">
+                    {{ number_format($plays->total()) }} {{ Str::plural('play', $plays->total()) }}
+                </span>
+            @endif
+        </div>
+
+        {{-- Row 2: Source type filter pills --}}
         <div class="flex flex-wrap gap-2">
             <button wire:click="setSource(null)"
                     class="text-xs px-3 py-1.5 rounded-full transition-colors {{ $sourceFilter === null ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 font-medium' : 'bg-gray-100 dark:bg-stone-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-stone-700' }}">
@@ -47,12 +79,6 @@
                 </button>
             @endforeach
         </div>
-
-        @if($plays->total() > 0)
-            <span class="ml-auto text-xs text-gray-400 dark:text-gray-600">
-                {{ number_format($plays->total()) }} {{ Str::plural('play', $plays->total()) }}
-            </span>
-        @endif
     </div>
 
     @if($plays->isEmpty())
@@ -165,10 +191,12 @@
                                                         {{ $play->track->name }}
                                                     </p>
                                                     <p class="text-xs text-gray-400 dark:text-gray-600 truncate mt-0.5 leading-snug">
-                                                        {{ $play->track->artist?->name }}
+                                                        @if($play->track->artist)
+                                                            <a href="{{ route('artists.show', $play->track->artist) }}" class="hover:underline hover:text-gray-600 dark:hover:text-gray-400">{{ $play->track->artist->name }}</a>
+                                                        @endif
                                                         @if($play->track->album?->name)
                                                             <span class="text-gray-300 dark:text-stone-700"> &middot; </span>
-                                                            {{ $play->track->album->name }}
+                                                            <a href="{{ route('albums.show', $play->track->album) }}" class="hover:underline hover:text-gray-600 dark:hover:text-gray-400">{{ $play->track->album->name }}</a>
                                                         @endif
                                                     </p>
                                                     @if($play->ended_at)
@@ -205,6 +233,13 @@
                                                         {{ ucfirst($play->source_type ?? 'Source') }}
                                                     </p>
                                                 </div>
+                                            @endif
+
+                                            {{-- Skipped indicator --}}
+                                            @if($play->skipped)
+                                                <span class="flex-shrink-0 text-amber-400 dark:text-amber-500 text-xs" title="Skipped">
+                                                    <i class="fa-solid fa-forward-step"></i>
+                                                </span>
                                             @endif
 
                                             {{-- Device badge --}}

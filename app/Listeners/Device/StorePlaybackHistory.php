@@ -230,12 +230,20 @@ class StorePlaybackHistory implements ShouldQueue
 
     private function closePreviousPlay(int $deviceId): void
     {
-        Play::query()
+        $play = Play::query()
             ->where('device_id', $deviceId)
             ->whereNull('ended_at')
             ->latest('played_at')
-            ->first()
-            ?->update(['ended_at' => now()]);
+            ->first();
+
+        if ($play === null) {
+            return;
+        }
+
+        $endedAt = now();
+        $skipped = $play->played_at->diffInSeconds($endedAt) < 30;
+
+        $play->update(['ended_at' => $endedAt, 'skipped' => $skipped]);
     }
 
     /**

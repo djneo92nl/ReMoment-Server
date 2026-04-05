@@ -2,9 +2,11 @@
 
 namespace App\Models\Media;
 
+use App\Models\Play;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Album extends Model
 {
@@ -33,5 +35,10 @@ class Album extends Model
     public function tracks(): HasMany
     {
         return $this->hasMany(Track::class);
+    }
+
+    public function plays(): HasManyThrough
+    {
+        return $this->hasManyThrough(Play::class, Track::class);
     }
 }

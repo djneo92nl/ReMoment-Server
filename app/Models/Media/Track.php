@@ -2,8 +2,10 @@
 
 namespace App\Models\Media;
 
+use App\Models\Play;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Track extends Model
@@ -33,6 +35,11 @@ class Track extends Model
     public function artist(): BelongsTo
     {
         return $this->belongsTo(Artist::class);
+    }
+
+    public function plays(): HasMany
+    {
+        return $this->hasMany(Play::class);
     }
 
     public function metadata(): MorphMany

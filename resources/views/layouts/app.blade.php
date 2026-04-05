@@ -49,6 +49,20 @@
                     </a>
                 </li>
                 <li>
+                    <a href="{{ route('artists.index') }}"
+                       class="flex items-center gap-3 px-5 py-3.5 rounded-xl transition-colors {{ request()->routeIs('artists.*') || request()->routeIs('albums.*') ? 'bg-gray-100 dark:bg-stone-800 font-medium text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-stone-800/50' }}">
+                        <i class="fa-solid fa-microphone-lines w-5 {{ request()->routeIs('artists.*') || request()->routeIs('albums.*') ? 'text-gray-700 dark:text-gray-300' : '' }}"></i>
+                        Library
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ route('stats.index') }}"
+                       class="flex items-center gap-3 px-5 py-3.5 rounded-xl transition-colors {{ request()->routeIs('stats.*') ? 'bg-gray-100 dark:bg-stone-800 font-medium text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-stone-800/50' }}">
+                        <i class="fa-solid fa-chart-simple w-5 {{ request()->routeIs('stats.*') ? 'text-gray-700 dark:text-gray-300' : '' }}"></i>
+                        Insights
+                    </a>
+                </li>
+                <li>
                     <a href="{{ route('settings.index') }}"
                        class="flex items-center gap-3 px-5 py-3.5 rounded-xl transition-colors {{ request()->routeIs('settings.*') ? 'bg-gray-100 dark:bg-stone-800 font-medium text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-stone-800/50' }}">
                         <i class="fa-solid fa-sliders w-5 {{ request()->routeIs('settings.*') ? 'text-gray-700 dark:text-gray-300' : '' }}"></i>
@@ -133,6 +147,18 @@
                         <a href="{{ route('history.index') }}" @click="mobileMenuOpen = false"
                            class="flex items-center gap-3 px-5 py-3.5 rounded-xl transition-colors {{ request()->routeIs('history.*') ? 'bg-gray-100 dark:bg-stone-800 font-medium text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400' }}">
                             <i class="fa-solid fa-clock-rotate-left w-5"></i>History
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('artists.index') }}" @click="mobileMenuOpen = false"
+                           class="flex items-center gap-3 px-5 py-3.5 rounded-xl transition-colors {{ request()->routeIs('artists.*') || request()->routeIs('albums.*') ? 'bg-gray-100 dark:bg-stone-800 font-medium text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400' }}">
+                            <i class="fa-solid fa-microphone-lines w-5"></i>Library
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('stats.index') }}" @click="mobileMenuOpen = false"
+                           class="flex items-center gap-3 px-5 py-3.5 rounded-xl transition-colors {{ request()->routeIs('stats.*') ? 'bg-gray-100 dark:bg-stone-800 font-medium text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400' }}">
+                            <i class="fa-solid fa-chart-simple w-5"></i>Insights
                         </a>
                     </li>
                     <li>
