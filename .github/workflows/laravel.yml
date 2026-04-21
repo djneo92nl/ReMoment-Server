@@ -20,7 +20,7 @@ jobs:
       run: |
         if [ ! -d packages/duncan3dc/sonos/.git ]; then
           mkdir -p packages/duncan3dc
-          git clone https://github.com/djneo92nl/sonos.git packages/duncan3dc/sonos
+          git clone --branch laravel12 https://github.com/djneo92nl/sonos.git packages/duncan3dc/sonos
         fi
     - name: Copy .env
       run: php -r "file_exists('.env') || copy('.env.example', '.env');"
