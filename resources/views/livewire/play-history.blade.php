@@ -199,6 +199,35 @@
                                                             <a href="{{ route('albums.show', $play->track->album) }}" class="hover:underline hover:text-gray-600 dark:hover:text-gray-400">{{ $play->track->album->name }}</a>
                                                         @endif
                                                     </p>
+                                                    @php
+                                                        $sourceLabel = $play->radioStation?->name
+                                                            ?? $play->radio_name
+                                                            ?? match($play->source_type) {
+                                                                'spotify' => 'Spotify',
+                                                                'tidal'   => 'Tidal',
+                                                                'deezer'  => 'Deezer',
+                                                                default   => null,
+                                                            };
+                                                        $sourceIcon = ($play->radioStation || $play->radio_name)
+                                                            ? 'fa-tower-broadcast'
+                                                            : match($play->source_type) {
+                                                                'spotify' => 'fa-brands fa-spotify',
+                                                                default   => 'fa-music',
+                                                            };
+                                                        $sourceColor = ($play->radioStation || $play->radio_name)
+                                                            ? 'text-sky-500 dark:text-sky-400'
+                                                            : match($play->source_type) {
+                                                                'spotify' => 'text-emerald-500',
+                                                                'tidal'   => 'text-violet-500',
+                                                                'deezer'  => 'text-orange-500',
+                                                                default   => 'text-gray-400 dark:text-stone-500',
+                                                            };
+                                                    @endphp
+                                                    @if($sourceLabel)
+                                                        <p class="text-[10px] {{ $sourceColor }} truncate mt-0.5 leading-snug">
+                                                            <i class="fa-solid {{ $sourceIcon }} mr-1"></i>{{ $sourceLabel }}
+                                                        </p>
+                                                    @endif
                                                     @if($play->ended_at)
                                                         <p class="text-[10px] text-gray-300 dark:text-stone-700 mt-0.5">
                                                             {{ gmdate('G:i', $play->played_at->diffInSeconds($play->ended_at)) }}
