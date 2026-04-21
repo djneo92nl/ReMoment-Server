@@ -2,9 +2,9 @@
 
 namespace Tests\Feature\Listeners\Device;
 
-use App\Domain\Media\Artist;
+use App\Domain\Media\ArtistData;
 use App\Domain\Media\NowPlaying;
-use App\Domain\Media\Track;
+use App\Domain\Media\TrackData;
 use App\Events\Device\NowPlayingUpdated;
 use App\Listeners\Device\PublishNowPlayingToMqtt;
 use App\Services\MqttService;
@@ -19,9 +19,8 @@ class PublishNowPlayingToMqttTest extends TestCase
         $trackName = "Bohemian Rhapsody";
         $artistName = "Queen";
 
-        $track = new Track(name: $trackName);
-        $artist = new Artist(name: $artistName);
-        $nowPlaying = new NowPlaying(track: $track, artist: $artist);
+        $track = new TrackData(name: $trackName, artist: new ArtistData(name: $artistName));
+        $nowPlaying = new NowPlaying(track: $track);
 
         $expectedPayload = json_encode([
             'track' => $trackName,

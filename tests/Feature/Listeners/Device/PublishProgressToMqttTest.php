@@ -4,7 +4,7 @@ namespace Tests\Feature\Listeners\Device;
 
 use App\Domain\Device\DeviceCache;
 use App\Domain\Media\NowPlaying;
-use App\Domain\Media\Track;
+use App\Domain\Media\TrackData;
 use App\Events\Device\ProgressUpdated;
 use App\Listeners\Device\PublishProgressToMqtt;
 use App\Services\MqttService;
@@ -20,7 +20,7 @@ class PublishProgressToMqttTest extends TestCase
         $duration = 300; // 300 seconds
         // Math: (150 / 300) * 100 = 50
 
-        $track = new Track(duration: $duration);
+        $track = new TrackData(duration: $duration);
         $nowPlaying = new NowPlaying(track: $track);
 
         (new DeviceCache())->updateNowPlaying($deviceId, $nowPlaying);

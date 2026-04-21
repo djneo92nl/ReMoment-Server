@@ -4,9 +4,11 @@ namespace Tests\Unit;
 
 use App\Domain\Media\NowPlaying;
 use App\Integrations\Sonos\Services\DeviceListener;
-use duncan3dc\Sonos\Device;
-use duncan3dc\Sonos\Network;
+use duncan3dc\Sonos\Interfaces\Devices\DeviceInterface;
+use duncan3dc\Sonos\Interfaces\NetworkInterface;
 use duncan3dc\Sonos\State as SonosState;
+use duncan3dc\Sonos\Tracks\Stream;
+use duncan3dc\Sonos\Utils\Time;
 use ReflectionClass;
 use Tests\TestCase;
 
@@ -27,12 +29,12 @@ class SonosDeviceListenerTest extends TestCase
         $listener = $this->makeListener();
 
         $state = new SonosState('x-rincon-mp3radio://example');
-        $state->stream = 'Station Name';
-        $state->title = 'Track Name';
-        $state->artist = 'Artist Name';
-        $state->albumArt = 'http://sonos.example/art.jpg';
-        $state->duration = '00:04:20';
-        $state->position = '00:01:10';
+        $state->setStream(new Stream('x-sonosapi-stream://example', 'Station Name'));
+        $state->setTitle('Track Name');
+        $state->setArtist('Artist Name');
+        $state->setAlbumArt('http://sonos.example/art.jpg');
+        $state->setDuration(Time::parse('00:04:20'));
+        $state->setPosition(Time::parse('00:01:10'));
 
         $nowPlaying = $this->callProtected($listener, 'buildNowPlaying', [$state]);
 
@@ -41,7 +43,7 @@ class SonosDeviceListenerTest extends TestCase
         $this->assertSame('radio', $nowPlaying->platform);
         $this->assertSame('Station Name', $nowPlaying->radio?->name);
         $this->assertSame('Track Name', $nowPlaying->track?->name);
-        $this->assertSame('Artist Name', $nowPlaying->artist?->name);
+        $this->assertSame('Artist Name', $nowPlaying->track?->artist?->name);
         $this->assertSame(['http://sonos.example/art.jpg'], $nowPlaying->track?->images);
         $this->assertSame(260, $nowPlaying->track?->duration);
         $this->assertSame(70, $nowPlaying->position);
@@ -52,13 +54,12 @@ class SonosDeviceListenerTest extends TestCase
         $listener = $this->makeListener();
 
         $state = new SonosState('x-file-cifs://example');
-        $state->stream = '';
-        $state->title = 'Track Name';
-        $state->artist = 'Artist Name';
-        $state->album = 'Album Name';
-        $state->albumArt = 'http://sonos.example/art.jpg';
-        $state->duration = '00:03:30';
-        $state->position = '00:00:15';
+        $state->setTitle('Track Name');
+        $state->setArtist('Artist Name');
+        $state->setAlbum('Album Name');
+        $state->setAlbumArt('http://sonos.example/art.jpg');
+        $state->setDuration(Time::parse('00:03:30'));
+        $state->setPosition(Time::parse('00:00:15'));
 
         $nowPlaying = $this->callProtected($listener, 'buildNowPlaying', [$state]);
 
@@ -66,7 +67,7 @@ class SonosDeviceListenerTest extends TestCase
         $this->assertSame('music', $nowPlaying->type);
         $this->assertSame('media', $nowPlaying->platform);
         $this->assertSame('Track Name', $nowPlaying->track?->name);
-        $this->assertSame('Artist Name', $nowPlaying->artist?->name);
+        $this->assertSame('Artist Name', $nowPlaying->track?->artist?->name);
         $this->assertSame('Album Name', $nowPlaying->album?->name);
         $this->assertSame(['http://sonos.example/art.jpg'], $nowPlaying->track?->images);
         $this->assertSame(210, $nowPlaying->track?->duration);
@@ -78,8 +79,6 @@ class SonosDeviceListenerTest extends TestCase
         $listener = $this->makeListener();
 
         $state = new SonosState('x-file-cifs://example');
-        $state->stream = '';
-        $state->title = '';
 
         $nowPlaying = $this->callProtected($listener, 'buildNowPlaying', [$state]);
 
@@ -88,8 +87,8 @@ class SonosDeviceListenerTest extends TestCase
 
     private function makeListener(): DeviceListener
     {
-        $device = $this->createMock(Device::class);
-        $network = $this->createMock(Network::class);
+        $device = $this->createMock(DeviceInterface::class);
+        $network = $this->createMock(NetworkInterface::class);
 
         return new DeviceListener($device, $network);
     }

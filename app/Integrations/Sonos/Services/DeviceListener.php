@@ -14,21 +14,21 @@ use App\Events\Device\NowPlayingUpdated;
 use App\Events\Device\ProgressUpdated;
 use App\Events\Device\VolumeUpdated;
 use duncan3dc\Sonos\Controller;
-use duncan3dc\Sonos\Device;
-use duncan3dc\Sonos\Network;
+use duncan3dc\Sonos\Interfaces\Devices\DeviceInterface;
+use duncan3dc\Sonos\Interfaces\NetworkInterface;
 use duncan3dc\Sonos\State as SonosState;
 
 class DeviceListener
 {
-    protected Network $network;
+    protected NetworkInterface $network;
 
     protected ?Controller $controller = null;
 
     protected int $pollIntervalSeconds = 1;
 
-    public function __construct(protected Device $device, ?Network $network = null)
+    public function __construct(protected DeviceInterface $device, ?NetworkInterface $network = null)
     {
-        $this->network = $network ?? new Network;
+        $this->network = $network ?? new \duncan3dc\Sonos\Network;
     }
 
     public function listen(string $deviceId)
@@ -115,19 +115,20 @@ class DeviceListener
 
     protected function buildNowPlaying(SonosState $details): ?NowPlaying
     {
-        $title = trim((string) ($details->title ?? ''));
-        $artistName = trim((string) ($details->artist ?? ''));
-        $albumName = trim((string) ($details->album ?? ''));
-        $streamName = trim((string) ($details->stream ?? ''));
-        $albumArt = trim((string) ($details->albumArt ?? ''));
+        $title = trim($details->getTitle());
+        $artistName = trim($details->getArtist());
+        $albumName = trim($details->getAlbum());
+        $stream = $details->getStream();
+        $streamName = $stream ? trim($stream->getTitle()) : '';
+        $albumArt = trim($details->getAlbumArt());
         $images = $albumArt !== '' ? [$albumArt] : [];
 
         if ($title === '' && $streamName === '') {
             return null;
         }
 
-        $durationSeconds = $this->toSeconds($details->duration ?? '');
-        $positionSeconds = $this->toSeconds($details->position ?? '');
+        $durationSeconds = $details->getDuration()->asInt() ?: null;
+        $positionSeconds = $details->getPosition()->asInt();
 
         if ($streamName !== '') {
             $radio = new Radio(name: $streamName, images: $images);

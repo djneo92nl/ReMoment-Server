@@ -28,7 +28,7 @@ class DeviceListenerTest extends TestCase
         $this->assertSame('music', $nowPlaying->type);
         $this->assertSame('radio', $nowPlaying->platform);
         $this->assertSame('Radio One', $nowPlaying->radio?->name);
-        $this->assertSame('Artist Name', $nowPlaying->artist?->name);
+        $this->assertSame('Artist Name', $nowPlaying->track?->artist?->name);
         $this->assertSame('Track Name', $nowPlaying->track?->name);
         $this->assertSame($payload['image'], $nowPlaying->track?->images);
     }
@@ -47,7 +47,7 @@ class DeviceListenerTest extends TestCase
 
         $this->assertSame('Radio Two', $nowPlaying->radio?->name);
         $this->assertSame('Just A Station Name', $nowPlaying->track?->name);
-        $this->assertNull($nowPlaying->artist);
+        $this->assertNull($nowPlaying->track?->artist);
         $this->assertNull($nowPlaying->type);
         $this->assertNull($nowPlaying->platform);
     }
@@ -68,7 +68,7 @@ class DeviceListenerTest extends TestCase
 
         $nowPlaying = $listener->parseStoredMusic($payload);
 
-        $this->assertSame('Artist Name', $nowPlaying->artist?->name);
+        $this->assertSame('Artist Name', $nowPlaying->track?->artist?->name);
         $this->assertSame('Album Name', $nowPlaying->album?->name);
         $this->assertSame('Track Name', $nowPlaying->track?->name);
         $this->assertSame(210, $nowPlaying->track?->duration);

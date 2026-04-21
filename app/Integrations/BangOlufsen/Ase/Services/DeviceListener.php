@@ -113,6 +113,7 @@ class DeviceListener
                     deviceId: $deviceId,
                     nowPlaying: $this->parseNetRadio($data),
                     sourceType: 'radio',
+                    timestamp: $n['timestamp'] ?? null,
                 ));
                 break;
 
@@ -196,15 +197,15 @@ class DeviceListener
         $trackId = urldecode($payload['trackId']);
         if (str_contains($trackId, 'spotify:')) {
             $source = 'spotify';
-            $meta[] = ['spotifyId' => $trackId];
+            $meta['spotifyId'] = $trackId;
         }
 
         if (isset($payload['sampleRate'])) {
-            $meta[] = ['sampleRate' => $payload['sampleRate']];
+            $meta['sampleRate'] = $payload['sampleRate'];
         }
 
         if (isset($payload['bitDepth'])) {
-            $meta[] = ['bitDepth' => $payload['bitDepth']];
+            $meta['bitDepth'] = $payload['bitDepth'];
         }
 
         $track = new TrackData(
