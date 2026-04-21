@@ -4,11 +4,18 @@
             <div>
                 <h1 class="text-3xl md:text-4xl font-medium tracking-tight dark:text-gray-100 text-gray-900">Devices</h1>
             </div>
-            <a href="{{ route('devices.create') }}"
-               class="flex items-center gap-2 px-5 py-2.5 bg-gray-900 dark:bg-stone-700 text-white rounded-2xl text-sm font-medium hover:bg-gray-700 dark:hover:bg-stone-600 transition-colors">
-                <i class="fa-solid fa-plus"></i>
-                <span class="hidden sm:inline">Add Device</span>
-            </a>
+            <div class="flex items-center gap-2">
+                <a href="{{ route('devices.discover') }}"
+                   class="flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-stone-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-stone-700 rounded-2xl text-sm font-medium hover:bg-gray-50 dark:hover:bg-stone-700 transition-colors">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <span class="hidden sm:inline">Discover</span>
+                </a>
+                <a href="{{ route('devices.create') }}"
+                   class="flex items-center gap-2 px-5 py-2.5 bg-gray-900 dark:bg-stone-700 text-white rounded-2xl text-sm font-medium hover:bg-gray-700 dark:hover:bg-stone-600 transition-colors">
+                    <i class="fa-solid fa-plus"></i>
+                    <span class="hidden sm:inline">Add Device</span>
+                </a>
+            </div>
         </div>
     </x-slot>
 

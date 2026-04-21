@@ -8,6 +8,7 @@
                 'product'     => $product,
                 'driver'      => $config['driver'],
                 'driver_name' => $config['driver_name'],
+                'virtual'     => $config['virtual'] ?? false,
             ];
         }
     }
@@ -20,6 +21,7 @@
         product: '{{ old('device_product_type', $device?->device_product_type ?? '') }}',
         driver: '{{ old('device_driver', $device?->device_driver ?? '') }}',
         driver_name: '{{ old('device_driver_name', $device?->device_driver_name ?? '') }}',
+        virtual: false,
         options: {{ json_encode($driverOptions) }},
         get brands() {
             return [...new Set(this.options.map(o => o.brand))];
@@ -27,10 +29,11 @@
         get products() {
             return this.options.filter(o => o.brand === this.brand);
         },
-        selectProduct(product, driver, driver_name) {
-            this.product = product;
-            this.driver = driver;
-            this.driver_name = driver_name;
+        selectProduct(option) {
+            this.product = option.product;
+            this.driver = option.driver;
+            this.driver_name = option.driver_name;
+            this.virtual = option.virtual ?? false;
         }
     }"
     class="space-y-6">
@@ -48,13 +51,13 @@
         @enderror
     </div>
 
-    <!-- IP Address -->
-    <div>
+    <!-- IP Address (hidden for virtual devices) -->
+    <div x-show="!virtual">
         <label for="ip_address" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">IP Address</label>
         <input type="text" name="ip_address" id="ip_address"
                value="{{ old('ip_address', $device?->ip_address ?? '') }}"
                placeholder="192.168.1.x"
-               required
+               :required="!virtual"
                class="w-full rounded-xl border {{ $errors->has('ip_address') ? 'border-red-400' : 'border-gray-200 dark:border-stone-700' }} dark:bg-stone-800 dark:text-gray-100 px-4 py-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-stone-500 focus:border-transparent transition-shadow">
         @error('ip_address')
             <p class="mt-1.5 text-xs text-red-500">{{ $message }}</p>
@@ -87,7 +90,7 @@
         <div class="flex flex-wrap gap-2">
             <template x-for="option in products" :key="option.product">
                 <button type="button"
-                        @click="selectProduct(option.product, option.driver, option.driver_name)"
+                        @click="selectProduct(option)"
                         :class="product === option.product
                             ? 'bg-gray-900 dark:bg-stone-600 text-white'
                             : 'bg-gray-100 dark:bg-stone-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-stone-700'"

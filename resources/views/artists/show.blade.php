@@ -99,6 +99,16 @@
                     <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">Recent Plays</h2>
                     <div class="space-y-3">
                         @foreach($recentPlays as $play)
+                            @php
+                                $playSource = $play->radioStation?->name
+                                    ?? ($play->radio_name ? $play->radio_name : null)
+                                    ?? match($play->source_type) {
+                                        'spotify' => 'Spotify',
+                                        'tidal'   => 'Tidal',
+                                        'deezer'  => 'Deezer',
+                                        default   => null,
+                                    };
+                            @endphp
                             <div class="flex items-center gap-3">
                                 <div class="flex-1 min-w-0">
                                     <p class="text-sm text-gray-800 dark:text-gray-200 truncate">{{ $play->track->name }}</p>
@@ -106,6 +116,9 @@
                                         {{ $play->played_at->format('M j') }}
                                         @if($play->device)
                                             &middot; {{ $play->device->device_name }}
+                                        @endif
+                                        @if($playSource)
+                                            &middot; {{ $playSource }}
                                         @endif
                                     </p>
                                 </div>
