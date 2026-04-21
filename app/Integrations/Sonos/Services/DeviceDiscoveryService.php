@@ -2,69 +2,57 @@
 
 namespace App\Integrations\Sonos\Services;
 
-use App\Integrations\Sonos\MusicPlayerDriver;
+use App\Integrations\Sonos\SonosDiscovery;
 use App\Models\Device;
 use App\Models\DeviceMeta;
 use Carbon\Carbon;
-use duncan3dc\Sonos\Devices\Device as SonosDevice;
-use duncan3dc\Sonos\Network;
 
 class DeviceDiscoveryService
 {
-    public function __construct(private ?Network $network = null)
-    {
-        $this->network = $network ?? new Network;
-    }
+    public function __construct(private SonosDiscovery $discovery) {}
 
     /**
+     * Discover and persist Sonos devices.
+     *
      * @return array<int, Device>
      */
     public function discoverAndStore(): array
     {
         $devices = [];
 
-        foreach ($this->network->getSpeakers() as $speaker) {
-            $ip = $speaker->getIp();
-            $uuid = $speaker->getUuid();
+        foreach ($this->discovery->discover() as $found) {
+            $uuid = $found->meta['sonos_uuid'] ?? null;
 
-            $device = Device::whereHas('meta', function ($query) use ($uuid) {
-                $query->where('key', 'sonos_uuid')
-                    ->where('value', $uuid);
-            })->first();
-
+            $device = null;
+            if ($uuid) {
+                $device = Device::whereHas('meta', fn ($q) => $q->where('key', 'sonos_uuid')->where('value', $uuid))->first();
+            }
             if (!$device) {
-                $device = Device::where('ip_address', $ip)->first();
+                $device = Device::where('ip_address', $found->ip_address)->first();
             }
 
-            $sonosDevice = new SonosDevice($ip);
-            $model = $sonosDevice->getModel();
-
-            $deviceData = [
-                'ip_address' => $ip,
-                'device_brand_name' => 'Sonos',
-                'device_product_type' => $model,
-                'device_name' => $speaker->getName() ?: ($speaker->getRoom() ?: $ip),
-                'device_driver' => MusicPlayerDriver::class,
-                'device_driver_name' => 'Sonos',
+            $data = [
+                'ip_address' => $found->ip_address,
+                'device_brand_name' => $found->device_brand_name,
+                'device_product_type' => $found->device_product_type,
+                'device_name' => $found->device_name,
+                'device_driver' => $found->device_driver,
+                'device_driver_name' => $found->device_driver_name,
                 'last_seen' => Carbon::now(),
             ];
 
             if ($device) {
-                $device->fill($deviceData);
-                $device->save();
+                $device->fill($data)->save();
             } else {
-                $device = Device::create($deviceData);
+                $device = Device::create($data);
             }
 
-            DeviceMeta::updateOrCreate(
-                [
-                    'device_id' => $device->id,
-                    'key' => 'sonos_uuid',
-                ],
-                [
-                    'value' => $uuid,
-                ]
-            );
+            if ($uuid) {
+                DeviceMeta::updateOrCreate(
+                    ['device_id' => $device->id, 'key' => 'sonos_uuid'],
+                    ['value' => $uuid]
+                );
+            }
 
             $devices[] = $device;
         }

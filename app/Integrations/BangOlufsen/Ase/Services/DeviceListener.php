@@ -153,7 +153,11 @@ class DeviceListener
 
     public function parseNetRadio(array $payload): NowPlaying
     {
-        $radio = new Radio(name: $payload['name'], images: $payload['image']);
+        $radio = new Radio(
+            name: $payload['name'],
+            images: $payload['image'],
+            id: $payload['stationId'] ?? $payload['id'] ?? null,
+        );
 
         if (str_contains($payload['liveDescription'], ' - ')) {
             $artist = new ArtistData(name: explode(' - ', $payload['liveDescription'])[0]);

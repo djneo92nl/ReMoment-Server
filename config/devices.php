@@ -1,6 +1,11 @@
 <?php
 
 return [
+    'discoverers' => [
+        \App\Integrations\BangOlufsen\Ase\AseDiscovery::class,
+        \App\Integrations\Sonos\SonosDiscovery::class,
+    ],
+
     'Bang & Olufsen' => [
         'BeoSound Essence' => [
             'driver_name' => 'ASE',
@@ -24,6 +29,13 @@ return [
             'driver' => \App\Integrations\BangOlufsen\Ase\MusicPlayerDriver::class,
             'speaker' => 'external',
             'wisa' => true,
+        ],
+    ],
+    'Spotify' => [
+        'Spotify Connect' => [
+            'driver_name' => 'Spotify',
+            'driver' => \App\Integrations\Spotify\MusicPlayerDriver::class,
+            'virtual' => true,
         ],
     ],
 ];

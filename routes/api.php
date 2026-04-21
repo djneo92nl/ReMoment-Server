@@ -11,3 +11,5 @@ Route::post('/devices/{device}/{action}', [DeviceController::class, 'action'])
 
 Route::get('/devices/{device}/volume', [DeviceController::class, 'getVolume']);
 Route::put('/devices/{device}/volume', [DeviceController::class, 'setVolume']);
+
+Route::post('/devices/{device}/radio/{station}', [DeviceController::class, 'playRadio']);
