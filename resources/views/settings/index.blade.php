@@ -52,6 +52,35 @@
             <div class="text-xs text-gray-400 dark:text-gray-600 mt-0.5">of {{ $deviceCount }} {{ $deviceCount === 1 ? 'device' : 'devices' }} active</div>
         </a>
 
+        <!-- Spotify Card -->
+        <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8">
+            <div class="flex items-start justify-between mb-6">
+                <div class="w-12 h-12 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl flex items-center justify-center">
+                    <i class="fa-brands fa-spotify text-emerald-500 text-xl"></i>
+                </div>
+            </div>
+            <h2 class="text-xl font-medium text-gray-900 dark:text-gray-100 mb-1">Spotify</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-500 mb-4">Connect your Spotify account to track playback</p>
+            @if($spotifyConnected)
+                <div class="flex items-center gap-2 mb-4">
+                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>Connected
+                    </span>
+                </div>
+                <form method="POST" action="{{ route('spotify.disconnect') }}">
+                    @csrf
+                    <button type="submit" class="text-xs text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors">
+                        Disconnect
+                    </button>
+                </form>
+            @else
+                <a href="{{ route('spotify.authorize') }}"
+                   class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-xl transition-colors">
+                    <i class="fa-brands fa-spotify"></i> Connect Spotify
+                </a>
+            @endif
+        </div>
+
         <!-- MQTT / Integration Card -->
         <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8">
             <div class="flex items-start justify-between mb-6">
