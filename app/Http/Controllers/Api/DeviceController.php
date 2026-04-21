@@ -7,8 +7,10 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\DeviceDetailResource;
 use App\Http\Resources\Api\DeviceListResource;
 use App\Integrations\Contracts\MediaControlsInterface;
+use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
+use App\Models\RadioStation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -33,26 +35,50 @@ class DeviceController extends Controller
 
         $driver = $device->driver;
 
-        if (! ($driver instanceof MediaControlsInterface)) {
+        if (!($driver instanceof MediaControlsInterface)) {
             return $this->unsupported('media_controls');
         }
 
         try {
             match ($action) {
-                'play'     => $driver->play(),
-                'pause'    => $driver->pause(),
-                'stop'     => $driver->stop(),
-                'next'     => $driver->next(),
+                'play' => $driver->play(),
+                'pause' => $driver->pause(),
+                'stop' => $driver->stop(),
+                'next' => $driver->next(),
                 'previous' => $driver->previous(),
             };
         } catch (\Exception $e) {
             return response()->json([
-                'error'   => 'driver_error',
+                'error' => 'driver_error',
                 'message' => 'The device did not respond: '.$e->getMessage(),
             ], 502);
         }
 
         return response()->json(['status' => 'ok', 'action' => $action]);
+    }
+
+    public function playRadio(Device $device, RadioStation $station): JsonResponse
+    {
+        if ($error = $this->assertReachable($device)) {
+            return $error;
+        }
+
+        $driver = $device->driver;
+
+        if (!($driver instanceof RadioControlInterface)) {
+            return $this->unsupported('radio_control');
+        }
+
+        try {
+            $driver->playRadioStation($station);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'driver_error',
+                'message' => 'The device did not respond: '.$e->getMessage(),
+            ], 502);
+        }
+
+        return response()->json(['status' => 'ok', 'station' => $station->name]);
     }
 
     public function getVolume(Device $device): JsonResponse
@@ -63,7 +89,7 @@ class DeviceController extends Controller
 
         $driver = $device->driver;
 
-        if (! ($driver instanceof VolumeControlInterface)) {
+        if (!($driver instanceof VolumeControlInterface)) {
             return $this->unsupported('volume_control');
         }
 
@@ -80,7 +106,7 @@ class DeviceController extends Controller
 
         $driver = $device->driver;
 
-        if (! ($driver instanceof VolumeControlInterface)) {
+        if (!($driver instanceof VolumeControlInterface)) {
             return $this->unsupported('volume_control');
         }
 
@@ -88,7 +114,7 @@ class DeviceController extends Controller
             $actual = $driver->setVolume($request->integer('volume'));
         } catch (\Exception $e) {
             return response()->json([
-                'error'   => 'driver_error',
+                'error' => 'driver_error',
                 'message' => 'The device did not respond: '.$e->getMessage(),
             ], 502);
         }
@@ -100,7 +126,7 @@ class DeviceController extends Controller
     {
         if ($device->state === State::Unreachable) {
             return response()->json([
-                'error'   => 'unreachable',
+                'error' => 'unreachable',
                 'message' => 'Device is not reachable.',
             ], 503);
         }
@@ -111,7 +137,7 @@ class DeviceController extends Controller
     private function unsupported(string $capability): JsonResponse
     {
         return response()->json([
-            'error'   => 'unsupported',
+            'error' => 'unsupported',
             'message' => "This device does not support {$capability}.",
         ], 422);
     }

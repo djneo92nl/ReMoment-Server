@@ -8,6 +8,7 @@ class Radio
         public ?string $name = null,
         public ?string $genre = null,
         public array $images = [],
+        public ?string $id = null,
     ) {}
 
     public function toArray(): array

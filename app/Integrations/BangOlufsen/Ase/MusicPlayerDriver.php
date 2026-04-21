@@ -12,10 +12,12 @@ use App\Integrations\BangOlufsen\Ase\Connectors\VolumeControls;
 use App\Integrations\Common\HttpConnector;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
+use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
+use App\Models\RadioStation;
 
-class MusicPlayerDriver implements MediaControlsInterface, MusicPlayerDriverInterface, VolumeControlInterface
+class MusicPlayerDriver implements MediaControlsInterface, MusicPlayerDriverInterface, RadioControlInterface, VolumeControlInterface
 {
     use ContentControls;
     use DeviceControls;
@@ -33,6 +35,21 @@ class MusicPlayerDriver implements MediaControlsInterface, MusicPlayerDriverInte
     public function deviceApiClient(): HttpConnector
     {
         return $this->deviceApi;
+    }
+
+    public function radioPlatform(): string
+    {
+        return 'beoradio';
+    }
+
+    public function canPlayRadioStation(RadioStation $station): bool
+    {
+        return $station->getMeta('beoradio') !== null;
+    }
+
+    public function playRadioStation(RadioStation $station): void
+    {
+        $this->playBeoRadioStation($station->getMeta('beoradio'));
     }
 
     public function getCurrentPlayingAttribute(): array

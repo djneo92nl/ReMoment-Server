@@ -8,7 +8,7 @@ trait ContentControls
 
     public function playDlnaTrack(string $url, bool $instant = true): void
     {
-        $path = 'BeoZone/Zone/PlayQueue' . ($instant ? '?instantplay' : '');
+        $path = 'BeoZone/Zone/PlayQueue'.($instant ? '?instantplay' : '');
         $this->deviceApiClient()->post($path, [
             'playQueueItem' => [
                 'behaviour' => 'impulsive',
@@ -19,9 +19,33 @@ trait ContentControls
         ]);
     }
 
+    public function playBeoRadioStation(string $contentId): void
+    {
+        $sources = $this->deviceApiClient()->get('BeoZone/Zone/Sources');
+        $sourceId = null;
+
+        foreach ($sources['sources'] ?? [] as $id => $source) {
+            if (str_starts_with((string) $id, 'beoradio:')) {
+                $sourceId = $id;
+                break;
+            }
+        }
+
+        if ($sourceId === null) {
+            throw new \RuntimeException('No B&O Radio source found on this device.');
+        }
+
+        $this->deviceApiClient()->post('BeoZone/Zone/ActiveSources', [
+            'primaryExperience' => [
+                'source' => ['id' => $sourceId],
+            ],
+            'contentId' => $contentId,
+        ]);
+    }
+
     public function playTuneInStation(string $stationId, bool $instant = true): void
     {
-        $path = 'BeoZone/Zone/PlayQueue' . ($instant ? '?instantplay' : '');
+        $path = 'BeoZone/Zone/PlayQueue'.($instant ? '?instantplay' : '');
         $this->deviceApiClient()->post($path, [
             'playQueueItem' => [
                 'behaviour' => 'impulsive',
@@ -34,7 +58,7 @@ trait ContentControls
 
     public function playDeezerTrack(int $trackId, bool $instant = true): void
     {
-        $path = 'BeoZone/Zone/PlayQueue' . ($instant ? '?instantplay' : '');
+        $path = 'BeoZone/Zone/PlayQueue'.($instant ? '?instantplay' : '');
         $this->deviceApiClient()->post($path, [
             'playQueueItem' => [
                 'behaviour' => 'impulsive',
@@ -47,7 +71,7 @@ trait ContentControls
 
     public function playDeezerPlaylist(int $playlistId, bool $instant = true): void
     {
-        $path = 'BeoZone/Zone/PlayQueue' . ($instant ? '?instantplay' : '');
+        $path = 'BeoZone/Zone/PlayQueue'.($instant ? '?instantplay' : '');
         $this->deviceApiClient()->post($path, [
             'playQueueItem' => [
                 'behaviour' => 'impulsive',
