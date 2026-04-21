@@ -69,11 +69,16 @@ class AdditionalASEDeviceDiscovery extends Command
                 'last_seen' => Carbon::now(),
             ];
 
-            if ($modelName
-                && array_key_exists($manufacturer, config('devices'))
-                && array_key_exists($modelName, config('devices.'.$manufacturer))) {
-                $deviceData['device_driver'] = config('devices.'.$manufacturer.'.'.$modelName)['driver'];
-                $deviceData['device_driver_name'] = config('devices.'.$manufacturer.'.'.$modelName)['driver_name'];
+            $deviceConfig = $modelName
+                ? config('devices.'.$manufacturer.'.'.$modelName)
+                : null;
+
+            if ($deviceConfig) {
+                $deviceData['device_driver'] = $deviceConfig['driver'];
+                $deviceData['device_driver_name'] = $deviceConfig['driver_name'];
+            } elseif (str_contains($manufacturer, 'Olufsen')) {
+                $deviceData['device_driver'] = \App\Integrations\BangOlufsen\Ase\MusicPlayerDriver::class;
+                $deviceData['device_driver_name'] = 'ASE';
             }
 
             if ($device) {
