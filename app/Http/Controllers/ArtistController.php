@@ -37,7 +37,7 @@ class ArtistController extends Controller
             ->get();
 
         $recentPlays = Play::whereHas('track', fn ($q) => $q->where('artist_id', $artist->id))
-            ->with(['track.album', 'device'])
+            ->with(['track.album', 'device', 'radioStation'])
             ->orderByDesc('played_at')
             ->limit(20)
             ->get();

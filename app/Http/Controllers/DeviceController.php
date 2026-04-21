@@ -15,10 +15,10 @@ class DeviceController extends Controller
     public function index()
     {
         $devices = Device::all()->sortByDesc(fn ($d) => match ($d->state) {
-            \App\Domain\Device\State::Playing    => 3,
-            \App\Domain\Device\State::Paused     => 2,
-            \App\Domain\Device\State::Standby    => 1,
-            default                              => 0,
+            \App\Domain\Device\State::Playing => 3,
+            \App\Domain\Device\State::Paused => 2,
+            \App\Domain\Device\State::Standby => 1,
+            default => 0,
         });
 
         return view('devices.index', ['devices' => $devices]);
@@ -26,19 +26,25 @@ class DeviceController extends Controller
 
     public function create()
     {
-        $driverConfig = config('devices');
+        $driverConfig = collect(config('devices'))->except('discoverers')->all();
+
         return view('devices.create', compact('driverConfig'));
     }
 
     public function store(Request $request)
     {
+        $driverConfig = config('devices');
+        $brand = $request->input('device_brand_name', '');
+        $product = $request->input('device_product_type', '');
+        $isVirtual = ($driverConfig[$brand][$product]['virtual'] ?? false) === true;
+
         $validated = $request->validate([
-            'device_name'         => ['required', 'string', 'max:255'],
-            'ip_address'          => ['required', 'string', 'max:255'],
-            'device_brand_name'   => ['required', 'string', 'max:255'],
+            'device_name' => ['required', 'string', 'max:255'],
+            'ip_address' => $isVirtual ? ['nullable', 'string', 'max:255'] : ['required', 'string', 'max:255'],
+            'device_brand_name' => ['required', 'string', 'max:255'],
             'device_product_type' => ['required', 'string', 'max:255'],
-            'device_driver'       => ['required', 'string', 'max:500'],
-            'device_driver_name'  => ['nullable', 'string', 'max:255'],
+            'device_driver' => ['required', 'string', 'max:500'],
+            'device_driver_name' => ['nullable', 'string', 'max:255'],
         ]);
 
         $validated['uuid'] = Str::uuid()->toString();
@@ -88,9 +94,9 @@ class DeviceController extends Controller
             ->sum(fn ($p) => $p->played_at->diffInSeconds($p->ended_at));
 
         $stats = [
-            'total_plays'   => Play::where('device_id', $device->id)->count(),
+            'total_plays' => Play::where('device_id', $device->id)->count(),
             'total_seconds' => (int) $totalSeconds,
-            'top_artist'    => Play::where('device_id', $device->id)
+            'top_artist' => Play::where('device_id', $device->id)
                 ->whereNotNull('track_id')
                 ->join('tracks', 'plays.track_id', '=', 'tracks.id')
                 ->join('artists', 'tracks.artist_id', '=', 'artists.id')
@@ -112,19 +118,25 @@ class DeviceController extends Controller
 
     public function edit(Device $device)
     {
-        $driverConfig = config('devices');
+        $driverConfig = collect(config('devices'))->except('discoverers')->all();
+
         return view('devices.edit', compact('device', 'driverConfig'));
     }
 
     public function update(Request $request, Device $device)
     {
+        $driverConfig = config('devices');
+        $brand = $request->input('device_brand_name', '');
+        $product = $request->input('device_product_type', '');
+        $isVirtual = ($driverConfig[$brand][$product]['virtual'] ?? false) === true;
+
         $validated = $request->validate([
-            'device_name'         => ['required', 'string', 'max:255'],
-            'ip_address'          => ['required', 'string', 'max:255'],
-            'device_brand_name'   => ['required', 'string', 'max:255'],
+            'device_name' => ['required', 'string', 'max:255'],
+            'ip_address' => $isVirtual ? ['nullable', 'string', 'max:255'] : ['required', 'string', 'max:255'],
+            'device_brand_name' => ['required', 'string', 'max:255'],
             'device_product_type' => ['required', 'string', 'max:255'],
-            'device_driver'       => ['required', 'string', 'max:500'],
-            'device_driver_name'  => ['nullable', 'string', 'max:255'],
+            'device_driver' => ['required', 'string', 'max:500'],
+            'device_driver_name' => ['nullable', 'string', 'max:255'],
         ]);
 
         $device->update($validated);

@@ -19,7 +19,7 @@ class AlbumController extends Controller
             ->sum(fn ($p) => $p->played_at->diffInSeconds($p->ended_at));
 
         $recentPlays = Play::whereHas('track', fn ($q) => $q->where('album_id', $album->id))
-            ->with(['track', 'device'])
+            ->with(['track', 'device', 'radioStation'])
             ->orderByDesc('played_at')
             ->limit(20)
             ->get();
