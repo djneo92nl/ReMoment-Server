@@ -26,13 +26,6 @@ class SettingsController extends Controller
         return view('settings.users', compact('users'));
     }
 
-    public function destroyUser(User $user)
-    {
-        $user->delete();
-
-        return redirect()->route('settings.users')->with('success', 'User removed.');
-    }
-
     public function listeners()
     {
         if (app(SpotifyTokenService::class)->isConnected()) {
