@@ -129,6 +129,90 @@
                 </div>
             @endif
 
+            <!-- Sources trigger -->
+            @if(in_array('source_control', $capabilities))
+                @php $ownCount = $sources->where('borrowed', false)->count(); @endphp
+                <button x-data @click="$dispatch('open-modal', 'sources-{{ $device->id }}')"
+                        class="w-full bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 px-8 py-5 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-stone-800/60 transition-colors">
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid fa-input-pipe text-gray-400 dark:text-gray-500"></i>
+                        <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Sources</span>
+                        @if($ownCount > 0)
+                            <span class="text-xs text-gray-400 dark:text-gray-600">{{ $ownCount }}</span>
+                        @endif
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-gray-300 dark:text-stone-600 text-xs"></i>
+                </button>
+
+                <x-modal name="sources-{{ $device->id }}" maxWidth="md">
+                    <div x-data="{ showBorrowed: false }" class="bg-white dark:bg-stone-900 rounded-2xl overflow-hidden">
+                        <div class="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100 dark:border-stone-800">
+                            <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">Sources</h3>
+                            <button type="button" @click="$dispatch('close-modal', 'sources-{{ $device->id }}')"
+                                    class="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-stone-800 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                                <i class="fa-solid fa-xmark text-xs"></i>
+                            </button>
+                        </div>
+
+                        @if($sources->isEmpty())
+                            <div class="px-6 py-8 text-center">
+                                <p class="text-sm text-gray-400 dark:text-gray-600 mb-3">No sources synced yet.</p>
+                                <p class="text-xs text-gray-400 dark:text-gray-600 font-mono">
+                                    GET /api/devices/{{ $device->id }}/sources
+                                </p>
+                            </div>
+                        @else
+                            @php
+                                $categoryIcon = [
+                                    'MUSIC' => 'fa-music',
+                                    'RADIO' => 'fa-radio',
+                                    'MEDIA' => 'fa-photo-film',
+                                ];
+                                $borrowedCount = $sources->where('borrowed', true)->count();
+                            @endphp
+                            <ul class="px-3 py-3 space-y-0.5">
+                                @foreach($sources as $source)
+                                    <li @if($source->borrowed) x-show="showBorrowed" x-cloak @endif
+                                        class="flex items-center gap-3 px-3 py-2 rounded-xl text-sm group">
+                                        <i class="fa-solid {{ $categoryIcon[$source->category] ?? 'fa-circle' }} text-gray-400 dark:text-gray-500 w-4 text-center flex-shrink-0 text-xs"></i>
+                                        <div class="flex-1 min-w-0">
+                                            <span class="text-gray-800 dark:text-gray-200 truncate block">{{ $source->friendly_name }}</span>
+                                            @if($source->borrowed)
+                                                <span class="text-xs text-gray-400 dark:text-gray-600">↳ {{ $source->provider_name }}</span>
+                                            @endif
+                                        </div>
+                                        <span class="text-xs text-gray-400 dark:text-gray-600 flex-shrink-0">{{ $source->category }}</span>
+                                        @if(in_array('source_activation', $capabilities))
+                                            <form method="POST"
+                                                  action="{{ route('devices.sources.activate', [$device, $source]) }}"
+                                                  class="flex-shrink-0">
+                                                @csrf
+                                                <button type="submit"
+                                                        class="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-stone-800 hover:text-gray-700 dark:hover:text-gray-300 transition-colors opacity-0 group-hover:opacity-100">
+                                                    <i class="fa-solid fa-play text-xs"></i>
+                                                </button>
+                                            </form>
+                                        @endif
+                                    </li>
+                                @endforeach
+                            </ul>
+
+                            @if($borrowedCount > 0)
+                                <div class="px-6 py-4 border-t border-gray-100 dark:border-stone-800">
+                                    <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                                        <input type="checkbox" x-model="showBorrowed"
+                                               class="rounded border-gray-300 dark:border-stone-600 text-gray-600 dark:bg-stone-800 focus:ring-0">
+                                        <span class="text-xs text-gray-500 dark:text-gray-400">
+                                            Show {{ $borrowedCount }} borrowed {{ Str::plural('source', $borrowedCount) }}
+                                        </span>
+                                    </label>
+                                </div>
+                            @endif
+                        @endif
+                    </div>
+                </x-modal>
+            @endif
+
             <!-- Device Info Card -->
             <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8">
                 <h2 class="text-base font-medium tracking-tight text-gray-900 dark:text-gray-100 mb-5">Device Info</h2>

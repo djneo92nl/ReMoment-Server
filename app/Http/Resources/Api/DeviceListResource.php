@@ -4,6 +4,8 @@ namespace App\Http\Resources\Api;
 
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\RadioControlInterface;
+use App\Integrations\Contracts\SourceActivationInterface;
+use App\Integrations\Contracts\SourcesInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -40,6 +42,12 @@ class DeviceListResource extends JsonResource
             }
             if ($driver instanceof RadioControlInterface) {
                 $capabilities[] = 'radio_control';
+            }
+            if ($driver instanceof SourcesInterface) {
+                $capabilities[] = 'source_control';
+            }
+            if ($driver instanceof SourceActivationInterface) {
+                $capabilities[] = 'source_activation';
             }
         } catch (\Exception) {
             // Driver not loadable — return empty capabilities

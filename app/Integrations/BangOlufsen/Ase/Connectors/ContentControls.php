@@ -24,9 +24,9 @@ trait ContentControls
         $sources = $this->deviceApiClient()->get('BeoZone/Zone/Sources');
         $sourceId = null;
 
-        foreach ($sources['sources'] ?? [] as $id => $source) {
-            if (str_starts_with((string) $id, 'beoradio:')) {
-                $sourceId = $id;
+        foreach ($sources['sources'] ?? [] as $pair) {
+            if (str_starts_with($pair[0], 'beoradio:')) {
+                $sourceId = $pair[0];
                 break;
             }
         }

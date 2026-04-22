@@ -4,8 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Domain\Device\DeviceCache;
 use App\Integrations\Contracts\MediaControlsInterface;
+use App\Integrations\Contracts\SourceActivationInterface;
+use App\Integrations\Contracts\SourcesInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
+use App\Models\DeviceSource;
 use App\Models\Play;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -69,8 +72,11 @@ class DeviceController extends Controller
                 $capabilities[] = 'volume_control';
                 $volume = $driver->getVolume();
             }
-            if (method_exists($driver, 'getSources')) {
+            if ($driver instanceof SourcesInterface) {
                 $capabilities[] = 'source_control';
+            }
+            if ($driver instanceof SourceActivationInterface) {
+                $capabilities[] = 'source_activation';
             }
             if (method_exists($driver, 'standby')) {
                 $capabilities[] = 'standby';
@@ -87,6 +93,7 @@ class DeviceController extends Controller
 
         $listenerRunning = DeviceCache::isListenerRunning($device->id);
         $mqttTopic = "remoment/player/{$device->id}";
+        $sources = $device->deviceSources()->orderBy('category')->orderBy('friendly_name')->get();
 
         $totalSeconds = Play::where('device_id', $device->id)
             ->whereNotNull('ended_at')
@@ -113,6 +120,7 @@ class DeviceController extends Controller
             'listenerRunning',
             'mqttTopic',
             'stats',
+            'sources',
         ));
     }
 
@@ -142,6 +150,25 @@ class DeviceController extends Controller
         $device->update($validated);
 
         return redirect()->route('devices.show', $device)->with('success', 'Device updated.');
+    }
+
+    public function activateSource(Device $device, DeviceSource $deviceSource)
+    {
+        abort_if($deviceSource->device_id !== $device->id, 403);
+
+        try {
+            $driver = $device->driver;
+
+            if (!($driver instanceof SourceActivationInterface)) {
+                return back()->with('error', "{$device->device_name} does not support source activation.");
+            }
+
+            $driver->activateSource($deviceSource->source_id);
+        } catch (\Throwable $e) {
+            return back()->with('error', "Could not reach {$device->device_name}: {$e->getMessage()}");
+        }
+
+        return back()->with('success', "Switched to {$deviceSource->friendly_name}.");
     }
 
     public function standby(Device $device)

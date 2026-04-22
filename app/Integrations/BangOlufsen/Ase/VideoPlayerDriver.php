@@ -10,11 +10,12 @@ use App\Integrations\BangOlufsen\Ase\Connectors\VolumeControls;
 use App\Integrations\Common\HttpConnector;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
+use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
 use Illuminate\Support\Facades\Cache;
 
-class VideoPlayerDriver implements MediaControlsInterface, MusicPlayerDriverInterface, VolumeControlInterface
+class VideoPlayerDriver implements MediaControlsInterface, MusicPlayerDriverInterface, SourceActivationInterface, VolumeControlInterface
 {
     use ContentControls;
     use DeviceControls;

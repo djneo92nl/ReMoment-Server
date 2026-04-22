@@ -29,9 +29,8 @@ class Device extends Model
     ];
 
     public $casts = [
-        'last_seen' => 'datetime'
+        'last_seen' => 'datetime',
     ];
-
 
     public function toArray(): array
     {
@@ -99,5 +98,10 @@ class Device extends Model
     public function meta(): HasMany
     {
         return $this->hasMany(DeviceMeta::class);
+    }
+
+    public function deviceSources(): HasMany
+    {
+        return $this->hasMany(DeviceSource::class);
     }
 }

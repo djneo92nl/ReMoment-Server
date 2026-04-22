@@ -13,11 +13,13 @@ use App\Integrations\Common\HttpConnector;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
 use App\Integrations\Contracts\RadioControlInterface;
+use App\Integrations\Contracts\SourceActivationInterface;
+use App\Integrations\Contracts\SourcesInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
 use App\Models\RadioStation;
 
-class MusicPlayerDriver implements MediaControlsInterface, MusicPlayerDriverInterface, RadioControlInterface, VolumeControlInterface
+class MusicPlayerDriver implements MediaControlsInterface, MusicPlayerDriverInterface, RadioControlInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
 {
     use ContentControls;
     use DeviceControls;
