@@ -12,13 +12,21 @@ use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
 use App\Events\Device\ProgressUpdated;
 use App\Services\SpotifyTokenService;
+use Illuminate\Support\Facades\Log;
 use SpotifyWebAPI\SpotifyWebAPIException;
 
 class DeviceListener
 {
     protected int $pollIntervalSeconds = 3;
 
+    protected ?\Closure $onError = null;
+
     public function __construct(protected SpotifyTokenService $tokenService) {}
+
+    public function onError(\Closure $callback): void
+    {
+        $this->onError = $callback;
+    }
 
     public function listen(string $deviceId): void
     {
@@ -103,18 +111,25 @@ class DeviceListener
 
             } catch (SpotifyWebAPIException $e) {
                 if ($e->getCode() === 401) {
-                    // Token expired — token service will refresh on next call
                     sleep(5);
 
                     continue;
                 }
 
+                Log::error("Spotify listener [{$deviceId}] API error: {$e->getMessage()}", ['exception' => $e]);
+                if ($this->onError) {
+                    ($this->onError)($e);
+                }
                 cache()->forget($cacheKey);
                 DeviceCache::updateState($deviceId, State::Unreachable);
                 $retryDelaySeconds = min($retryDelaySeconds * 2, $maxRetryDelaySeconds);
                 sleep($retryDelaySeconds);
 
             } catch (\Throwable $e) {
+                Log::error("Spotify listener [{$deviceId}] error: {$e->getMessage()}", ['exception' => $e]);
+                if ($this->onError) {
+                    ($this->onError)($e);
+                }
                 cache()->forget($cacheKey);
                 DeviceCache::updateState($deviceId, State::Unreachable);
                 $retryDelaySeconds = min($retryDelaySeconds * 2, $maxRetryDelaySeconds);

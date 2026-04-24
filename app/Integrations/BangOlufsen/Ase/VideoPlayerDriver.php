@@ -5,21 +5,24 @@ namespace App\Integrations\BangOlufsen\Ase;
 use App\Integrations\BangOlufsen\Ase\Connectors\ContentControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\DeviceControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\MediaControls;
+use App\Integrations\BangOlufsen\Ase\Connectors\MultiRoomControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\SourceControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\VolumeControls;
 use App\Integrations\Common\HttpConnector;
 use App\Integrations\Contracts\MediaControlsInterface;
+use App\Integrations\Contracts\MultiRoomInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
 use Illuminate\Support\Facades\Cache;
 
-class VideoPlayerDriver implements MediaControlsInterface, MusicPlayerDriverInterface, SourceActivationInterface, VolumeControlInterface
+class VideoPlayerDriver implements MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, SourceActivationInterface, VolumeControlInterface
 {
     use ContentControls;
     use DeviceControls;
     use MediaControls;
+    use MultiRoomControls;
     use SourceControls;
     use VolumeControls;
 

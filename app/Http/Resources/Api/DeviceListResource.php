@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Api;
 
 use App\Integrations\Contracts\MediaControlsInterface;
+use App\Integrations\Contracts\MultiRoomInterface;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\SourcesInterface;
@@ -48,6 +49,9 @@ class DeviceListResource extends JsonResource
             }
             if ($driver instanceof SourceActivationInterface) {
                 $capabilities[] = 'source_activation';
+            }
+            if ($driver instanceof MultiRoomInterface) {
+                $capabilities[] = 'multi_room';
             }
         } catch (\Exception) {
             // Driver not loadable — return empty capabilities

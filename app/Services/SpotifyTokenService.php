@@ -81,8 +81,7 @@ class SpotifyTokenService
 
     public function makeApiClient(): SpotifyWebAPI
     {
-        $api = new SpotifyWebAPI;
-        $api->setReturnType(SpotifyWebAPI::RETURN_ASSOC);
+        $api = new SpotifyWebAPI(['return_assoc' => true]);
         $accessToken = $this->getAccessToken();
 
         if ($accessToken) {

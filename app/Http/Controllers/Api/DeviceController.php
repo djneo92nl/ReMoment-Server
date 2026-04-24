@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\DeviceDetailResource;
 use App\Http\Resources\Api\DeviceListResource;
 use App\Integrations\Contracts\MediaControlsInterface;
+use App\Integrations\Contracts\MultiRoomInterface;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\SourcesInterface;
@@ -178,6 +179,95 @@ class DeviceController extends Controller
         }
 
         return response()->json(['volume' => $actual]);
+    }
+
+    public function multiroom(Device $device): JsonResponse
+    {
+        $driver = $device->driver;
+
+        if (!($driver instanceof MultiRoomInterface)) {
+            return $this->unsupported('multi_room');
+        }
+
+        try {
+            $peerIds = $driver->getJoinablePeerIds();
+            $listenerIds = $driver->getCurrentPeerIds();
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'driver_error',
+                'message' => 'The device did not respond: '.$e->getMessage(),
+            ], 502);
+        }
+
+        $joinable = $this->mapPeerIdsToDevices($peerIds, $device);
+        $listeners = $this->mapPeerIdsToDevices($listenerIds, $device);
+
+        return response()->json([
+            'joinable' => $joinable->map(fn ($d) => ['id' => $d->id, 'device_name' => $d->device_name, 'state' => $d->state?->value])->values(),
+            'listeners' => $listeners->map(fn ($d) => ['id' => $d->id, 'device_name' => $d->device_name, 'state' => $d->state?->value])->values(),
+        ]);
+    }
+
+    public function multiroomJoin(Request $request, Device $device): JsonResponse
+    {
+        $request->validate(['host_device_id' => ['required', 'integer', 'exists:devices,id']]);
+
+        $driver = $device->driver;
+
+        if (!($driver instanceof MultiRoomInterface)) {
+            return $this->unsupported('multi_room');
+        }
+
+        $hostDevice = Device::findOrFail($request->integer('host_device_id'));
+
+        try {
+            $driver->joinSession($hostDevice);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'driver_error',
+                'message' => 'The device did not respond: '.$e->getMessage(),
+            ], 502);
+        }
+
+        return response()->json(['status' => 'ok', 'joined' => $hostDevice->device_name]);
+    }
+
+    public function multiroomLeave(Device $device): JsonResponse
+    {
+        $driver = $device->driver;
+
+        if (!($driver instanceof MultiRoomInterface)) {
+            return $this->unsupported('multi_room');
+        }
+
+        try {
+            $driver->leaveSession();
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'driver_error',
+                'message' => 'The device did not respond: '.$e->getMessage(),
+            ], 502);
+        }
+
+        return response()->json(['status' => 'ok']);
+    }
+
+    private function mapPeerIdsToDevices(array $ids, Device $exclude): \Illuminate\Support\Collection
+    {
+        if (empty($ids)) {
+            return collect();
+        }
+
+        $driver = $exclude->driver;
+        if (!($driver instanceof MultiRoomInterface)) {
+            return collect();
+        }
+
+        $metaKey = $driver->multiRoomMetaKey();
+
+        return Device::whereHas('meta', function ($q) use ($ids, $metaKey) {
+            $q->where('key', $metaKey)->whereIn('value', $ids);
+        })->where('id', '!=', $exclude->id)->get();
     }
 
     private function assertReachable(Device $device): ?JsonResponse

@@ -113,6 +113,7 @@
                         'standby'        => ['fa-power-off',   'Standby'],
                         'speaker_groups' => ['fa-speaker',     'Speaker Groups'],
                         'sound_modes'    => ['fa-sliders',     'Sound Modes'],
+                        'multi_room'     => ['fa-layer-group', 'Multiroom'],
                     ];
                 @endphp
                 <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8">

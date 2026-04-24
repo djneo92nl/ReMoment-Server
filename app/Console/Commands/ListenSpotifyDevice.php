@@ -17,7 +17,10 @@ class ListenSpotifyDevice extends Command
     {
         $device = SpotifyDevice::findOrProvision();
 
+        $this->info('Listening to Spotify (device '.$device->id.')');
+
         $listener = new DeviceListener(app(SpotifyTokenService::class));
+        $listener->onError(fn (\Throwable $e) => $this->error('[error] '.$e->getMessage()));
         $listener->listen((string) $device->id);
     }
 }

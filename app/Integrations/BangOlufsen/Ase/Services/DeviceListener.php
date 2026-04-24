@@ -15,6 +15,7 @@ use App\Events\Device\NowPlayingUpdated;
 use App\Events\Device\ProgressUpdated;
 use App\Events\Device\VolumeUpdated;
 use GuzzleHttp\Client;
+use Illuminate\Support\Facades\Log;
 
 class DeviceListener
 {
@@ -30,6 +31,13 @@ class DeviceListener
             'read_timeout' => 0,   // allow streaming
             'stream' => true,
         ]);
+    }
+
+    protected ?\Closure $onError = null;
+
+    public function onError(\Closure $callback): void
+    {
+        $this->onError = $callback;
     }
 
     public function listen(string $deviceId)
@@ -86,6 +94,13 @@ class DeviceListener
                 }
             } catch (\Throwable $e) {
                 $hadError = true;
+                Log::error("ASE listener [{$deviceId}] error: {$e->getMessage()}", [
+                    'exception' => $e,
+                    'url' => $this->url,
+                ]);
+                if ($this->onError) {
+                    ($this->onError)($e);
+                }
             } finally {
                 cache()->forget($cacheKey);
                 DeviceCache::updateState($deviceId, State::Unreachable);
@@ -113,7 +128,7 @@ class DeviceListener
                     deviceId: $deviceId,
                     nowPlaying: $this->parseNetRadio($data),
                     sourceType: 'radio',
-                    timestamp: $n['timestamp'] ?? null,
+                    timestamp: isset($n['timestamp']) ? (int) $n['timestamp'] : null,
                 ));
                 break;
 

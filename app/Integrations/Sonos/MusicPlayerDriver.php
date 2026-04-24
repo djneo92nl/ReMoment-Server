@@ -3,9 +3,11 @@
 namespace App\Integrations\Sonos;
 
 use App\Integrations\Contracts\MediaControlsInterface;
+use App\Integrations\Contracts\MultiRoomInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
+use App\Integrations\Sonos\Connectors\MultiRoomControls;
 use App\Models\Device;
 use App\Models\RadioStation;
 use duncan3dc\Sonos\Controller;
@@ -13,8 +15,10 @@ use duncan3dc\Sonos\Devices\Collection;
 use duncan3dc\Sonos\Network;
 use duncan3dc\Sonos\Tracks\Stream;
 
-class MusicPlayerDriver implements MediaControlsInterface, MusicPlayerDriverInterface, RadioControlInterface, VolumeControlInterface
+class MusicPlayerDriver implements MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, RadioControlInterface, VolumeControlInterface
 {
+    use MultiRoomControls;
+
     public Controller $deviceApi;
 
     public function __construct(public Device $device)

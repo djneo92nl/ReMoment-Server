@@ -53,6 +53,8 @@ All drivers implement interfaces from `app/Integrations/Contracts/`:
 - `MusicPlayerDriverInterface` – current playback state
 - `MediaControlsInterface` – play/pause/next/previous/stop
 - `VolumeControlInterface` – volume and mute
+- `SourcesInterface` / `SourceActivationInterface` – list and activate sources (ASE only)
+- `MultiRoomInterface` – join/leave multiroom sessions (ASE + Sonos)
 
 ### Domain vs. Model Layer
 
@@ -92,6 +94,32 @@ Topics:
 - `remoment/player/{id}/data` – JSON: `{track, artist, artwork?: {proxy_512, proxy_320, colors}}`
 - `remoment/player/{id}/progress` – progress percentage (0–100)
 
+### Multiroom / Device Joining
+
+`MultiRoomInterface` (`app/Integrations/Contracts/MultiRoomInterface.php`) is implemented by both ASE and Sonos drivers. It allows devices of the same platform to join each other's playback sessions.
+
+**ASE implementation** (`app/Integrations/BangOlufsen/Ase/Connectors/MultiRoomControls.php`):
+- `getMultiRoomId()` – fetches the B&O JID (`activeSources.primaryJid`) from the device; cached in Redis and stored in `device_meta` as key `ase_jid`
+- `getJoinablePeerIds()` – returns JIDs from `primaryExperience.listenerList._capabilities.value["listener.jid"]` (note: literal dot in key, use direct array access not `data_get`)
+- `joinSession(Device $host)` – `POST {this.ip}:8080/BeoZone/Zone/ActiveSources/primaryExperience` with host JID in body
+- `leaveSession()` – `DELETE {this.ip}:8080/BeoZone/Zone/ActiveSources/primaryExperience`
+
+**Sonos implementation** (`app/Integrations/Sonos/Connectors/MultiRoomControls.php`):
+- `joinSession(Device $host)` – constructs per-IP `Network` for both host and self, calls Sonos `SetAVTransportURI` SOAP action at the Speaker level (avoids coordinator requirement)
+- `leaveSession()` – calls `BecomeCoordinatorOfStandaloneGroup` SOAP action on the speaker
+- `getJoinablePeerIds()` returns `[]`; UI falls back to showing all Sonos devices
+
+**JID-to-Device lookup** (used in API and Livewire): query `device_meta` where `key IN ('ase_jid', 'sonos_uuid')` and `value IN ($peerIds)`.
+
+Populate JIDs for all B&O devices with: `php artisan devices:sync-sources`
+
+**API endpoints:**
+- `GET /api/devices/{id}/multiroom` – joinable and currently-listening devices
+- `POST /api/devices/{id}/multiroom/join` – body: `{host_device_id}`
+- `DELETE /api/devices/{id}/multiroom/leave`
+
+**UI:** The "Multiroom" button appears on the device card footer for multiroom-capable devices. It opens a modal (Alpine.js overlay + Livewire data) showing sessions to join and, when playing, devices to invite or currently listening.
+
 ### Local Package
 
 `packages/duncan3dc/sonos` is a local fork of the Sonos library (on branch `laravel12`). Changes here are not published upstream.
@@ -112,7 +140,7 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 ### Livewire Components
 
 - `Nowplaying` (`app/Livewire/Nowplaying.php`) — full playback card with transport + volume controls, polls every 1s
-- `DeviceCard` (`app/Livewire/DeviceCard.php`) — compact standby/unreachable card, polls every 5s; shows a color gradient from `ArtworkCache` when artwork has been processed
+- `DeviceCard` (`app/Livewire/DeviceCard.php`) — compact standby/unreachable card, polls every 1s; shows a color gradient from `ArtworkCache` when artwork has been processed; includes "Multiroom" button for capable devices that opens a join/invite modal
 - `DeviceHistory` (`app/Livewire/DeviceHistory.php`) — last 10 unique tracks for a device
 - `PlayHistory` (`app/Livewire/PlayHistory.php`) — paginated play history with device/source filters
 

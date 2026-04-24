@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Integrations\BangOlufsen\Ase\Services\DeviceListener;
 use App\Models\Device;
 use Illuminate\Console\Command;
 
@@ -18,7 +19,10 @@ class ListenAseSingleDevice extends Command
         $device = Device::find($id);
         $url = 'http://'.$device->ip_address.':8080/BeoNotify/Notifications';
 
-        $listener = new \App\Integrations\BangOlufsen\Ase\Services\DeviceListener($url);
+        $this->info("Listening to {$device->device_name} ({$device->ip_address})");
+
+        $listener = new DeviceListener($url);
+        $listener->onError(fn (\Throwable $e) => $this->error('[error] '.$e->getMessage()));
         $listener->listen($id);
     }
 }

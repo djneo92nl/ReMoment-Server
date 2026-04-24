@@ -16,3 +16,7 @@ Route::get('/devices/{device}/sources', [DeviceController::class, 'sources']);
 Route::post('/devices/{device}/sources/activate', [DeviceController::class, 'activateSource']);
 
 Route::post('/devices/{device}/radio/{station}', [DeviceController::class, 'playRadio']);
+
+Route::get('/devices/{device}/multiroom', [DeviceController::class, 'multiroom']);
+Route::post('/devices/{device}/multiroom/join', [DeviceController::class, 'multiroomJoin']);
+Route::delete('/devices/{device}/multiroom/leave', [DeviceController::class, 'multiroomLeave']);

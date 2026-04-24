@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Integrations\Contracts\MultiRoomInterface;
 use App\Integrations\Contracts\SourcesInterface;
 use App\Models\Device;
 use Illuminate\Console\Command;
@@ -53,6 +54,14 @@ class SyncDeviceSources extends Command
             );
 
             $this->info("  Synced {$device->device_name}: ".count($sources).' sources');
+
+            if ($driver instanceof MultiRoomInterface) {
+                try {
+                    $driver->getMultiRoomId();
+                } catch (\Throwable) {
+                    // Non-fatal — JID will be populated on next successful API call
+                }
+            }
         }
 
         return self::SUCCESS;
