@@ -68,7 +68,7 @@ class RadioStationController extends Controller
                 $radio->setMeta($platform, $identifier);
             } else {
                 $radio->meta()->where('key', $platform)->delete();
-                $radio->unsetRelation('identifiers');
+                $radio->unsetRelation('meta');
             }
         }
 

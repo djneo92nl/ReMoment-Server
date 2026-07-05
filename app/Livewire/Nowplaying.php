@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Domain\Device\DeviceCache;
+use App\Integrations\Contracts\VolumeControlInterface;
 use Livewire\Component;
 
 class Nowplaying extends Component
@@ -16,7 +17,14 @@ class Nowplaying extends Component
     public function mount($device)
     {
         $this->device = $device;
-        $this->volume = $device->driver->getVolume();
+        try {
+            $driver = $device->driver;
+            if ($driver instanceof VolumeControlInterface) {
+                $this->volume = $driver->getVolume();
+            }
+        } catch (\Throwable) {
+            $this->volume = 0;
+        }
         $this->listenerRunning = DeviceCache::isListenerRunning($device->id);
     }
 
@@ -28,32 +36,43 @@ class Nowplaying extends Component
 
     public function updatedVolume($value)
     {
-        $this->device->driver->setVolume($value);
+        try {
+            $driver = $this->device->driver;
+            if ($driver instanceof VolumeControlInterface) {
+                $driver->setVolume($value);
+            }
+        } catch (\Throwable) {
+        }
         $this->volume = $value;
     }
 
     public function play()
     {
-        $this->device->driver->play();
+        try { $this->device->driver->play(); } catch (\Throwable) {}
     }
 
     public function pause()
     {
-        $this->device->driver->pause();
+        try { $this->device->driver->pause(); } catch (\Throwable) {}
     }
 
     public function next()
     {
-        $this->device->driver->next();
+        try { $this->device->driver->next(); } catch (\Throwable) {}
     }
 
     public function previous()
     {
-        $this->device->driver->previous();
+        try { $this->device->driver->previous(); } catch (\Throwable) {}
     }
 
     public function standby()
     {
-        $this->device->driver->standby();
+        try {
+            $driver = $this->device->driver;
+            if (method_exists($driver, 'standby')) {
+                $driver->standby();
+            }
+        } catch (\Throwable) {}
     }
 }

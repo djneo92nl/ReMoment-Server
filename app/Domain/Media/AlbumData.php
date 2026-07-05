@@ -9,6 +9,7 @@ class AlbumData
         public array $images = [],
         public ?ArtistData $artist = null,
         public ?string $released_at = null,
+        public ?string $source = null,
     ) {}
 
     public function toArray(): array
@@ -18,6 +19,7 @@ class AlbumData
             'images' => $this->images,
             'artist' => $this->artist?->toArray(),
             'released_at' => $this->released_at,
+            'source' => $this->source,
         ], fn ($value) => $value !== null);
     }
 }
