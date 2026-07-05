@@ -5,11 +5,10 @@
                 <h1 class="text-3xl md:text-4xl font-medium tracking-tight dark:text-gray-100 text-gray-900">Radio</h1>
                 <p class="mt-1.5 text-gray-500 dark:text-gray-500">{{ $stations->count() }} {{ Str::plural('station', $stations->count()) }} in your library</p>
             </div>
-            <a href="{{ route('radio.create') }}"
-               class="flex items-center gap-2 px-5 py-2.5 bg-gray-900 dark:bg-stone-700 text-white rounded-2xl text-sm font-medium hover:bg-gray-700 dark:hover:bg-stone-600 transition-colors">
+            <x-primary-button href="{{ route('radio.create') }}">
                 <i class="fa-solid fa-plus"></i>
                 Add station
-            </a>
+            </x-primary-button>
         </div>
     </x-slot>
 
@@ -18,10 +17,9 @@
             <i class="fa-solid fa-radio text-4xl text-gray-200 dark:text-stone-700 mb-4"></i>
             <p class="text-gray-500 dark:text-gray-500 font-medium mb-1">No radio stations yet</p>
             <p class="text-gray-400 dark:text-gray-600 text-sm mb-6">Add a station and set platform identifiers to play it on any supported device</p>
-            <a href="{{ route('radio.create') }}"
-               class="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-900 dark:bg-stone-700 text-white rounded-2xl text-sm font-medium hover:bg-gray-700 dark:hover:bg-stone-600 transition-colors">
+            <x-primary-button href="{{ route('radio.create') }}">
                 <i class="fa-solid fa-plus"></i>Add station
-            </a>
+            </x-primary-button>
         </div>
     @else
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -1,10 +1,9 @@
 <div>
     {{-- Scan button --}}
     <div class="flex items-center gap-4 mb-8">
-        <button wire:click="scan" wire:loading.attr="disabled"
-                class="flex items-center gap-2 px-6 py-2.5 bg-gray-900 dark:bg-stone-700 text-white rounded-2xl text-sm font-medium hover:bg-gray-700 dark:hover:bg-stone-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+        <x-primary-button size="xl" wire:click="scan" wire:loading.attr="disabled">
             <span wire:loading.remove wire:target="scan">
-                <i class="fa-solid fa-magnifying-glass mr-1"></i>Scan Network
+                <i class="fa-solid fa-magnifying-glass"></i>Scan Network
             </span>
             <span wire:loading wire:target="scan" class="flex items-center gap-2">
                 <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
@@ -13,7 +12,7 @@
                 </svg>
                 Scanning...
             </span>
-        </button>
+        </x-primary-button>
 
         @if($done && count($results) > 0)
             <div class="flex items-center gap-3 ml-auto">
@@ -84,16 +83,16 @@
                    class="px-5 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
                     Cancel
                 </a>
-                <button wire:click="addSelected"
+                <x-primary-button size="xl"
+                        wire:click="addSelected"
                         wire:loading.attr="disabled"
-                        @if(collect($results)->where('selected', true)->isEmpty()) disabled @endif
-                        class="flex items-center gap-2 px-6 py-2.5 bg-gray-900 dark:bg-stone-700 text-white rounded-2xl text-sm font-medium hover:bg-gray-700 dark:hover:bg-stone-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                        @if(collect($results)->where('selected', true)->isEmpty()) disabled @endif>
                     <span wire:loading.remove wire:target="addSelected">
-                        <i class="fa-solid fa-plus mr-1"></i>
+                        <i class="fa-solid fa-plus"></i>
                         Add {{ collect($results)->where('selected', true)->count() }} Device{{ collect($results)->where('selected', true)->count() !== 1 ? 's' : '' }}
                     </span>
                     <span wire:loading wire:target="addSelected">Saving&hellip;</span>
-                </button>
+                </x-primary-button>
             </div>
         @endif
     @endif

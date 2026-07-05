@@ -1,3 +1,17 @@
-<button {{ $attributes->merge(['type' => 'submit', 'class' => 'inline-flex items-center px-4 py-2 bg-gray-800 dark:bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-white dark:text-gray-800 uppercase tracking-widest hover:bg-gray-700 dark:hover:bg-white focus:bg-gray-700 dark:focus:bg-white active:bg-gray-900 dark:active:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150']) }}>
-    {{ $slot }}
-</button>
+@props(['size' => 'lg'])
+@php
+    $sizes = [
+        'sm' => 'px-3 py-1.5 text-xs rounded-xl',
+        'md' => 'px-4 py-2 text-sm rounded-xl',
+        'lg' => 'px-5 py-2.5 text-sm rounded-2xl',
+        'xl' => 'px-6 py-2.5 text-sm rounded-2xl',
+    ];
+    $cls = 'inline-flex items-center gap-2 font-medium ' . ($sizes[$size] ?? $sizes['lg'])
+         . ' bg-gray-900 dark:bg-stone-700 text-white hover:bg-gray-700 dark:hover:bg-stone-600'
+         . ' transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
+@endphp
+@if($attributes->has('href'))
+    <a {{ $attributes->merge(['class' => $cls]) }}>{{ $slot }}</a>
+@else
+    <button {{ $attributes->merge(['type' => 'submit', 'class' => $cls]) }}>{{ $slot }}</button>
+@endif

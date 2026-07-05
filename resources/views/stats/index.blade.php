@@ -20,7 +20,7 @@
         </div>
     </div>
 
-    <div class="grid gap-7 lg:grid-cols-2">
+    <div class="grid gap-6 lg:grid-cols-2">
 
         {{-- Top Artists --}}
         <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8">

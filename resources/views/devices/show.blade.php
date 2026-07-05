@@ -2,10 +2,7 @@
     <x-slot name="header">
         <div class="flex items-start justify-between gap-4">
             <div class="flex items-start gap-4">
-                <a href="{{ route('devices.index') }}"
-                   class="mt-1 flex items-center justify-center w-9 h-9 rounded-xl bg-gray-100 dark:bg-stone-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-stone-700 transition-colors flex-shrink-0">
-                    <i class="fa-solid fa-arrow-left text-sm"></i>
-                </a>
+                <x-back-button href="{{ route('devices.index') }}" class="mt-1" />
                 <div>
                     <h1 class="text-3xl md:text-4xl font-medium tracking-tight dark:text-gray-100 text-gray-900">{{ $device->device_name }}</h1>
                     <p class="mt-1.5 text-gray-500 dark:text-gray-500">
@@ -35,17 +32,16 @@
                       onsubmit="return confirm('Remove {{ addslashes($device->device_name) }}? This cannot be undone.')">
                     @csrf
                     @method('DELETE')
-                    <button type="submit"
-                            class="flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl text-sm font-medium hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors">
+                    <x-danger-button>
                         <i class="fa-solid fa-trash"></i>
                         <span class="hidden sm:inline">Remove</span>
-                    </button>
+                    </x-danger-button>
                 </form>
             </div>
         </div>
     </x-slot>
 
-    <div class="grid gap-7 lg:grid-cols-3">
+    <div class="grid gap-6 lg:grid-cols-3">
 
         <!-- Left: Now Playing / Controls + History -->
         <div class="lg:col-span-2 space-y-6">
@@ -146,7 +142,7 @@
                 </button>
 
                 <x-modal name="sources-{{ $device->id }}" maxWidth="md">
-                    <div x-data="{ showBorrowed: false }" class="bg-white dark:bg-stone-900 rounded-2xl overflow-hidden">
+                    <div x-data="{ showBorrowed: false }">
                         <div class="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100 dark:border-stone-800">
                             <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">Sources</h3>
                             <button type="button" @click="$dispatch('close-modal', 'sources-{{ $device->id }}')"

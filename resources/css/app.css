@@ -1,3 +1,22 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+    [x-cloak] { display: none !important; }
+
+    input[type=range]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #374151;
+        cursor: pointer;
+    }
+
+    input[type=range]::-webkit-slider-runnable-track {
+        height: 6px;
+        border-radius: 9999px;
+        background: #e5e7eb;
+    }
+}

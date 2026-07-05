@@ -1,6 +1,6 @@
 <div>
     {{-- Filter bar --}}
-    <div class="bg-white dark:bg-stone-900 rounded-2xl border border-gray-200/70 dark:border-stone-800/80 shadow-sm p-4 mb-6 space-y-3">
+    <div class="bg-white dark:bg-stone-900 rounded-3xl border border-gray-200/70 dark:border-stone-800/80 shadow-sm p-4 mb-6 space-y-3">
 
         {{-- Row 1: Search + Device + Dates --}}
         <div class="flex flex-wrap gap-3 items-center">
@@ -15,13 +15,12 @@
             </div>
 
             {{-- Device filter --}}
-            <select wire:model.live="deviceId"
-                    class="text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 text-gray-700 dark:text-gray-300 rounded-xl px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-stone-600 appearance-none cursor-pointer">
+            <x-select wire:model.live="deviceId">
                 <option value="">All devices</option>
                 @foreach($devices as $device)
                     <option value="{{ $device->id }}">{{ $device->device_name }}</option>
                 @endforeach
-            </select>
+            </x-select>
 
             {{-- Date range --}}
             <input wire:model.live="dateFrom" type="date"
