@@ -50,6 +50,13 @@
                 @endif
             </li>
             <li>
+                <a href="{{ route('multiroom.index') }}"
+                   class="flex items-center gap-3 px-5 py-3.5 rounded-xl transition-colors {{ request()->routeIs('multiroom.*') ? 'bg-gray-100 dark:bg-stone-800 font-medium text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-stone-800/50' }}">
+                    <i class="fa-solid fa-layer-group w-5 {{ request()->routeIs('multiroom.*') ? 'text-gray-700 dark:text-gray-300' : '' }}"></i>
+                    Multiroom
+                </a>
+            </li>
+            <li>
                 <a href="{{ route('stats.index') }}"
                    class="flex items-center gap-3 px-5 py-3.5 rounded-xl transition-colors {{ request()->routeIs('stats.*') ? 'bg-gray-100 dark:bg-stone-800 font-medium text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-stone-800/50' }}">
                     <i class="fa-solid fa-chart-simple w-5 {{ request()->routeIs('stats.*') ? 'text-gray-700 dark:text-gray-300' : '' }}"></i>

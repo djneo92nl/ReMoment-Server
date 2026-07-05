@@ -21,6 +21,8 @@ Route::post('/devices/{device}/standby', [DeviceController::class, 'standby'])->
 Route::post('/devices/{device}/sources/{deviceSource}/activate', [DeviceController::class, 'activateSource'])->name('devices.sources.activate');
 Route::get('/history', [HistoryController::class, 'index'])->name('history.index');
 Route::get('/stats', [StatsController::class, 'index'])->name('stats.index');
+Route::get('/multiroom', fn () => view('multiroom.index'))->name('multiroom.index');
+Route::get('/receiver', fn () => view('receiver'))->name('receiver');
 Route::get('/artists', [ArtistController::class, 'index'])->name('artists.index');
 Route::resource('radio', RadioStationController::class);
 Route::post('/radio/{radio}/play/{device}', [RadioStationController::class, 'play'])->name('radio.play');

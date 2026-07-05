@@ -4,8 +4,15 @@
         <p class="mt-1.5 text-gray-500 dark:text-gray-500">Your listening stats across all devices</p>
     </x-slot>
 
+    @php
+        $listeningHours = $listeningSeconds > 0 ? floor($listeningSeconds / 3600) : 0;
+        $listeningMins  = $listeningSeconds > 0 ? floor(($listeningSeconds % 3600) / 60) : 0;
+        $listeningLabel = $listeningHours > 0 ? "{$listeningHours}h {$listeningMins}m" : ($listeningMins > 0 ? "{$listeningMins}m" : '—');
+        $skipRate       = $totalPlays > 0 ? round($skippedPlays / $totalPlays * 100) : 0;
+    @endphp
+
     {{-- Overview numbers --}}
-    <div class="grid grid-cols-3 gap-4 mb-8">
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
         <div class="bg-white dark:bg-stone-900 rounded-2xl border border-gray-200/70 dark:border-stone-800/80 shadow-sm p-6 text-center">
             <p class="text-3xl font-medium text-gray-900 dark:text-gray-100">{{ number_format($totalPlays) }}</p>
             <p class="text-xs text-gray-400 dark:text-gray-600 mt-1 uppercase tracking-wider">Total plays</p>
@@ -17,6 +24,36 @@
         <div class="bg-white dark:bg-stone-900 rounded-2xl border border-gray-200/70 dark:border-stone-800/80 shadow-sm p-6 text-center">
             <p class="text-3xl font-medium text-gray-900 dark:text-gray-100">{{ number_format($totalArtists) }}</p>
             <p class="text-xs text-gray-400 dark:text-gray-600 mt-1 uppercase tracking-wider">Artists</p>
+        </div>
+        <div class="bg-white dark:bg-stone-900 rounded-2xl border border-gray-200/70 dark:border-stone-800/80 shadow-sm p-6 text-center">
+            <p class="text-3xl font-medium text-gray-900 dark:text-gray-100">{{ $listeningLabel }}</p>
+            <p class="text-xs text-gray-400 dark:text-gray-600 mt-1 uppercase tracking-wider">Listened</p>
+        </div>
+        <div class="bg-white dark:bg-stone-900 rounded-2xl border border-gray-200/70 dark:border-stone-800/80 shadow-sm p-6 text-center">
+            <p class="text-3xl font-medium text-gray-900 dark:text-gray-100">{{ $skipRate }}%</p>
+            <p class="text-xs text-gray-400 dark:text-gray-600 mt-1 uppercase tracking-wider">Skipped</p>
+        </div>
+    </div>
+
+    {{-- Last 30 days trend --}}
+    @php $trendMax = $last30Days->max() ?: 1; @endphp
+    <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8 mb-6">
+        <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">Last 30 Days</h2>
+        <div class="flex items-end gap-0.5 h-16">
+            @foreach($last30Days as $day => $count)
+                <div class="flex-1 rounded-t-sm transition-all"
+                     style="height: {{ $trendMax > 0 ? round($count / $trendMax * 100) : 0 }}%; min-height: {{ $count > 0 ? '2px' : '0' }}; background: {{ $count > 0 ? '#111827' : '#f3f4f6' }};"
+                     title="{{ $day }} — {{ number_format($count) }} plays"></div>
+            @endforeach
+        </div>
+        <div class="flex mt-1.5">
+            @foreach($last30Days->keys() as $i => $day)
+                <div class="flex-1 text-center">
+                    @if($i === 0 || $i === 14 || $i === 29)
+                        <span class="text-[9px] text-gray-300 dark:text-stone-600">{{ \Carbon\Carbon::parse($day)->format('j M') }}</span>
+                    @endif
+                </div>
+            @endforeach
         </div>
     </div>
 
@@ -95,6 +132,71 @@
                                 <div class="h-1.5 bg-gray-100 dark:bg-stone-800 rounded-full overflow-hidden">
                                     <div class="h-full bg-gray-900 dark:bg-gray-100 rounded-full"
                                          style="width: {{ $maxPlays > 0 ? round($album->plays_count / $maxPlays * 100) : 0 }}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+        </div>
+
+        {{-- Top Tracks --}}
+        <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8">
+            <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">Top Tracks</h2>
+            @if($topTracks->isEmpty())
+                <p class="text-sm text-gray-400 dark:text-gray-600">No data yet</p>
+            @else
+                @php $maxPlays = $topTracks->first()->plays_count; @endphp
+                <div class="space-y-3">
+                    @foreach($topTracks as $i => $track)
+                        <div class="flex items-center gap-3">
+                            <span class="w-5 text-center text-xs text-gray-300 dark:text-stone-600 flex-shrink-0">{{ $i + 1 }}</span>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center justify-between mb-1">
+                                    <div class="min-w-0">
+                                        <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{{ $track->name }}</p>
+                                        <p class="text-xs text-gray-400 dark:text-gray-600 truncate">
+                                            {{ $track->artist?->name }}
+                                            @if($track->album)
+                                                · {{ $track->album->name }}
+                                            @endif
+                                        </p>
+                                    </div>
+                                    <span class="text-xs text-gray-400 dark:text-gray-600 flex-shrink-0 ml-2">
+                                        {{ number_format($track->plays_count) }}
+                                    </span>
+                                </div>
+                                <div class="h-1.5 bg-gray-100 dark:bg-stone-800 rounded-full overflow-hidden">
+                                    <div class="h-full bg-gray-900 dark:bg-gray-100 rounded-full"
+                                         style="width: {{ $maxPlays > 0 ? round($track->plays_count / $maxPlays * 100) : 0 }}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+        </div>
+
+        {{-- Source distribution --}}
+        <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8">
+            <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">By Source</h2>
+            @if($sourceDistribution->isEmpty())
+                <p class="text-sm text-gray-400 dark:text-gray-600">No data yet</p>
+            @else
+                @php $sourceMax = $sourceDistribution->first()->count; @endphp
+                <div class="space-y-3">
+                    @foreach($sourceDistribution as $row)
+                        <div class="flex items-center gap-3">
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center justify-between mb-1">
+                                    <span class="text-sm font-medium text-gray-900 dark:text-gray-100 capitalize">
+                                        {{ $row->source_type === 'unknown' ? 'Other' : $row->source_type }}
+                                    </span>
+                                    <span class="text-xs text-gray-400 dark:text-gray-600 ml-2">{{ number_format($row->count) }}</span>
+                                </div>
+                                <div class="h-1.5 bg-gray-100 dark:bg-stone-800 rounded-full overflow-hidden">
+                                    <div class="h-full bg-gray-900 dark:bg-gray-100 rounded-full"
+                                         style="width: {{ $sourceMax > 0 ? round($row->count / $sourceMax * 100) : 0 }}%"></div>
                                 </div>
                             </div>
                         </div>
