@@ -7,8 +7,12 @@ use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
+use App\Integrations\Contracts\RadioControlInterface;
+use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
+use App\Models\Play;
+use App\Models\RadioStation;
 use Livewire\Component;
 
 class DeviceCard extends Component
@@ -22,6 +26,14 @@ class DeviceCard extends Component
     public bool $standalone = false; // disables md:col-span-2 (use on show page)
 
     public bool $supportsMultiRoom = false;
+
+    public bool $supportsSourceActivation = false;
+
+    public bool $supportsRadio = false;
+
+    public array $quickSources = [];
+
+    public ?array $lastRadioStation = null;
 
     // Multiroom modal state
     public bool $multiRoomDataLoaded = false;
@@ -39,9 +51,49 @@ class DeviceCard extends Component
         $this->device = $device;
         $this->refresh();
         try {
-            $this->supportsMultiRoom = $device->driver instanceof MultiRoomInterface;
+            $driver = $device->driver;
+            $this->supportsMultiRoom = $driver instanceof MultiRoomInterface;
+            $this->supportsSourceActivation = $driver instanceof SourceActivationInterface;
+            $this->supportsRadio = $driver instanceof RadioControlInterface;
         } catch (\Throwable) {
             $this->supportsMultiRoom = false;
+            $this->supportsSourceActivation = false;
+            $this->supportsRadio = false;
+        }
+
+        if ($this->supportsSourceActivation) {
+            $streamingTypes = ['spotify', 'deezer', 'tidal', 'qobuz'];
+            $this->quickSources = $device->deviceSources()
+                ->where('borrowed', false)
+                ->where('hidden', false)
+                ->whereNotIn('source_type', $streamingTypes)
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->get()
+                ->map(fn ($s) => [
+                    'id' => $s->source_id,
+                    'name' => $s->friendly_name,
+                    'type' => $s->source_type,
+                    'category' => $s->category,
+                ])
+                ->values()
+                ->all();
+        }
+
+        if ($this->supportsRadio) {
+            $lastPlay = Play::where('device_id', $device->id)
+                ->where('source_type', 'radio')
+                ->whereNotNull('radio_station_id')
+                ->with('radioStation')
+                ->latest('played_at')
+                ->first();
+
+            if ($lastPlay?->radioStation) {
+                $this->lastRadioStation = [
+                    'id' => $lastPlay->radioStation->id,
+                    'name' => $lastPlay->radioStation->name,
+                ];
+            }
         }
     }
 
@@ -75,6 +127,38 @@ class DeviceCard extends Component
     public function standby(): void
     {
         $this->withDriver(fn ($d) => $d->standby());
+    }
+
+    public function playLastRadioStation(): void
+    {
+        if (!$this->lastRadioStation) {
+            return;
+        }
+        try {
+            $driver = $this->device->driver;
+            if ($driver instanceof RadioControlInterface) {
+                $station = RadioStation::find($this->lastRadioStation['id']);
+                if ($station) {
+                    $driver->playRadioStation($station);
+                }
+            }
+        } catch (\Throwable) {
+        }
+    }
+
+    public function activateSource(int $index): void
+    {
+        $source = $this->quickSources[$index] ?? null;
+        if (!$source) {
+            return;
+        }
+        try {
+            $driver = $this->device->driver;
+            if ($driver instanceof SourceActivationInterface) {
+                $driver->activateSource($source['id']);
+            }
+        } catch (\Throwable) {
+        }
     }
 
     public function setVolume(int $volume): void

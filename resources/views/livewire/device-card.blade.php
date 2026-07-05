@@ -195,9 +195,63 @@
 
         {{-- ── Standby ── --}}
         @elseif($state === \App\Domain\Device\State::Standby)
-            <div class="h-36 bg-gray-100 dark:bg-stone-800 rounded-2xl flex items-center justify-center mb-5">
-                <i class="fa-solid fa-power-off text-5xl text-gray-300 dark:text-stone-600"></i>
-            </div>
+            @if(!$standalone && ($lastRadioStation || count($quickSources) > 0))
+                <div class="space-y-4 mb-5">
+                    @if($lastRadioStation)
+                        <div>
+                            <p class="text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-2">Last Played</p>
+                            <button wire:click="playLastRadioStation"
+                                    class="flex items-center gap-2.5 w-full px-4 py-3 rounded-2xl bg-gray-100 dark:bg-stone-800 hover:bg-gray-200 dark:hover:bg-stone-700 transition-colors text-left group">
+                                <i class="fa-solid fa-tower-broadcast text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300 text-sm flex-shrink-0"></i>
+                                <span class="flex-1 text-sm font-medium text-gray-700 dark:text-gray-300 truncate">{{ $lastRadioStation['name'] }}</span>
+                                <i class="fa-solid fa-play text-xs text-gray-300 dark:text-gray-600 group-hover:text-gray-500 dark:group-hover:text-gray-400 flex-shrink-0"></i>
+                            </button>
+                        </div>
+                    @endif
+
+                    @if(count($quickSources) > 0)
+                        <div x-data="{ expanded: false }">
+                            <div class="flex items-center justify-between mb-2">
+                                <p class="text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600">Sources</p>
+                                @if(count($quickSources) > 6)
+                                    <button @click="expanded = !expanded"
+                                            class="text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors">
+                                        <span x-text="expanded ? 'Show less' : 'Show all ({{ count($quickSources) }})'"></span>
+                                    </button>
+                                @endif
+                            </div>
+                            <div class="flex flex-wrap gap-2 overflow-hidden transition-all"
+                                 :style="expanded ? '' : 'max-height: 4rem'"
+                                 style="max-height: 4rem">
+                                @foreach($quickSources as $i => $source)
+                                    @php
+                                        $sourceIcon = match(strtoupper($source['type'] ?? '')) {
+                                            'HDMI', 'TV' => 'fa-display',
+                                            'TUNEIN', 'RADIO' => 'fa-tower-broadcast',
+                                            'LINEIN' => 'fa-plug',
+                                            'DLNA', 'UPNP' => 'fa-network-wired',
+                                            'CD', 'DVD' => 'fa-compact-disc',
+                                            'OPTICAL' => 'fa-circle',
+                                            'BLUETOOTH' => 'fa-bluetooth',
+                                            default => 'fa-plug',
+                                        };
+                                    @endphp
+                                    <button wire:click="activateSource({{ $i }})"
+                                            class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-stone-800 hover:bg-gray-200 dark:hover:bg-stone-700 transition-colors text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 flex-shrink-0">
+                                        <i class="fa-solid {{ $sourceIcon }} text-xs"></i>
+                                        <span>{{ $source['name'] }}</span>
+                                    </button>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            @else
+                <div class="h-36 bg-gray-100 dark:bg-stone-800 rounded-2xl flex items-center justify-center mb-5">
+                    <i class="fa-solid fa-power-off text-5xl text-gray-300 dark:text-stone-600"></i>
+                </div>
+            @endif
+
             <div x-data="{ vol: {{ $volume }} }"
                  x-init="$watch('$wire.volume', v => vol = v)"
                  class="flex items-center gap-3 text-sm">

@@ -15,6 +15,8 @@ class DeviceSource extends Model
         'category',
         'in_use',
         'borrowed',
+        'hidden',
+        'sort_order',
         'provider_jid',
         'provider_name',
     ];
@@ -22,6 +24,7 @@ class DeviceSource extends Model
     protected $casts = [
         'in_use' => 'boolean',
         'borrowed' => 'boolean',
+        'hidden' => 'boolean',
     ];
 
     public function device(): BelongsTo

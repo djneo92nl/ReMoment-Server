@@ -38,11 +38,10 @@ class SyncDeviceSources extends Command
                 continue;
             }
 
-            $device->deviceSources()->delete();
-
-            $device->deviceSources()->createMany(
-                array_map(fn ($s) => [
-                    'source_id' => $s->sourceId,
+            $syncedIds = [];
+            foreach ($sources as $position => $s) {
+                $syncedIds[] = $s->sourceId;
+                $apiFields = [
                     'friendly_name' => $s->friendlyName,
                     'source_type' => $s->sourceType,
                     'category' => $s->category,
@@ -50,8 +49,22 @@ class SyncDeviceSources extends Command
                     'borrowed' => $s->borrowed,
                     'provider_jid' => $s->providerJid,
                     'provider_name' => $s->providerName,
-                ], $sources)
-            );
+                ];
+
+                $existing = $device->deviceSources()->where('source_id', $s->sourceId)->first();
+                if ($existing) {
+                    $existing->update($apiFields);
+                } else {
+                    $device->deviceSources()->create([
+                        ...$apiFields,
+                        'source_id' => $s->sourceId,
+                        'sort_order' => $position,
+                        'hidden' => $s->borrowed,
+                    ]);
+                }
+            }
+
+            $device->deviceSources()->whereNotIn('source_id', $syncedIds)->delete();
 
             $this->info("  Synced {$device->device_name}: ".count($sources).' sources');
 

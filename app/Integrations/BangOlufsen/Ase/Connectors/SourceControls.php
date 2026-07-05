@@ -13,8 +13,9 @@ trait SourceControls
         $raw = $this->deviceApiClient()->get('BeoZone/Zone/Sources');
 
         return collect($raw['sources'] ?? [])
+            ->filter(fn ($pair) => isset($pair[1]['friendlyName']))
             ->map(fn ($pair) => new AvailableSource(
-                sourceId: $pair[1]['id'],
+                sourceId: $pair[1]['id'] ?? $pair[0],
                 friendlyName: $pair[1]['friendlyName'],
                 sourceType: $pair[1]['sourceType']['type'] ?? 'UNKNOWN',
                 category: $pair[1]['category'] ?? 'MUSIC',
