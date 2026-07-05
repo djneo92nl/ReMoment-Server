@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Integrations\Contracts\LibraryPlaybackInterface;
+use App\Models\Device;
 use App\Models\Media\Album;
 use App\Models\Play;
 
@@ -9,7 +11,7 @@ class AlbumController extends Controller
 {
     public function show(Album $album)
     {
-        $album->load(['artist', 'tracks' => fn ($q) => $q->withCount('plays')->orderByDesc('plays_count')]);
+        $album->load(['artist', 'tracks' => fn ($q) => $q->withCount('plays')->with(['metadata' => fn ($q) => $q->where('key', 'dlna_url')])->orderByDesc('plays_count')]);
 
         $totalPlays = $album->plays()->count();
 
@@ -24,11 +26,16 @@ class AlbumController extends Controller
             ->limit(20)
             ->get();
 
+        $playableDevices = Device::all()->filter(
+            fn ($d) => $d->driver instanceof LibraryPlaybackInterface
+        )->values();
+
         return view('albums.show', compact(
             'album',
             'totalPlays',
             'totalSeconds',
             'recentPlays',
+            'playableDevices',
         ));
     }
 }

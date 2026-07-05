@@ -46,4 +46,14 @@ class Track extends Model
     {
         return $this->morphMany(Metadata::class, 'metadatable');
     }
+
+    public function getDlnaUrl(): ?string
+    {
+        // Prefer already-loaded relation to avoid extra queries
+        if ($this->relationLoaded('metadata')) {
+            return $this->metadata->firstWhere('key', 'dlna_url')?->value;
+        }
+
+        return $this->metadata()->where('key', 'dlna_url')->value('value');
+    }
 }

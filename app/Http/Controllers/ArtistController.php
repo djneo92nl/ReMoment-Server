@@ -10,7 +10,7 @@ class ArtistController extends Controller
     public function index()
     {
         $artists = Artist::query()
-            ->whereHas('plays')
+            ->where(fn ($q) => $q->whereHas('plays')->orWhere('source', 'dlna'))
             ->withCount('plays')
             ->orderByDesc('plays_count')
             ->paginate(50);

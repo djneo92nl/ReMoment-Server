@@ -5,7 +5,10 @@ namespace App\Http\Controllers;
 use App\Domain\Device\DeviceCache;
 use App\Integrations\Spotify\SpotifyDevice;
 use App\Models\Device;
+use App\Models\DlnaServer;
 use App\Models\User;
+use App\Services\Dlna\DlnaLibraryScanner;
+use App\Services\Dlna\DlnaServerDiscovery;
 use App\Services\SpotifyTokenService;
 
 class SettingsController extends Controller
@@ -62,6 +65,27 @@ class SettingsController extends Controller
         shell_exec($cmd);
 
         return back()->with('success', "Listener started for {$device->device_name}.");
+    }
+
+    public function dlna()
+    {
+        $servers = DlnaServer::orderBy('friendly_name')->get();
+
+        return view('settings.dlna', compact('servers'));
+    }
+
+    public function dlnaDiscover(DlnaServerDiscovery $discovery)
+    {
+        $discovered = $discovery->discover();
+
+        return back()->with('success', 'Found '.count($discovered).' DLNA server(s).');
+    }
+
+    public function dlnaScan(DlnaServer $server, DlnaLibraryScanner $scanner)
+    {
+        $count = $scanner->scanServer($server);
+
+        return back()->with('success', "Indexed {$count} tracks from {$server->friendly_name}.");
     }
 
     public function startAllListeners()

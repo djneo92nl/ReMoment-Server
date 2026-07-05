@@ -2,6 +2,7 @@
 
 namespace App\Integrations\Sonos;
 
+use App\Integrations\Contracts\LibraryPlaybackInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
@@ -9,13 +10,15 @@ use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Integrations\Sonos\Connectors\MultiRoomControls;
 use App\Models\Device;
+use App\Models\Media\Track;
 use App\Models\RadioStation;
 use duncan3dc\Sonos\Controller;
 use duncan3dc\Sonos\Devices\Collection;
 use duncan3dc\Sonos\Network;
 use duncan3dc\Sonos\Tracks\Stream;
+use duncan3dc\Sonos\Tracks\Track as SonosTrack;
 
-class MusicPlayerDriver implements MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, RadioControlInterface, VolumeControlInterface
+class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, RadioControlInterface, VolumeControlInterface
 {
     use MultiRoomControls;
 
@@ -107,5 +110,22 @@ class MusicPlayerDriver implements MediaControlsInterface, MultiRoomInterface, M
     public function unmute(): void
     {
         $this->deviceApi->unmute(true);
+    }
+
+    public function playLibraryTrack(Track $track): void
+    {
+        $url = $track->getDlnaUrl();
+
+        if (! $url) {
+            throw new \RuntimeException("Track {$track->id} has no DLNA URL.");
+        }
+
+        $sonosTrack = (new SonosTrack($url))
+            ->setTitle($track->name)
+            ->setArtist($track->artist?->name ?? '')
+            ->setAlbum($track->album?->name ?? '');
+
+        $this->deviceApi->useQueue()->getQueue()->clear()->addTrack($sonosTrack);
+        $this->deviceApi->play();
     }
 }

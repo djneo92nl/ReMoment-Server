@@ -20,3 +20,5 @@ Route::post('/devices/{device}/radio/{station}', [DeviceController::class, 'play
 Route::get('/devices/{device}/multiroom', [DeviceController::class, 'multiroom']);
 Route::post('/devices/{device}/multiroom/join', [DeviceController::class, 'multiroomJoin']);
 Route::delete('/devices/{device}/multiroom/leave', [DeviceController::class, 'multiroomLeave']);
+
+Route::post('/devices/{device}/library/play', [DeviceController::class, 'libraryPlay']);
