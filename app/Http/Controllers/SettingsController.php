@@ -3,13 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Device\DeviceCache;
+use App\Integrations\Spotify\MusicPlayerDriver as SpotifyDriver;
 use App\Integrations\Spotify\SpotifyDevice;
 use App\Models\Device;
+use App\Models\DeviceMeta;
 use App\Models\DlnaServer;
 use App\Models\User;
 use App\Services\Dlna\DlnaLibraryScanner;
 use App\Services\Dlna\DlnaServerDiscovery;
 use App\Services\SpotifyTokenService;
+use Illuminate\Http\Request;
 
 class SettingsController extends Controller
 {
@@ -65,6 +68,52 @@ class SettingsController extends Controller
         shell_exec($cmd);
 
         return back()->with('success', "Listener started for {$device->device_name}.");
+    }
+
+    public function spotifyConnect(SpotifyTokenService $spotify)
+    {
+        $spotifyDevices = [];
+
+        if ($spotify->isConnected()) {
+            try {
+                $spotifyDevices = $spotify->makeApiClient()->getMyDevices()['devices'] ?? [];
+            } catch (\Throwable) {
+                // Spotify unreachable — show empty list
+            }
+        }
+
+        // Local devices excluding the Spotify virtual device
+        $localDevices = Device::where('device_driver', '!=', SpotifyDriver::class)
+            ->orderBy('device_name')
+            ->get();
+
+        // Current mappings: spotify_connect_name → device_id
+        $mappings = DeviceMeta::where('key', 'spotify_connect_name')
+            ->pluck('device_id', 'value');
+
+        return view('settings.spotify-connect', compact('spotifyDevices', 'localDevices', 'mappings'));
+    }
+
+    public function spotifyConnectSave(Request $request)
+    {
+        $data = $request->validate([
+            'mappings' => ['nullable', 'array'],
+            'mappings.*' => ['nullable', 'integer', 'exists:devices,id'],
+        ]);
+
+        // Remove all existing spotify_connect_name meta entries
+        DeviceMeta::where('key', 'spotify_connect_name')->delete();
+
+        foreach ($data['mappings'] ?? [] as $spotifyName => $deviceId) {
+            if ($deviceId) {
+                DeviceMeta::updateOrCreate(
+                    ['device_id' => (int) $deviceId, 'key' => 'spotify_connect_name'],
+                    ['value' => $spotifyName],
+                );
+            }
+        }
+
+        return back()->with('success', 'Spotify Connect mappings saved.');
     }
 
     public function dlna()

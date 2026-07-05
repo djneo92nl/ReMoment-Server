@@ -64,6 +64,21 @@ final class DeviceCache
         return Cache::has("listener_running_{$deviceId}");
     }
 
+    public static function setSpotifyRoutedDevice(int $deviceId): void
+    {
+        Cache::put('spotify_routed_to', $deviceId, 30);
+    }
+
+    public static function clearSpotifyRoutedDevice(): void
+    {
+        Cache::forget('spotify_routed_to');
+    }
+
+    public static function getSpotifyRoutedDeviceId(): ?int
+    {
+        return Cache::get('spotify_routed_to');
+    }
+
     public static function forget(int $deviceId): void
     {
         Cache::forget(self::stateKey($deviceId));

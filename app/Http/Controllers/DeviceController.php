@@ -17,12 +17,23 @@ class DeviceController extends Controller
 {
     public function index()
     {
-        $devices = Device::all()->sortByDesc(fn ($d) => match ($d->state) {
-            \App\Domain\Device\State::Playing => 3,
-            \App\Domain\Device\State::Paused => 2,
-            \App\Domain\Device\State::Standby => 1,
-            default => 0,
-        });
+        $spotifyRoutedDeviceId = DeviceCache::getSpotifyRoutedDeviceId();
+
+        $devices = Device::all()
+            ->filter(function (Device $device) use ($spotifyRoutedDeviceId) {
+                // Hide the Spotify virtual device while a mapped local device is actively playing Spotify
+                if ($spotifyRoutedDeviceId !== null && $device->device_driver_name === 'Spotify') {
+                    return false;
+                }
+
+                return true;
+            })
+            ->sortByDesc(fn ($d) => match ($d->state) {
+                \App\Domain\Device\State::Playing => 3,
+                \App\Domain\Device\State::Paused => 2,
+                \App\Domain\Device\State::Standby => 1,
+                default => 0,
+            });
 
         return view('devices.index', ['devices' => $devices]);
     }

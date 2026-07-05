@@ -11,6 +11,7 @@ use App\Domain\Media\TrackData;
 use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
 use App\Events\Device\ProgressUpdated;
+use App\Models\DeviceMeta;
 use App\Services\SpotifyTokenService;
 use Illuminate\Support\Facades\Log;
 use SpotifyWebAPI\SpotifyWebAPIException;
@@ -36,6 +37,7 @@ class DeviceListener
 
         $lastNowPlayingKey = null;
         $lastPositionSeconds = null;
+        $lastEffectiveDeviceId = $deviceId;
 
         DeviceCache::updateState($deviceId, State::Unreachable);
 
@@ -58,10 +60,11 @@ class DeviceListener
                 if ($playback === null || empty($playback)) {
                     // 204 No Content — nothing playing
                     if ($lastNowPlayingKey !== null) {
-                        event(new NowPlayingEnded(deviceId: $deviceId));
+                        event(new NowPlayingEnded(deviceId: $lastEffectiveDeviceId));
                         $lastNowPlayingKey = null;
                         $lastPositionSeconds = null;
                     }
+                    DeviceCache::clearSpotifyRoutedDevice();
                     DeviceCache::updateState($deviceId, State::Standby);
                     $retryDelaySeconds = 1;
                     sleep($this->pollIntervalSeconds);
@@ -74,15 +77,37 @@ class DeviceListener
 
                 if (!$isPlaying || $item === null) {
                     if ($lastNowPlayingKey !== null) {
-                        event(new NowPlayingEnded(deviceId: $deviceId));
+                        event(new NowPlayingEnded(deviceId: $lastEffectiveDeviceId));
                         $lastNowPlayingKey = null;
                         $lastPositionSeconds = null;
                     }
+                    DeviceCache::clearSpotifyRoutedDevice();
                     DeviceCache::updateState($deviceId, State::Standby);
                     $retryDelaySeconds = 1;
                     sleep($this->pollIntervalSeconds);
 
                     continue;
+                }
+
+                // Route to a local device if this Spotify Connect speaker is mapped
+                $spotifyDeviceName = $playback['device']['name'] ?? null;
+                $localDeviceId = $this->resolveLocalDevice($spotifyDeviceName);
+                $effectiveDeviceId = $localDeviceId ?? $deviceId;
+
+                // Device changed — end playback on the previous effective device
+                if ($effectiveDeviceId !== $lastEffectiveDeviceId && $lastNowPlayingKey !== null) {
+                    event(new NowPlayingEnded(deviceId: $lastEffectiveDeviceId));
+                    $lastNowPlayingKey = null;
+                    $lastPositionSeconds = null;
+                }
+                $lastEffectiveDeviceId = $effectiveDeviceId;
+
+                if ($localDeviceId !== null) {
+                    DeviceCache::setSpotifyRoutedDevice($localDeviceId);
+                    // Keep Spotify virtual device quiet
+                    DeviceCache::updateState($deviceId, State::Standby);
+                } else {
+                    DeviceCache::clearSpotifyRoutedDevice();
                 }
 
                 $nowPlaying = $this->buildNowPlaying($item, $playback);
@@ -92,7 +117,7 @@ class DeviceListener
 
                     if ($key !== $lastNowPlayingKey) {
                         event(new NowPlayingUpdated(
-                            deviceId: $deviceId,
+                            deviceId: $effectiveDeviceId,
                             nowPlaying: $nowPlaying,
                             sourceType: 'spotify',
                         ));
@@ -101,7 +126,7 @@ class DeviceListener
 
                     $positionSeconds = (int) round(($playback['progress_ms'] ?? 0) / 1000);
                     if (abs($positionSeconds - ($lastPositionSeconds ?? -999)) > 2) {
-                        event(new ProgressUpdated(deviceId: $deviceId, progress: $positionSeconds));
+                        event(new ProgressUpdated(deviceId: $effectiveDeviceId, progress: $positionSeconds));
                         $lastPositionSeconds = $positionSeconds;
                     }
                 }
@@ -193,5 +218,18 @@ class DeviceListener
             'album' => $nowPlaying->album?->name,
             'id' => $nowPlaying->track?->id,
         ]));
+    }
+
+    protected function resolveLocalDevice(?string $spotifyDeviceName): ?int
+    {
+        if ($spotifyDeviceName === null) {
+            return null;
+        }
+
+        $meta = DeviceMeta::where('key', 'spotify_connect_name')
+            ->where('value', $spotifyDeviceName)
+            ->first();
+
+        return $meta?->device_id;
     }
 }

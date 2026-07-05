@@ -67,12 +67,18 @@
                         <span class="w-2 h-2 rounded-full bg-emerald-500"></span>Connected
                     </span>
                 </div>
-                <form method="POST" action="{{ route('spotify.disconnect') }}">
-                    @csrf
-                    <button type="submit" class="text-xs text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors">
-                        Disconnect
-                    </button>
-                </form>
+                <div class="flex items-center justify-between">
+                    <a href="{{ route('settings.spotify-connect') }}"
+                       class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">
+                        Speaker mappings →
+                    </a>
+                    <form method="POST" action="{{ route('spotify.disconnect') }}">
+                        @csrf
+                        <button type="submit" class="text-xs text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors">
+                            Disconnect
+                        </button>
+                    </form>
+                </div>
             @else
                 <a href="{{ route('spotify.authorize') }}"
                    class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-xl transition-colors">

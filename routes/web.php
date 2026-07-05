@@ -46,6 +46,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/settings/dlna/discover', [SettingsController::class, 'dlnaDiscover'])->name('settings.dlna.discover');
     Route::post('/settings/dlna/{server}/scan', [SettingsController::class, 'dlnaScan'])->name('settings.dlna.scan');
 
+    Route::get('/settings/spotify-connect', [SettingsController::class, 'spotifyConnect'])->name('settings.spotify-connect');
+    Route::post('/settings/spotify-connect', [SettingsController::class, 'spotifyConnectSave'])->name('settings.spotify-connect.save');
+
     Route::get('/settings/spotify/authorize', [SpotifyAuthController::class, 'authorize'])->name('spotify.authorize');
     Route::get('/settings/spotify/callback', [SpotifyAuthController::class, 'callback'])->name('spotify.callback');
     Route::post('/settings/spotify/disconnect', [SpotifyAuthController::class, 'disconnect'])->name('spotify.disconnect');
