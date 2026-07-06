@@ -18,15 +18,16 @@
     flex-direction: column;
   }
 
-  #bg-art {
+  .bg-layer {
     position: absolute;
     inset: 0;
     background-size: cover;
     background-position: center;
     filter: blur(80px) brightness(0.18) saturate(1.4);
     transform: scale(1.1);
-    transition: background-image 1.5s ease;
+    transition: opacity 1.4s ease;
     z-index: 0;
+    opacity: 0;
   }
 
   #main {
@@ -54,14 +55,15 @@
     position: relative;
   }
 
-  #artwork {
+  .art-img {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: opacity 0.6s ease;
+    transition: opacity 0.9s ease;
+    opacity: 0;
   }
-
-  #artwork.loading { opacity: 0; }
 
   #art-placeholder {
     position: absolute;
@@ -80,6 +82,7 @@
     flex-direction: column;
     justify-content: center;
     gap: 12px;
+    transition: opacity 0.25s ease;
   }
 
   #platform {
@@ -327,7 +330,8 @@
   </svg>
 </button>
 
-<div id="bg-art"></div>
+<div class="bg-layer" id="bg-a"></div>
+<div class="bg-layer" id="bg-b"></div>
 
 <div id="main">
   <div id="artwork-wrap">
@@ -337,7 +341,8 @@
         <line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/>
       </svg>
     </div>
-    <img id="artwork" class="loading" src="" alt="" onerror="this.classList.add('loading')">
+    <img class="art-img" id="aw-a" src="" alt="">
+    <img class="art-img" id="aw-b" src="" alt="">
   </div>
 
   <div id="meta">
@@ -389,8 +394,9 @@ const showControls = !isChromecast && (hasTouch || isTV);
 
 let deviceId = null;
 let pollTimer = null;
-let currentProgress = 0, currentDuration = 0, currentEndTime = null;
+let currentProgress = 0, currentDuration = 0, progressLastPollTime = 0, isCurrentlyPlaying = false;
 let lastTrackId = null;
+let activeArt = 'a', currentArtUrl = '';
 
 const params = new URLSearchParams(window.location.search);
 const paramDeviceId = params.get('device') ? parseInt(params.get('device')) : null;
@@ -493,10 +499,6 @@ function updateUI(d) {
     trackId = np.radio.name;
   }
 
-  setMarquee(trackName);
-  document.getElementById('artist-name').textContent = artistName;
-  document.getElementById('album-name').textContent = albumName;
-
   if (np.artwork?.proxy_512) artUrl = fixHost(np.artwork.proxy_512);
   else if (np.artwork?.proxy_320) artUrl = fixHost(np.artwork.proxy_320);
   else if (isTrack && np.track?.images?.length) artUrl = extractImgUrl(np.track.images);
@@ -505,14 +507,23 @@ function updateUI(d) {
 
   if (trackId !== lastTrackId) {
     lastTrackId = trackId;
+    const meta = document.getElementById('meta');
+    meta.style.opacity = '0';
+    setTimeout(() => {
+      setMarquee(trackName);
+      document.getElementById('artist-name').textContent = artistName;
+      document.getElementById('album-name').textContent = albumName;
+      meta.style.opacity = '1';
+    }, 250);
     setArtwork(artUrl, np.artwork?.colors);
-  } else if (artUrl && document.getElementById('artwork').src !== artUrl) {
+  } else if (artUrl && artUrl !== currentArtUrl) {
     setArtwork(artUrl, np.artwork?.colors);
   }
 
   currentDuration = np.track?.duration || 0;
-  currentEndTime = np.endTime ? new Date(np.endTime.replace(' ', 'T')) : null;
   if (np.position !== undefined) currentProgress = np.position;
+  progressLastPollTime = Date.now();
+  isCurrentlyPlaying = (state === 'playing');
 
   updateProgress();
 }
@@ -522,6 +533,37 @@ function hexToRgba(hex, alpha) {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
+// Lift a hex color to a minimum HSL lightness, preserving hue + saturation.
+function ensureL(hex, minL) {
+  const r = parseInt(hex.slice(1,3),16)/255;
+  const g = parseInt(hex.slice(3,5),16)/255;
+  const b = parseInt(hex.slice(5,7),16)/255;
+  const max = Math.max(r,g,b), min = Math.min(r,g,b), d = max - min;
+  let h = 0, s = 0, l = (max + min) / 2;
+  if (d > 0) {
+    s = d / (1 - Math.abs(2 * l - 1));
+    if (max === r)      h = (((g - b) / d) % 6) / 6;
+    else if (max === g) h = ((b - r) / d + 2) / 6;
+    else                h = ((r - g) / d + 4) / 6;
+    if (h < 0) h += 1;
+  }
+  if (l >= minL) return hex;
+  l = minL;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs((h * 6) % 2 - 1));
+  const m = l - c / 2;
+  let ro, go, bo;
+  const hi = Math.floor(h * 6) % 6;
+  if      (hi === 0) { ro = c; go = x; bo = 0; }
+  else if (hi === 1) { ro = x; go = c; bo = 0; }
+  else if (hi === 2) { ro = 0; go = c; bo = x; }
+  else if (hi === 3) { ro = 0; go = x; bo = c; }
+  else if (hi === 4) { ro = x; go = 0; bo = c; }
+  else               { ro = c; go = 0; bo = x; }
+  const h2 = v => Math.min(255, Math.round((v + m) * 255)).toString(16).padStart(2, '0');
+  return `#${h2(ro)}${h2(go)}${h2(bo)}`;
+}
+
 function setMarquee(text) {
   const el = document.getElementById('track-name-inner');
   const container = document.getElementById('track-name');
@@ -529,33 +571,46 @@ function setMarquee(text) {
   el.style.removeProperty('--marquee-dist');
   el.style.removeProperty('animation-duration');
   el.textContent = text;
-  requestAnimationFrame(() => {
+  document.fonts.ready.then(() => requestAnimationFrame(() => {
     const overflow = el.scrollWidth - container.clientWidth;
     if (overflow > 10) {
-      const duration = Math.max(6, overflow / 40);
-      el.style.setProperty('--marquee-dist', `-${overflow}px`);
+      const duration = Math.max(8, overflow / 40);
+      el.style.setProperty('--marquee-dist', `-${overflow + 60}px`);
       el.style.animationDuration = `${duration}s`;
       el.classList.add('marquee');
     }
-  });
+  }));
 }
 
 function setArtwork(url, colors) {
-  const img = document.getElementById('artwork');
-  const bg = document.getElementById('bg-art');
-  if (url) {
-    img.classList.add('loading');
-    img.onload = () => { img.classList.remove('loading'); };
-    img.src = url;
-    bg.style.backgroundImage = `url('${url}')`;
-  } else {
-    img.classList.add('loading');
-    img.src = '';
-    bg.style.backgroundImage = '';
+  if (url && url !== currentArtUrl) {
+    const next = activeArt === 'a' ? 'b' : 'a';
+    const awNext = document.getElementById('aw-' + next);
+    const bgNext = document.getElementById('bg-' + next);
+    const awCurr = document.getElementById('aw-' + activeArt);
+    const bgCurr = document.getElementById('bg-' + activeArt);
+    awNext.onload = () => {
+      bgNext.style.backgroundImage = `url('${url}')`;
+      awNext.style.opacity = '1';
+      bgNext.style.opacity = '1';
+      awCurr.style.opacity = '0';
+      bgCurr.style.opacity = '0';
+      activeArt = next;
+      currentArtUrl = url;
+    };
+    awNext.onerror = () => {};
+    awNext.src = url;
+  } else if (!url) {
+    ['a', 'b'].forEach(s => {
+      document.getElementById('aw-' + s).style.opacity = '0';
+      document.getElementById('bg-' + s).style.opacity = '0';
+    });
+    currentArtUrl = '';
   }
   if (colors?.length >= 2) {
-    const accent = colors[1];
-    const muted  = colors[2] || colors[1];
+    const src    = np.artwork?.safe_colors ?? null;
+    const accent = src ? src[1]            : ensureL(colors[1], 0.58);
+    const muted  = src ? (src[2] || src[1]): ensureL(colors[2] || colors[1], 0.68);
     document.getElementById('progress-bar-fill').style.background = accent;
     document.getElementById('state-dot').style.background = accent;
     document.getElementById('artist-name').style.color = hexToRgba(muted, 0.9);
@@ -575,9 +630,8 @@ function setArtwork(url, colors) {
 function updateProgress() {
   if (currentDuration > 0) {
     let pos = currentProgress;
-    if (currentEndTime) {
-      const remaining = (currentEndTime - Date.now()) / 1000;
-      pos = Math.max(0, currentDuration - remaining);
+    if (isCurrentlyPlaying && progressLastPollTime) {
+      pos = Math.min(currentDuration, currentProgress + (Date.now() - progressLastPollTime) / 1000);
     }
     const pct = Math.min(100, (pos / currentDuration) * 100);
     document.getElementById('progress-bar-fill').style.width = pct + '%';
