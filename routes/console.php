@@ -9,3 +9,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('devices:sync-sources')->weekly();
+Schedule::command('library:sync-spotify')->daily();

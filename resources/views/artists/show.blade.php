@@ -49,7 +49,10 @@
                                     @endif
                                 </div>
                                 <div class="flex-1 min-w-0">
-                                    <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{{ $track->name }}</p>
+                                    <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate flex items-center gap-1.5">
+                                        {{ $track->name }}
+                                        <x-source-icon :source="$track->source" />
+                                    </p>
                                     @if($track->album)
                                         <p class="text-xs text-gray-400 dark:text-gray-600 truncate mt-0.5">
                                             <a href="{{ route('albums.show', $track->album) }}" class="hover:underline">{{ $track->album->name }}</a>

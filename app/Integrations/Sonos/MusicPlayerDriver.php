@@ -10,6 +10,7 @@ use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Integrations\Sonos\Connectors\MultiRoomControls;
 use App\Models\Device;
+use App\Models\Media\Playlist;
 use App\Models\Media\Track;
 use App\Models\RadioStation;
 use duncan3dc\Sonos\Controller;
@@ -116,7 +117,7 @@ class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterf
     {
         $url = $track->getDlnaUrl();
 
-        if (! $url) {
+        if (!$url) {
             throw new \RuntimeException("Track {$track->id} has no DLNA URL.");
         }
 
@@ -126,6 +127,34 @@ class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterf
             ->setAlbum($track->album?->name ?? '');
 
         $this->deviceApi->useQueue()->getQueue()->clear()->addTrack($sonosTrack);
+        $this->deviceApi->play();
+    }
+
+    public function playLibraryPlaylist(Playlist $playlist): void
+    {
+        $tracks = $playlist->tracks()->get();
+
+        if ($tracks->isEmpty()) {
+            throw new \RuntimeException("Playlist {$playlist->id} has no tracks.");
+        }
+
+        $queue = $this->deviceApi->useQueue()->getQueue()->clear();
+
+        foreach ($tracks as $track) {
+            $url = $track->getDlnaUrl();
+
+            if (!$url) {
+                continue;
+            }
+
+            $queue->addTrack(
+                (new SonosTrack($url))
+                    ->setTitle($track->name)
+                    ->setArtist($track->artist?->name ?? '')
+                    ->setAlbum($track->album?->name ?? '')
+            );
+        }
+
         $this->deviceApi->play();
     }
 }

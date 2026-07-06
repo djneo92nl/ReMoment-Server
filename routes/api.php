@@ -22,3 +22,4 @@ Route::post('/devices/{device}/multiroom/join', [DeviceController::class, 'multi
 Route::delete('/devices/{device}/multiroom/leave', [DeviceController::class, 'multiroomLeave']);
 
 Route::post('/devices/{device}/library/play', [DeviceController::class, 'libraryPlay']);
+Route::post('/devices/{device}/library/play-playlist', [DeviceController::class, 'libraryPlayPlaylist']);

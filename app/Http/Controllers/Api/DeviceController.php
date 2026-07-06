@@ -14,6 +14,7 @@ use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\SourcesInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
+use App\Models\Media\Playlist;
 use App\Models\Media\Track;
 use App\Models\RadioStation;
 use Illuminate\Http\JsonResponse;
@@ -264,13 +265,13 @@ class DeviceController extends Controller
 
         $driver = $device->driver;
 
-        if (! ($driver instanceof LibraryPlaybackInterface)) {
+        if (!($driver instanceof LibraryPlaybackInterface)) {
             return $this->unsupported('library_playback');
         }
 
         $track = Track::with('metadata', 'artist', 'album')->findOrFail($request->integer('track_id'));
 
-        if (! $track->getDlnaUrl()) {
+        if (!$track->getDlnaUrl()) {
             return response()->json(['error' => 'no_dlna_url', 'message' => 'This track has no DLNA stream URL.'], 422);
         }
 
@@ -284,6 +285,34 @@ class DeviceController extends Controller
         }
 
         return response()->json(['status' => 'ok', 'track' => $track->name]);
+    }
+
+    public function libraryPlayPlaylist(Request $request, Device $device): JsonResponse
+    {
+        $request->validate(['playlist_id' => ['required', 'integer', 'exists:playlists,id']]);
+
+        if ($error = $this->assertReachable($device)) {
+            return $error;
+        }
+
+        $driver = $device->driver;
+
+        if (!($driver instanceof LibraryPlaybackInterface)) {
+            return $this->unsupported('library_playback');
+        }
+
+        $playlist = Playlist::findOrFail($request->integer('playlist_id'));
+
+        try {
+            $driver->playLibraryPlaylist($playlist);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'driver_error',
+                'message' => 'The device did not respond: '.$e->getMessage(),
+            ], 502);
+        }
+
+        return response()->json(['status' => 'ok', 'playlist' => $playlist->name]);
     }
 
     private function mapPeerIdsToDevices(array $ids, Device $exclude): \Illuminate\Support\Collection

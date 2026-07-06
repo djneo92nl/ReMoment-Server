@@ -186,8 +186,9 @@
                                                 </div>
 
                                                 <div class="flex-1 min-w-0">
-                                                    <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate leading-snug">
+                                                    <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate leading-snug flex items-center gap-1.5">
                                                         {{ $play->track->name }}
+                                                        <x-source-icon :source="$play->track->source" />
                                                     </p>
                                                     <p class="text-xs text-gray-400 dark:text-gray-600 truncate mt-0.5 leading-snug">
                                                         @if($play->track->artist)

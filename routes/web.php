@@ -4,6 +4,7 @@ use App\Http\Controllers\AlbumController;
 use App\Http\Controllers\ArtistController;
 use App\Http\Controllers\DeviceController;
 use App\Http\Controllers\HistoryController;
+use App\Http\Controllers\PlaylistController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RadioStationController;
 use App\Http\Controllers\SettingsController;
@@ -28,6 +29,11 @@ Route::resource('radio', RadioStationController::class);
 Route::post('/radio/{radio}/play/{device}', [RadioStationController::class, 'play'])->name('radio.play');
 Route::get('/artists/{artist}', [ArtistController::class, 'show'])->name('artists.show');
 Route::get('/albums/{album}', [AlbumController::class, 'show'])->name('albums.show');
+Route::get('/playlists', [PlaylistController::class, 'index'])->name('playlists.index');
+Route::post('/playlists', [PlaylistController::class, 'store'])->name('playlists.store');
+Route::get('/playlists/{playlist}', [PlaylistController::class, 'show'])->name('playlists.show');
+Route::delete('/playlists/{playlist}', [PlaylistController::class, 'destroy'])->name('playlists.destroy');
+Route::post('/playlists/{playlist}/play/{device}', [PlaylistController::class, 'play'])->name('playlists.play');
 
 Route::get('/dashboard', function () {
     return redirect()->route('devices.index');
@@ -48,6 +54,10 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/settings/spotify-connect', [SettingsController::class, 'spotifyConnect'])->name('settings.spotify-connect');
     Route::post('/settings/spotify-connect', [SettingsController::class, 'spotifyConnectSave'])->name('settings.spotify-connect.save');
+
+    Route::get('/settings/spotify/library', [SettingsController::class, 'spotifyLibrary'])->name('settings.spotify-library');
+    Route::post('/settings/spotify/library/sync-tracks', [SettingsController::class, 'spotifyLibrarySyncTracks'])->name('settings.spotify-library.sync-tracks');
+    Route::post('/settings/spotify/library/sync-playlists', [SettingsController::class, 'spotifyLibrarySyncPlaylists'])->name('settings.spotify-library.sync-playlists');
 
     Route::get('/settings/spotify/authorize', [SpotifyAuthController::class, 'authorize'])->name('spotify.authorize');
     Route::get('/settings/spotify/callback', [SpotifyAuthController::class, 'callback'])->name('spotify.callback');

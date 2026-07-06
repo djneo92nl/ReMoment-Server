@@ -26,17 +26,24 @@
             </li>
             <li>
                 <a href="{{ route('artists.index') }}"
-                   class="flex items-center gap-3 px-5 py-3.5 rounded-xl transition-colors {{ request()->routeIs('artists.*') || request()->routeIs('albums.*') || request()->routeIs('radio.*') ? 'bg-gray-100 dark:bg-stone-800 font-medium text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-stone-800/50' }}">
-                    <i class="fa-solid fa-microphone-lines w-5 {{ request()->routeIs('artists.*') || request()->routeIs('albums.*') || request()->routeIs('radio.*') ? 'text-gray-700 dark:text-gray-300' : '' }}"></i>
+                   class="flex items-center gap-3 px-5 py-3.5 rounded-xl transition-colors {{ request()->routeIs('artists.*') || request()->routeIs('albums.*') || request()->routeIs('radio.*') || request()->routeIs('playlists.*') ? 'bg-gray-100 dark:bg-stone-800 font-medium text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-stone-800/50' }}">
+                    <i class="fa-solid fa-microphone-lines w-5 {{ request()->routeIs('artists.*') || request()->routeIs('albums.*') || request()->routeIs('radio.*') || request()->routeIs('playlists.*') ? 'text-gray-700 dark:text-gray-300' : '' }}"></i>
                     Library
                 </a>
-                @if(request()->routeIs('artists.*') || request()->routeIs('albums.*') || request()->routeIs('radio.*'))
+                @if(request()->routeIs('artists.*') || request()->routeIs('albums.*') || request()->routeIs('radio.*') || request()->routeIs('playlists.*'))
                     <ul class="mt-1 ml-4 space-y-1">
                         <li>
                             <a href="{{ route('artists.index') }}"
                                class="flex items-center gap-3 px-5 py-2.5 rounded-xl text-sm transition-colors {{ request()->routeIs('artists.*') || request()->routeIs('albums.*') ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-500 dark:text-gray-500 hover:text-gray-800 dark:hover:text-gray-300' }}">
                                 <i class="fa-solid fa-microphone-lines w-4 text-xs {{ request()->routeIs('artists.*') || request()->routeIs('albums.*') ? 'text-indigo-500' : 'text-gray-300 dark:text-stone-700' }}"></i>
                                 Artists
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ route('playlists.index') }}"
+                               class="flex items-center gap-3 px-5 py-2.5 rounded-xl text-sm transition-colors {{ request()->routeIs('playlists.*') ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-500 dark:text-gray-500 hover:text-gray-800 dark:hover:text-gray-300' }}">
+                                <i class="fa-solid fa-list-ul w-4 text-xs {{ request()->routeIs('playlists.*') ? 'text-purple-500' : 'text-gray-300 dark:text-stone-700' }}"></i>
+                                Playlists
                             </a>
                         </li>
                         <li>

@@ -12,6 +12,9 @@ class SpotifyTokenService
         'user-read-currently-playing',
         'user-read-playback-state',
         'user-modify-playback-state',
+        'playlist-read-private',
+        'playlist-read-collaborative',
+        'user-library-read',
     ];
 
     private Session $session;
@@ -39,6 +42,14 @@ class SpotifyTokenService
         Setting::set('spotify_access_token', $this->session->getAccessToken());
         Setting::set('spotify_refresh_token', $this->session->getRefreshToken());
         Setting::set('spotify_token_expires_at', (string) $this->session->getTokenExpiration());
+        Setting::set('spotify_granted_scopes', implode(' ', $this->session->getScope()));
+    }
+
+    public function hasRequiredScopes(): bool
+    {
+        $granted = explode(' ', Setting::get('spotify_granted_scopes', ''));
+
+        return empty(array_diff(self::SCOPES, $granted));
     }
 
     public function getAccessToken(): ?string
@@ -77,6 +88,7 @@ class SpotifyTokenService
         Setting::forget('spotify_access_token');
         Setting::forget('spotify_refresh_token');
         Setting::forget('spotify_token_expires_at');
+        Setting::forget('spotify_granted_scopes');
     }
 
     public function makeApiClient(): SpotifyWebAPI

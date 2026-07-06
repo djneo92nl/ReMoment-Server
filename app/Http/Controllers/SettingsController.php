@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Domain\Device\DeviceCache;
 use App\Integrations\Spotify\MusicPlayerDriver as SpotifyDriver;
+use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
 use App\Integrations\Spotify\SpotifyDevice;
 use App\Models\Device;
 use App\Models\DeviceMeta;
 use App\Models\DlnaServer;
+use App\Models\Setting;
 use App\Models\User;
 use App\Services\Dlna\DlnaLibraryScanner;
 use App\Services\Dlna\DlnaServerDiscovery;
@@ -114,6 +116,32 @@ class SettingsController extends Controller
         }
 
         return back()->with('success', 'Spotify Connect mappings saved.');
+    }
+
+    public function spotifyLibrary(SpotifyTokenService $spotify)
+    {
+        return view('settings.spotify-library', [
+            'connected' => $spotify->isConnected(),
+            'hasRequiredScopes' => $spotify->hasRequiredScopes(),
+            'tracksSyncedAt' => Setting::get('spotify_library_tracks_synced_at'),
+            'playlistsSyncedAt' => Setting::get('spotify_library_playlists_synced_at'),
+        ]);
+    }
+
+    public function spotifyLibrarySyncTracks(SpotifyLibraryImporter $importer)
+    {
+        $count = $importer->importSavedTracks();
+        Setting::set('spotify_library_tracks_synced_at', now()->toIso8601String());
+
+        return back()->with('success', "Imported {$count} saved tracks.");
+    }
+
+    public function spotifyLibrarySyncPlaylists(SpotifyLibraryImporter $importer)
+    {
+        $count = $importer->importPlaylists();
+        Setting::set('spotify_library_playlists_synced_at', now()->toIso8601String());
+
+        return back()->with('success', "Imported {$count} playlists.");
     }
 
     public function dlna()

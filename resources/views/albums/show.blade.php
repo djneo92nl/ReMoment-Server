@@ -76,7 +76,10 @@
                                 <div class="flex items-center gap-4 px-6 py-3 hover:bg-gray-50 dark:hover:bg-stone-800/30 transition-colors group">
                                     <span class="w-5 text-center text-xs text-gray-300 dark:text-stone-600 flex-shrink-0">{{ $i + 1 }}</span>
                                     <div class="flex-1 min-w-0">
-                                        <p class="text-sm text-gray-900 dark:text-gray-100 truncate">{{ $track->name }}</p>
+                                        <p class="text-sm text-gray-900 dark:text-gray-100 truncate flex items-center gap-1.5">
+                                            {{ $track->name }}
+                                            <x-source-icon :source="$track->source" />
+                                        </p>
                                         @if($track->duration)
                                             <p class="text-xs text-gray-400 dark:text-gray-600 mt-0.5">{{ gmdate('g:i', $track->duration) }}</p>
                                         @endif

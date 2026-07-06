@@ -34,6 +34,11 @@
                             <div class="absolute bottom-1.5 right-1.5 bg-black/50 rounded-md px-1.5 py-0.5 text-white text-xs leading-none">
                                 {{ $play->played_at->format('H:i') }}
                             </div>
+
+                            {{-- Source badge --}}
+                            <div class="absolute top-1.5 right-1.5 bg-black/50 rounded-md w-5 h-5 flex items-center justify-center">
+                                <x-source-icon :source="$track->source" size="text-[10px]" class="!text-white" />
+                            </div>
                         </div>
 
                         {{-- Track info --}}

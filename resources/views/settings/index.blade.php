@@ -68,10 +68,16 @@
                     </span>
                 </div>
                 <div class="flex items-center justify-between">
-                    <a href="{{ route('settings.spotify-connect') }}"
-                       class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">
-                        Speaker mappings →
-                    </a>
+                    <div class="flex items-center gap-3">
+                        <a href="{{ route('settings.spotify-connect') }}"
+                           class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">
+                            Speaker mappings →
+                        </a>
+                        <a href="{{ route('settings.spotify-library') }}"
+                           class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">
+                            Library sync →
+                        </a>
+                    </div>
                     <form method="POST" action="{{ route('spotify.disconnect') }}">
                         @csrf
                         <button type="submit" class="text-xs text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors">
