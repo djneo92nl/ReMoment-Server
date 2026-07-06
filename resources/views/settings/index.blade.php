@@ -36,6 +36,21 @@
             <div class="text-xs text-gray-400 dark:text-gray-600 mt-0.5">{{ $deviceCount === 1 ? 'device' : 'devices' }} registered</div>
         </a>
 
+        <!-- Device Drivers Card -->
+        <a href="{{ route('settings.devices') }}"
+           class="group bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8 hover:shadow-xl transition-all">
+            <div class="flex items-start justify-between mb-6">
+                <div class="w-12 h-12 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl flex items-center justify-center">
+                    <i class="fa-solid fa-satellite-dish text-indigo-500 text-xl"></i>
+                </div>
+                <i class="fa-solid fa-arrow-up-right-from-square text-gray-300 dark:text-stone-700 group-hover:text-gray-500 dark:group-hover:text-stone-500 transition-colors text-sm mt-1"></i>
+            </div>
+            <h2 class="text-xl font-medium text-gray-900 dark:text-gray-100 mb-1">Device Drivers</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-500 mb-4">Add by IP, discover, and remove per driver</p>
+            <div class="text-3xl font-medium text-gray-900 dark:text-gray-100">{{ $deviceCount }}</div>
+            <div class="text-xs text-gray-400 dark:text-gray-600 mt-0.5">{{ $deviceCount === 1 ? 'device' : 'devices' }} across all drivers</div>
+        </a>
+
         <!-- Listeners Card -->
         <a href="{{ route('settings.listeners') }}"
            class="group bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8 hover:shadow-xl transition-all">
@@ -117,6 +132,47 @@
                 </div>
             </dl>
         </div>
+
+        <!-- Clients Card -->
+        <a href="{{ route('settings.clients') }}"
+           class="group bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8 hover:shadow-xl transition-all">
+            <div class="flex items-start justify-between mb-6">
+                <div class="w-12 h-12 bg-sky-50 dark:bg-sky-900/20 rounded-2xl flex items-center justify-center">
+                    <i class="fa-solid fa-microchip text-sky-500 text-xl"></i>
+                </div>
+                <i class="fa-solid fa-arrow-up-right-from-square text-gray-300 dark:text-stone-700 group-hover:text-gray-500 dark:group-hover:text-stone-500 transition-colors text-sm mt-1"></i>
+            </div>
+            <h2 class="text-xl font-medium text-gray-900 dark:text-gray-100 mb-1">Client Devices</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-500 mb-4">ESP, Pi, and software clients</p>
+            @php($clientCount = \App\Models\Client::count())
+            @php($pendingCount = \App\Models\Client::where('status', 'pending')->count())
+            <div class="text-3xl font-medium text-gray-900 dark:text-gray-100">{{ $clientCount }}</div>
+            <div class="text-xs mt-0.5">
+                @if($pendingCount > 0)
+                    <span class="text-amber-500">{{ $pendingCount }} pending</span>
+                    @if($clientCount - $pendingCount > 0)
+                        <span class="text-gray-400 dark:text-gray-600"> &middot; {{ $clientCount - $pendingCount }} approved</span>
+                    @endif
+                @else
+                    <span class="text-gray-400 dark:text-gray-600">{{ $clientCount === 1 ? 'client' : 'clients' }} registered</span>
+                @endif
+            </div>
+        </a>
+
+        <!-- DLNA Card -->
+        <a href="{{ route('settings.dlna') }}"
+           class="group bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8 hover:shadow-xl transition-all">
+            <div class="flex items-start justify-between mb-6">
+                <div class="w-12 h-12 bg-purple-50 dark:bg-purple-900/20 rounded-2xl flex items-center justify-center">
+                    <i class="fa-solid fa-server text-purple-500 text-xl"></i>
+                </div>
+                <i class="fa-solid fa-arrow-up-right-from-square text-gray-300 dark:text-stone-700 group-hover:text-gray-500 dark:group-hover:text-stone-500 transition-colors text-sm mt-1"></i>
+            </div>
+            <h2 class="text-xl font-medium text-gray-900 dark:text-gray-100 mb-1">DLNA Library</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-500 mb-4">Discover and import network media servers</p>
+            <div class="text-3xl font-medium text-gray-900 dark:text-gray-100">{{ $dlnaServerCount }}</div>
+            <div class="text-xs text-gray-400 dark:text-gray-600 mt-0.5">{{ $dlnaServerCount === 1 ? 'server' : 'servers' }} &middot; {{ $dlnaTrackCount }} {{ $dlnaTrackCount === 1 ? 'track' : 'tracks' }} imported</div>
+        </a>
 
     </div>
 </x-app-layout>

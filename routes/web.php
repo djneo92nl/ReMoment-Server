@@ -19,6 +19,7 @@ Route::get('/', function () {
 Route::get('/devices/discover', fn () => view('devices.discover'))->name('devices.discover');
 Route::resource('devices', DeviceController::class);
 Route::post('/devices/{device}/standby', [DeviceController::class, 'standby'])->name('devices.standby');
+Route::post('/devices/{device}/hidden', [DeviceController::class, 'toggleHidden'])->name('devices.toggle-hidden');
 Route::post('/devices/{device}/sources/{deviceSource}/activate', [DeviceController::class, 'activateSource'])->name('devices.sources.activate');
 Route::get('/history', [HistoryController::class, 'index'])->name('history.index');
 Route::get('/stats', [StatsController::class, 'index'])->name('stats.index');
@@ -48,6 +49,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/settings/listeners/start-all', [SettingsController::class, 'startAllListeners'])->name('settings.listeners.start-all');
     Route::post('/settings/listeners/{device}/start', [SettingsController::class, 'startListener'])->name('settings.listeners.start');
 
+    Route::get('/settings/devices', [SettingsController::class, 'devices'])->name('settings.devices');
+
     Route::get('/settings/dlna', [SettingsController::class, 'dlna'])->name('settings.dlna');
     Route::post('/settings/dlna/discover', [SettingsController::class, 'dlnaDiscover'])->name('settings.dlna.discover');
     Route::post('/settings/dlna/{server}/scan', [SettingsController::class, 'dlnaScan'])->name('settings.dlna.scan');
@@ -62,6 +65,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings/spotify/authorize', [SpotifyAuthController::class, 'authorize'])->name('spotify.authorize');
     Route::get('/settings/spotify/callback', [SpotifyAuthController::class, 'callback'])->name('spotify.callback');
     Route::post('/settings/spotify/disconnect', [SpotifyAuthController::class, 'disconnect'])->name('spotify.disconnect');
+
+    Route::get('/settings/clients', [SettingsController::class, 'clients'])->name('settings.clients');
 });
 
 require __DIR__.'/auth.php';

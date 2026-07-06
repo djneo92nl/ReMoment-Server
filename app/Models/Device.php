@@ -18,7 +18,6 @@ class Device extends Model
     protected $driver = null;
 
     public $fillable = [
-        'uuid',
         'ip_address',
         'device_brand_name',
         'device_product_type',
@@ -26,10 +25,12 @@ class Device extends Model
         'device_driver',
         'device_driver_name',
         'last_seen',
+        'hidden',
     ];
 
     public $casts = [
         'last_seen' => 'datetime',
+        'hidden' => 'boolean',
     ];
 
     public function toArray(): array

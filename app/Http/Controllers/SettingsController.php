@@ -6,9 +6,11 @@ use App\Domain\Device\DeviceCache;
 use App\Integrations\Spotify\MusicPlayerDriver as SpotifyDriver;
 use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
 use App\Integrations\Spotify\SpotifyDevice;
+use App\Models\Client;
 use App\Models\Device;
 use App\Models\DeviceMeta;
 use App\Models\DlnaServer;
+use App\Models\Media\Track;
 use App\Models\Setting;
 use App\Models\User;
 use App\Services\Dlna\DlnaLibraryScanner;
@@ -23,8 +25,10 @@ class SettingsController extends Controller
         $userCount = User::count();
         $deviceCount = Device::count();
         $spotifyConnected = app(SpotifyTokenService::class)->isConnected();
+        $dlnaServerCount = DlnaServer::count();
+        $dlnaTrackCount = Track::where('source', 'dlna')->count();
 
-        return view('settings.index', compact('userCount', 'deviceCount', 'spotifyConnected'));
+        return view('settings.index', compact('userCount', 'deviceCount', 'spotifyConnected', 'dlnaServerCount', 'dlnaTrackCount'));
     }
 
     public function users()
@@ -49,6 +53,11 @@ class SettingsController extends Controller
         });
 
         return view('settings.listeners', compact('devices'));
+    }
+
+    public function devices()
+    {
+        return view('settings.devices');
     }
 
     public function startListener(Device $device)
@@ -163,6 +172,14 @@ class SettingsController extends Controller
         $count = $scanner->scanServer($server);
 
         return back()->with('success', "Indexed {$count} tracks from {$server->friendly_name}.");
+    }
+
+    public function clients()
+    {
+        $clientCount = Client::count();
+        $pendingCount = Client::where('status', 'pending')->count();
+
+        return view('settings.clients', compact('clientCount', 'pendingCount'));
     }
 
     public function startAllListeners()

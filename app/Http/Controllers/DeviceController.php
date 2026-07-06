@@ -11,18 +11,25 @@ use App\Models\Device;
 use App\Models\DeviceSource;
 use App\Models\Play;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 
 class DeviceController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $spotifyRoutedDeviceId = DeviceCache::getSpotifyRoutedDeviceId();
+        $showHidden = $request->boolean('hidden');
 
-        $devices = Device::all()
-            ->filter(function (Device $device) use ($spotifyRoutedDeviceId) {
+        $all = Device::all();
+        $hiddenCount = $all->where('hidden', true)->count();
+
+        $devices = $all
+            ->filter(function (Device $device) use ($spotifyRoutedDeviceId, $showHidden) {
                 // Hide the Spotify virtual device while a mapped local device is actively playing Spotify
                 if ($spotifyRoutedDeviceId !== null && $device->device_driver_name === 'Spotify') {
+                    return false;
+                }
+
+                if ($device->hidden && !$showHidden) {
                     return false;
                 }
 
@@ -35,7 +42,7 @@ class DeviceController extends Controller
                 default => 0,
             });
 
-        return view('devices.index', ['devices' => $devices]);
+        return view('devices.index', ['devices' => $devices, 'hiddenCount' => $hiddenCount, 'showHidden' => $showHidden]);
     }
 
     public function create()
@@ -60,8 +67,6 @@ class DeviceController extends Controller
             'device_driver' => ['required', 'string', 'max:500'],
             'device_driver_name' => ['nullable', 'string', 'max:255'],
         ]);
-
-        $validated['uuid'] = Str::uuid()->toString();
 
         $device = Device::create($validated);
 
@@ -194,6 +199,13 @@ class DeviceController extends Controller
         }
 
         return redirect()->route('devices.show', $device);
+    }
+
+    public function toggleHidden(Device $device)
+    {
+        $device->update(['hidden' => !$device->hidden]);
+
+        return back()->with('success', $device->hidden ? "{$device->device_name} hidden." : "{$device->device_name} unhidden.");
     }
 
     public function destroy(Device $device)

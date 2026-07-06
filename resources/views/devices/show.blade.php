@@ -23,6 +23,14 @@
                         <span class="hidden sm:inline">Standby</span>
                     </button>
                 </form>
+                <form method="POST" action="{{ route('devices.toggle-hidden', $device) }}">
+                    @csrf
+                    <button type="submit"
+                            class="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-stone-800 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-medium hover:bg-gray-200 dark:hover:bg-stone-700 transition-colors">
+                        <i class="fa-solid {{ $device->hidden ? 'fa-eye' : 'fa-eye-slash' }}"></i>
+                        <span class="hidden sm:inline">{{ $device->hidden ? 'Unhide' : 'Hide' }}</span>
+                    </button>
+                </form>
                 <a href="{{ route('devices.edit', $device) }}"
                    class="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-stone-800 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-medium hover:bg-gray-200 dark:hover:bg-stone-700 transition-colors">
                     <i class="fa-solid fa-pen-to-square"></i>

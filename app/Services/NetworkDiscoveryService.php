@@ -9,13 +9,14 @@ use App\Models\Device;
 class NetworkDiscoveryService
 {
     /**
-     * Run all registered discoverers and return devices not yet in the database.
+     * Run the given discoverers (or all registered ones) and return devices not yet in the database.
      *
+     * @param  string[]|null  $discovererClasses
      * @return DiscoveredDevice[]
      */
-    public function discover(): array
+    public function discover(?array $discovererClasses = null): array
     {
-        $discovererClasses = config('devices.discoverers', []);
+        $discovererClasses ??= config('devices.discoverers', []);
 
         $all = [];
 

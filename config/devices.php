@@ -38,4 +38,10 @@ return [
             'virtual' => true,
         ],
     ],
+    'Sonos' => [
+        'Sonos Speaker' => [
+            'driver_name' => 'Sonos',
+            'driver' => \App\Integrations\Sonos\MusicPlayerDriver::class,
+        ],
+    ],
 ];

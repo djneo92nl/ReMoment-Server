@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\ClientController;
 use App\Http\Controllers\Api\DeviceController;
 use Illuminate\Support\Facades\Route;
 
@@ -23,3 +24,8 @@ Route::delete('/devices/{device}/multiroom/leave', [DeviceController::class, 'mu
 
 Route::post('/devices/{device}/library/play', [DeviceController::class, 'libraryPlay']);
 Route::post('/devices/{device}/library/play-playlist', [DeviceController::class, 'libraryPlayPlaylist']);
+
+Route::post('/clients/register', [ClientController::class, 'register']);
+Route::get('/clients/status/{registrationToken}', [ClientController::class, 'status']);
+Route::get('/clients/{apiToken}/devices', [ClientController::class, 'devices']);
+Route::put('/clients/{apiToken}/heartbeat', [ClientController::class, 'heartbeat']);

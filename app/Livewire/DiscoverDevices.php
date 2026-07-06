@@ -6,7 +6,6 @@ use App\Models\Device;
 use App\Models\DeviceMeta;
 use App\Services\NetworkDiscoveryService;
 use Carbon\Carbon;
-use Illuminate\Support\Str;
 use Livewire\Component;
 
 class DiscoverDevices extends Component
@@ -55,7 +54,6 @@ class DiscoverDevices extends Component
             }
 
             $device = Device::create([
-                'uuid' => Str::uuid(),
                 'ip_address' => $row['ip'],
                 'device_name' => $row['name'],
                 'device_brand_name' => $row['brand'],
