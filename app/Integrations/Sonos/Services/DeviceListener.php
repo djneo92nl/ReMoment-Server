@@ -16,6 +16,7 @@ use App\Events\Device\VolumeUpdated;
 use duncan3dc\Sonos\Controller;
 use duncan3dc\Sonos\Interfaces\Devices\DeviceInterface;
 use duncan3dc\Sonos\Interfaces\NetworkInterface;
+use duncan3dc\Sonos\Interfaces\PlayState;
 use duncan3dc\Sonos\State as SonosState;
 
 class DeviceListener
@@ -58,7 +59,7 @@ class DeviceListener
                     $lastVolume = $volume;
                 }
 
-                if ($state === Controller::STATE_STOPPED) {
+                if ($state === PlayState::Stopped) {
                     if ($lastNowPlayingKey !== null) {
                         event(new NowPlayingEnded(deviceId: $deviceId));
                         $lastNowPlayingKey = null;
