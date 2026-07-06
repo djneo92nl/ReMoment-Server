@@ -55,13 +55,20 @@
                 @endif
             </div>
 
-            <div class="flex items-center gap-3 flex-shrink-0">
+            <div class="flex items-center gap-2 flex-shrink-0">
                 <span class="text-sm text-gray-500 dark:text-gray-400 hidden sm:block truncate max-w-40">{{ $device->device_name }}</span>
-                <a href="{{ $showUrl }}"
+                <a href="/receiver?device={{ $device->id }}" target="_blank"
                    class="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 dark:text-gray-600 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-stone-800 transition-colors"
-                   title="Open {{ $device->device_name }}">
-                    <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+                   title="Open receiver">
+                    <i class="fa-solid fa-expand text-xs"></i>
                 </a>
+                @if(!$standalone)
+                    <a href="{{ $showUrl }}"
+                       class="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 dark:text-gray-600 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-stone-800 transition-colors"
+                       title="Open {{ $device->device_name }}">
+                        <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+                    </a>
+                @endif
             </div>
         </div>
 
