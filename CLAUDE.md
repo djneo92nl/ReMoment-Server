@@ -6,6 +6,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ReMoment Server is a Laravel 12 application that acts as a universal controller and abstraction layer for networked audio/video devices (Bang & Olufsen ASE, Sonos, Spotify). It normalizes control interfaces across brands, captures playback history, publishes events to MQTT for IoT integration, and exposes a REST API for client devices.
 
+## Documentation
+
+Detailed documentation lives in `docs/`. CLAUDE.md holds enough context to understand the project; the docs hold enough to implement or integrate without reading the source.
+
+```
+docs/
+  api/
+    client-devices.md       Client device registration flow, all endpoints, firmware guide
+  architecture/
+    client-devices.md       DB schema, model, controller, admin UI internals
+    device-drivers.md       Driver contracts, existing drivers, guide for adding a new brand
+    device-discovery.md     Discovery commands, listener startup, device_meta keys
+    plugin-architecture.md  Design doc: extracting drivers into composable packages
+  frontend/
+    receiver.md             /receiver view: JS globals, DOM structure, browser targets
+```
+
+When adding a significant feature, add a matching doc in the relevant subfolder (`api/` for new REST endpoints, `architecture/` for server-side systems, `frontend/` for complex UI pages).
+
 ## Common Commands
 
 ```bash
@@ -205,6 +224,19 @@ POST /api/devices/{id}/library/play   body: { "track_id": 42 }   → { "status":
 
 Error: `{ "error": "no_dlna_url", "message": "This track has no DLNA stream URL." }` → `422`
 
+### Client Device API
+
+Four endpoints used by firmware and software clients to self-register, poll for admin approval, and retrieve assigned devices.
+
+```
+POST  /api/clients/register                           → registration_token
+GET   /api/clients/status/{registration_token}        → pending | approved + api_token + devices
+GET   /api/clients/{api_token}/devices                → assigned device list
+PUT   /api/clients/{api_token}/heartbeat              → updates IP, firmware, last_seen_at
+```
+
+See `docs/api/client-devices.md` for full request/response shapes, the registration flow, firmware implementation notes, and an Arduino sketch outline.
+
 ---
 
 ## MQTT Reference
@@ -271,7 +303,7 @@ All drivers implement interfaces from `app/Integrations/Contracts/`:
 ### Domain vs. Model Layer
 
 - `app/Domain/` – Non-Eloquent value objects used in events and cache: `NowPlaying`, `TrackData`, `ArtistData`, `AlbumData`, `Radio`, `Source`
-- `app/Models/` – Eloquent models for persistence: `Device`, `DeviceSource`, `DeviceMeta`, `DlnaServer`, `MultiroomPreset`, `Play`, media models (`Track`, `Album`, `Artist`, `Metadata`)
+- `app/Models/` – Eloquent models for persistence: `Device`, `DeviceSource`, `DeviceMeta`, `DlnaServer`, `MultiroomPreset`, `Play`, `Client`, media models (`Track`, `Album`, `Artist`, `Metadata`)
 
 Domain objects represent live state; Eloquent models represent stored history.
 
@@ -356,6 +388,21 @@ Populate JIDs for all B&O devices with: `php artisan devices:sync-sources`
 
 `MultiroomPreset` model stores named groupings of device IDs (`device_ids` JSON column). Activating a preset calls `joinSession($host)` on all member devices, with the first device as host. Managed at `/multiroom` via the `MultiroomPresets` Livewire component.
 
+### Client Device Management
+
+Physical and software controllers (ESP8266, ESP32, Raspberry Pi, Squeezebox Touch, etc.) self-register and are approved by an admin. The server tracks firmware metadata and controls which media players each client can see.
+
+Two client types: `single` (one assigned device) and `multi` (explicit list, or all devices when none assigned).
+
+Key files:
+- Model: `app/Models/Client.php` + `client_device` pivot
+- API controller: `app/Http/Controllers/Api/ClientController.php`
+- Admin UI: `app/Livewire/ClientManager.php`
+- Settings page: `resources/views/settings/clients.blade.php` at `/settings/clients`
+
+See `docs/architecture/client-devices.md` for the full DB schema, device resolution logic, and component internals.
+See `docs/api/client-devices.md` for the firmware integration guide and full endpoint reference.
+
 ### Source Management
 
 `DeviceSource` rows represent sources synced from the device. Two UI-controlled fields:
@@ -393,6 +440,7 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 - `MultiroomPresets` (`app/Livewire/MultiroomPresets.php`) — create/activate/delete named multiroom groupings
 - `DeviceHistory` (`app/Livewire/DeviceHistory.php`) — last 10 unique tracks for a device
 - `PlayHistory` (`app/Livewire/PlayHistory.php`) — paginated play history with device/source filters
+- `ClientManager` (`app/Livewire/ClientManager.php`) — approve/reject pending registrations, edit client name/type/device assignment, regenerate tokens
 
 ### Web Pages
 
@@ -411,13 +459,15 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 - `/settings/listeners` — start/stop device background listeners
 - `/settings/dlna` — discover DLNA servers, trigger library scans
 - `/settings/spotify-connect` — map Spotify Connect speaker names to local devices
+- `/settings/clients` — manage client device registrations; approve/reject pending, assign devices, view tokens
 
 ### Controllers
 
 - `DeviceController` (`app/Http/Controllers/DeviceController.php`) — full CRUD + standby + source activation (web)
 - `Api/DeviceController` (`app/Http/Controllers/Api/DeviceController.php`) — REST API
 - `HistoryController` — play history views
-- `SettingsController` — settings, listeners, DLNA, Spotify Connect
+- `SettingsController` — settings, listeners, DLNA, Spotify Connect, client devices
+- `Api/ClientController` (`app/Http/Controllers/Api/ClientController.php`) — client registration, status polling, device list, heartbeat
 - `StatsController` — statistics views
 
 ---
