@@ -49,6 +49,7 @@ class SyncDeviceSources extends Command
                     'borrowed' => $s->borrowed,
                     'provider_jid' => $s->providerJid,
                     'provider_name' => $s->providerName,
+                    'sort_order' => $position,
                 ];
 
                 $existing = $device->deviceSources()->where('source_id', $s->sourceId)->first();

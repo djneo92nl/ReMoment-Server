@@ -17,7 +17,12 @@
                             <span class="text-base font-medium uppercase tracking-wider text-red-600 dark:text-red-500">Standby</span>
                         @endif
                     </div>
-                    <span class="text-sm text-gray-600 dark:text-gray-400">{{ $device->device_name }}</span>
+                    <div class="flex items-center gap-3">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">{{ $device->device_name }}</span>
+                        <a href="/receiver?device={{ $device->id }}" target="_blank" title="Open receiver" class="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
+                            <i class="fa-solid fa-expand text-sm"></i>
+                        </a>
+                    </div>
                 </div>
 
                 @if($device->state !== \App\Domain\Device\State::Standby)
@@ -92,6 +97,9 @@
                                         </button>
                                         @include('livewire.partials.listener-badge')
                                     </div>
+                                    @if($controlError)
+                                        <p class="text-sm text-red-500 mt-2">{{ $controlError }}</p>
+                                    @endif
                                 </div>
                             </div>
                         </div>

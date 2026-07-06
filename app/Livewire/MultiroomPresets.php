@@ -71,7 +71,8 @@ class MultiroomPresets extends Component
             return;
         }
 
-        $devices = Device::whereIn('id', $preset->device_ids)->get();
+        $deviceMap = Device::whereIn('id', $preset->device_ids)->get()->keyBy('id');
+        $devices = collect($preset->device_ids)->map(fn ($id) => $deviceMap->get($id))->filter()->values();
         if ($devices->count() < 2) {
             $this->setFeedback('Preset needs at least 2 devices.', true);
 

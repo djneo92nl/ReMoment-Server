@@ -146,16 +146,12 @@ class DeviceCard extends Component
         }
     }
 
-    public function activateSource(int $index): void
+    public function activateSource(string $sourceId): void
     {
-        $source = $this->quickSources[$index] ?? null;
-        if (!$source) {
-            return;
-        }
         try {
             $driver = $this->device->driver;
             if ($driver instanceof SourceActivationInterface) {
-                $driver->activateSource($source['id']);
+                $driver->activateSource($sourceId);
             }
         } catch (\Throwable) {
         }

@@ -12,9 +12,12 @@ class DlnaLibraryScanner
 {
     private int $tracksImported = 0;
 
+    private array $visitedContainers = [];
+
     public function scanServer(DlnaServer $server, ?callable $progress = null): int
     {
         $this->tracksImported = 0;
+        $this->visitedContainers = [];
 
         $client = new DlnaContentDirectoryClient($server->control_url);
         $this->browseContainer($client, '0', $server, $progress);
@@ -30,6 +33,11 @@ class DlnaLibraryScanner
         DlnaServer $server,
         ?callable $progress = null,
     ): void {
+        if (isset($this->visitedContainers[$objectId])) {
+            return;
+        }
+        $this->visitedContainers[$objectId] = true;
+
         $result = $client->browseChildren($objectId);
 
         foreach ($result['items'] as $item) {
@@ -59,7 +67,7 @@ class DlnaLibraryScanner
         );
 
         $albumData = ['source' => 'dlna'];
-        if (! empty($item['album_art'])) {
+        if (!empty($item['album_art'])) {
             $albumData['images'] = [['url' => $item['album_art']]];
         }
 
@@ -93,7 +101,7 @@ class DlnaLibraryScanner
             ],
         );
 
-        if (! empty($item['album_art']) && empty($album->images)) {
+        if (!empty($item['album_art']) && empty($album->images)) {
             $album->update(['images' => [['url' => $item['album_art']]]]);
         }
     }

@@ -14,6 +14,8 @@ class Nowplaying extends Component
 
     public bool $listenerRunning = false;
 
+    public ?string $controlError = null;
+
     public function mount($device)
     {
         $this->device = $device;
@@ -31,6 +33,7 @@ class Nowplaying extends Component
     public function render()
     {
         $this->listenerRunning = DeviceCache::isListenerRunning($this->device->id);
+
         return view('livewire.nowplaying');
     }
 
@@ -48,22 +51,42 @@ class Nowplaying extends Component
 
     public function play()
     {
-        try { $this->device->driver->play(); } catch (\Throwable) {}
+        try {
+            $this->device->driver->play();
+            $this->controlError = null;
+        } catch (\Throwable $e) {
+            $this->controlError = 'Command failed: '.$e->getMessage();
+        }
     }
 
     public function pause()
     {
-        try { $this->device->driver->pause(); } catch (\Throwable) {}
+        try {
+            $this->device->driver->pause();
+            $this->controlError = null;
+        } catch (\Throwable $e) {
+            $this->controlError = 'Command failed: '.$e->getMessage();
+        }
     }
 
     public function next()
     {
-        try { $this->device->driver->next(); } catch (\Throwable) {}
+        try {
+            $this->device->driver->next();
+            $this->controlError = null;
+        } catch (\Throwable $e) {
+            $this->controlError = 'Command failed: '.$e->getMessage();
+        }
     }
 
     public function previous()
     {
-        try { $this->device->driver->previous(); } catch (\Throwable) {}
+        try {
+            $this->device->driver->previous();
+            $this->controlError = null;
+        } catch (\Throwable $e) {
+            $this->controlError = 'Command failed: '.$e->getMessage();
+        }
     }
 
     public function standby()
@@ -73,6 +96,9 @@ class Nowplaying extends Component
             if (method_exists($driver, 'standby')) {
                 $driver->standby();
             }
-        } catch (\Throwable) {}
+            $this->controlError = null;
+        } catch (\Throwable $e) {
+            $this->controlError = 'Command failed: '.$e->getMessage();
+        }
     }
 }

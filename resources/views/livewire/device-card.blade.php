@@ -236,7 +236,7 @@
                                             default => 'fa-plug',
                                         };
                                     @endphp
-                                    <button wire:click="activateSource({{ $i }})"
+                                    <button wire:click="activateSource('{{ $source['id'] }}')"
                                             class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-stone-800 hover:bg-gray-200 dark:hover:bg-stone-700 transition-colors text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 flex-shrink-0">
                                         <i class="fa-solid {{ $sourceIcon }} text-xs"></i>
                                         <span>{{ $source['name'] }}</span>

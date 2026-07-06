@@ -141,6 +141,11 @@ class DeviceListener
                     continue;
                 }
 
+                if ($lastNowPlayingKey !== null) {
+                    event(new NowPlayingEnded(deviceId: $lastEffectiveDeviceId));
+                    $lastNowPlayingKey = null;
+                    $lastPositionSeconds = null;
+                }
                 Log::error("Spotify listener [{$deviceId}] API error: {$e->getMessage()}", ['exception' => $e]);
                 if ($this->onError) {
                     ($this->onError)($e);
@@ -151,6 +156,11 @@ class DeviceListener
                 sleep($retryDelaySeconds);
 
             } catch (\Throwable $e) {
+                if ($lastNowPlayingKey !== null) {
+                    event(new NowPlayingEnded(deviceId: $lastEffectiveDeviceId));
+                    $lastNowPlayingKey = null;
+                    $lastPositionSeconds = null;
+                }
                 Log::error("Spotify listener [{$deviceId}] error: {$e->getMessage()}", ['exception' => $e]);
                 if ($this->onError) {
                     ($this->onError)($e);

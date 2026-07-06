@@ -31,10 +31,10 @@ class DlnaServerDiscovery
 
         $locations = [];
         $start = time();
-        while (time() - $start < $this->timeout) {
+        while (($remaining = $this->timeout - (time() - $start)) > 0) {
             $read = [$socket];
             $write = $except = [];
-            $changed = socket_select($read, $write, $except, $this->timeout);
+            $changed = socket_select($read, $write, $except, $remaining);
             if ($changed === false || $changed === 0) {
                 break;
             }
@@ -67,12 +67,12 @@ class DlnaServerDiscovery
     private function resolveServer(string $location): ?DlnaServer
     {
         $xml = @file_get_contents($location);
-        if (! $xml) {
+        if (!$xml) {
             return null;
         }
 
         $parsed = simplexml_load_string($xml, 'SimpleXMLElement', LIBXML_NOCDATA);
-        if (! $parsed) {
+        if (!$parsed) {
             return null;
         }
 
@@ -84,15 +84,16 @@ class DlnaServerDiscovery
             }
         }
 
-        if (! $controlUrl) {
+        if (!$controlUrl) {
             return null;
         }
 
         $parsed_url = parse_url($location);
-        $base = $parsed_url['scheme'].'://'.$parsed_url['host'].':'.$parsed_url['port'];
+        $urlPort = $parsed_url['port'] ?? null;
+        $base = $parsed_url['scheme'].'://'.$parsed_url['host'].($urlPort !== null ? ':'.$urlPort : '');
 
         // controlURL may be relative or absolute
-        if (! str_starts_with($controlUrl, 'http')) {
+        if (!str_starts_with($controlUrl, 'http')) {
             $controlUrl = $base.'/'.ltrim($controlUrl, '/');
         }
 

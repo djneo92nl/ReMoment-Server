@@ -3,8 +3,8 @@
 namespace App\Models;
 
 use App\Models\Media\Track;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class DlnaServer extends Model
 {
@@ -21,15 +21,12 @@ class DlnaServer extends Model
         'port' => 'integer',
     ];
 
-    public function tracks(): HasManyThrough
+    // metadata.source stores 'dlna:{id}' strings, so hasManyThrough cannot join correctly.
+    public function tracks(): Builder
     {
-        return $this->hasManyThrough(
-            Track::class,
-            Media\Metadata::class,
-            'source',
-            'id',
-            'id',
-            'metadatable_id',
+        return Track::whereHas('metadata', fn ($q) => $q
+            ->where('key', 'dlna_url')
+            ->where('source', 'dlna:'.$this->id)
         );
     }
 

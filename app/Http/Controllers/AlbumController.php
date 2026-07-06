@@ -26,9 +26,13 @@ class AlbumController extends Controller
             ->limit(20)
             ->get();
 
-        $playableDevices = Device::all()->filter(
-            fn ($d) => $d->driver instanceof LibraryPlaybackInterface
-        )->values();
+        $playableDevices = Device::all()->filter(function ($d) {
+            try {
+                return $d->driver instanceof LibraryPlaybackInterface;
+            } catch (\Throwable) {
+                return false;
+            }
+        })->values();
 
         return view('albums.show', compact(
             'album',
