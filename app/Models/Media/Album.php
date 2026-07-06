@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Album extends Model
 {
@@ -40,5 +41,15 @@ class Album extends Model
     public function plays(): HasManyThrough
     {
         return $this->hasManyThrough(Play::class, Track::class);
+    }
+
+    public function metadata(): MorphMany
+    {
+        return $this->morphMany(Metadata::class, 'metadatable');
+    }
+
+    public function label(): ?string
+    {
+        return $this->metadata()->where('key', 'label')->value('value');
     }
 }

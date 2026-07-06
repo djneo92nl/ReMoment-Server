@@ -11,7 +11,7 @@ class AlbumController extends Controller
 {
     public function show(Album $album)
     {
-        $album->load(['artist', 'tracks' => fn ($q) => $q->withCount('plays')->with(['metadata' => fn ($q) => $q->where('key', 'dlna_url')])->orderByDesc('plays_count')]);
+        $album->load(['artist', 'tracks' => fn ($q) => $q->withCount('plays')->with(['metadata' => fn ($q) => $q->whereIn('key', ['dlna_url', 'lyrics_plain'])])->orderByDesc('plays_count')]);
 
         $totalPlays = $album->plays()->count();
 

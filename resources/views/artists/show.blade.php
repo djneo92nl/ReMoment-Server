@@ -12,6 +12,14 @@
                         {{ $hours > 0 ? "{$hours}h {$mins}m" : "{$mins}m" }} listened
                     @endif
                 </p>
+                @php $genres = $artist->genres() @endphp
+                @if(count($genres))
+                    <div class="flex flex-wrap gap-1.5 mt-2">
+                        @foreach(array_slice($genres, 0, 8) as $genre)
+                            <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-stone-800 text-gray-600 dark:text-gray-400">{{ $genre }}</span>
+                        @endforeach
+                    </div>
+                @endif
             </div>
         </div>
     </x-slot>

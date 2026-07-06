@@ -4,6 +4,7 @@ namespace App\Listeners\Device;
 
 use App\Events\Device\NowPlayingUpdated;
 use App\Integrations\Contracts\RadioControlInterface;
+use App\Jobs\EnrichTrackMetadata;
 use App\Models\Device;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
@@ -228,6 +229,10 @@ class StorePlaybackHistory implements ShouldQueue
                 'images' => ($npTrack->images ?? []) ?: null,
             ]
         );
+
+        if ($track->wasRecentlyCreated) {
+            EnrichTrackMetadata::dispatch($track);
+        }
 
         // --- Resolve radio station when track is playing via a radio source ---
         $radioStation = null;

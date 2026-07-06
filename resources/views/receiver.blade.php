@@ -265,15 +265,63 @@
 
   #controls {
     display: none;
+    flex-direction: column;
     position: relative;
     z-index: 1;
-    justify-content: center;
     align-items: center;
-    gap: 32px;
-    padding: 0 80px 36px;
+    gap: 18px;
+    padding: 0 80px 40px;
   }
 
   #controls.visible { display: flex; }
+
+  .ctrl-playback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 32px;
+  }
+
+  #vol-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 280px;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+  }
+  #vol-row:hover { opacity: 1; }
+
+  #vol-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 3px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  #vol-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 13px; height: 13px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.85);
+    cursor: pointer;
+  }
+  #vol-slider::-moz-range-thumb {
+    width: 13px; height: 13px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.85);
+    cursor: pointer;
+  }
+  #vol-val {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: rgba(255,255,255,0.4);
+    width: 26px;
+    text-align: right;
+  }
 
   #btn-fullscreen {
     position: fixed;
@@ -309,6 +357,101 @@
   .ctrl-btn svg { display: block; }
   .ctrl-btn.primary { padding: 18px; background: rgba(255,255,255,0.1); }
   .ctrl-btn.primary:hover { background: rgba(255,255,255,0.18); }
+
+  /* ── Idle clock ── */
+  #idle-screen {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 4;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 1s ease;
+  }
+  #idle-screen.visible { opacity: 1; }
+  #idle-time {
+    font-size: clamp(80px, 14vw, 160px);
+    font-weight: 300;
+    letter-spacing: -0.02em;
+    color: rgba(255,255,255,0.88);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  #idle-date {
+    font-family: 'DM Mono', monospace;
+    font-size: 15px;
+    color: rgba(255,255,255,0.28);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-top: 22px;
+  }
+
+  /* ── Ambient mode ── */
+  body.ambient #meta,
+  body.ambient #progress-wrap,
+  body.ambient #controls,
+  body.ambient #btn-fullscreen,
+  body.ambient #switch-btn { opacity: 0 !important; pointer-events: none; transition: opacity 2.5s ease !important; }
+
+  /* ── Device switcher ── */
+  #switch-btn {
+    display: none;
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 10;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 10px;
+    border-radius: 8px;
+    color: rgba(255,255,255,0.25);
+    transition: color 0.15s, background 0.15s;
+    line-height: 0;
+  }
+  #switch-btn:hover { color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.08); }
+
+  #switch-panel {
+    display: none;
+    position: fixed;
+    top: 52px;
+    left: 12px;
+    z-index: 20;
+    background: rgba(12,12,12,0.96);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 12px;
+    padding: 6px;
+    min-width: 200px;
+    backdrop-filter: blur(20px);
+  }
+  #switch-panel.open { display: block; }
+
+  .switch-item {
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    color: #fff;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    padding: 9px 12px;
+    border-radius: 7px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    transition: background 0.12s;
+  }
+  .switch-item:hover { background: rgba(255,255,255,0.08); }
+  .switch-item.active { opacity: 0.4; cursor: default; }
+  .switch-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
 </style>
 </head>
 <body>
@@ -318,6 +461,13 @@
   <div id="picker-devices"></div>
   <div id="picker-status">Loading…</div>
 </div>
+
+<button id="switch-btn" title="Switch device">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+  </svg>
+</button>
+<div id="switch-panel"></div>
 
 <button id="btn-fullscreen" onclick="toggleFullscreen()" title="Toggle fullscreen">
   <svg id="icon-expand" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -332,6 +482,11 @@
 
 <div class="bg-layer" id="bg-a"></div>
 <div class="bg-layer" id="bg-b"></div>
+
+<div id="idle-screen">
+  <div id="idle-time">00:00</div>
+  <div id="idle-date"></div>
+</div>
 
 <div id="main">
   <div id="artwork-wrap">
@@ -366,37 +521,49 @@
 </div>
 
 <div id="controls">
-  <button class="ctrl-btn" onclick="sendAction('previous')" title="Previous">
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="4" x2="5" y2="20"/>
+  <div class="ctrl-playback">
+    <button class="ctrl-btn" onclick="sendAction('previous')" title="Previous">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="4" x2="5" y2="20"/>
+      </svg>
+    </button>
+    <button class="ctrl-btn primary" id="btn-playpause" onclick="togglePlayPause()" title="Play/Pause">
+      <svg id="icon-play" width="32" height="32" viewBox="0 0 24 24" fill="white" stroke="none">
+        <polygon points="5 3 19 12 5 21 5 3"/>
+      </svg>
+      <svg id="icon-pause" width="32" height="32" viewBox="0 0 24 24" fill="white" stroke="none" style="display:none">
+        <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
+      </svg>
+    </button>
+    <button class="ctrl-btn" onclick="sendAction('next')" title="Next">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="4" x2="19" y2="20"/>
+      </svg>
+    </button>
+  </div>
+  <div id="vol-row">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
     </svg>
-  </button>
-  <button class="ctrl-btn primary" id="btn-playpause" onclick="togglePlayPause()" title="Play/Pause">
-    <svg id="icon-play" width="32" height="32" viewBox="0 0 24 24" fill="white" stroke="none">
-      <polygon points="5 3 19 12 5 21 5 3"/>
-    </svg>
-    <svg id="icon-pause" width="32" height="32" viewBox="0 0 24 24" fill="white" stroke="none" style="display:none">
-      <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
-    </svg>
-  </button>
-  <button class="ctrl-btn" onclick="sendAction('next')" title="Next">
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="4" x2="19" y2="20"/>
-    </svg>
-  </button>
+    <input type="range" id="vol-slider" min="0" max="100" value="50">
+    <span id="vol-val">—</span>
+  </div>
 </div>
 
 <script>
 const isChromecast = /CrKey/i.test(navigator.userAgent);
 const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 const isTV = /TV|SmartTV|Tizen|WebOS|HbbTV|BRAVIA/i.test(navigator.userAgent);
-const showControls = !isChromecast && (hasTouch || isTV);
+const showControls = !isChromecast;
 
 let deviceId = null;
 let pollTimer = null;
 let currentProgress = 0, currentDuration = 0, progressLastPollTime = 0, isCurrentlyPlaying = false;
 let lastTrackId = null;
 let activeArt = 'a', currentArtUrl = '';
+let allDevices = [];
+let currentVolume = 50, volumeDebounce = null;
+let ambientTimer = null;
 
 const params = new URLSearchParams(window.location.search);
 const paramDeviceId = params.get('device') ? parseInt(params.get('device')) : null;
@@ -407,6 +574,7 @@ async function init() {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const json = await r.json();
     const devices = json.data ?? json;
+    allDevices = devices;
 
     if (!devices.length) {
       document.getElementById('picker-status').textContent = 'No devices found';
@@ -438,11 +606,20 @@ async function init() {
 }
 
 function startReceiver(device) {
+  if (pollTimer) clearInterval(pollTimer);
   deviceId = device.id;
+  lastTrackId = null;
+  currentArtUrl = '';
+  activeArt = 'a';
   document.getElementById('picker-panel').style.display = 'none';
   const label = [device.device_name, device.device_product_type].filter(Boolean).join(' · ');
   document.getElementById('device-name').textContent = label;
-  if (showControls) document.getElementById('controls').classList.add('visible');
+  if (showControls) {
+    document.getElementById('controls').classList.add('visible');
+    fetchVolume();
+  }
+  document.getElementById('switch-btn').style.display = 'block';
+  resetAmbient();
   pollNow();
   pollTimer = setInterval(pollNow, 3000);
 }
@@ -466,6 +643,9 @@ function updateUI(d) {
   const dot = document.getElementById('state-dot');
   const label = document.getElementById('state-label');
 
+  const isIdle = !np || d.state === 'Unreachable' || d.state === 'standby';
+  showIdle(isIdle);
+
   if (!np || d.state === 'Unreachable') {
     dot.className = '';
     label.textContent = 'unreachable';
@@ -476,6 +656,11 @@ function updateUI(d) {
   dot.className = state === 'playing' ? 'playing' : '';
   label.textContent = state;
   if (showControls) updatePlayPauseIcon(state);
+
+  if (!isCurrentlyPlaying) {
+    document.body.classList.remove('ambient');
+    clearTimeout(ambientTimer);
+  }
 
   document.getElementById('platform').textContent = np.platform || np.source?.name || '—';
 
@@ -680,6 +865,117 @@ document.addEventListener('fullscreenchange', () => {
   document.getElementById('icon-expand').style.display   = fs ? 'none'  : 'block';
   document.getElementById('icon-compress').style.display = fs ? 'block' : 'none';
 });
+
+// ── Idle clock ──────────────────────────────────────────────
+const DAYS   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function updateClock() {
+  const now = new Date();
+  const hh = now.getHours().toString().padStart(2, '0');
+  const mm = now.getMinutes().toString().padStart(2, '0');
+  document.getElementById('idle-time').textContent = `${hh}:${mm}`;
+  document.getElementById('idle-date').textContent =
+    `${DAYS[now.getDay()]}, ${MONTHS[now.getMonth()]} ${now.getDate()}`;
+}
+
+function showIdle(on) {
+  document.getElementById('idle-screen').classList.toggle('visible', on);
+}
+
+setInterval(updateClock, 1000);
+updateClock();
+
+// ── Ambient mode ─────────────────────────────────────────────
+function resetAmbient() {
+  document.body.classList.remove('ambient');
+  clearTimeout(ambientTimer);
+  if (isCurrentlyPlaying) {
+    ambientTimer = setTimeout(() => document.body.classList.add('ambient'), 30000);
+  }
+}
+
+document.addEventListener('mousemove', resetAmbient);
+document.addEventListener('touchstart', resetAmbient, { passive: true });
+document.addEventListener('keydown', resetAmbient);
+
+// ── Volume ───────────────────────────────────────────────────
+async function fetchVolume() {
+  try {
+    const r = await fetch(`/api/devices/${deviceId}/volume`);
+    if (!r.ok) return;
+    const j = await r.json();
+    currentVolume = j.volume ?? 50;
+    updateVolumeUI();
+  } catch(e) {}
+}
+
+function updateVolumeUI() {
+  document.getElementById('vol-slider').value = currentVolume;
+  document.getElementById('vol-val').textContent = currentVolume;
+}
+
+async function commitVolume(v) {
+  try {
+    await fetch(`/api/devices/${deviceId}/volume`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ volume: v }),
+    });
+  } catch(e) {}
+}
+
+function setVolume(v) {
+  v = Math.max(0, Math.min(100, Math.round(v)));
+  currentVolume = v;
+  updateVolumeUI();
+  clearTimeout(volumeDebounce);
+  volumeDebounce = setTimeout(() => commitVolume(v), 200);
+}
+
+document.getElementById('vol-slider').addEventListener('input', e => {
+  setVolume(parseInt(e.target.value));
+});
+
+document.addEventListener('wheel', e => {
+  if (!deviceId || !showControls) return;
+  e.preventDefault();
+  resetAmbient();
+  setVolume(currentVolume + (e.deltaY < 0 ? 5 : -5));
+}, { passive: false });
+
+// ── Device switcher ──────────────────────────────────────────
+const STATE_COLORS = { playing: '#4ade80', paused: '#fbbf24', standby: '#ef4444', unreachable: '#6b7280' };
+
+function buildSwitcher() {
+  const panel = document.getElementById('switch-panel');
+  panel.innerHTML = '';
+  allDevices.forEach(d => {
+    const btn = document.createElement('button');
+    btn.className = 'switch-item' + (d.id === deviceId ? ' active' : '');
+    const color = STATE_COLORS[d.state] || STATE_COLORS.unreachable;
+    btn.innerHTML = `<span class="switch-dot" style="background:${color}"></span><span>${d.device_name}</span>`;
+    if (d.id !== deviceId) {
+      btn.onclick = () => { toggleSwitcher(false); startReceiver(d); };
+    }
+    panel.appendChild(btn);
+  });
+}
+
+function toggleSwitcher(force) {
+  const panel = document.getElementById('switch-panel');
+  const open = force !== undefined ? force : !panel.classList.contains('open');
+  if (open) buildSwitcher();
+  panel.classList.toggle('open', open);
+}
+
+document.getElementById('switch-btn').addEventListener('click', e => {
+  e.stopPropagation();
+  resetAmbient();
+  toggleSwitcher();
+});
+
+document.addEventListener('click', () => toggleSwitcher(false));
 
 setInterval(updateProgress, 1000);
 init();

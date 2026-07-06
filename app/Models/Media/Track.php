@@ -49,11 +49,28 @@ class Track extends Model
 
     public function getDlnaUrl(): ?string
     {
-        // Prefer already-loaded relation to avoid extra queries
         if ($this->relationLoaded('metadata')) {
             return $this->metadata->firstWhere('key', 'dlna_url')?->value;
         }
 
         return $this->metadata()->where('key', 'dlna_url')->value('value');
+    }
+
+    public function lyricsPlain(): ?string
+    {
+        $value = $this->relationLoaded('metadata')
+            ? $this->metadata->firstWhere('key', 'lyrics_plain')?->value
+            : $this->metadata()->where('key', 'lyrics_plain')->value('value');
+
+        return ($value !== null && $value !== '') ? $value : null;
+    }
+
+    public function lyricsSynced(): ?string
+    {
+        $value = $this->relationLoaded('metadata')
+            ? $this->metadata->firstWhere('key', 'lyrics_synced')?->value
+            : $this->metadata()->where('key', 'lyrics_synced')->value('value');
+
+        return ($value !== null && $value !== '') ? $value : null;
     }
 }
