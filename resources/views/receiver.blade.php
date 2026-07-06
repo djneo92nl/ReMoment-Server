@@ -2,6 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ReMoment Receiver</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
 <style>
@@ -358,6 +359,60 @@
   .ctrl-btn.primary { padding: 18px; background: rgba(255,255,255,0.1); }
   .ctrl-btn.primary:hover { background: rgba(255,255,255,0.18); }
 
+  /* ── Lyrics toggle button ── */
+  #btn-lyrics {
+    display: none;
+    position: fixed;
+    top: 20px;
+    right: 64px;
+    z-index: 10;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 10px;
+    border-radius: 8px;
+    color: rgba(255,255,255,0.25);
+    transition: color 0.15s, background 0.15s;
+    line-height: 0;
+  }
+  #btn-lyrics:hover { color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.08); }
+  #btn-lyrics.active { color: rgba(255,255,255,0.6); }
+
+  /* ── Lyrics 3-line view ── */
+  #lyrics-view {
+    display: none;
+    flex: 1;
+    min-width: 0;
+    flex-direction: column;
+    justify-content: center;
+    gap: 18px;
+    transition: opacity 0.2s ease;
+  }
+  #lyric-prev, #lyric-next {
+    font-size: 20px;
+    font-weight: 300;
+    color: rgba(255,255,255,0.22);
+    white-space: normal;
+    overflow: hidden;
+    max-height: 1.6em;
+  }
+  #lyric-curr {
+    font-size: 34px;
+    font-weight: 500;
+    line-height: 1.25;
+    color: rgba(255,255,255,0.92);
+    white-space: nowrap;
+    overflow: hidden;
+    position: relative;
+  }
+  #lyric-curr-inner {
+    display: inline-block;
+    white-space: nowrap;
+  }
+  #lyric-curr-inner.marquee {
+    animation: marquee-scroll linear infinite;
+  }
+
   /* ── Idle clock ── */
   #idle-screen {
     position: fixed;
@@ -373,6 +428,7 @@
   }
   #idle-screen.visible { opacity: 1; }
   #idle-time {
+    font-size: 14vw;
     font-size: clamp(80px, 14vw, 160px);
     font-weight: 300;
     letter-spacing: -0.02em;
@@ -394,6 +450,7 @@
   body.ambient #progress-wrap,
   body.ambient #controls,
   body.ambient #btn-fullscreen,
+  body.ambient #btn-lyrics,
   body.ambient #switch-btn { opacity: 0 !important; pointer-events: none; transition: opacity 2.5s ease !important; }
 
   /* ── Device switcher ── */
@@ -452,6 +509,44 @@
     border-radius: 50%;
     flex-shrink: 0;
   }
+
+  /* ── Responsive: portrait tablet (≤ 900px) ── */
+  @media (max-width: 900px) {
+    #main {
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      padding: 20px 24px 0;
+    }
+    #artwork-wrap { width: 260px; height: 260px; }
+    #meta, #lyrics-view { width: 100%; }
+    #track-name { font-size: 30px; }
+    #artist-name { font-size: 17px; }
+    #album-name { font-size: 13px; }
+    #progress-wrap { padding: 0 24px 16px; }
+    #controls { padding: 0 24px 16px; }
+    #lyric-curr { font-size: 24px; }
+    #lyric-prev, #lyric-next { font-size: 15px; }
+    .picker-device { width: 100%; max-width: 360px; }
+    .ctrl-btn { padding: 16px; touch-action: manipulation; }
+    .ctrl-btn.primary { padding: 22px; }
+    #btn-fullscreen, #btn-lyrics, #switch-btn { touch-action: manipulation; }
+  }
+
+  /* ── Responsive: phone (≤ 480px) ── */
+  @media (max-width: 480px) {
+    #main { gap: 14px; padding: 14px 16px 0; }
+    #artwork-wrap { width: 52vw; height: 52vw; }
+    #track-name { font-size: 22px; }
+    #artist-name { font-size: 14px; }
+    #album-name { font-size: 11px; }
+    #progress-wrap { padding: 0 16px 12px; }
+    #controls { padding: 0 16px 12px; }
+    #lyric-curr { font-size: 19px; }
+    #lyric-prev, #lyric-next { font-size: 12px; }
+    #lyrics-view { gap: 14px; }
+    #vol-row { width: 100%; }
+  }
 </style>
 </head>
 <body>
@@ -468,6 +563,12 @@
   </svg>
 </button>
 <div id="switch-panel"></div>
+
+<button id="btn-lyrics" onclick="toggleLyricsView()" title="Toggle lyrics">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+    <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="17" y2="12"/><line x1="3" y1="18" x2="19" y2="18"/>
+  </svg>
+</button>
 
 <button id="btn-fullscreen" onclick="toggleFullscreen()" title="Toggle fullscreen">
   <svg id="icon-expand" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -507,6 +608,12 @@
     <div id="album-name"></div>
     <div id="device-name"></div>
     <div id="state-badge"><span id="state-dot"></span><span id="state-label">idle</span></div>
+  </div>
+
+  <div id="lyrics-view">
+    <p id="lyric-prev"></p>
+    <p id="lyric-curr"><span id="lyric-curr-inner"></span></p>
+    <p id="lyric-next"></p>
   </div>
 </div>
 
@@ -564,6 +671,12 @@ let activeArt = 'a', currentArtUrl = '';
 let allDevices = [];
 let currentVolume = 50, volumeDebounce = null;
 let ambientTimer = null;
+let currentLyricsData = null;
+let currentLyricLineIdx = -2;
+let lastLyricsKey = null;
+let lyricsViewActive = false;
+let ambientSwitchedToLyrics = false;
+let lyricFadeTimer = null;
 
 const params = new URLSearchParams(window.location.search);
 const paramDeviceId = params.get('device') ? parseInt(params.get('device')) : null;
@@ -573,7 +686,7 @@ async function init() {
     const r = await fetch('/api/devices');
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const json = await r.json();
-    const devices = json.data ?? json;
+    const devices = json.data != null ? json.data : json;
     allDevices = devices;
 
     if (!devices.length) {
@@ -629,8 +742,112 @@ async function pollNow() {
     const r = await fetch(`/api/devices/${deviceId}`);
     if (!r.ok) return;
     const json = await r.json();
-    updateUI(json.data ?? json);
+    updateUI(json.data != null ? json.data : json);
   } catch(e) {}
+}
+
+function parseLrc(lrc) {
+  const lines = [];
+  for (const line of lrc.split('\n')) {
+    const m = line.match(/\[(\d+):(\d+(?:\.\d+)?)\](.*)/);
+    if (m) {
+      const time = parseInt(m[1]) * 60 + parseFloat(m[2]);
+      const text = m[3].trim();
+      if (text) lines.push({ time, text });
+    }
+  }
+  return lines.sort((a, b) => a.time - b.time);
+}
+
+function setLyrics(lyrics) {
+  const btn = document.getElementById('btn-lyrics');
+  currentLyricLineIdx = -2;
+  if (lyrics && lyrics.synced) {
+    const lines = parseLrc(lyrics.synced);
+    if (lines.length) {
+      currentLyricsData = { type: 'synced', lines };
+      btn.style.display = 'block';
+      syncLyricsLine();
+      return;
+    }
+  }
+  if (lyrics && lyrics.plain) {
+    const lines = lyrics.plain.split('\n').filter(t => t.trim()).map(t => ({ time: null, text: t }));
+    if (lines.length) {
+      currentLyricsData = { type: 'plain', lines };
+      btn.style.display = 'block';
+      syncLyricsLine();
+      return;
+    }
+  }
+  currentLyricsData = null;
+  btn.style.display = 'none';
+  if (lyricsViewActive) toggleLyricsView();
+  document.getElementById('lyric-prev').textContent = '';
+  document.getElementById('lyric-curr-inner').textContent = '';
+  document.getElementById('lyric-next').textContent = '';
+}
+
+function updateLyricDisplay(idx) {
+  const lines = currentLyricsData.lines;
+  const view = document.getElementById('lyrics-view');
+  if (lyricFadeTimer) clearTimeout(lyricFadeTimer);
+  view.style.opacity = '0';
+  lyricFadeTimer = setTimeout(() => {
+    document.getElementById('lyric-prev').textContent = idx > 0 ? lines[idx - 1].text : '';
+    const inner = document.getElementById('lyric-curr-inner');
+    inner.classList.remove('marquee');
+    inner.style.removeProperty('--marquee-dist');
+    inner.style.removeProperty('animation-duration');
+    inner.textContent = idx >= 0 ? lines[idx].text : ((lines[0] && lines[0].text) || '');
+    document.getElementById('lyric-next').textContent = (lines[idx + 1] && lines[idx + 1].text) || '';
+    view.style.opacity = '1';
+    const container = document.getElementById('lyric-curr');
+    document.fonts.ready.then(() => requestAnimationFrame(() => {
+      const overflow = inner.scrollWidth - container.clientWidth;
+      if (overflow > 10) {
+        const duration = Math.max(6, overflow / 50);
+        inner.style.setProperty('--marquee-dist', `-${overflow + 40}px`);
+        inner.style.animationDuration = `${duration}s`;
+        inner.classList.add('marquee');
+      }
+    }));
+  }, 180);
+}
+
+function syncLyricsLine() {
+  if (!currentLyricsData) return;
+  const lines = currentLyricsData.lines;
+  let pos = currentProgress;
+  if (isCurrentlyPlaying && progressLastPollTime) {
+    pos = Math.min(currentDuration || Infinity, currentProgress + (Date.now() - progressLastPollTime) / 1000);
+  }
+  let idx;
+  if (currentLyricsData.type === 'synced') {
+    idx = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].time <= pos + 0.3) idx = i;
+      else break;
+    }
+  } else {
+    idx = currentDuration > 0
+      ? Math.min(lines.length - 1, Math.floor((pos / currentDuration) * lines.length))
+      : 0;
+  }
+  if (idx === currentLyricLineIdx) return;
+  currentLyricLineIdx = idx;
+  updateLyricDisplay(idx);
+}
+
+function toggleLyricsView() {
+  lyricsViewActive = !lyricsViewActive;
+  const meta = document.getElementById('meta');
+  const view = document.getElementById('lyrics-view');
+  const btn  = document.getElementById('btn-lyrics');
+  meta.style.display = lyricsViewActive ? 'none' : '';
+  view.style.display = lyricsViewActive ? 'flex' : 'none';
+  btn.classList.toggle('active', lyricsViewActive);
+  if (lyricsViewActive) { currentLyricLineIdx = -2; syncLyricsLine(); }
 }
 
 function fixHost(url) {
@@ -662,12 +879,12 @@ function updateUI(d) {
     clearTimeout(ambientTimer);
   }
 
-  document.getElementById('platform').textContent = np.platform || np.source?.name || '—';
+  document.getElementById('platform').textContent = np.platform || (np.source && np.source.name) || '—';
 
   function extractImgUrl(arr) {
-    if (!arr?.length) return '';
+    if (!arr || !arr.length) return '';
     const item = arr[0];
-    return typeof item === 'string' ? item : (item?.url || '');
+    return typeof item === 'string' ? item : ((item && item.url) || '');
   }
 
   const isTrack = np.track && (np.type === 'track' || np.type === 'music');
@@ -675,8 +892,8 @@ function updateUI(d) {
 
   if (isTrack) {
     trackName = np.track.name || '—';
-    artistName = np.track.artist?.name || '';
-    albumName = np.album?.name || '';
+    artistName = (np.track.artist && np.track.artist.name) || '';
+    albumName = (np.album && np.album.name) || '';
     trackId = np.track.id || trackName;
   } else if (np.radio) {
     trackName = np.radio.name || '—';
@@ -684,14 +901,15 @@ function updateUI(d) {
     trackId = np.radio.name;
   }
 
-  if (np.artwork?.proxy_512) artUrl = fixHost(np.artwork.proxy_512);
-  else if (np.artwork?.proxy_320) artUrl = fixHost(np.artwork.proxy_320);
-  else if (isTrack && np.track?.images?.length) artUrl = extractImgUrl(np.track.images);
-  else if (np.album?.images?.length) artUrl = extractImgUrl(np.album.images);
-  else if (np.radio?.images?.length) artUrl = extractImgUrl(np.radio.images);
+  if (np.artwork && np.artwork.proxy_512) artUrl = fixHost(np.artwork.proxy_512);
+  else if (np.artwork && np.artwork.proxy_320) artUrl = fixHost(np.artwork.proxy_320);
+  else if (isTrack && np.track && np.track.images && np.track.images.length) artUrl = extractImgUrl(np.track.images);
+  else if (np.album && np.album.images && np.album.images.length) artUrl = extractImgUrl(np.album.images);
+  else if (np.radio && np.radio.images && np.radio.images.length) artUrl = extractImgUrl(np.radio.images);
 
   if (trackId !== lastTrackId) {
     lastTrackId = trackId;
+    lastLyricsKey = null;
     const meta = document.getElementById('meta');
     meta.style.opacity = '0';
     setTimeout(() => {
@@ -700,12 +918,18 @@ function updateUI(d) {
       document.getElementById('album-name').textContent = albumName;
       meta.style.opacity = '1';
     }, 250);
-    setArtwork(artUrl, np.artwork?.colors);
+    setArtwork(artUrl, np.artwork && np.artwork.colors);
   } else if (artUrl && artUrl !== currentArtUrl) {
-    setArtwork(artUrl, np.artwork?.colors);
+    setArtwork(artUrl, np.artwork && np.artwork.colors);
   }
 
-  currentDuration = np.track?.duration || 0;
+  const newLyricsKey = trackId + ':' + ((np.lyrics && np.lyrics.synced) ? 'synced' : (np.lyrics && np.lyrics.plain) ? 'plain' : 'none');
+  if (newLyricsKey !== lastLyricsKey) {
+    lastLyricsKey = newLyricsKey;
+    setLyrics(np.lyrics || null);
+  }
+
+  currentDuration = (np.track && np.track.duration) || 0;
   if (np.position !== undefined) currentProgress = np.position;
   progressLastPollTime = Date.now();
   isCurrentlyPlaying = (state === 'playing');
@@ -792,8 +1016,8 @@ function setArtwork(url, colors) {
     });
     currentArtUrl = '';
   }
-  if (colors?.length >= 2) {
-    const src    = np.artwork?.safe_colors ?? null;
+  if (colors && colors.length >= 2) {
+    const src    = (np.artwork && np.artwork.safe_colors) || null;
     const accent = src ? src[1]            : ensureL(colors[1], 0.58);
     const muted  = src ? (src[2] || src[1]): ensureL(colors[2] || colors[1], 0.68);
     document.getElementById('progress-bar-fill').style.background = accent;
@@ -802,6 +1026,9 @@ function setArtwork(url, colors) {
     document.getElementById('album-name').style.color  = hexToRgba(muted, 0.55);
     document.getElementById('time-pos').style.color    = hexToRgba(accent, 0.5);
     document.getElementById('time-dur').style.color    = hexToRgba(accent, 0.3);
+    document.getElementById('lyric-curr').style.color  = hexToRgba(accent, 0.92);
+    document.getElementById('lyric-prev').style.color  = hexToRgba(muted, 0.28);
+    document.getElementById('lyric-next').style.color  = hexToRgba(muted, 0.28);
   } else {
     document.getElementById('progress-bar-fill').style.background = 'rgba(255,255,255,0.5)';
     document.getElementById('state-dot').style.background = 'rgba(255,255,255,0.2)';
@@ -809,6 +1036,9 @@ function setArtwork(url, colors) {
     document.getElementById('album-name').style.color  = 'rgba(255,255,255,0.35)';
     document.getElementById('time-pos').style.color    = 'rgba(255,255,255,0.25)';
     document.getElementById('time-dur').style.color    = 'rgba(255,255,255,0.25)';
+    document.getElementById('lyric-curr').style.color  = 'rgba(255,255,255,0.92)';
+    document.getElementById('lyric-prev').style.color  = 'rgba(255,255,255,0.22)';
+    document.getElementById('lyric-next').style.color  = 'rgba(255,255,255,0.22)';
   }
 }
 
@@ -888,10 +1118,21 @@ updateClock();
 
 // ── Ambient mode ─────────────────────────────────────────────
 function resetAmbient() {
+  const wasAmbient = document.body.classList.contains('ambient');
   document.body.classList.remove('ambient');
   clearTimeout(ambientTimer);
+  if (wasAmbient && ambientSwitchedToLyrics && lyricsViewActive) {
+    ambientSwitchedToLyrics = false;
+    toggleLyricsView();
+  }
   if (isCurrentlyPlaying) {
-    ambientTimer = setTimeout(() => document.body.classList.add('ambient'), 30000);
+    ambientTimer = setTimeout(() => {
+      document.body.classList.add('ambient');
+      if (currentLyricsData && !lyricsViewActive) {
+        ambientSwitchedToLyrics = true;
+        toggleLyricsView();
+      }
+    }, 30000);
   }
 }
 
@@ -905,7 +1146,7 @@ async function fetchVolume() {
     const r = await fetch(`/api/devices/${deviceId}/volume`);
     if (!r.ok) return;
     const j = await r.json();
-    currentVolume = j.volume ?? 50;
+    currentVolume = j.volume != null ? j.volume : 50;
     updateVolumeUI();
   } catch(e) {}
 }
@@ -977,7 +1218,7 @@ document.getElementById('switch-btn').addEventListener('click', e => {
 
 document.addEventListener('click', () => toggleSwitcher(false));
 
-setInterval(updateProgress, 1000);
+setInterval(() => { updateProgress(); syncLyricsLine(); }, 1000);
 init();
 </script>
 </body>

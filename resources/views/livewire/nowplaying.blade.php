@@ -100,6 +100,20 @@
                                     @if($controlError)
                                         <p class="text-sm text-red-500 mt-2">{{ $controlError }}</p>
                                     @endif
+
+                                    @php($lyricsDisplay = $lyricsPlain ?? ($lyricsSynced ? preg_replace('/\[\d+:\d+\.\d+\]\s*/u', '', $lyricsSynced) : null))
+                                    @if($lyricsDisplay)
+                                        <div x-data="{ lyricsOpen: false }" class="border-t border-gray-200 dark:border-stone-700 pt-4">
+                                            <button @click="lyricsOpen = !lyricsOpen" class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
+                                                <i class="fa-solid fa-microphone text-xs"></i>
+                                                <span x-text="lyricsOpen ? 'Hide lyrics' : 'Show lyrics'">Show lyrics</span>
+                                                <i class="fa-solid fa-chevron-down text-xs transition-transform duration-200" :class="lyricsOpen ? 'rotate-180' : ''"></i>
+                                            </button>
+                                            <div x-show="lyricsOpen" x-transition class="mt-4 max-h-72 overflow-y-auto rounded-lg bg-gray-50 dark:bg-stone-800 p-4">
+                                                <pre class="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap font-sans leading-relaxed">{{ $lyricsDisplay }}</pre>
+                                            </div>
+                                        </div>
+                                    @endif
                                 </div>
                             </div>
                         </div>

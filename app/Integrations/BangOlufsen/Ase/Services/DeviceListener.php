@@ -209,8 +209,8 @@ class DeviceListener
         $album = new AlbumData(name: $payload['album'], images: $payload['albumImage'], artist: $artist);
         $source = null;
         $meta = [];
-        $trackId = urldecode($payload['trackId']);
-        if (str_contains($trackId, 'spotify:')) {
+        $trackId = isset($payload['trackId']) ? urldecode($payload['trackId']) : null;
+        if ($trackId && str_contains($trackId, 'spotify:')) {
             $source = 'spotify';
             $meta['spotifyId'] = $trackId;
         }
