@@ -8,6 +8,14 @@ namespace Djneo92nl\BeoMozart\Enums;
  * (unlike PlaybackCommand/RenderingStateValue). Always resolve via
  * SourceType::tryFrom() and fall back to the raw string when unrecognized —
  * never assume this list is exhaustive or verified against real hardware.
+ *
+ * Deliberately NOT shared with the ASE driver's source types (e.g. "HDMI",
+ * "TV" from the older BeoZone protocol) — ASE doesn't use an enum for this
+ * today, and the two protocol generations' literal vocabularies aren't
+ * confirmed to match despite overlapping concepts. Revisit once ASE is
+ * actually extracted into its own package (see
+ * docs/architecture/plugin-architecture.md) and real values from both can
+ * be compared side by side.
  */
 enum SourceType: string
 {
