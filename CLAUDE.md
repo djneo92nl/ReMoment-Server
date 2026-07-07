@@ -411,9 +411,13 @@ See `docs/api/client-devices.md` for the firmware integration guide and full end
 
 Managed via the `DeviceSourceManager` Livewire component on the device detail page. Preferences survive source refreshes because records are keyed by `source_id`.
 
-### Local Package
+### Local Packages
 
-`packages/duncan3dc/sonos` is a local fork of the Sonos library (on branch `laravel12`). Changes here are not published upstream.
+Mozart-platform support ships as two git-submodule Composer packages under `packages/`, wired via `path` repositories in the root `composer.json` (see `docs/architecture/plugin-architecture.md`):
+- `packages/djneo92nl/beo-mozart-php` — pure PHP Mozart REST + WebSocket client, no Laravel dependency, tests standalone via its own `composer test`. Submodule: `github.com/djneo92nl/beo-mozart-php`.
+- `packages/remoment/mozart-driver` — Laravel driver package implementing the Mozart `MusicPlayerDriver` on top of it. Not yet split into its own repo/submodule.
+
+See `docs/architecture/device-drivers.md` for the Mozart driver's contracts and capabilities.
 
 ---
 
