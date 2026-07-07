@@ -1,8 +1,0 @@
-{
-    "eventType": "WebSocketEventPlaybackProgress",
-    "eventData": {
-        "id": "abc-123",
-        "progress": 42,
-        "totalDuration": 210
-    }
-}

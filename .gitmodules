@@ -1,0 +1,3 @@
+[submodule "packages/djneo92nl/beo-mozart-php"]
+	path = packages/djneo92nl/beo-mozart-php
+	url = https://github.com/djneo92nl/beo-mozart-php.git

@@ -1,6 +1,0 @@
-{
-    "eventType": "SOME_UNEXPECTED_TAG",
-    "eventData": {
-        "value": "started"
-    }
-}
