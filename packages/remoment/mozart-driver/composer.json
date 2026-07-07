@@ -1,0 +1,26 @@
+{
+    "name": "remoment/mozart-driver",
+    "type": "library",
+    "description": "ReMomentServer driver package for Bang & Olufsen Mozart-platform devices.",
+    "license": "MIT",
+    "version": "0.1.0",
+    "require": {
+        "php": "^8.2",
+        "djneo92nl/beo-mozart-php": "*",
+        "illuminate/contracts": "^12.0",
+        "illuminate/support": "^12.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Remoment\\MozartDriver\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Remoment\\MozartDriver\\MozartDriverServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "stable"
+}

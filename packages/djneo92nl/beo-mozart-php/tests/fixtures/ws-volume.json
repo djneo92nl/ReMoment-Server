@@ -1,0 +1,9 @@
+{
+    "eventType": "WebSocketEventVolume",
+    "eventData": {
+        "default": {"level": 30},
+        "level": {"level": 42},
+        "maximum": {"level": 90},
+        "muted": {"muted": false}
+    }
+}

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "cf1cdad80f28674075b3ae17e02e9e6d",
+    "content-hash": "e63f96d99f0821d5f08837bfc941bc87",
     "packages": [
         {
             "name": "aerni/laravel-spotify",
@@ -408,6 +408,48 @@
                 "source": "https://github.com/dflydev/dflydev-dot-access-data/tree/v3.0.3"
             },
             "time": "2024-07-08T12:26:09+00:00"
+        },
+        {
+            "name": "djneo92nl/beo-mozart-php",
+            "version": "0.1.0",
+            "dist": {
+                "type": "path",
+                "url": "packages/djneo92nl/beo-mozart-php",
+                "reference": "e6c06853eb740d6ed59548957ce06f9290454ebf"
+            },
+            "require": {
+                "ext-curl": "*",
+                "ext-json": "*",
+                "ext-sockets": "*",
+                "php": "^8.2"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^11.5"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Djneo92nl\\BeoMozart\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Djneo92nl\\BeoMozart\\Tests\\": "tests/"
+                }
+            },
+            "scripts": {
+                "test": [
+                    "phpunit"
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Pure PHP client for the Bang & Olufsen Mozart platform REST API and WebSocket notification feed.",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
         },
         {
             "name": "doctrine/inflector",
@@ -4957,6 +4999,42 @@
                 "source": "https://github.com/reactphp/stream/tree/v1.1.1"
             },
             "time": "2020-05-04T10:17:57+00:00"
+        },
+        {
+            "name": "remoment/mozart-driver",
+            "version": "0.1.0",
+            "dist": {
+                "type": "path",
+                "url": "packages/remoment/mozart-driver",
+                "reference": "d1318797255cb671c97580aae46db0f732b84368"
+            },
+            "require": {
+                "djneo92nl/beo-mozart-php": "*",
+                "illuminate/contracts": "^12.0",
+                "illuminate/support": "^12.0",
+                "php": "^8.2"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Remoment\\MozartDriver\\MozartDriverServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Remoment\\MozartDriver\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "ReMomentServer driver package for Bang & Olufsen Mozart-platform devices.",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
         },
         {
             "name": "seld/cli-prompt",

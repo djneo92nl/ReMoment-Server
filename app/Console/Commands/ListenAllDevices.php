@@ -7,6 +7,7 @@ use App\Integrations\Spotify\MusicPlayerDriver as SpotifyMusicPlayerDriver;
 use App\Models\Device;
 use App\Services\SpotifyTokenService;
 use Illuminate\Console\Command;
+use Remoment\MozartDriver\MusicPlayerDriver as MozartMusicPlayerDriver;
 use Symfony\Component\Process\Process;
 
 class ListenAllDevices extends Command
@@ -17,6 +18,7 @@ class ListenAllDevices extends Command
 
     private array $driverCommandMap = [
         AseMusicPlayerDriver::class => 'device-ase:listen-single',
+        MozartMusicPlayerDriver::class => 'device-mozart:listen-single',
     ];
 
     public function handle(): void
@@ -40,8 +42,9 @@ class ListenAllDevices extends Command
 
             $command = $this->driverCommandMap[$device->device_driver] ?? null;
 
-            if (! $command) {
+            if (!$command) {
                 $this->warn("No listener command for driver [{$device->device_driver}] on device [{$device->device_name}], skipping.");
+
                 continue;
             }
 
@@ -56,6 +59,7 @@ class ListenAllDevices extends Command
 
         if (empty($processes)) {
             $this->warn('No listeners started.');
+
             return;
         }
 
@@ -64,13 +68,13 @@ class ListenAllDevices extends Command
         while (true) {
             foreach ($processes as $id => ['process' => $process, 'label' => $label]) {
                 if ($output = $process->getIncrementalOutput()) {
-                    $this->line("[{$label}] " . trim($output));
+                    $this->line("[{$label}] ".trim($output));
                 }
                 if ($error = $process->getIncrementalErrorOutput()) {
-                    $this->error("[{$label}] " . trim($error));
+                    $this->error("[{$label}] ".trim($error));
                 }
 
-                if (! $process->isRunning()) {
+                if (!$process->isRunning()) {
                     $this->warn("[{$label}] process exited (code {$process->getExitCode()}), restarting...");
 
                     if ($id === 'spotify') {

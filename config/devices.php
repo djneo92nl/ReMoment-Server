@@ -4,6 +4,7 @@ return [
     'discoverers' => [
         \App\Integrations\BangOlufsen\Ase\AseDiscovery::class,
         \App\Integrations\Sonos\SonosDiscovery::class,
+        \Remoment\MozartDriver\MozartDiscovery::class,
     ],
 
     'Bang & Olufsen' => [
@@ -21,6 +22,50 @@ return [
             'driver_name' => 'ASE',
             'driver' => \App\Integrations\BangOlufsen\Ase\MusicPlayerDriver::class,
             'speaker' => 'internal',
+        ],
+        'Beoconnect Core' => [
+            'driver_name' => 'Mozart',
+            'driver' => \Remoment\MozartDriver\MusicPlayerDriver::class,
+        ],
+        'Beolab 8' => [
+            'driver_name' => 'Mozart',
+            'driver' => \Remoment\MozartDriver\MusicPlayerDriver::class,
+        ],
+        'Beolab 28' => [
+            'driver_name' => 'Mozart',
+            'driver' => \Remoment\MozartDriver\MusicPlayerDriver::class,
+        ],
+        'Beosound 2 3rd gen' => [
+            'driver_name' => 'Mozart',
+            'driver' => \Remoment\MozartDriver\MusicPlayerDriver::class,
+        ],
+        'Beosound A5' => [
+            'driver_name' => 'Mozart',
+            'driver' => \Remoment\MozartDriver\MusicPlayerDriver::class,
+        ],
+        'Beosound A9 5th gen' => [
+            'driver_name' => 'Mozart',
+            'driver' => \Remoment\MozartDriver\MusicPlayerDriver::class,
+        ],
+        'Beosound Balance' => [
+            'driver_name' => 'Mozart',
+            'driver' => \Remoment\MozartDriver\MusicPlayerDriver::class,
+        ],
+        'Beosound Emerge' => [
+            'driver_name' => 'Mozart',
+            'driver' => \Remoment\MozartDriver\MusicPlayerDriver::class,
+        ],
+        'Beosound Level' => [
+            'driver_name' => 'Mozart',
+            'driver' => \Remoment\MozartDriver\MusicPlayerDriver::class,
+        ],
+        'Beosound Premiere' => [
+            'driver_name' => 'Mozart',
+            'driver' => \Remoment\MozartDriver\MusicPlayerDriver::class,
+        ],
+        'Beosound Theatre' => [
+            'driver_name' => 'Mozart',
+            'driver' => \Remoment\MozartDriver\MusicPlayerDriver::class,
         ],
     ],
     'Bang &amp; Olufsen' => [

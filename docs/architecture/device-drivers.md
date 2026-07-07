@@ -31,6 +31,21 @@ The API and UI check `instanceof` against these interfaces to determine a device
 
 Communicates with the B&O ASE REST API on port 8080 via `HttpConnector`. Functionality is split into traits under `Connectors/` (e.g. `MediaControls`, `VolumeControls`, `MultiRoomControls`, `SourcesControls`). Real-time state updates arrive via a long-running HTTP stream handled by `app/Integrations/BangOlufsen/Ase/Services/DeviceListener.php`.
 
+### Bang & Olufsen Mozart
+
+**Path:** `packages/djneo92nl/beo-mozart-php` (protocol) + `packages/remoment/mozart-driver` (ReMoment driver), wired as local Composer path packages — see [Plugin Architecture](plugin-architecture.md).
+
+Covers B&O's newer Mozart platform (Beoconnect Core, Beolab 8/28, Beosound 2 3rd gen/A5/A9 5th gen/Balance/Emerge/Level/Premiere/Theatre), distinct from the older ASE-generation products above.
+
+- `djneo92nl/beo-mozart-php` — pure PHP REST client (`MozartClient`, `Api/{Playback,Sources,Volume,Power,Beolink}Api`) plus a hand-rolled WebSocket notification client (`WebSocket/NotificationClient`). Zero Laravel dependency; runs and tests standalone.
+- `remoment/mozart-driver` — `MusicPlayerDriver` implements `MediaControlsInterface`, `VolumeControlInterface`, `SourcesInterface`, `SourceActivationInterface`, `MultiRoomInterface` (via B&O's "Beolink" JID system), `LibraryPlaybackInterface`, and `RadioControlInterface` (reusing the `beoradio` `RadioStationMeta` key ASE already uses — TuneIn is no longer used anywhere in the B&O ecosystem). `Services/DeviceListener` connects to the notification WebSocket and fires the same `NowPlayingUpdated`/`ProgressUpdated`/`NowPlayingEnded`/`VolumeUpdated` events as ASE's listener. `MozartDiscovery` reuses ASE's SSDP/UPnP approach.
+
+Two assumptions are unverifiable without physical hardware and are `config('mozart.*')`-overridable (`packages/remoment/mozart-driver/config/mozart.php`):
+- **WebSocket port 9000** — the Mozart OpenAPI spec documents no connection info for real-time notifications at all; port 9000 is a community convention (B&O's official client libraries).
+- **SSDP/UPnP discovery** — no Mozart-specific discovery mechanism is documented; `MozartDiscovery` assumes Mozart devices are UPnP MediaRenderers like ASE devices.
+
+Console commands: `device-mozart:listen-single {id}` (per-device listener, registered in `ListenAllDevices`'s driver map) and `device:mozart-discovery`.
+
 ### Sonos
 
 **Path:** `app/Integrations/Sonos/`

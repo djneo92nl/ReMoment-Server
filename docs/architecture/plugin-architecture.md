@@ -4,6 +4,8 @@
 
 Extract device integrations into loadable plugins so ReMomentServer only pulls in the drivers it needs. Users without B&O ASE won't get that code; Sonos-only users won't need ASE. Eventually every brand is an optional plugin. The B&O + Mozart packages are a natural first candidate.
 
+> **Status:** the Bang & Olufsen Mozart driver (`packages/djneo92nl/beo-mozart-php` + `packages/remoment/mozart-driver`) is the first concrete implementation of this split — built directly as two packages rather than extracted from existing in-app code, since there was no prior Mozart driver. It does **not** yet implement the `AseDeviceInterface`-style adapter this doc proposes below for resolving the `App\Models\Device` coupling — `remoment/mozart-driver` `use`s `App\*` classes directly, same as the (still not-yet-extracted) ASE driver would need to before that adapter exists. Treat Mozart as a reference for the *package-boundary* split only, not the full decoupling described in Package 2 below. The ASE extraction itself remains outstanding.
+
 ---
 
 ## Proposed layer split

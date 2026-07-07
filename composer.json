@@ -14,6 +14,7 @@
         "ext-sockets": "*",
         "aerni/laravel-spotify": "^3.0",
         "clue/mdns-react": "~0.2.0",
+        "djneo92nl/beo-mozart-php": "*",
         "duncan3dc/sonos": "^3.0",
         "intervention/image": "^3.0",
         "jwilsson/spotify-web-api-php": "^7.0",
@@ -22,7 +23,8 @@
         "laravel/tinker": "^2.10.1",
         "livewire/livewire": "^3.7",
         "mikealmond/musicbrainz": "^0.2.2",
-        "php-mqtt/client": "^2.3"
+        "php-mqtt/client": "^2.3",
+        "remoment/mozart-driver": "*"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -82,6 +84,22 @@
             "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
         ]
     },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "packages/djneo92nl/beo-mozart-php",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "packages/remoment/mozart-driver",
+            "options": {
+                "symlink": true
+            }
+        }
+    ],
     "extra": {
         "laravel": {
             "dont-discover": []
