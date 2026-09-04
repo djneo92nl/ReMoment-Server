@@ -3,7 +3,10 @@
 use App\Http\Controllers\AlbumController;
 use App\Http\Controllers\ArtistController;
 use App\Http\Controllers\DeviceController;
+use App\Http\Controllers\GenreController;
 use App\Http\Controllers\HistoryController;
+use App\Http\Controllers\LastfmAuthController;
+use App\Http\Controllers\LibraryController;
 use App\Http\Controllers\PlaylistController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RadioStationController;
@@ -29,7 +32,14 @@ Route::get('/artists', [ArtistController::class, 'index'])->name('artists.index'
 Route::resource('radio', RadioStationController::class);
 Route::post('/radio/{radio}/play/{device}', [RadioStationController::class, 'play'])->name('radio.play');
 Route::get('/artists/{artist}', [ArtistController::class, 'show'])->name('artists.show');
+Route::post('/artists/{artist}/play/{device}', [ArtistController::class, 'play'])->name('artists.play');
+Route::get('/albums', [AlbumController::class, 'index'])->name('albums.index');
 Route::get('/albums/{album}', [AlbumController::class, 'show'])->name('albums.show');
+Route::post('/albums/{album}/play/{device}', [AlbumController::class, 'play'])->name('albums.play');
+Route::post('/tracks/{track}/play/{device}', [DeviceController::class, 'playTrack'])->name('tracks.play');
+Route::get('/genres', [GenreController::class, 'index'])->name('genres.index');
+Route::get('/genres/{genre}', [GenreController::class, 'show'])->name('genres.show')->where('genre', '.*');
+Route::get('/library', [LibraryController::class, 'index'])->name('library.index');
 Route::get('/playlists', [PlaylistController::class, 'index'])->name('playlists.index');
 Route::post('/playlists', [PlaylistController::class, 'store'])->name('playlists.store');
 Route::get('/playlists/{playlist}', [PlaylistController::class, 'show'])->name('playlists.show');
@@ -55,6 +65,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/settings/dlna/discover', [SettingsController::class, 'dlnaDiscover'])->name('settings.dlna.discover');
     Route::post('/settings/dlna/{server}/scan', [SettingsController::class, 'dlnaScan'])->name('settings.dlna.scan');
 
+    Route::get('/settings/mqtt', [SettingsController::class, 'mqtt'])->name('settings.mqtt');
+
+    Route::get('/settings/spotify', [SettingsController::class, 'spotify'])->name('settings.spotify');
+    Route::get('/settings/lastfm', [SettingsController::class, 'lastfm'])->name('settings.lastfm');
+
     Route::get('/settings/spotify-connect', [SettingsController::class, 'spotifyConnect'])->name('settings.spotify-connect');
     Route::post('/settings/spotify-connect', [SettingsController::class, 'spotifyConnectSave'])->name('settings.spotify-connect.save');
 
@@ -65,6 +80,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings/spotify/authorize', [SpotifyAuthController::class, 'authorize'])->name('spotify.authorize');
     Route::get('/settings/spotify/callback', [SpotifyAuthController::class, 'callback'])->name('spotify.callback');
     Route::post('/settings/spotify/disconnect', [SpotifyAuthController::class, 'disconnect'])->name('spotify.disconnect');
+
+    Route::get('/settings/lastfm/authorize', [LastfmAuthController::class, 'authorize'])->name('lastfm.authorize');
+    Route::get('/settings/lastfm/callback', [LastfmAuthController::class, 'callback'])->name('lastfm.callback');
+    Route::post('/settings/lastfm/disconnect', [LastfmAuthController::class, 'disconnect'])->name('lastfm.disconnect');
 
     Route::get('/settings/clients', [SettingsController::class, 'clients'])->name('settings.clients');
 });

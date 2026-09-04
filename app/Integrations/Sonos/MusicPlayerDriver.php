@@ -18,6 +18,7 @@ use duncan3dc\Sonos\Devices\Collection;
 use duncan3dc\Sonos\Network;
 use duncan3dc\Sonos\Tracks\Stream;
 use duncan3dc\Sonos\Tracks\Track as SonosTrack;
+use Illuminate\Support\Collection as TrackCollection;
 
 class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, RadioControlInterface, VolumeControlInterface
 {
@@ -130,6 +131,28 @@ class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterf
         $this->deviceApi->play();
     }
 
+    public function playLibraryTracks(TrackCollection $tracks): void
+    {
+        $playable = $tracks->filter(fn (Track $track) => (bool) $track->getDlnaUrl())->values();
+
+        if ($playable->isEmpty()) {
+            throw new \RuntimeException('No tracks with a playable DLNA URL.');
+        }
+
+        $queue = $this->deviceApi->useQueue()->getQueue()->clear();
+
+        foreach ($playable as $track) {
+            $queue->addTrack(
+                (new SonosTrack($track->getDlnaUrl()))
+                    ->setTitle($track->name)
+                    ->setArtist($track->artist?->name ?? '')
+                    ->setAlbum($track->album?->name ?? '')
+            );
+        }
+
+        $this->deviceApi->play();
+    }
+
     public function playLibraryPlaylist(Playlist $playlist): void
     {
         $tracks = $playlist->tracks()->get();
@@ -138,23 +161,6 @@ class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterf
             throw new \RuntimeException("Playlist {$playlist->id} has no tracks.");
         }
 
-        $queue = $this->deviceApi->useQueue()->getQueue()->clear();
-
-        foreach ($tracks as $track) {
-            $url = $track->getDlnaUrl();
-
-            if (!$url) {
-                continue;
-            }
-
-            $queue->addTrack(
-                (new SonosTrack($url))
-                    ->setTitle($track->name)
-                    ->setArtist($track->artist?->name ?? '')
-                    ->setAlbum($track->album?->name ?? '')
-            );
-        }
-
-        $this->deviceApi->play();
+        $this->playLibraryTracks($tracks);
     }
 }

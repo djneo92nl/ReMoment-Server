@@ -26,6 +26,7 @@ use App\Models\Media\Track;
 use App\Models\RadioStation;
 use Djneo92nl\BeoMozart\Enums\PlaybackCommand;
 use Djneo92nl\BeoMozart\MozartClient;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
 class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, RadioControlInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
@@ -240,6 +241,25 @@ class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterf
         $this->client->playback()->playUri($url);
     }
 
+    public function playLibraryTracks(Collection $tracks): void
+    {
+        $playable = $tracks->filter(fn (Track $track) => (bool) $track->getDlnaUrl())->values();
+
+        if ($playable->isEmpty()) {
+            throw new \RuntimeException('No tracks with a playable DLNA URL.');
+        }
+
+        foreach ($playable as $i => $track) {
+            $url = $track->getDlnaUrl();
+
+            if ($i === 0) {
+                $this->client->playback()->playUri($url);
+            } else {
+                $this->client->playback()->enqueue('track', 'dlna', $url);
+            }
+        }
+    }
+
     public function playLibraryPlaylist(Playlist $playlist): void
     {
         $tracks = $playlist->tracks()->get();
@@ -248,19 +268,7 @@ class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterf
             throw new \RuntimeException("Playlist {$playlist->id} has no tracks.");
         }
 
-        foreach ($tracks as $i => $track) {
-            $url = $track->getDlnaUrl();
-
-            if (!$url) {
-                continue;
-            }
-
-            if ($i === 0) {
-                $this->client->playback()->playUri($url);
-            } else {
-                $this->client->playback()->enqueue('track', 'dlna', $url);
-            }
-        }
+        $this->playLibraryTracks($tracks);
     }
 
     // --- RadioControlInterface ---

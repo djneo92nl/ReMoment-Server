@@ -2,6 +2,8 @@
 
 namespace App\Services\Dlna;
 
+use App\Domain\Artwork\ArtworkCache;
+use App\Jobs\ProcessArtwork;
 use App\Models\DlnaServer;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
@@ -14,10 +16,14 @@ class DlnaLibraryScanner
 
     private array $visitedContainers = [];
 
+    /** @var array<string, true> */
+    private array $dispatchedArtwork = [];
+
     public function scanServer(DlnaServer $server, ?callable $progress = null): int
     {
         $this->tracksImported = 0;
         $this->visitedContainers = [];
+        $this->dispatchedArtwork = [];
 
         $client = new DlnaContentDirectoryClient($server->control_url);
         $this->browseContainer($client, '0', $server, $progress);
@@ -76,6 +82,10 @@ class DlnaLibraryScanner
             $albumData,
         );
 
+        if ($album->wasRecentlyCreated) {
+            $this->maybeProcessArtwork($item['album_art'] ?? null);
+        }
+
         $externalId = $server->id.':'.$item['id'];
 
         $track = Track::updateOrCreate(
@@ -103,6 +113,17 @@ class DlnaLibraryScanner
 
         if (!empty($item['album_art']) && empty($album->images)) {
             $album->update(['images' => [['url' => $item['album_art']]]]);
+            $this->maybeProcessArtwork($item['album_art']);
         }
+    }
+
+    private function maybeProcessArtwork(?string $url): void
+    {
+        if (!$url || isset($this->dispatchedArtwork[$url]) || ArtworkCache::has($url)) {
+            return;
+        }
+
+        $this->dispatchedArtwork[$url] = true;
+        ProcessArtwork::dispatch($url);
     }
 }

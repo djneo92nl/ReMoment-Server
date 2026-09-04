@@ -10,11 +10,11 @@ use App\Models\Client;
 use App\Models\Device;
 use App\Models\DeviceMeta;
 use App\Models\DlnaServer;
-use App\Models\Media\Track;
 use App\Models\Setting;
 use App\Models\User;
 use App\Services\Dlna\DlnaLibraryScanner;
 use App\Services\Dlna\DlnaServerDiscovery;
+use App\Services\LastfmSessionService;
 use App\Services\SpotifyTokenService;
 use Illuminate\Http\Request;
 
@@ -25,10 +25,36 @@ class SettingsController extends Controller
         $userCount = User::count();
         $deviceCount = Device::count();
         $spotifyConnected = app(SpotifyTokenService::class)->isConnected();
+        $lastfmConnected = app(LastfmSessionService::class)->isConnected();
         $dlnaServerCount = DlnaServer::count();
-        $dlnaTrackCount = Track::where('source', 'dlna')->count();
+        $clientCount = Client::count();
+        $pendingClientCount = Client::where('status', 'pending')->count();
+        $listenerCount = Device::all()->filter(fn (Device $d) => DeviceCache::isListenerRunning($d->id))->count();
 
-        return view('settings.index', compact('userCount', 'deviceCount', 'spotifyConnected', 'dlnaServerCount', 'dlnaTrackCount'));
+        return view('settings.index', compact(
+            'userCount', 'deviceCount', 'spotifyConnected', 'lastfmConnected',
+            'dlnaServerCount', 'clientCount', 'pendingClientCount', 'listenerCount',
+        ));
+    }
+
+    public function spotify(SpotifyTokenService $spotify)
+    {
+        return view('settings.spotify', [
+            'connected' => $spotify->isConnected(),
+        ]);
+    }
+
+    public function lastfm(LastfmSessionService $lastfm)
+    {
+        return view('settings.lastfm', [
+            'connected' => $lastfm->isConnected(),
+            'username' => $lastfm->username(),
+        ]);
+    }
+
+    public function mqtt()
+    {
+        return view('settings.mqtt');
     }
 
     public function users()

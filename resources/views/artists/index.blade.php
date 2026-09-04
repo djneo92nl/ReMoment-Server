@@ -12,12 +12,18 @@
     @else
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             @foreach($artists as $artist)
+                @php($coverAlbum = $artist->coverAlbum())
                 <a href="{{ route('artists.show', $artist) }}"
                    class="bg-white dark:bg-stone-900 rounded-2xl border border-gray-200/70 dark:border-stone-800/80 shadow-sm p-5 hover:border-gray-300 dark:hover:border-stone-700 hover:shadow-md transition-all group">
                     <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 rounded-xl bg-gray-100 dark:bg-stone-800 flex items-center justify-center flex-shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-stone-700 transition-colors">
-                            <i class="fa-solid fa-microphone-lines text-gray-400 dark:text-gray-500"></i>
-                        </div>
+                        <x-artwork-thumb
+                            :src="$coverAlbum?->images[0]['url'] ?? null"
+                            :colors="$coverAlbum?->colors"
+                            :seed="$artist->name"
+                            icon="fa-solid fa-microphone-lines"
+                            size="w-12 h-12"
+                            rounded="rounded-xl"
+                        />
                         <div class="flex-1 min-w-0">
                             <p class="font-medium text-gray-900 dark:text-gray-100 truncate">{{ $artist->name }}</p>
                             <p class="text-xs text-gray-400 dark:text-gray-600 mt-0.5">

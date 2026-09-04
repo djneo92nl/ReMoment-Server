@@ -43,6 +43,11 @@ class EnrichTrackMetadata implements ShouldQueue
         }
 
         try {
+            $this->enrichFromLastfm($track);
+        } catch (\Throwable) {
+        }
+
+        try {
             $this->fetchLyrics($track, $trackName, $artistName);
         } catch (\Throwable) {
         }
@@ -145,6 +150,15 @@ class EnrichTrackMetadata implements ShouldQueue
                 }
             }
         }
+    }
+
+    private function enrichFromLastfm(Track $track): void
+    {
+        if (!$track->artist || $track->artist->metadata()->where('source', 'lastfm')->exists()) {
+            return;
+        }
+
+        EnrichArtistLastfm::dispatchSync($track->artist);
     }
 
     private function fetchLyrics(Track $track, string $trackName, string $artistName): void

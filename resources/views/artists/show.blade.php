@@ -12,17 +12,80 @@
                         {{ $hours > 0 ? "{$hours}h {$mins}m" : "{$mins}m" }} listened
                     @endif
                 </p>
-                @php $genres = $artist->genres() @endphp
-                @if(count($genres))
-                    <div class="flex flex-wrap gap-1.5 mt-2">
-                        @foreach(array_slice($genres, 0, 8) as $genre)
-                            <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-stone-800 text-gray-600 dark:text-gray-400">{{ $genre }}</span>
-                        @endforeach
-                    </div>
-                @endif
             </div>
         </div>
     </x-slot>
+
+    @php
+        $coverAlbum = $artist->coverAlbum();
+        $heroColors = $coverAlbum?->colors ?? [];
+        $genres = $artist->genres();
+        $country = $artist->country();
+        $bio = $artist->bio();
+        $similarArtists = $artist->similarArtistModels();
+    @endphp
+
+    <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8 mb-6"
+         @if(count($heroColors) >= 2) style="background: linear-gradient(135deg, {{ $heroColors[0] }}22, {{ $heroColors[1] }}11)" @endif>
+        <div class="flex flex-col md:flex-row items-center md:items-start gap-6 text-center md:text-left">
+            <x-artwork-thumb
+                :src="$coverAlbum?->images[0]['url'] ?? null"
+                :colors="$heroColors"
+                :seed="$artist->name"
+                icon="fa-solid fa-microphone-lines"
+                size="w-28 h-28 md:w-36 md:h-36"
+                rounded="rounded-full"
+                class="shadow-lg ring-1 ring-black/5 text-4xl"
+            />
+            <div class="flex-1 min-w-0">
+                <div class="flex flex-wrap items-center justify-center md:justify-start gap-1.5">
+                    @foreach(array_slice($genres, 0, 8) as $genre)
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-stone-800 text-gray-600 dark:text-gray-400">{{ $genre }}</span>
+                    @endforeach
+                    @if($country)
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-stone-800 text-gray-600 dark:text-gray-400">
+                            <i class="fa-solid fa-earth-americas mr-1"></i>{{ $country }}
+                        </span>
+                    @endif
+                </div>
+
+                @if($bio)
+                    <p class="mt-4 text-sm text-gray-500 dark:text-gray-400 leading-relaxed max-w-2xl">{{ $bio }}</p>
+                @endif
+
+                @if($playableDevices->isNotEmpty())
+                    <div class="flex items-center justify-center md:justify-start gap-2 mt-4">
+                        <button type="button"
+                                @click="$dispatch('open-modal', 'play-artist-{{ $artist->id }}')"
+                                class="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors">
+                            <i class="fa-solid fa-play text-xs"></i>
+                            Play all
+                        </button>
+                        <button type="button"
+                                @click="$dispatch('open-modal', 'shuffle-artist-{{ $artist->id }}')"
+                                class="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gray-100 dark:bg-stone-800 hover:bg-gray-200 dark:hover:bg-stone-700 text-gray-700 dark:text-gray-300 text-sm font-medium transition-colors">
+                            <i class="fa-solid fa-shuffle text-xs"></i>
+                            Shuffle
+                        </button>
+                    </div>
+                    <x-device-picker
+                        name="play-artist-{{ $artist->id }}"
+                        title="Play all tracks"
+                        :description="$artist->name"
+                        :devices="$playableDevices"
+                        :action-template="url('artists/'.$artist->id.'/play').'/{id}'"
+                    />
+                    <x-device-picker
+                        name="shuffle-artist-{{ $artist->id }}"
+                        title="Shuffle all tracks"
+                        :description="$artist->name"
+                        :devices="$playableDevices"
+                        :action-template="url('artists/'.$artist->id.'/play').'/{id}?shuffle=1'"
+                    />
+                @endif
+            </div>
+        </div>
+    </div>
 
     <div class="grid gap-6 lg:grid-cols-3">
 
@@ -73,22 +136,17 @@
                     <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">Albums</h2>
                     <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
                         @foreach($artist->albums as $album)
-                            @php
-                                $artUrl = $album->images[0]['url'] ?? null;
-                                $colors = $album->colors ?? [];
-                            @endphp
                             <a href="{{ route('albums.show', $album) }}"
                                class="group text-center">
-                                <div class="aspect-square rounded-2xl overflow-hidden mb-3 shadow-sm ring-1 ring-gray-100 dark:ring-stone-800"
-                                     @if(count($colors) >= 2) style="background: linear-gradient(135deg, {{ $colors[0] }}, {{ $colors[1] }})" @else style="background: #f3f4f6" @endif>
-                                    @if($artUrl)
-                                        <img src="{{ $artUrl }}" alt="{{ $album->name }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
-                                    @else
-                                        <div class="w-full h-full flex items-center justify-center">
-                                            <i class="fa-solid fa-compact-disc text-2xl text-white/50"></i>
-                                        </div>
-                                    @endif
-                                </div>
+                                <x-artwork-thumb
+                                    :src="$album->images[0]['url'] ?? null"
+                                    :colors="$album->colors"
+                                    :seed="$album->name.$album->id"
+                                    icon="fa-solid fa-compact-disc"
+                                    size="w-full aspect-square"
+                                    rounded="rounded-2xl"
+                                    class="mb-3 shadow-sm ring-1 ring-gray-100 dark:ring-stone-800"
+                                />
                                 <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate group-hover:underline">{{ $album->name }}</p>
                                 @if($album->released_at)
                                     <p class="text-xs text-gray-400 dark:text-gray-600 mt-0.5">{{ $album->released_at->format('Y') }}</p>
@@ -143,6 +201,20 @@
                            class="text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors">
                             Full history &rarr;
                         </a>
+                    </div>
+                </div>
+            @endif
+
+            @if($similarArtists->isNotEmpty())
+                <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8 mt-6">
+                    <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">Similar Artists</h2>
+                    <div class="flex flex-wrap gap-2">
+                        @foreach($similarArtists as $similarArtist)
+                            <a href="{{ route('artists.show', $similarArtist) }}"
+                               class="px-3 py-1.5 rounded-full text-sm font-medium bg-gray-100 dark:bg-stone-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-stone-700 transition-colors">
+                                {{ $similarArtist->name }}
+                            </a>
+                        @endforeach
                     </div>
                 </div>
             @endif

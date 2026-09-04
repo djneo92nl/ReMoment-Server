@@ -5,6 +5,8 @@ namespace App\Listeners\Device;
 use App\Events\Device\NowPlayingUpdated;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Jobs\EnrichTrackMetadata;
+use App\Jobs\ScrobbleToLastfm;
+use App\Jobs\SendNowPlayingToLastfm;
 use App\Models\Device;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
@@ -250,6 +252,8 @@ class StorePlaybackHistory implements ShouldQueue
             'played_at' => now(),
         ]);
 
+        SendNowPlayingToLastfm::dispatch($track);
+
         // --- Store metadata from the Track object (key/value) ---
         foreach ($npTrack->meta ?? [] as $meta) {
             $this->storeTrackMetadata($track, $meta, $trackSource);
@@ -373,6 +377,10 @@ class StorePlaybackHistory implements ShouldQueue
         $skipped = $play->played_at->diffInSeconds($endedAt) < 30;
 
         $play->update(['ended_at' => $endedAt, 'skipped' => $skipped]);
+
+        if ($play->track_id !== null) {
+            ScrobbleToLastfm::dispatch($play);
+        }
     }
 
     /**

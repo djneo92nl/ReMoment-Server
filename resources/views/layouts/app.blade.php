@@ -70,22 +70,43 @@
                         </a>
                     </li>
                     <li>
-                        <a href="{{ route('artists.index') }}" @click="mobileMenuOpen = false"
-                           class="flex items-center gap-3 px-5 py-3.5 rounded-xl transition-colors {{ request()->routeIs('artists.*') || request()->routeIs('albums.*') || request()->routeIs('radio.*') ? 'bg-gray-100 dark:bg-stone-800 font-medium text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400' }}">
+                        @php
+                            $libraryActiveMobile = request()->routeIs('library.*') || request()->routeIs('artists.*') || request()->routeIs('albums.*') || request()->routeIs('genres.*') || request()->routeIs('radio.*') || request()->routeIs('playlists.*');
+                        @endphp
+                        <a href="{{ route('library.index') }}" @click="mobileMenuOpen = false"
+                           class="flex items-center gap-3 px-5 py-3.5 rounded-xl transition-colors {{ $libraryActiveMobile ? 'bg-gray-100 dark:bg-stone-800 font-medium text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400' }}">
                             <i class="fa-solid fa-microphone-lines w-5"></i>Library
                         </a>
-                        @if(request()->routeIs('artists.*') || request()->routeIs('albums.*') || request()->routeIs('radio.*'))
+                        @if($libraryActiveMobile)
                             <ul class="mt-1 ml-4 space-y-1">
                                 <li>
                                     <a href="{{ route('artists.index') }}" @click="mobileMenuOpen = false"
-                                       class="flex items-center gap-3 px-5 py-2.5 rounded-xl text-sm transition-colors {{ request()->routeIs('artists.*') || request()->routeIs('albums.*') ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-500 dark:text-gray-500' }}">
+                                       class="flex items-center gap-3 px-5 py-2.5 rounded-xl text-sm transition-colors {{ request()->routeIs('artists.*') ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-500 dark:text-gray-500' }}">
                                         <i class="fa-solid fa-microphone-lines w-4 text-xs"></i>Artists
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="{{ route('albums.index') }}" @click="mobileMenuOpen = false"
+                                       class="flex items-center gap-3 px-5 py-2.5 rounded-xl text-sm transition-colors {{ request()->routeIs('albums.*') ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-500 dark:text-gray-500' }}">
+                                        <i class="fa-solid fa-compact-disc w-4 text-xs"></i>Albums
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="{{ route('playlists.index') }}" @click="mobileMenuOpen = false"
+                                       class="flex items-center gap-3 px-5 py-2.5 rounded-xl text-sm transition-colors {{ request()->routeIs('playlists.*') ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-500 dark:text-gray-500' }}">
+                                        <i class="fa-solid fa-list-ul w-4 text-xs"></i>Playlists
                                     </a>
                                 </li>
                                 <li>
                                     <a href="{{ route('radio.index') }}" @click="mobileMenuOpen = false"
                                        class="flex items-center gap-3 px-5 py-2.5 rounded-xl text-sm transition-colors {{ request()->routeIs('radio.*') ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-500 dark:text-gray-500' }}">
                                         <i class="fa-solid fa-radio w-4 text-xs"></i>Radio
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="{{ route('genres.index') }}" @click="mobileMenuOpen = false"
+                                       class="flex items-center gap-3 px-5 py-2.5 rounded-xl text-sm transition-colors {{ request()->routeIs('genres.*') ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-500 dark:text-gray-500' }}">
+                                        <i class="fa-solid fa-tags w-4 text-xs"></i>Genres
                                     </a>
                                 </li>
                             </ul>
@@ -111,6 +132,11 @@
                     </li>
                 </ul>
             </nav>
+        </div>
+
+        <!-- Global search -->
+        <div class="mb-6">
+            <livewire:global-search />
         </div>
 
         <!-- Flash messages -->

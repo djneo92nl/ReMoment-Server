@@ -78,13 +78,7 @@ class PlaylistController extends Controller
 
     private function libraryCapableDevices(): \Illuminate\Support\Collection
     {
-        return Device::all()->filter(function (Device $device) {
-            try {
-                return $device->driver instanceof LibraryPlaybackInterface;
-            } catch (\Throwable) {
-                return false;
-            }
-        })->values();
+        return Device::libraryCapable();
     }
 
     private function spotifyConnectMappedDevices(): \Illuminate\Support\Collection

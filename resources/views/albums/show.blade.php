@@ -32,16 +32,15 @@
                 {{-- Hero --}}
                 <div class="flex gap-6 p-6 md:p-8"
                      @if(count($colors) >= 2) style="background: linear-gradient(135deg, {{ $colors[0] }}22, {{ $colors[1] }}11)" @endif>
-                    <div class="w-32 h-32 rounded-2xl overflow-hidden shadow-lg flex-shrink-0 ring-1 ring-black/5"
-                         @if(count($colors) >= 2) style="background: linear-gradient(135deg, {{ $colors[0] }}, {{ $colors[1] }})" @else class="bg-gray-100 dark:bg-stone-800" @endif>
-                        @if($artUrl)
-                            <img src="{{ $artUrl }}" alt="{{ $album->name }}" class="w-full h-full object-cover">
-                        @else
-                            <div class="w-full h-full flex items-center justify-center">
-                                <i class="fa-solid fa-compact-disc text-3xl text-white/50"></i>
-                            </div>
-                        @endif
-                    </div>
+                    <x-artwork-thumb
+                        :src="$artUrl"
+                        :colors="$colors"
+                        :seed="$album->name.$album->id"
+                        icon="fa-solid fa-compact-disc"
+                        size="w-32 h-32"
+                        rounded="rounded-2xl"
+                        class="shadow-lg ring-1 ring-black/5 text-3xl"
+                    />
                     <div class="flex-1 min-w-0 pt-2">
                         <p class="text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-1">Album</p>
                         <h2 class="text-xl font-medium text-gray-900 dark:text-gray-100 leading-snug">{{ $album->name }}</h2>
@@ -63,6 +62,36 @@
                                     <div class="w-5 h-5 rounded-full shadow-sm ring-1 ring-black/10" style="background: {{ $color }}"></div>
                                 @endforeach
                             </div>
+                        @endif
+                        @if($playableDevices->isNotEmpty() && $album->tracks->isNotEmpty())
+                            <div class="flex items-center gap-2 mt-4">
+                                <button type="button"
+                                        @click="$dispatch('open-modal', 'play-album-{{ $album->id }}')"
+                                        class="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors">
+                                    <i class="fa-solid fa-play text-xs"></i>
+                                    Play all
+                                </button>
+                                <button type="button"
+                                        @click="$dispatch('open-modal', 'shuffle-album-{{ $album->id }}')"
+                                        class="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gray-100 dark:bg-stone-800 hover:bg-gray-200 dark:hover:bg-stone-700 text-gray-700 dark:text-gray-300 text-sm font-medium transition-colors">
+                                    <i class="fa-solid fa-shuffle text-xs"></i>
+                                    Shuffle
+                                </button>
+                            </div>
+                            <x-device-picker
+                                name="play-album-{{ $album->id }}"
+                                title="Play album"
+                                :description="$album->name"
+                                :devices="$playableDevices"
+                                :action-template="url('albums/'.$album->id.'/play').'/{id}'"
+                            />
+                            <x-device-picker
+                                name="shuffle-album-{{ $album->id }}"
+                                title="Shuffle album"
+                                :description="$album->name"
+                                :devices="$playableDevices"
+                                :action-template="url('albums/'.$album->id.'/play').'/{id}?shuffle=1'"
+                            />
                         @endif
                     </div>
                 </div>
@@ -98,32 +127,18 @@
                                         </button>
                                     @endif
                                     @if($dlnaUrl && $playableDevices->isNotEmpty())
-                                        <div x-data="{ open: false, playing: false }" class="relative flex-shrink-0">
-                                            <button @click.stop="open = !open"
-                                                    class="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity w-7 h-7 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-stone-700"
-                                                    title="Play on device">
-                                                <i x-show="!playing" class="fa-solid fa-play text-xs"></i>
-                                                <i x-show="playing" class="fa-solid fa-spinner fa-spin text-xs"></i>
-                                            </button>
-                                            <div x-show="open" @click.outside="open = false"
-                                                 x-transition
-                                                 class="absolute right-0 top-8 z-20 bg-white dark:bg-stone-900 rounded-2xl shadow-xl border border-gray-200/70 dark:border-stone-700/80 py-1.5 min-w-44">
-                                                <p class="px-4 py-1.5 text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600">Play on</p>
-                                                @foreach($playableDevices as $device)
-                                                    <button @click="
-                                                        open = false; playing = true;
-                                                        fetch('/api/devices/{{ $device->id }}/library/play', {
-                                                            method: 'POST',
-                                                            headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}'},
-                                                            body: JSON.stringify({track_id: {{ $track->id }}})
-                                                        }).finally(() => playing = false)"
-                                                       class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-stone-800 flex items-center gap-2">
-                                                        <i class="fa-solid fa-tv text-xs text-gray-400 w-4"></i>
-                                                        {{ $device->device_name }}
-                                                    </button>
-                                                @endforeach
-                                            </div>
-                                        </div>
+                                        <button @click="$dispatch('open-modal', 'play-track-{{ $track->id }}')"
+                                                class="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity w-7 h-7 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-stone-700 flex-shrink-0"
+                                                title="Play on device">
+                                            <i class="fa-solid fa-play text-xs"></i>
+                                        </button>
+                                        <x-device-picker
+                                            name="play-track-{{ $track->id }}"
+                                            title="Play track"
+                                            :description="$track->name"
+                                            :devices="$playableDevices"
+                                            :action-template="url('tracks/'.$track->id.'/play').'/{id}'"
+                                        />
                                     @endif
                                 </div>
                                 @if($lyrics)

@@ -4,6 +4,7 @@ namespace App\Integrations\BangOlufsen\Ase\Connectors;
 
 use App\Models\Media\Playlist;
 use App\Models\Media\Track;
+use Illuminate\Support\Collection;
 
 trait LibraryPlayback
 {
@@ -18,6 +19,19 @@ trait LibraryPlayback
         $this->playDlnaTrack($url);
     }
 
+    public function playLibraryTracks(Collection $tracks): void
+    {
+        $playable = $tracks->filter(fn (Track $track) => (bool) $track->getDlnaUrl())->values();
+
+        if ($playable->isEmpty()) {
+            throw new \RuntimeException('No tracks with a playable DLNA URL.');
+        }
+
+        foreach ($playable as $i => $track) {
+            $this->playDlnaTrack($track->getDlnaUrl(), instant: $i === 0);
+        }
+    }
+
     public function playLibraryPlaylist(Playlist $playlist): void
     {
         $tracks = $playlist->tracks()->get();
@@ -26,14 +40,6 @@ trait LibraryPlayback
             throw new \RuntimeException("Playlist {$playlist->id} has no tracks.");
         }
 
-        foreach ($tracks as $i => $track) {
-            $url = $track->getDlnaUrl();
-
-            if (!$url) {
-                continue;
-            }
-
-            $this->playDlnaTrack($url, instant: $i === 0);
-        }
+        $this->playLibraryTracks($tracks);
     }
 }

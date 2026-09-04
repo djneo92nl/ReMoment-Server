@@ -18,6 +18,7 @@ docs/
     client-devices.md       DB schema, model, controller, admin UI internals
     device-drivers.md       Driver contracts, existing drivers, guide for adding a new brand
     device-discovery.md     Discovery commands, listener startup, device_meta keys
+    lastfm.md                Scrobbling, now-playing, auth flow, artist enrichment, backfill
     plugin-architecture.md  Design doc: extracting drivers into composable packages
   frontend/
     receiver.md             /receiver view: JS globals, DOM structure, browser targets

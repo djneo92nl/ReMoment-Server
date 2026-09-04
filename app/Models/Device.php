@@ -4,9 +4,11 @@ namespace App\Models;
 
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
+use App\Integrations\Contracts\LibraryPlaybackInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 /**
  * $params
@@ -104,5 +106,20 @@ class Device extends Model
     public function deviceSources(): HasMany
     {
         return $this->hasMany(DeviceSource::class);
+    }
+
+    public static function libraryCapable(): Collection
+    {
+        return static::all()->filter(function (self $device) {
+            try {
+                // Explicit accessor call, not `$device->driver` — this closure is
+                // lexically scoped inside Device, so `->driver` would resolve as
+                // direct protected-property access and bypass the lazy-loading
+                // magic getter entirely, always seeing the uninitialized null.
+                return $device->getDriverAttribute() instanceof LibraryPlaybackInterface;
+            } catch (\Throwable) {
+                return false;
+            }
+        })->values();
     }
 }

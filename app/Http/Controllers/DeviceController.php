@@ -3,12 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Device\DeviceCache;
+use App\Integrations\Contracts\LibraryPlaybackInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\SourcesInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
 use App\Models\DeviceSource;
+use App\Models\Media\Track;
 use App\Models\Play;
 use Illuminate\Http\Request;
 
@@ -185,6 +187,23 @@ class DeviceController extends Controller
         }
 
         return back()->with('success', "Switched to {$deviceSource->friendly_name}.");
+    }
+
+    public function playTrack(Track $track, Device $device)
+    {
+        try {
+            $driver = $device->driver;
+
+            if (!($driver instanceof LibraryPlaybackInterface)) {
+                return back()->with('error', "{$device->device_name} does not support library playback.");
+            }
+
+            $driver->playLibraryTrack($track);
+        } catch (\Throwable $e) {
+            return back()->with('error', "Could not play \"{$track->name}\" on {$device->device_name}: {$e->getMessage()}");
+        }
+
+        return back()->with('success', "Playing \"{$track->name}\" on {$device->device_name}.");
     }
 
     public function standby(Device $device)

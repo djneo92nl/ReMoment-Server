@@ -49,4 +49,42 @@ class Artist extends Model
     {
         return $this->metadata()->where('key', 'country')->value('value');
     }
+
+    public function bio(): ?string
+    {
+        return $this->metadata()->where('key', 'bio')->value('value');
+    }
+
+    public function similarArtists(): array
+    {
+        $value = $this->metadata()->where('key', 'similar_artists')->where('source', 'lastfm')->value('value');
+
+        return $value ? (json_decode($value, true) ?? []) : [];
+    }
+
+    /**
+     * Similar-artist names resolved against artists already in the library, keyed by name.
+     * Names with no local match are omitted (nothing to link to).
+     */
+    public function similarArtistModels(): \Illuminate\Support\Collection
+    {
+        $names = $this->similarArtists();
+
+        if (empty($names)) {
+            return collect();
+        }
+
+        return static::query()->whereIn('name', $names)->get()->keyBy('name');
+    }
+
+    public function coverAlbum(): ?Album
+    {
+        if (!$this->relationLoaded('albums')) {
+            $this->load(['albums' => fn ($q) => $q->withCount('plays')
+                ->orderByDesc('plays_count')
+                ->orderByDesc('created_at')]);
+        }
+
+        return $this->albums->first(fn (Album $album) => !empty($album->images));
+    }
 }

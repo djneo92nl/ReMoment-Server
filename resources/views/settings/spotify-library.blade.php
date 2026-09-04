@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center gap-4">
-            <x-back-button href="{{ route('settings.index') }}" />
+            <x-back-button href="{{ route('settings.spotify') }}" />
             <div>
                 <h1 class="text-3xl md:text-4xl font-medium tracking-tight dark:text-gray-100 text-gray-900">Spotify Library</h1>
                 <p class="mt-1.5 text-gray-500 dark:text-gray-500">Import saved tracks and playlists from your Spotify account</p>
@@ -28,7 +28,7 @@
             <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 flex flex-col items-center justify-center py-20 text-center px-8">
                 <i class="fa-brands fa-spotify text-4xl text-gray-200 dark:text-stone-700 mb-4"></i>
                 <p class="text-gray-500 dark:text-gray-500">Spotify is not connected yet.</p>
-                <a href="{{ route('settings.index') }}" class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline mt-1">
+                <a href="{{ route('settings.spotify') }}" class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline mt-1">
                     Connect Spotify from Settings →
                 </a>
             </div>

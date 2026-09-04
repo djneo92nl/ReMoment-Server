@@ -27,7 +27,9 @@ class ProcessArtwork implements ShouldQueue
 
     public function handle(): void
     {
-        if (ArtworkCache::has($this->originalUrl)) {
+        if ($cached = ArtworkCache::get($this->originalUrl)) {
+            $this->applyColorsToAlbums($cached['colors'] ?? []);
+
             return;
         }
 
@@ -60,7 +62,28 @@ class ProcessArtwork implements ShouldQueue
             'safe_colors' => $safeColors,
         ]);
 
-        Album::whereJsonContains('images', $this->originalUrl)->update(['colors' => $colors]);
+        $this->applyColorsToAlbums($colors);
+    }
+
+    private function applyColorsToAlbums(array $colors): void
+    {
+        if (empty($colors)) {
+            return;
+        }
+
+        // json_encode() (used by Eloquent's array cast) escapes "/" as "\/",
+        // so the LIKE pattern must match the escaped form actually stored.
+        $likeValue = str_replace('/', '\/', $this->originalUrl);
+
+        Album::whereNotNull('images')
+            ->where('images', 'like', '%'.$likeValue.'%')
+            ->get(['id', 'images'])
+            ->filter(fn (Album $album) => in_array(
+                $this->originalUrl,
+                array_map(fn ($image) => is_array($image) ? ($image['url'] ?? null) : $image, $album->images ?? []),
+                true
+            ))
+            ->each(fn (Album $album) => $album->update(['colors' => $colors]));
     }
 
     private function ensureL(string $hex, float $minL): string
@@ -71,17 +94,23 @@ class ProcessArtwork implements ShouldQueue
 
         $max = max($r, $g, $b);
         $min = min($r, $g, $b);
-        $d   = $max - $min;
-        $l   = ($max + $min) / 2;
-        $h   = 0.0;
-        $s   = 0.0;
+        $d = $max - $min;
+        $l = ($max + $min) / 2;
+        $h = 0.0;
+        $s = 0.0;
 
         if ($d > 0) {
             $s = $d / (1 - abs(2 * $l - 1));
-            if ($max === $r)      $h = fmod(($g - $b) / $d, 6) / 6;
-            elseif ($max === $g)  $h = (($b - $r) / $d + 2) / 6;
-            else                  $h = (($r - $g) / $d + 4) / 6;
-            if ($h < 0) $h += 1;
+            if ($max === $r) {
+                $h = fmod(($g - $b) / $d, 6) / 6;
+            } elseif ($max === $g) {
+                $h = (($b - $r) / $d + 2) / 6;
+            } else {
+                $h = (($r - $g) / $d + 4) / 6;
+            }
+            if ($h < 0) {
+                $h += 1;
+            }
         }
 
         if ($l >= $minL) {

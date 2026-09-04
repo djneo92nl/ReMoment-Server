@@ -10,3 +10,5 @@ Artisan::command('inspire', function () {
 
 Schedule::command('devices:sync-sources')->weekly();
 Schedule::command('library:sync-spotify')->daily();
+Schedule::command('library:backfill-artwork')->daily();
+Schedule::command('library:backfill-lastfm')->daily();

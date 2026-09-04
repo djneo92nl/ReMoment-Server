@@ -3,6 +3,7 @@
 namespace App\Listeners\Device;
 
 use App\Events\Device\NowPlayingEnded;
+use App\Jobs\ScrobbleToLastfm;
 use App\Models\Play;
 
 class ClosePlaybackHistory
@@ -31,5 +32,9 @@ class ClosePlaybackHistory
         $skipped = $listenedSeconds < 30;
 
         $play->update(['ended_at' => $endedAt, 'skipped' => $skipped]);
+
+        if ($play->track_id !== null) {
+            ScrobbleToLastfm::dispatch($play);
+        }
     }
 }
