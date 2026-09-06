@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\RedirectToSetupWizard;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -12,13 +13,13 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->web(append: [RedirectToSetupWizard::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->renderable(function (\Exception $e, $request) {
             if ($request->is('api/*')) {
                 return response()->json([
-                    'error'   => 'server_error',
+                    'error' => 'server_error',
                     'message' => $e->getMessage(),
                 ], 500);
             }

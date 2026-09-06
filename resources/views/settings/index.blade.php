@@ -7,6 +7,11 @@
     <div class="max-w-2xl space-y-8">
 
         <x-settings-group title="Devices">
+            <x-settings-row href="{{ route('setup.index') }}"
+                             icon="fa-solid fa-wand-magic-sparkles" icon-bg="bg-amber-50 dark:bg-amber-900/20" icon-color="text-amber-500"
+                             label="Setup Wizard">
+                Get started
+            </x-settings-row>
             <x-settings-row href="{{ route('devices.index') }}"
                              icon="fa-solid fa-tv" icon-bg="bg-emerald-50 dark:bg-emerald-900/20" icon-color="text-emerald-500"
                              label="Devices">

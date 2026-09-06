@@ -53,6 +53,8 @@ Route::get('/dashboard', function () {
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
 
+    Route::get('/setup', fn () => view('setup.index'))->name('setup.index');
+
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
     Route::get('/settings/users', [SettingsController::class, 'users'])->name('settings.users');
     Route::get('/settings/listeners', [SettingsController::class, 'listeners'])->name('settings.listeners');

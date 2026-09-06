@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ReMoment Server is a Laravel 12 application that acts as a universal controller and abstraction layer for networked audio/video devices (Bang & Olufsen ASE, Sonos, Spotify). It normalizes control interfaces across brands, captures playback history, publishes events to MQTT for IoT integration, and exposes a REST API for client devices.
 
+## Auth Model
+
+There is exactly **one shared admin login** (seeded by `DatabaseSeeder` as `admin@admin.com`) — there is no self-registration route, no multiple accounts, and no per-user profiles or roles. This one login gates only admin setup/config actions: `/settings/*`, the Spotify/Last.fm OAuth connect flows, and client device approval. Every other page — `/devices`, `/receiver`, `/history`, `/library`, `/stats`, playback controls, etc. — is intentionally guest-accessible with no login required, matching the REST API (also unauthenticated). **Never add user registration, multiple accounts, profiles, or role-based access** — this is a deliberate, permanent constraint, not an oversight to "fix."
+
 ## Documentation
 
 Detailed documentation lives in `docs/`. CLAUDE.md holds enough context to understand the project; the docs hold enough to implement or integrate without reading the source.
@@ -20,6 +24,7 @@ docs/
     device-discovery.md     Discovery commands, listener startup, device_meta keys
     lastfm.md                Scrobbling, now-playing, auth flow, artist enrichment, backfill
     plugin-architecture.md  Design doc: extracting drivers into composable packages
+    setup-wizard.md          First-time setup wizard: steps, Setting flags, auto-redirect middleware
   frontend/
     receiver.md             /receiver view: JS globals, DOM structure, browser targets
 ```
@@ -446,9 +451,11 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 - `DeviceHistory` (`app/Livewire/DeviceHistory.php`) — last 10 unique tracks for a device
 - `PlayHistory` (`app/Livewire/PlayHistory.php`) — paginated play history with device/source filters
 - `ClientManager` (`app/Livewire/ClientManager.php`) — approve/reject pending registrations, edit client name/type/device assignment, regenerate tokens
+- `SetupWizard` (`app/Livewire/SetupWizard.php`) — first-time setup checklist: add devices, client devices, library source (see `docs/architecture/setup-wizard.md`)
 
 ### Web Pages
 
+- `/setup` — first-time setup wizard (see `docs/architecture/setup-wizard.md`); auto-redirected here for a logged-in admin while zero devices exist
 - `/devices` — responsive device grid dashboard (playing devices get wide card, others get compact)
 - `/devices/create` — add device with cascading brand→product→driver form (Alpine.js)
 - `/devices/{id}` — device detail: nowplaying + source manager + info panel
