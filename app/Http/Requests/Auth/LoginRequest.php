@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\User;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -19,20 +20,25 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string'],
             'password' => ['required', 'string'],
         ];
     }
 
+    /**
+     * There's exactly one admin account (see CLAUDE.md's Auth Model note) —
+     * login is password-only against it, no username/email to enter.
+     */
     public function authenticate(): void
     {
         $this->ensureIsNotRateLimited();
 
-        if (!Auth::attempt($this->only('name', 'password'), $this->boolean('remember'))) {
+        $user = User::first();
+
+        if (!$user || !Auth::attempt(['id' => $user->id, 'password' => $this->string('password')], $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
-                'name' => trans('auth.failed'),
+                'password' => trans('auth.failed'),
             ]);
         }
 
@@ -50,7 +56,7 @@ class LoginRequest extends FormRequest
         $seconds = RateLimiter::availableIn($this->throttleKey());
 
         throw ValidationException::withMessages([
-            'name' => trans('auth.throttle', [
+            'password' => trans('auth.throttle', [
                 'seconds' => $seconds,
                 'minutes' => ceil($seconds / 60),
             ]),
@@ -59,6 +65,6 @@ class LoginRequest extends FormRequest
 
     public function throttleKey(): string
     {
-        return Str::transliterate(Str::lower($this->string('name')).'|'.$this->ip());
+        return Str::transliterate('login|'.$this->ip());
     }
 }

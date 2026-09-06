@@ -5,25 +5,14 @@
     <form method="POST" action="{{ route('login') }}">
         @csrf
 
-        <!-- Username -->
-        <div>
-            <label for="name" class="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">
-                {{ __('Username') }}
-            </label>
-            <input id="name" type="text" name="name" value="{{ old('name') }}"
-                   class="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-stone-700 bg-gray-50 dark:bg-stone-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-stone-500 focus:border-transparent"
-                   required autofocus autocomplete="username" />
-            <x-input-error :messages="$errors->get('name')" class="mt-2" />
-        </div>
-
         <!-- Password -->
-        <div class="mt-4">
+        <div>
             <label for="password" class="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">
                 {{ __('Password') }}
             </label>
             <input id="password" type="password" name="password"
                    class="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-stone-700 bg-gray-50 dark:bg-stone-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-stone-500 focus:border-transparent"
-                   required autocomplete="current-password" />
+                   required autofocus autocomplete="current-password" />
             <x-input-error :messages="$errors->get('password')" class="mt-2" />
         </div>
 
