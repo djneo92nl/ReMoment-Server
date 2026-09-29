@@ -3,6 +3,7 @@
 namespace App\Domain\Device;
 
 use App\Domain\Media\NowPlaying;
+use App\Events\Device\DeviceStateChanged;
 use Illuminate\Support\Facades\Cache;
 
 final class DeviceCache
@@ -11,6 +12,8 @@ final class DeviceCache
 
     public static function updateState(int $deviceId, State $state): void
     {
+        $previous = Cache::get(self::stateKey($deviceId));
+
         Cache::put(
             self::stateKey($deviceId),
             $state->value,
@@ -22,6 +25,10 @@ final class DeviceCache
             now(),
             self::TTL
         );
+
+        if ($previous !== $state->value) {
+            DeviceStateChanged::dispatch($deviceId, $state, $previous ? State::tryFrom($previous) : null);
+        }
     }
 
     public static function forgetNowPlaying(int $deviceId)

@@ -2,11 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Device\Capabilities;
 use App\Domain\Device\DeviceCache;
 use App\Integrations\Contracts\LibraryPlaybackInterface;
-use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
-use App\Integrations\Contracts\SourcesInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
 use App\Models\DeviceSource;
@@ -79,22 +78,12 @@ class DeviceController extends Controller
     {
         $device->load('meta');
 
-        $capabilities = [];
+        $capabilities = Capabilities::forDriver($device->device_driver);
         $volume = null;
         try {
             $driver = $device->driver;
-            if ($driver instanceof MediaControlsInterface) {
-                $capabilities[] = 'media_controls';
-            }
             if ($driver instanceof VolumeControlInterface) {
-                $capabilities[] = 'volume_control';
                 $volume = $driver->getVolume();
-            }
-            if ($driver instanceof SourcesInterface) {
-                $capabilities[] = 'source_control';
-            }
-            if ($driver instanceof SourceActivationInterface) {
-                $capabilities[] = 'source_activation';
             }
             if (method_exists($driver, 'standby')) {
                 $capabilities[] = 'standby';

@@ -105,12 +105,8 @@ class RadioStationController extends Controller
 
     private function radioCapableDevices(): \Illuminate\Support\Collection
     {
-        return Device::all()->filter(function (Device $device) {
-            try {
-                return $device->driver instanceof RadioControlInterface;
-            } catch (\Throwable) {
-                return false;
-            }
-        })->values();
+        return Device::all()->filter(
+            fn (Device $device) => is_a($device->device_driver, RadioControlInterface::class, true)
+        )->values();
     }
 }

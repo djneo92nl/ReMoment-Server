@@ -1,4 +1,4 @@
-<div wire:poll.1s>
+<div x-data="liveDevice({{ $device->id }})">
     @if($device->state !== \App\Domain\Device\State::Unreachable)
         <!-- Now Playing Card -->
         <div class="md:col-span-2 bg-white rounded-3xl shadow-xl border border-gray-200/80 dark:border-stone-900/80 overflow-hidden hover:shadow-2xl dark:bg-stone-900 transition-all">
@@ -51,16 +51,11 @@
 
                                 <div class="space-y-6">
                                     <!-- Progress Bar -->
-                                    <div>
-                                        <div class="flex justify-between text-sm text-gray-500 mb-2">
-                                            <span>{{ \App\Domain\Helpers\TimeHelper::secondsToMinutes($nowPlaying['position']) }}</span>
-                                            <span>{{ \App\Domain\Helpers\TimeHelper::secondsToMinutes($nowPlaying['track']['duration'] ?? 0) }}</span>
-                                        </div>
-                                        <div class="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                                            <div class="h-full bg-gradient-to-r from-red-500 to-rose-600 rounded-full" style="width:{{ (int)(($nowPlaying['position'] / $nowPlaying['track']['duration'] ?? 0
-) * 100) }}%"></div>
-                                        </div>
-                                    </div>
+                                    <x-progress-ticker :device-id="$device->id"
+                                                       :position="(int) ($nowPlaying['position'] ?? 0)"
+                                                       :duration="(int) ($nowPlaying['track']['duration'] ?? 0)"
+                                                       :playing="($nowPlaying['state'] ?? null) !== 'pause'"
+                                                       :seekable="$supportsSeek" />
 
                                     <!-- Playback Controls -->
                                     @isset($nowPlaying['state'])
@@ -85,7 +80,9 @@
 
                                     <!-- Volume Control -->
                                     <div class="flex items-center gap-4 max-w-md">
-                                        <i class="fa-solid fa-volume-high text-gray-500 w-5"></i>
+                                        <button wire:click="toggleMute" title="{{ $muted ? 'Unmute' : 'Mute' }}" class="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 w-5 transition-colors">
+                                            <i class="fa-solid {{ $muted ? 'fa-volume-xmark' : 'fa-volume-high' }}"></i>
+                                        </button>
                                         <input type="range" min="0" max="100" wire:model="volume" class="flex-1 h-1.5 appearance-none rounded-full bg-gray-200 accent-gray-700 dark:accent-stone-600">
                                         <span class="text-sm font-medium text-gray-700 dark:text-gray-400 w-8">{{ $volume }}</span>
                                     </div>

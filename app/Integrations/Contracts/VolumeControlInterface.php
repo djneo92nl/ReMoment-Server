@@ -15,4 +15,6 @@ interface VolumeControlInterface
     public function mute(): void;
 
     public function unmute(): void;
+
+    public function isMuted(): bool;
 }

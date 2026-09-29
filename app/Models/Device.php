@@ -110,16 +110,8 @@ class Device extends Model
 
     public static function libraryCapable(): Collection
     {
-        return static::all()->filter(function (self $device) {
-            try {
-                // Explicit accessor call, not `$device->driver` — this closure is
-                // lexically scoped inside Device, so `->driver` would resolve as
-                // direct protected-property access and bypass the lazy-loading
-                // magic getter entirely, always seeing the uninitialized null.
-                return $device->getDriverAttribute() instanceof LibraryPlaybackInterface;
-            } catch (\Throwable) {
-                return false;
-            }
-        })->values();
+        return static::all()->filter(
+            fn (self $device) => is_a($device->device_driver, LibraryPlaybackInterface::class, true)
+        )->values();
     }
 }

@@ -64,6 +64,11 @@ class SettingsController extends Controller
         return view('settings.users', compact('users'));
     }
 
+    public function health()
+    {
+        return view('settings.health');
+    }
+
     public function listeners()
     {
         if (app(SpotifyTokenService::class)->isConnected()) {

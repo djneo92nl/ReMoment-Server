@@ -23,6 +23,7 @@ docs/
     device-drivers.md       Driver contracts, existing drivers, guide for adding a new brand
     device-discovery.md     Discovery commands, listener startup, device_meta keys
     lastfm.md                Scrobbling, now-playing, auth flow, artist enrichment, backfill
+    live-updates.md          MQTT-over-WebSocket push to Livewire + /receiver, topics, fallback polling
     plugin-architecture.md  Design doc: extracting drivers into composable packages
     setup-wizard.md          First-time setup wizard: steps, Setting flags, auto-redirect middleware
   frontend/
@@ -92,7 +93,7 @@ Response: `{ "data": DeviceDetailResource }`
 
 `state` values: `playing` | `standby` | `paused` | `unreachable`
 
-`capabilities` values: `media_controls` | `volume_control` | `radio_control` | `source_control` | `source_activation` | `multi_room` | `library_playback`
+`capabilities` values: `media_controls` | `volume_control` | `radio_control` | `source_control` | `source_activation` | `multi_room` | `library_playback` | `seek` | `queue`
 
 Always check `capabilities` before calling a feature endpoint — calling an unsupported feature returns `422`.
 
@@ -163,6 +164,39 @@ PUT  /api/devices/{id}/volume          body: { "volume": 45 }   → { "volume": 
 ```
 
 Volume is an integer 0–100.
+
+### Mute
+
+Part of `volume_control`.
+
+```
+GET  /api/devices/{id}/mute            → { "muted": false }
+PUT  /api/devices/{id}/mute            body: { "muted": true }  → { "muted": true }
+```
+
+### Seek
+
+Requires `seek` (Sonos, Spotify, Mozart).
+
+```
+PUT  /api/devices/{id}/seek            body: { "position": 90 }  → { "status": "ok", "position": 90 }
+```
+
+`position` is an absolute offset in seconds within the current track.
+
+### Up Next (queue)
+
+Requires `queue` (Sonos, Spotify).
+
+```
+GET  /api/devices/{id}/queue?limit=20  → { "up_next": [ QueueItem, … ] }
+```
+
+`limit` is 1–100 (default 20). Returns only the tracks after the current one. The list is empty when the device isn't playing from a queue (radio, line-in).
+
+**QueueItem shape:** `{ "name": "…", "artist": "…"|null, "album": "…"|null, "image": "https://…"|null, "duration": 200|null, "uri": "…"|null }`
+
+Validation errors return Laravel's standard `422` `{ "message", "errors" }`. Unknown devices and routes return `404`.
 
 ### Sources
 
@@ -254,9 +288,11 @@ The Mosquitto broker runs in Docker on port 1883. Each device's MQTT base topic 
 | Topic | Trigger | Payload |
 |-------|---------|---------|
 | `remoment/player/{id}/data` | New track starts | `{ "track": "Name", "artist": "Name", "artwork": { "proxy_512": "…", "proxy_320": "…", "colors": ["#…"] } }` |
-| `remoment/player/{id}/progress` | Every second while playing | Progress in seconds (integer string) |
+| `remoment/player/{id}/progress` | Every second while playing | Progress as a percentage of the track, 0–100 (integer string) |
+| `remoment/player/{id}/state` | State transition (retained) | `{ "state": "playing" }` — `playing` / `paused` / `standby` / `unreachable` |
+| `remoment/player/{id}/volume` | Volume level changes (retained) | `{ "volume": 45 }` |
 
-`artwork` is absent in the MQTT payload if not yet processed. Published by `PublishNowPlayingToMqtt` and `PublishProgressToMqtt` listeners. The broker is publish-only from the server; no subscriptions are consumed.
+`artwork` is absent in the MQTT payload if not yet processed. Published by the `PublishNowPlayingToMqtt`, `PublishProgressToMqtt`, `PublishStateToMqtt` and `PublishVolumeToMqtt` listeners. The server only publishes and never subscribes. Browsers subscribe over the WebSocket listener on port 9001 to drive live UI refreshes; see `docs/architecture/live-updates.md`.
 
 ---
 
@@ -269,6 +305,10 @@ Defined in `app/Providers/AppServiceProvider.php`:
 - `NowPlayingUpdated` → `UpdateDeviceCache`, `StorePlaybackHistory` (queued), `PublishNowPlayingToMqtt`, `DispatchArtworkProcessing`
 - `ProgressUpdated` → `UpdateDeviceCache`, `PublishProgressToMqtt`
 - `NowPlayingEnded` → `UpdateDeviceCache`, `ClosePlaybackHistory`
+- `VolumeUpdated` → `UpdateDeviceCache`, `PublishVolumeToMqtt`
+- `DeviceStateChanged` → `PublishStateToMqtt`. Fired by `DeviceCache::updateState()` only when the cached state actually changes.
+
+Listeners are registered only here: event auto-discovery is disabled in `bootstrap/app.php`, because it registered every listener twice.
 
 Device listeners (`app/Integrations/*/Services/DeviceListener.php`) poll devices and fire these events. The queue must be running for `StorePlaybackHistory` and `ProcessArtwork` to process.
 
@@ -287,6 +327,10 @@ All drivers implement interfaces from `app/Integrations/Contracts/`:
 - `SourcesInterface` / `SourceActivationInterface` – list and activate sources (ASE only)
 - `MultiRoomInterface` – join/leave multiroom sessions (ASE + Sonos)
 - `LibraryPlaybackInterface` – play a local DLNA track (ASE + Sonos)
+- `SeekInterface` – jump within the current track (Sonos, Spotify, Mozart)
+- `QueueInterface` – list up-next tracks (Sonos, Spotify)
+
+`App\Domain\Device\Capabilities::forDriver()` maps these contracts to the API capability strings from the driver class name, without instantiating the driver.
 
 ### Integration Drivers
 
@@ -298,12 +342,12 @@ All drivers implement interfaces from `app/Integrations/Contracts/`:
 
 **Sonos** (`app/Integrations/Sonos/`)
 - Communicates via UPnP SOAP to device IP
-- Library: local fork of `duncan3dc/sonos` in `packages/duncan3dc/sonos` (branch `laravel12`)
-- Capabilities: media controls, volume, radio, multiroom, library playback
+- Library: `duncan3dc/sonos` v3
+- Capabilities: media controls, volume, radio, multiroom, library playback, seek, queue
 
 **Spotify** (`app/Integrations/Spotify/`)
 - Virtual device — polls Spotify Web API every 3 seconds
-- Capabilities: media controls only (cloud-controlled)
+- Capabilities: media controls, seek, queue (cloud-controlled)
 - Can route playback to a mapped local device via `spotify_connect_name` device meta key
 
 ### Domain vs. Model Layer
@@ -324,6 +368,8 @@ Domain objects represent live state; Eloquent models represent stored history.
 | `device:{id}:last_seen` | Timestamp | 3600s |
 | `spotify_routed_to` | device ID integer | 30s |
 | `listener_running_{id}` | boolean flag | 10s |
+| `mqtt_published_volume_{id}` | last volume published to MQTT (dedupe) | 3600s |
+| `health:scheduler` / `health:queue` | ISO timestamp heartbeats for `/settings/health` | 86400s |
 
 `State` enum values: `playing` | `standby` | `paused` | `unreachable`
 
@@ -432,7 +478,7 @@ See `docs/architecture/device-drivers.md` for the Mozart driver's contracts and 
 Defined in `compose.yaml` via Laravel Sail:
 - **laravel.test** – PHP 8.4 app server (port 80)
 - **redis** – cache, sessions, and queue backend
-- **mosquitto** – MQTT broker (port 1883)
+- **mosquitto** – MQTT broker (port 1883; WebSockets on 9001 for browser live updates)
 - **meilisearch** – search (port 7700)
 - **Vite dev server** – port 5173
 
@@ -440,12 +486,14 @@ Defined in `compose.yaml` via Laravel Sail:
 
 ## Frontend
 
-Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interactivity. Tailwind CSS and Font Awesome loaded via CDN (not compiled). The layout (`resources/views/layouts/app.blade.php`) provides a persistent sidebar navigation.
+Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interactivity. Rendering stays in Livewire: `public/js/remoment-live.js` only listens to MQTT over WebSockets and triggers `$wire.$refresh()`, falling back to 1s polling when the broker is unreachable (see `docs/architecture/live-updates.md`). Tailwind CSS and Font Awesome loaded via CDN (not compiled). The layout (`resources/views/layouts/app.blade.php`) provides a persistent sidebar navigation.
 
 ### Livewire Components
 
-- `Nowplaying` (`app/Livewire/Nowplaying.php`) — full playback card with transport + volume controls, polls every 1s
-- `DeviceCard` (`app/Livewire/DeviceCard.php`) — compact standby/unreachable card, polls every 1s; shows color gradient from `ArtworkCache`; includes Multiroom button for capable devices
+- `Nowplaying` (`app/Livewire/Nowplaying.php`) — full playback card with transport, volume, mute, and click-to-seek; refreshes on MQTT push (`liveDevice`)
+- `DeviceCard` (`app/Livewire/DeviceCard.php`) — device card with transport, volume, mute, and click-to-seek; refreshes on MQTT push; shows color gradient from `ArtworkCache`; includes Multiroom button for capable devices
+- `DeviceQueue` (`app/Livewire/DeviceQueue.php`) — "Up Next" list on the device page for `queue`-capable devices, loaded lazily via `wire:init`
+- `SystemHealth` (`app/Livewire/SystemHealth.php`) — `/settings/health`: MQTT broker reachability, scheduler/queue-worker heartbeats, pending/failed jobs, per-device listener state and last seen
 - `DeviceSourceManager` (`app/Livewire/DeviceSourceManager.php`) — source list with hide/show toggle, drag-to-reorder, and activate button
 - `MultiroomPresets` (`app/Livewire/MultiroomPresets.php`) — create/activate/delete named multiroom groupings
 - `DeviceHistory` (`app/Livewire/DeviceHistory.php`) — last 10 unique tracks for a device
@@ -458,17 +506,18 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 - `/setup` — first-time setup wizard (see `docs/architecture/setup-wizard.md`); auto-redirected here for a logged-in admin while zero devices exist
 - `/devices` — responsive device grid dashboard (playing devices get wide card, others get compact)
 - `/devices/create` — add device with cascading brand→product→driver form (Alpine.js)
-- `/devices/{id}` — device detail: nowplaying + source manager + info panel
+- `/devices/{id}` — device detail: nowplaying + up next queue + source manager + info panel
 - `/devices/{id}/edit` — edit device name, IP, brand, product
 - `/history` — full play history browser
 - `/stats` — listening statistics (top artists, devices, hourly heatmap)
 - `/multiroom` — multiroom session management and presets
-- `/receiver` — full-screen now-playing display; fetches `GET /api/devices`, lets user pick device (or auto-selects if only one); polls `GET /api/devices/{id}` every 3s and supports play/pause/next/previous via the REST API. Accepts `?device={id}` query parameter to skip the picker.
+- `/receiver` — full-screen now-playing display; fetches `GET /api/devices`, lets user pick device (or auto-selects if only one); re-fetches `GET /api/devices/{id}` on MQTT push (polling every 3s without a broker) and supports play/pause/next/previous, seek and mute via the REST API. Accepts `?device={id}` query parameter to skip the picker.
 - `/artists` — artist library browser
 - `/albums/{id}` — album detail with track listing
 - `/settings` — overview of listeners, MQTT config
 - `/settings/users` — user management table
 - `/settings/listeners` — start/stop device background listeners
+- `/settings/health` — scheduler, queue worker, MQTT broker and per-device listener health
 - `/settings/dlna` — discover DLNA servers, trigger library scans
 - `/settings/spotify-connect` — map Spotify Connect speaker names to local devices
 - `/settings/clients` — manage client device registrations; approve/reject pending, assign devices, view tokens

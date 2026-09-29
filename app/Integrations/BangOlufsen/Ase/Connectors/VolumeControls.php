@@ -55,7 +55,7 @@ trait VolumeControls
         ]);
     }
 
-    public function getMuted(): bool
+    public function isMuted(): bool
     {
         $response = $this->deviceApiClient()->get('BeoZone/Zone/Sound/Volume/Speaker/Muted');
 

@@ -2,11 +2,14 @@
 
 namespace App\Integrations\Sonos;
 
+use App\Domain\Device\QueueItem;
 use App\Integrations\Contracts\LibraryPlaybackInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
+use App\Integrations\Contracts\QueueInterface;
 use App\Integrations\Contracts\RadioControlInterface;
+use App\Integrations\Contracts\SeekInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Integrations\Sonos\Connectors\MultiRoomControls;
 use App\Models\Device;
@@ -18,9 +21,10 @@ use duncan3dc\Sonos\Devices\Collection;
 use duncan3dc\Sonos\Network;
 use duncan3dc\Sonos\Tracks\Stream;
 use duncan3dc\Sonos\Tracks\Track as SonosTrack;
+use duncan3dc\Sonos\Utils\Time;
 use Illuminate\Support\Collection as TrackCollection;
 
-class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, RadioControlInterface, VolumeControlInterface
+class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, QueueInterface, RadioControlInterface, SeekInterface, VolumeControlInterface
 {
     use MultiRoomControls;
 
@@ -59,7 +63,7 @@ class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterf
 
     public function play(): void
     {
-        $this->deviceApi->pause();
+        $this->deviceApi->play();
     }
 
     public function pause(): void
@@ -111,7 +115,37 @@ class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterf
 
     public function unmute(): void
     {
-        $this->deviceApi->unmute(true);
+        $this->deviceApi->unmute();
+    }
+
+    public function isMuted(): bool
+    {
+        return $this->deviceApi->isMuted();
+    }
+
+    public function seek(int $seconds): void
+    {
+        $this->deviceApi->seek(Time::inSeconds(max(0, $seconds)));
+    }
+
+    public function getUpNext(int $limit = 20): array
+    {
+        $state = $this->deviceApi->getStateDetails();
+
+        // Radio and line-in play a single stream, not the queue.
+        if ($state->isStreaming()) {
+            return [];
+        }
+
+        $tracks = $this->deviceApi->getQueue()->getTracks($state->getNumber() + 1, $limit);
+
+        return array_map(fn ($track) => new QueueItem(
+            name: $track->getTitle() ?: 'Unknown',
+            artist: $track->getArtist() ?: null,
+            album: $track->getAlbum() ?: null,
+            image: $track->getAlbumArt() ?: null,
+            uri: $track->getUri() ?: null,
+        ), $tracks);
     }
 
     public function playLibraryTrack(Track $track): void

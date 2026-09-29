@@ -13,9 +13,6 @@
 
     // Progress — only when we have a track with a known duration
     $hasDuration = $nowPlaying?->track && ($nowPlaying->track->duration ?? 0) > 0;
-    $pct = $hasDuration
-        ? min(100, (int)(($nowPlaying->position / $nowPlaying->track->duration) * 100))
-        : 0;
 
     // Artwork proxy and dominant colors
     $artUrl = $nowPlaying ? \App\Domain\Artwork\ArtworkCache::extractImageUrl($nowPlaying) : null;
@@ -26,7 +23,7 @@
         : '';
 @endphp
 
-<div wire:poll.1s
+<div x-data="liveDevice({{ $device->id }})"
      class="{{ $gradientStyle ? '' : 'bg-white dark:bg-stone-900' }} rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 overflow-hidden hover:shadow-xl transition-all {{ (!$standalone && $isActive) ? 'md:col-span-2' : '' }}"
      style="{{ $gradientStyle }}">
 
@@ -131,14 +128,12 @@
                         {{-- Progress bar — only for timed tracks --}}
                         @if($hasDuration)
                             <div>
-                                <div class="flex justify-between text-xs text-gray-400 dark:text-gray-600 mb-1.5">
-                                    <span>{{ \App\Domain\Helpers\TimeHelper::secondsToMinutes($nowPlaying->position) }}</span>
-                                    <span>{{ \App\Domain\Helpers\TimeHelper::secondsToMinutes($nowPlaying->track->duration) }}</span>
-                                </div>
-                                <div class="h-1.5 bg-gray-200 dark:bg-stone-700 rounded-full overflow-hidden">
-                                    <div class="h-full bg-gradient-to-r from-red-500 to-rose-600 rounded-full transition-all duration-500"
-                                         style="width: {{ $pct }}%"></div>
-                                </div>
+                                <x-progress-ticker :device-id="$device->id"
+                                                   :position="(int) $nowPlaying->position"
+                                                   :duration="(int) $nowPlaying->track->duration"
+                                                   :playing="$isPlaying"
+                                                   :seekable="$supportsSeek"
+                                                   size="sm" />
                             </div>
                         @else
                             {{-- Radio / no duration: animated bar --}}
@@ -175,7 +170,10 @@
                             <div x-data="{ vol: {{ $volume }} }"
                                  x-init="$watch('$wire.volume', v => vol = v)"
                                  class="flex items-center gap-3">
-                                <i class="fa-solid fa-volume-high text-gray-400 dark:text-gray-600 text-sm w-4 flex-shrink-0"></i>
+                                <button wire:click="toggleMute" title="{{ $muted ? 'Unmute' : 'Mute' }}"
+                                        class="text-gray-400 dark:text-gray-600 hover:text-gray-700 dark:hover:text-gray-300 text-sm w-4 flex-shrink-0 transition-colors">
+                                    <i class="fa-solid {{ $muted ? 'fa-volume-xmark' : 'fa-volume-high' }}"></i>
+                                </button>
                                 <div class="relative flex-1 max-w-xs">
                                     <div class="h-1.5 bg-gray-200 dark:bg-stone-700 rounded-full overflow-hidden">
                                         <div class="h-full bg-gray-500 dark:bg-stone-400 rounded-full"

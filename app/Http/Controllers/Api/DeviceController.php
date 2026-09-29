@@ -9,7 +9,9 @@ use App\Http\Resources\Api\DeviceListResource;
 use App\Integrations\Contracts\LibraryPlaybackInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
+use App\Integrations\Contracts\QueueInterface;
 use App\Integrations\Contracts\RadioControlInterface;
+use App\Integrations\Contracts\SeekInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\SourcesInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
@@ -61,6 +63,58 @@ class DeviceController extends Controller
         }
 
         return response()->json(['status' => 'ok', 'action' => $action]);
+    }
+
+    public function seek(Request $request, Device $device): JsonResponse
+    {
+        $request->validate(['position' => ['required', 'integer', 'min:0']]);
+
+        if ($error = $this->assertReachable($device)) {
+            return $error;
+        }
+
+        $driver = $device->driver;
+
+        if (!($driver instanceof SeekInterface)) {
+            return $this->unsupported('seek');
+        }
+
+        try {
+            $driver->seek($request->integer('position'));
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'driver_error',
+                'message' => 'The device did not respond: '.$e->getMessage(),
+            ], 502);
+        }
+
+        return response()->json(['status' => 'ok', 'position' => $request->integer('position')]);
+    }
+
+    public function queue(Request $request, Device $device): JsonResponse
+    {
+        $request->validate(['limit' => ['nullable', 'integer', 'min:1', 'max:100']]);
+
+        if ($error = $this->assertReachable($device)) {
+            return $error;
+        }
+
+        $driver = $device->driver;
+
+        if (!($driver instanceof QueueInterface)) {
+            return $this->unsupported('queue');
+        }
+
+        try {
+            $items = $driver->getUpNext($request->integer('limit', 20));
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'driver_error',
+                'message' => 'The device did not respond: '.$e->getMessage(),
+            ], 502);
+        }
+
+        return response()->json(['up_next' => array_map(fn ($item) => $item->toArray(), $items)]);
     }
 
     public function playRadio(Device $device, RadioStation $station): JsonResponse
@@ -182,6 +236,56 @@ class DeviceController extends Controller
         }
 
         return response()->json(['volume' => $actual]);
+    }
+
+    public function getMute(Device $device): JsonResponse
+    {
+        if ($error = $this->assertReachable($device)) {
+            return $error;
+        }
+
+        $driver = $device->driver;
+
+        if (!($driver instanceof VolumeControlInterface)) {
+            return $this->unsupported('volume_control');
+        }
+
+        try {
+            $muted = $driver->isMuted();
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'driver_error',
+                'message' => 'The device did not respond: '.$e->getMessage(),
+            ], 502);
+        }
+
+        return response()->json(['muted' => $muted]);
+    }
+
+    public function setMute(Request $request, Device $device): JsonResponse
+    {
+        $request->validate(['muted' => ['required', 'boolean']]);
+
+        if ($error = $this->assertReachable($device)) {
+            return $error;
+        }
+
+        $driver = $device->driver;
+
+        if (!($driver instanceof VolumeControlInterface)) {
+            return $this->unsupported('volume_control');
+        }
+
+        try {
+            $request->boolean('muted') ? $driver->mute() : $driver->unmute();
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'driver_error',
+                'message' => 'The device did not respond: '.$e->getMessage(),
+            ], 502);
+        }
+
+        return response()->json(['muted' => $request->boolean('muted')]);
     }
 
     public function multiroom(Device $device): JsonResponse

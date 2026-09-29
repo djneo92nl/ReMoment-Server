@@ -17,6 +17,7 @@ use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
 use App\Integrations\Contracts\RadioControlInterface;
+use App\Integrations\Contracts\SeekInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\SourcesInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
@@ -29,7 +30,7 @@ use Djneo92nl\BeoMozart\MozartClient;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
-class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, RadioControlInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
+class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, RadioControlInterface, SeekInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
 {
     public MozartClient $client;
 
@@ -77,6 +78,13 @@ class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterf
     public function previous(): void
     {
         $this->client->playback()->sendCommand(PlaybackCommand::Prev);
+    }
+
+    // --- SeekInterface ---
+
+    public function seek(int $seconds): void
+    {
+        $this->client->playback()->seek(max(0, $seconds) * 1000);
     }
 
     // --- VolumeControlInterface ---
@@ -135,6 +143,11 @@ class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterf
     public function unmute(): void
     {
         $this->client->volume()->setMuted(false);
+    }
+
+    public function isMuted(): bool
+    {
+        return (bool) ($this->client->volume()->getState()['muted']['muted'] ?? false);
     }
 
     // --- SourcesInterface / SourceActivationInterface ---

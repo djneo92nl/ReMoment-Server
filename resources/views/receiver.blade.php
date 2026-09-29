@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ReMoment Receiver</title>
+<x-live-scripts />
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -197,6 +198,15 @@
     width: 0%;
     transition: width 1s linear;
   }
+  #progress-wrap.seekable #progress-bar-bg { cursor: pointer; }
+  #progress-wrap.seekable #progress-bar-bg:hover { height: 6px; margin-top: -1px; }
+
+  #vol-mute {
+    background: none; border: none; padding: 0; cursor: pointer;
+    display: flex; align-items: center;
+  }
+  #vol-row.muted #vol-slider, #vol-row.muted #vol-val { opacity: 0.35; }
+  #vol-row.muted #vol-mute svg { stroke: #f87171; }
 
   #time-row {
     display: flex;
@@ -649,9 +659,11 @@
     </button>
   </div>
   <div id="vol-row">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
-    </svg>
+    <button id="vol-mute" onclick="toggleMute()" title="Mute">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+      </svg>
+    </button>
     <input type="range" id="vol-slider" min="0" max="100" value="50">
     <span id="vol-val">—</span>
   </div>
@@ -670,6 +682,8 @@ let lastTrackId = null;
 let activeArt = 'a', currentArtUrl = '';
 let allDevices = [];
 let currentVolume = 50, volumeDebounce = null;
+let currentMuted = false, deviceCaps = [];
+let lastPollAt = 0, pushPollDebounce = null;
 let ambientTimer = null;
 let currentLyricsData = null;
 let currentLyricLineIdx = -2;
@@ -732,12 +746,39 @@ function startReceiver(device) {
     fetchVolume();
   }
   document.getElementById('switch-btn').style.display = 'block';
+  deviceCaps = device.capabilities || [];
+  document.getElementById('progress-wrap').classList.toggle('seekable', deviceCaps.includes('seek'));
+  if (showControls && deviceCaps.includes('volume_control')) fetchMute();
   resetAmbient();
   pollNow();
-  pollTimer = setInterval(pollNow, 3000);
+  // With MQTT push connected, polling is only a safety net; otherwise poll every 3s.
+  pollTimer = setInterval(() => {
+    const interval = (window.RemomentLive && RemomentLive.connected) ? 15000 : 3000;
+    if (Date.now() - lastPollAt >= interval) pollNow();
+  }, 1000);
 }
 
+// remoment-live.js is deferred, so it's only defined once the DOM has parsed.
+document.addEventListener('DOMContentLoaded', () => {
+  if (!window.RemomentLive) return;
+  RemomentLive.on(msg => {
+    if (msg.deviceId !== deviceId || msg.retained) return;
+    if (msg.kind === 'volume' && msg.data && msg.data.volume != null) {
+      currentVolume = msg.data.volume;
+      updateVolumeUI();
+    } else if (msg.kind === 'state' || msg.kind === 'data') {
+      clearTimeout(pushPollDebounce);
+      pushPollDebounce = setTimeout(pollNow, 150);
+    } else if (msg.kind === 'progress' && currentDuration > 0) {
+      // Progress is pushed as a percentage; re-fetch only if local interpolation drifted (e.g. after a seek).
+      const localPct = (currentPosition() / currentDuration) * 100;
+      if (Math.abs(parseInt(msg.data, 10) - localPct) > 3) pollNow();
+    }
+  });
+});
+
 async function pollNow() {
+  lastPollAt = Date.now();
   try {
     const r = await fetch(`/api/devices/${deviceId}`);
     if (!r.ok) return;
@@ -1042,12 +1083,16 @@ function setArtwork(url, colors) {
   }
 }
 
+function currentPosition() {
+  if (isCurrentlyPlaying && progressLastPollTime) {
+    return Math.min(currentDuration, currentProgress + (Date.now() - progressLastPollTime) / 1000);
+  }
+  return currentProgress;
+}
+
 function updateProgress() {
   if (currentDuration > 0) {
-    let pos = currentProgress;
-    if (isCurrentlyPlaying && progressLastPollTime) {
-      pos = Math.min(currentDuration, currentProgress + (Date.now() - progressLastPollTime) / 1000);
-    }
+    const pos = currentPosition();
     const pct = Math.min(100, (pos / currentDuration) * 100);
     document.getElementById('progress-bar-fill').style.width = pct + '%';
     document.getElementById('time-pos').textContent = fmtTime(pos);
@@ -1184,6 +1229,51 @@ document.addEventListener('wheel', e => {
   resetAmbient();
   setVolume(currentVolume + (e.deltaY < 0 ? 5 : -5));
 }, { passive: false });
+
+document.getElementById('progress-bar-bg').addEventListener('click', async e => {
+  if (!deviceId || !deviceCaps.includes('seek') || currentDuration <= 0) return;
+  e.stopPropagation();
+  const rect = e.currentTarget.getBoundingClientRect();
+  const position = Math.round(Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)) * currentDuration);
+  currentProgress = position;
+  progressLastPollTime = Date.now();
+  updateProgress();
+  try {
+    await fetch(`/api/devices/${deviceId}/seek`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ position }),
+    });
+  } catch(e) {}
+});
+
+// ── Mute ─────────────────────────────────────────────────────
+async function fetchMute() {
+  try {
+    const r = await fetch(`/api/devices/${deviceId}/mute`);
+    if (!r.ok) return;
+    currentMuted = !!(await r.json()).muted;
+    updateMuteUI();
+  } catch(e) {}
+}
+
+function updateMuteUI() {
+  document.getElementById('vol-row').classList.toggle('muted', currentMuted);
+  document.getElementById('vol-mute').title = currentMuted ? 'Unmute' : 'Mute';
+}
+
+async function toggleMute() {
+  resetAmbient();
+  currentMuted = !currentMuted;
+  updateMuteUI();
+  try {
+    await fetch(`/api/devices/${deviceId}/mute`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ muted: currentMuted }),
+    });
+  } catch(e) {}
+}
 
 // ── Device switcher ──────────────────────────────────────────
 const STATE_COLORS = { playing: '#4ade80', paused: '#fbbf24', standby: '#ef4444', unreachable: '#6b7280' };

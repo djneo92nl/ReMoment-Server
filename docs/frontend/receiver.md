@@ -4,7 +4,7 @@ Full-screen now-playing display, designed for TVs, wall-mounted tablets, and Chr
 
 ## Overview
 
-A standalone Blade template with no Livewire dependency — pure polling JS hitting `GET /api/devices/{id}` every 3 seconds. Accepts a `?device={id}` query parameter to skip the picker. If only one device exists it auto-selects.
+A standalone Blade template with no Livewire dependency — plain JS fetching `GET /api/devices/{id}`. When the MQTT WebSocket broker is reachable it re-fetches on push (`state` / `data` messages) and only polls every 15s as a safety net; otherwise it polls every 3 seconds. See [Live Updates](../architecture/live-updates.md). Accepts a `?device={id}` query parameter to skip the picker. If only one device exists it auto-selects.
 
 ## Features
 
@@ -13,9 +13,11 @@ A standalone Blade template with no Livewire dependency — pure polling JS hitt
 | Device picker | Shown on first load if `?device=` is absent |
 | Album art crossfade | Two `<img>` layers (a/b) swap with opacity transition |
 | Color theming | 5 dominant colors from `ArtworkCache`; accent on track name, muted on artist/album |
-| Progress bar | Driven by `ProgressUpdated` MQTT payload via API; interpolated locally each second |
+| Progress bar | Position from the API, interpolated locally each second; re-fetches when the pushed `progress` percentage drifts >3% |
+| Seek | Click the progress bar → `PUT /api/devices/{id}/seek`; only when the device has the `seek` capability (`#progress-wrap.seekable`) |
 | Playback controls | Play/pause/next/previous via REST API; hidden on Chromecast UA |
-| Volume control | Slider, debounced 400ms, hidden on TV UA and Chromecast |
+| Volume control | Slider, debounced 200ms, hidden on TV UA and Chromecast; updates live from the `volume` MQTT topic |
+| Mute | Speaker icon (`#vol-mute`) toggles `PUT /api/devices/{id}/mute`; `#vol-row.muted` dims the slider |
 | Lyrics view | Toggle button swaps meta panel ↔ 3-line teleprompter (previous / current / next) |
 | Synced lyrics | LRC timestamps → binary search per second for current line |
 | Plain lyrics | Proportional estimate when no timestamps available |
@@ -84,6 +86,8 @@ The controlling features and their first-ship dates:
 - Apple TV: tvOS 11+ (2017) ✓
 - Chromecast: controls are hidden via UA detection; lyrics and art still display
 
+`mqtt.js` (loaded from jsDelivr) targets newer engines; if it fails to load or parse on an old TV, `window.RemomentLive` never connects and the page silently stays on 3s polling.
+
 **Features deliberately not used:**
 - Optional chaining `?.` (Chrome 80 / 2020)
 - Nullish coalescing `??` (Chrome 80 / 2020)
@@ -101,6 +105,7 @@ The controlling features and their first-ship dates:
 | `#lyric-curr-inner` | Inner `<span>` inside `#lyric-curr` — carries the marquee animation |
 | `#progress-wrap` | Progress bar + timestamps |
 | `#controls` | Play/pause/next/previous buttons |
+| `#vol-row`, `#vol-mute` | Volume slider and mute toggle |
 | `#btn-lyrics` | Toggle between meta and lyrics view |
 | `#btn-fullscreen` | Fullscreen toggle |
 | `#idle-screen` | Clock shown when nothing is playing |
@@ -115,3 +120,6 @@ The controlling features and their first-ship dates:
 | `ambientSwitchedToLyrics` | bool | Whether ambient mode triggered the lyrics switch (determines swap-back on wake) |
 | `currentProgress` | number | Last known playback position in seconds |
 | `progressLastPollTime` | number | `Date.now()` of last API poll, for local interpolation |
+| `deviceCaps` | string[] | `capabilities` of the selected device (gates seek / mute) |
+| `currentMuted` | bool | Mute state, read from `GET /mute` on device select |
+| `lastPollAt` | number | Last `pollNow()` time; the 1s timer polls when it's older than 3s (no push) or 15s (push connected) |

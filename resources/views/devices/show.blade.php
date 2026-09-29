@@ -54,6 +54,9 @@
         <!-- Left: Now Playing / Controls + History -->
         <div class="lg:col-span-2 space-y-6">
             <livewire:device-card :device="$device" :standalone="true" :key="'dc-show-'.$device->id" />
+            @if(in_array('queue', $capabilities))
+                <livewire:device-queue :device="$device" :key="'queue-'.$device->id" />
+            @endif
             @if(in_array('source_control', $capabilities))
                 <livewire:device-source-manager :device="$device" :key="'srcs-'.$device->id" />
             @endif
@@ -121,6 +124,11 @@
                         'speaker_groups' => ['fa-speaker',     'Speaker Groups'],
                         'sound_modes'    => ['fa-sliders',     'Sound Modes'],
                         'multi_room'     => ['fa-layer-group', 'Multiroom'],
+                        'radio_control'  => ['fa-radio',       'Radio'],
+                        'source_activation' => ['fa-right-to-bracket', 'Source Activation'],
+                        'library_playback' => ['fa-compact-disc', 'Library Playback'],
+                        'seek'           => ['fa-forward',     'Seek'],
+                        'queue'          => ['fa-list-ol',     'Up Next'],
                     ];
                 @endphp
                 <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8">

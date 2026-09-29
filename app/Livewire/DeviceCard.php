@@ -8,6 +8,7 @@ use App\Domain\Device\State;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
 use App\Integrations\Contracts\RadioControlInterface;
+use App\Integrations\Contracts\SeekInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
@@ -30,6 +31,10 @@ class DeviceCard extends Component
     public bool $supportsSourceActivation = false;
 
     public bool $supportsRadio = false;
+
+    public bool $supportsSeek = false;
+
+    public bool $muted = false;
 
     public array $quickSources = [];
 
@@ -55,6 +60,12 @@ class DeviceCard extends Component
             $this->supportsMultiRoom = $driver instanceof MultiRoomInterface;
             $this->supportsSourceActivation = $driver instanceof SourceActivationInterface;
             $this->supportsRadio = $driver instanceof RadioControlInterface;
+            $this->supportsSeek = $driver instanceof SeekInterface;
+            // Asking the device costs a network round trip, so only the
+            // single-device page reads it; grid cards start unmuted.
+            if ($this->standalone && $driver instanceof VolumeControlInterface) {
+                $this->muted = $driver->isMuted();
+            }
         } catch (\Throwable) {
             $this->supportsMultiRoom = false;
             $this->supportsSourceActivation = false;
@@ -127,6 +138,29 @@ class DeviceCard extends Component
     public function standby(): void
     {
         $this->withDriver(fn ($d) => $d->standby());
+    }
+
+    public function seek(int $seconds): void
+    {
+        try {
+            $driver = $this->device->driver;
+            if ($driver instanceof SeekInterface) {
+                $driver->seek($seconds);
+            }
+        } catch (\Throwable) {
+        }
+    }
+
+    public function toggleMute(): void
+    {
+        try {
+            $driver = $this->device->driver;
+            if ($driver instanceof VolumeControlInterface) {
+                $this->muted ? $driver->unmute() : $driver->mute();
+                $this->muted = !$this->muted;
+            }
+        } catch (\Throwable) {
+        }
     }
 
     public function playLastRadioStation(): void

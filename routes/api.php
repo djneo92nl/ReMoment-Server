@@ -12,6 +12,11 @@ Route::post('/devices/{device}/{action}', [DeviceController::class, 'action'])
 
 Route::get('/devices/{device}/volume', [DeviceController::class, 'getVolume']);
 Route::put('/devices/{device}/volume', [DeviceController::class, 'setVolume']);
+Route::get('/devices/{device}/mute', [DeviceController::class, 'getMute']);
+Route::put('/devices/{device}/mute', [DeviceController::class, 'setMute']);
+
+Route::put('/devices/{device}/seek', [DeviceController::class, 'seek']);
+Route::get('/devices/{device}/queue', [DeviceController::class, 'queue']);
 
 Route::get('/devices/{device}/sources', [DeviceController::class, 'sources']);
 Route::post('/devices/{device}/sources/activate', [DeviceController::class, 'activateSource']);

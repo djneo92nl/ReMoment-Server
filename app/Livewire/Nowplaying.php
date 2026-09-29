@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Domain\Device\DeviceCache;
+use App\Integrations\Contracts\SeekInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Media\Track;
 use Livewire\Component;
@@ -14,6 +15,10 @@ class Nowplaying extends Component
     public $volume = 2; // default volume 0-100
 
     public bool $listenerRunning = false;
+
+    public bool $supportsSeek = false;
+
+    public bool $muted = false;
 
     public ?string $controlError = null;
 
@@ -31,6 +36,7 @@ class Nowplaying extends Component
             if ($driver instanceof VolumeControlInterface) {
                 $this->volume = $driver->getVolume();
             }
+            $this->supportsSeek = $driver instanceof SeekInterface;
         } catch (\Throwable) {
             $this->volume = 0;
         }
@@ -69,6 +75,33 @@ class Nowplaying extends Component
         } catch (\Throwable) {
         }
         $this->volume = $value;
+    }
+
+    public function seek(int $seconds)
+    {
+        try {
+            $driver = $this->device->driver;
+            if ($driver instanceof SeekInterface) {
+                $driver->seek($seconds);
+            }
+            $this->controlError = null;
+        } catch (\Throwable $e) {
+            $this->controlError = 'Command failed: '.$e->getMessage();
+        }
+    }
+
+    public function toggleMute()
+    {
+        try {
+            $driver = $this->device->driver;
+            if ($driver instanceof VolumeControlInterface) {
+                $this->muted ? $driver->unmute() : $driver->mute();
+                $this->muted = !$this->muted;
+            }
+            $this->controlError = null;
+        } catch (\Throwable $e) {
+            $this->controlError = 'Command failed: '.$e->getMessage();
+        }
     }
 
     public function play()

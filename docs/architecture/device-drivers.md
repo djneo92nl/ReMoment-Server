@@ -10,7 +10,9 @@ All contracts live in `app/Integrations/Contracts/`.
 |-----------|---------|-----------|
 | `MusicPlayerDriverInterface` | `__construct(Device $device)`, `getCurrentPlayingAttribute()` | Yes, for all drivers |
 | `MediaControlsInterface` | `play()`, `pause()`, `stop()`, `next()`, `previous()` | If device supports transport control |
-| `VolumeControlInterface` | `setVolume(int): int`, `getVolume(): int`, `incrementVolume()`, `decrementVolume()`, `mute()`, `unmute()` | If device supports volume |
+| `VolumeControlInterface` | `setVolume(int): int`, `getVolume(): int`, `incrementVolume()`, `decrementVolume()`, `mute()`, `unmute()`, `isMuted(): bool` | If device supports volume |
+| `SeekInterface` | `seek(int $seconds)` | If device can jump within the current track (Sonos, Spotify, Mozart) |
+| `QueueInterface` | `getUpNext(int $limit = 20): QueueItem[]` — tracks after the current one; `[]` when not playing from a queue | If device exposes its play queue (Sonos, Spotify) |
 | `SourcesInterface` | `getSources(): AvailableSource[]` | If device exposes a source list (ASE only) |
 | `SourceActivationInterface` | `activateSource(string $sourceId)` | If device supports switching sources (ASE only) |
 | `MultiRoomInterface` | `multiRoomMetaKey()`, `getMultiRoomId()`, `getJoinablePeerIds()`, `getCurrentPeerIds()`, `joinSession(Device $host)`, `leaveSession()` | If device supports multiroom grouping (ASE, Sonos) |
@@ -18,7 +20,7 @@ All contracts live in `app/Integrations/Contracts/`.
 | `RadioControlInterface` | `radioPlatform(): string`, `canPlayRadioStation(RadioStation $station): bool`, `playRadioStation(RadioStation $station)` | If device can tune radio stations |
 | `DiscoveryInterface` | `discover(): DiscoveredDevice[]` | Implemented by a discovery service, not the driver itself |
 
-The API and UI check `instanceof` against these interfaces to determine a device's capabilities at runtime — no separate capability configuration is needed. `MultiRoomInterface::getMultiRoomId()` also writes the platform ID (JID, UUID) to `device_meta` under the key returned by `multiRoomMetaKey()`, so devices can be looked up by peer ID later.
+The API and UI check these interfaces to determine a device's capabilities at runtime — no separate capability configuration is needed. `App\Domain\Device\Capabilities::forDriver()` maps each contract to its REST capability string (`seek`, `queue`, …) from the driver *class name*, so listing devices never instantiates a driver or touches the network. `MultiRoomInterface::getMultiRoomId()` also writes the platform ID (JID, UUID) to `device_meta` under the key returned by `multiRoomMetaKey()`, so devices can be looked up by peer ID later.
 
 ## Existing Drivers
 
@@ -26,7 +28,7 @@ The API and UI check `instanceof` against these interfaces to determine a device
 
 **Path:** `app/Integrations/BangOlufsen/Ase/`
 
-- `MusicPlayerDriver` — implements all interfaces above (media controls, volume, sources, source activation, multiroom, library playback, radio)
+- `MusicPlayerDriver` — media controls, volume, sources, source activation, multiroom, radio. No seek or queue: the ASE API's play-queue/seek endpoints haven't been verified against hardware.
 - `VideoPlayerDriver` — HDMI/video plus library playback
 
 Communicates with the B&O ASE REST API on port 8080 via `HttpConnector`. Functionality is split into traits under `Connectors/` (e.g. `MediaControls`, `VolumeControls`, `MultiRoomControls`, `SourcesControls`). Real-time state updates arrive via a long-running HTTP stream handled by `app/Integrations/BangOlufsen/Ase/Services/DeviceListener.php`.
@@ -38,7 +40,7 @@ Communicates with the B&O ASE REST API on port 8080 via `HttpConnector`. Functio
 Covers B&O's newer Mozart platform (Beoconnect Core, Beolab 8/28, Beosound 2 3rd gen/A5/A9 5th gen/Balance/Emerge/Level/Premiere/Theatre), distinct from the older ASE-generation products above.
 
 - `djneo92nl/beo-mozart-php` — pure PHP REST client (`MozartClient`, `Api/{Playback,Sources,Volume,Power,Beolink}Api`) plus a hand-rolled WebSocket notification client (`WebSocket/NotificationClient`). Zero Laravel dependency; runs and tests standalone.
-- `remoment/mozart-driver` — `MusicPlayerDriver` implements `MediaControlsInterface`, `VolumeControlInterface`, `SourcesInterface`, `SourceActivationInterface`, `MultiRoomInterface` (via B&O's "Beolink" JID system), `LibraryPlaybackInterface`, and `RadioControlInterface` (reusing the `beoradio` `RadioStationMeta` key ASE already uses — TuneIn is no longer used anywhere in the B&O ecosystem). `Services/DeviceListener` connects to the notification WebSocket and fires the same `NowPlayingUpdated`/`ProgressUpdated`/`NowPlayingEnded`/`VolumeUpdated` events as ASE's listener. `MozartDiscovery` reuses ASE's SSDP/UPnP approach.
+- `remoment/mozart-driver` — `MusicPlayerDriver` implements `MediaControlsInterface`, `VolumeControlInterface`, `SourcesInterface`, `SourceActivationInterface`, `MultiRoomInterface` (via B&O's "Beolink" JID system), `LibraryPlaybackInterface`, `SeekInterface` (`PUT /api/v1/playback/seek`), and `RadioControlInterface` (reusing the `beoradio` `RadioStationMeta` key ASE already uses — TuneIn is no longer used anywhere in the B&O ecosystem). `Services/DeviceListener` connects to the notification WebSocket and fires the same `NowPlayingUpdated`/`ProgressUpdated`/`NowPlayingEnded`/`VolumeUpdated` events as ASE's listener. `MozartDiscovery` reuses ASE's SSDP/UPnP approach.
 
 Two assumptions are unverifiable without physical hardware and are `config('mozart.*')`-overridable (`packages/remoment/mozart-driver/config/mozart.php`):
 - **WebSocket port 9000** — the Mozart OpenAPI spec documents no connection info for real-time notifications at all; port 9000 is a community convention (B&O's official client libraries).
@@ -50,13 +52,13 @@ Console commands: `device-mozart:listen-single {id}` (per-device listener, regis
 
 **Path:** `app/Integrations/Sonos/`
 
-Implements media controls, volume, radio, multiroom, and library playback. Uses the `duncan3dc/sonos` library (local fork at `packages/duncan3dc/sonos`, branch `laravel12`) for UPnP/SOAP communication.
+Implements media controls, volume, radio, multiroom, library playback, seek, and queue (`getUpNext()` reads the Sonos queue after the current track; empty while streaming radio or line-in). Uses the `duncan3dc/sonos` library (v3) for UPnP/SOAP communication.
 
 ### Spotify
 
 **Path:** `app/Integrations/Spotify/`
 
-Virtual device — implements only `MediaControlsInterface`. Polls the Spotify Web API rather than a local network device; see [Spotify Connect → Local Device Mapping](../../CLAUDE.md) in CLAUDE.md for how it routes playback to a physical device.
+Virtual device — implements `MediaControlsInterface`, `SeekInterface`, and `QueueInterface` (`GET /v1/me/player/queue`). Polls the Spotify Web API rather than a local network device; see [Spotify Connect → Local Device Mapping](../../CLAUDE.md) in CLAUDE.md for how it routes playback to a physical device.
 
 ## Adding a New Driver
 
@@ -92,6 +94,7 @@ class MusicPlayerDriver implements MusicPlayerDriverInterface, MediaControlsInte
     public function decrementVolume(): void  {}
     public function mute(): void   {}
     public function unmute(): void {}
+    public function isMuted(): bool { return false; }
 }
 ```
 
