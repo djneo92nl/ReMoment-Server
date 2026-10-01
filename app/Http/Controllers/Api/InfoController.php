@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Artwork\NowPlayingArtwork;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -31,6 +32,8 @@ class InfoController extends Controller
                 'port' => (int) config('mqtt.public_port'),
                 'topic_prefix' => 'remoment/player',
             ],
+            // Shown by clients whenever there is no artwork; rendered on the spot if missing.
+            'placeholder' => NowPlayingArtwork::placeholder(),
         ]);
     }
 }

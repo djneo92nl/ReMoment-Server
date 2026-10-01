@@ -20,6 +20,15 @@ Unauthenticated, like the rest of the API. Controller: `app/Http/Controllers/Api
     "host": "192.168.1.100",
     "port": 1883,
     "topic_prefix": "remoment/player"
+  },
+  "placeholder": {
+    "kind": "source",
+    "proxy_512": "http://remoment.local/storage/artwork/6910ad50fb63f947ac24032558d3b570/512.jpg",
+    "proxy_320": "http://remoment.local/storage/artwork/6910ad50fb63f947ac24032558d3b570/320.jpg",
+    "proxy_120": "http://remoment.local/storage/artwork/6910ad50fb63f947ac24032558d3b570/120.jpg",
+    "proxy_bg": "http://remoment.local/storage/artwork/6910ad50fb63f947ac24032558d3b570/bg_1024x600.jpg",
+    "colors": ["#1b1b1b", "#e2e2e2", "#848484", "#5e5e5e", "#7c7c7c"],
+    "safe_colors": ["#a6a6a6", "#e2e2e2", "#a6a6a6", "#a6a6a6", "#a6a6a6"]
   }
 }
 ```
@@ -35,6 +44,7 @@ Unauthenticated, like the rest of the API. Controller: `app/Http/Controllers/Api
 | `mqtt.host` | `MQTT_PUBLIC_HOST`, else the request host | Broker host as the client should reach it |
 | `mqtt.port` | `MQTT_PUBLIC_PORT`, else `MQTT_PORT`, else `1883` | Plain MQTT (TCP), not WebSockets |
 | `mqtt.topic_prefix` | constant | Device topics are `{topic_prefix}/{device_id}/{data,progress,state,volume}` |
+| `placeholder` | `NowPlayingArtwork::placeholder()` | Artwork object (same shape as `now_playing.artwork`, `kind: "source"`) of the generic music-note logo. Show it whenever there is no artwork, including the first play of a cover that is still being processed. Rendered on the spot if not cached, so it is always present (`null` only if rendering itself fails). Its hash is the same on every server; cache `proxy_320` (and `proxy_bg`) like any cover |
 
 ### Why the MQTT host isn't `MQTT_HOST`
 

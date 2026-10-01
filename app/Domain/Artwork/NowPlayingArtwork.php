@@ -77,6 +77,18 @@ final class NowPlayingArtwork
         return is_array($entry) && ArtworkCache::isComplete($entry) ? $entry : self::renderLogo($url);
     }
 
+    /**
+     * The generic placeholder (the music-note logo) as a full artwork object,
+     * for clients to show whenever there is no artwork — e.g. while a cover
+     * is processed on its first play. Served by GET /api/info.
+     */
+    public static function placeholder(): ?array
+    {
+        $entry = self::logo(SourceLogo::DEFAULT);
+
+        return $entry === null ? null : ['kind' => self::KIND_SOURCE] + $entry;
+    }
+
     private static function renderLogo(string $url): ?array
     {
         try {
