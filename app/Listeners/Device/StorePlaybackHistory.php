@@ -2,6 +2,7 @@
 
 namespace App\Listeners\Device;
 
+use App\Domain\Library\LibraryIdentity;
 use App\Events\Device\NowPlayingUpdated;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Jobs\EnrichTrackMetadata;
@@ -9,7 +10,6 @@ use App\Jobs\ScrobbleToLastfm;
 use App\Jobs\SendNowPlayingToLastfm;
 use App\Models\Device;
 use App\Models\Media\Album;
-use App\Models\Media\Artist;
 use App\Models\Media\Metadata;
 use App\Models\Media\Track;
 use App\Models\Play;
@@ -163,23 +163,17 @@ class StorePlaybackHistory implements ShouldQueue
 
         // --- Persist / upsert normalized media entities ---
 
+        // One record per artist/album/track whatever the source (LibraryIdentity),
+        // so a play of a DLNA-scanned or Spotify-imported track counts for it.
         $artistSource = $npTrack->artist?->source
             ?? $npTrack->source
             ?? null;
 
-        $artist = Artist::query()->firstOrCreate(
-            [
-                'name' => $artistName,
-                'source' => $artistSource,
-            ],
-            [
-                'name' => $artistName,
-                'source' => $artistSource,
-            ]
-        );
+        $artist = LibraryIdentity::artist($artistName, $artistSource);
 
         // Album is OPTIONAL (tracks.album_id nullable)
         $albumId = null;
+        $album = null;
 
         $albumName = $nowPlaying->album?->name;
         $albumName = is_string($albumName) ? trim($albumName) : '';
@@ -188,25 +182,14 @@ class StorePlaybackHistory implements ShouldQueue
             $albumSource = $nowPlaying->album?->source ?? $npTrack->source ?? null;
             $albumImages = $nowPlaying->album?->images ?? [];
 
-            $album = Album::query()->firstOrCreate(
-                [
-                    'artist_id' => $artist->id,
-                    'name' => $albumName,
-                    'source' => $albumSource,
-                ],
-                [
-                    'artist_id' => $artist->id,
-                    'name' => $albumName,
-                    'source' => $albumSource,
-                    'images' => $albumImages ?: null,
-                    'released_at' => $nowPlaying->album?->released_at ?? null,
-                ]
-            );
+            $album = LibraryIdentity::album($artist, $albumName, $albumSource, [
+                'images' => $albumImages ?: null,
+                'released_at' => $nowPlaying->album?->released_at ?? null,
+            ]);
 
             $albumId = $album->id;
         }
 
-        $trackExternalId = $npTrack->id;
         $trackSource = $npTrack->source ?? $event->sourceType ?? null;
         $trackName = $npTrack->name ?? '';
 
@@ -215,21 +198,16 @@ class StorePlaybackHistory implements ShouldQueue
             return;
         }
 
-        $track = Track::query()->updateOrCreate(
+        $track = LibraryIdentity::track(
+            $artist,
+            $album,
+            $trackName,
+            $npTrack->id ?? $this->spotifyIdFromMeta($npTrack->meta ?? [], $npTrack->source),
+            $trackSource,
             [
-                'name' => $trackName,
-                'artist_id' => $artist->id,
-                'source' => $trackSource,
-            ],
-            [
-                'artist_id' => $artist->id,
-                'album_id' => $albumId,
-                'external_id' => $trackExternalId,
-                'name' => $trackName,
                 'duration' => $npTrack->duration,
-                'source' => $trackSource,
                 'images' => ($npTrack->images ?? []) ?: null,
-            ]
+            ],
         );
 
         if ($track->wasRecentlyCreated) {
@@ -255,14 +233,36 @@ class StorePlaybackHistory implements ShouldQueue
         SendNowPlayingToLastfm::dispatch($track);
 
         // --- Store metadata from the Track object (key/value) ---
-        foreach ($npTrack->meta ?? [] as $meta) {
-            $this->storeTrackMetadata($track, $meta, $trackSource);
+        // Drivers send a list of key/value arrays (Spotify) or one flat key/value array (B&O ASE).
+        $metaEntries = $npTrack->meta ?? [];
+        foreach (array_is_list($metaEntries) ? $metaEntries : [$metaEntries] as $meta) {
+            if (is_array($meta)) {
+                $this->storeTrackMetadata($track, $meta, $trackSource);
+            }
         }
 
         // --- Enrich Spotify tracks with API metadata (release date, etc.) ---
         if ($npTrack->source === 'spotify' && $albumId !== null) {
-            $this->enrichSpotifyAlbum($album ?? null, $npTrack->meta ?? []);
+            $this->enrichSpotifyAlbum($album, $npTrack->meta ?? []);
         }
+    }
+
+    /** A speaker playing Spotify (B&O ASE) reports the URI only in its meta. */
+    private function spotifyIdFromMeta(array $meta, ?string $source): ?string
+    {
+        if ($source !== 'spotify') {
+            return null;
+        }
+
+        foreach ($meta as $key => $entry) {
+            $value = is_array($entry) ? ($entry['spotifyId'] ?? null) : ($key === 'spotifyId' ? $entry : null);
+
+            if (is_string($value) && str_starts_with($value, 'spotify:track:')) {
+                return $value;
+            }
+        }
+
+        return null;
     }
 
     private function enrichSpotifyAlbum(?Album $album, array $meta): void

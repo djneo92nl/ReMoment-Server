@@ -22,7 +22,8 @@ use SpotifyWebAPI\SpotifyWebAPI;
  * 1. DLNA — the device's LibraryPlaybackInterface driver, for tracks with a
  *    `dlna_url` (DLNA library scans).
  * 2. Spotify — for tracks with a Spotify URI (`external_id`
- *    `spotify:track:…`: the Spotify library import and Spotify plays), on
+ *    `spotify:track:…`: the Spotify library import and Spotify plays, or
+ *    kept as `external_id` metadata on a merged track), on
  *    the Spotify device itself (the active Connect device) or on a local
  *    device mapped to a Spotify Connect name (`spotify_connect_name`),
  *    through the Spotify Web API.
@@ -31,6 +32,9 @@ class LibraryPlayback
 {
     /** Spotify's `uris` body is kept to this many tracks. */
     public const MAX_SPOTIFY_URIS = 100;
+
+    /** Metadata keys playback reads: the DLNA stream and other sources' ids (a Spotify URI). */
+    public const PLAYBACK_METADATA = ['dlna_url', 'external_id'];
 
     public function __construct(protected SpotifyTokenService $tokens) {}
 
@@ -60,11 +64,27 @@ class LibraryPlayback
         return DeviceMeta::where('device_id', $device->id)->where('key', 'spotify_connect_name')->value('value');
     }
 
+    /**
+     * The track's Spotify URI: its own `external_id`, or, for a track merged
+     * from several sources (LibraryIdentity), Spotify's id kept as
+     * `external_id` metadata.
+     */
     public static function spotifyUri(Track $track): ?string
     {
-        $id = (string) $track->external_id;
+        if (self::isSpotifyTrackUri($track->external_id)) {
+            return $track->external_id;
+        }
 
-        return str_starts_with($id, 'spotify:track:') && strlen($id) > strlen('spotify:track:') ? $id : null;
+        $kept = $track->relationLoaded('metadata')
+            ? $track->metadata->where('key', 'external_id')->where('source', 'spotify')->pluck('value')
+            : $track->metadata()->where('key', 'external_id')->where('source', 'spotify')->pluck('value');
+
+        return $kept->first(fn ($uri) => self::isSpotifyTrackUri($uri));
+    }
+
+    private static function isSpotifyTrackUri(?string $id): bool
+    {
+        return is_string($id) && str_starts_with($id, 'spotify:track:') && strlen($id) > strlen('spotify:track:');
     }
 
     /** Whether the server has a stream for the track (any device), or one $device can play. */
@@ -85,7 +105,7 @@ class LibraryPlayback
     {
         return $album->tracks()
             ->orderBy('id')
-            ->with(['metadata' => fn ($q) => $q->where('key', 'dlna_url')])
+            ->with(['metadata' => fn ($q) => $q->whereIn('key', self::PLAYBACK_METADATA)])
             ->get();
     }
 
@@ -94,7 +114,7 @@ class LibraryPlayback
     {
         return $artist->tracks()
             ->orderBy('album_id')->orderBy('id')
-            ->with(['metadata' => fn ($q) => $q->where('key', 'dlna_url')])
+            ->with(['metadata' => fn ($q) => $q->whereIn('key', self::PLAYBACK_METADATA)])
             ->get();
     }
 

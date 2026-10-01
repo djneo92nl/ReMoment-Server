@@ -3,10 +3,9 @@
 namespace App\Services\Dlna;
 
 use App\Domain\Artwork\ArtworkCache;
+use App\Domain\Library\LibraryIdentity;
 use App\Jobs\ProcessArtwork;
 use App\Models\DlnaServer;
-use App\Models\Media\Album;
-use App\Models\Media\Artist;
 use App\Models\Media\Metadata;
 use App\Models\Media\Track;
 
@@ -68,34 +67,27 @@ class DlnaLibraryScanner
         $artistName = $item['artist'] ?: 'Unknown Artist';
         $albumName = $item['album'] ?: 'Unknown Album';
 
-        $artist = Artist::firstOrCreate(
-            ['name' => $artistName, 'source' => 'dlna'],
-        );
+        // One record per artist/album/track whatever the source (LibraryIdentity).
+        $artist = LibraryIdentity::artist($artistName, 'dlna');
 
-        $albumData = ['source' => 'dlna'];
+        $albumData = [];
         if (!empty($item['album_art'])) {
             $albumData['images'] = [['url' => $item['album_art']]];
         }
 
-        $album = Album::firstOrCreate(
-            ['artist_id' => $artist->id, 'name' => $albumName, 'source' => 'dlna'],
-            $albumData,
-        );
+        $album = LibraryIdentity::album($artist, $albumName, 'dlna', $albumData);
 
         if ($album->wasRecentlyCreated) {
             $this->maybeProcessArtwork($item['album_art'] ?? null);
         }
 
-        $externalId = $server->id.':'.$item['id'];
-
-        $track = Track::updateOrCreate(
-            ['external_id' => $externalId, 'source' => 'dlna'],
-            [
-                'album_id' => $album->id,
-                'artist_id' => $artist->id,
-                'name' => $item['title'] ?: 'Unknown Track',
-                'duration' => $item['duration'],
-            ],
+        $track = LibraryIdentity::track(
+            $artist,
+            $album,
+            $item['title'] ?: 'Unknown Track',
+            $server->id.':'.$item['id'],
+            'dlna',
+            ['duration' => $item['duration']],
         );
 
         Metadata::updateOrCreate(
@@ -103,10 +95,11 @@ class DlnaLibraryScanner
                 'metadatable_type' => Track::class,
                 'metadatable_id' => $track->id,
                 'key' => 'dlna_url',
+                // Per server: a merged track can have a stream on more than one.
+                'source' => 'dlna:'.$server->id,
             ],
             [
                 'value' => $item['url'],
-                'source' => 'dlna:'.$server->id,
                 'type' => 'url',
             ],
         );

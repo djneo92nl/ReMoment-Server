@@ -2,6 +2,7 @@
 
 namespace App\Models\Media;
 
+use App\Domain\Library\Normalizer;
 use App\Models\Play;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -26,6 +27,16 @@ class Track extends Model
         'images' => 'array',
         'duration' => 'integer',
     ];
+
+    /** Keeps `name_key` (the identity used to find this track again across sources) in step with `name`. */
+    protected static function booted(): void
+    {
+        static::saving(function (self $track) {
+            if ($track->isDirty('name') || $track->name_key === null) {
+                $track->name_key = Normalizer::track($track->name);
+            }
+        });
+    }
 
     public function album(): BelongsTo
     {

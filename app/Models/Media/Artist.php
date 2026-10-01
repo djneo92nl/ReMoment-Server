@@ -2,6 +2,7 @@
 
 namespace App\Models\Media;
 
+use App\Domain\Library\Normalizer;
 use App\Models\Play;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -21,6 +22,16 @@ class Artist extends Model
     protected $casts = [
         'favorited_at' => 'datetime',
     ];
+
+    /** Keeps `name_key` (the identity used to find this artist again across sources) in step with `name`. */
+    protected static function booted(): void
+    {
+        static::saving(function (self $artist) {
+            if ($artist->isDirty('name') || $artist->name_key === null) {
+                $artist->name_key = Normalizer::artist($artist->name);
+            }
+        });
+    }
 
     public function albums(): HasMany
     {

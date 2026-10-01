@@ -3,10 +3,9 @@
 namespace App\Integrations\Spotify\Services;
 
 use App\Domain\Artwork\ArtworkCache;
+use App\Domain\Library\LibraryIdentity;
 use App\Jobs\EnrichTrackMetadata;
 use App\Jobs\ProcessArtwork;
-use App\Models\Media\Album;
-use App\Models\Media\Artist;
 use App\Models\Media\Metadata;
 use App\Models\Media\Playlist;
 use App\Models\Media\Track;
@@ -94,24 +93,23 @@ class SpotifyLibraryImporter
         $albumName = $spotifyTrack['album']['name'] ?? 'Unknown Album';
         $images = $spotifyTrack['album']['images'] ?? [];
 
-        $artist = Artist::firstOrCreate(['name' => $artistName, 'source' => 'spotify']);
+        // One record per artist/album/track whatever the source (LibraryIdentity).
+        $artist = LibraryIdentity::artist($artistName, 'spotify');
 
-        $album = Album::firstOrCreate(
-            ['artist_id' => $artist->id, 'name' => $albumName, 'source' => 'spotify'],
-            [
-                'images' => $images,
-                'released_at' => $spotifyTrack['album']['release_date'] ?? null,
-            ],
-        );
+        $album = LibraryIdentity::album($artist, $albumName, 'spotify', [
+            'images' => $images,
+            'released_at' => $spotifyTrack['album']['release_date'] ?? null,
+        ]);
 
         $this->maybeProcessArtwork($images[0]['url'] ?? null);
 
-        $track = Track::updateOrCreate(
-            ['external_id' => 'spotify:track:'.$spotifyTrack['id'], 'source' => 'spotify'],
+        $track = LibraryIdentity::track(
+            $artist,
+            $album,
+            $spotifyTrack['name'] ?: 'Unknown Track',
+            'spotify:track:'.$spotifyTrack['id'],
+            'spotify',
             [
-                'album_id' => $album->id,
-                'artist_id' => $artist->id,
-                'name' => $spotifyTrack['name'] ?: 'Unknown Track',
                 'duration' => isset($spotifyTrack['duration_ms']) ? (int) round($spotifyTrack['duration_ms'] / 1000) : null,
                 'images' => $images,
             ],

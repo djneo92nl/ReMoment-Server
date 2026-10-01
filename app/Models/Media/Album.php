@@ -2,6 +2,7 @@
 
 namespace App\Models\Media;
 
+use App\Domain\Library\Normalizer;
 use App\Models\Play;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -29,6 +30,16 @@ class Album extends Model
         'released_at' => 'date',
         'favorited_at' => 'datetime',
     ];
+
+    /** Keeps `name_key` (the identity used to find this album again across sources) in step with `name`. */
+    protected static function booted(): void
+    {
+        static::saving(function (self $album) {
+            if ($album->isDirty('name') || $album->name_key === null) {
+                $album->name_key = Normalizer::album($album->name);
+            }
+        });
+    }
 
     public function artist(): BelongsTo
     {
