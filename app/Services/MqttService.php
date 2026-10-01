@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use PhpMqtt\Client\ConnectionSettings;
 use PhpMqtt\Client\MqttClient;
 
 /**
@@ -11,10 +12,27 @@ use PhpMqtt\Client\MqttClient;
  */
 class MqttService
 {
+    /** Keep-alive we announce to the broker (it drops a silent client after 1.5x this). */
+    private const KEEP_ALIVE_SECONDS = 60;
+
+    /**
+     * We only publish and never run the client loop, so no pings are sent. A connection that
+     * stayed silent close to the keep-alive (e.g. a long pause) may already be closed by the
+     * broker, and a QoS 0 publish into it fails without an error. Reconnect before that.
+     */
+    private const MAX_IDLE_SECONDS = 45;
+
     protected ?MqttClient $client = null;
+
+    protected float $lastPublishAt = 0.0;
 
     public function publish(string $topic, string $message, int $qualityOfService = 0, bool $retain = false): void
     {
+        if ($this->client !== null && microtime(true) - $this->lastPublishAt > self::MAX_IDLE_SECONDS) {
+            $this->disconnect();
+        }
+        $this->lastPublishAt = microtime(true);
+
         try {
             $this->client()->publish($topic, $message, $qualityOfService, $retain);
         } catch (\Exception) {
@@ -49,7 +67,7 @@ class MqttService
                 config('mqtt.port'),
                 config('mqtt.client_id').'-'.getmypid(),
             );
-            $client->connect();
+            $client->connect((new ConnectionSettings)->setKeepAliveInterval(self::KEEP_ALIVE_SECONDS));
             $this->client = $client;
         }
 
