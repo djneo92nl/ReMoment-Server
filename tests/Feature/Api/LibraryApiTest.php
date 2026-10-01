@@ -133,6 +133,22 @@ class LibraryApiTest extends TestCase
             ]);
     }
 
+    public function test_artists_can_start_at_a_letter(): void
+    {
+        $this->album($this->artist('ABBA'), 'Arrival');
+        $this->album($this->artist('The Beatles'), 'Abbey Road');
+        $this->album($this->artist('Coldplay'), 'Parachutes');
+        $this->album($this->artist('Muse'), 'Absolution');
+
+        // "The Beatles" sorts under B
+        $this->getJson('/api/library/artists?letter=B')
+            ->assertOk()
+            ->assertJsonPath('data.*.name', ['The Beatles', 'Coldplay', 'Muse']);
+        $this->getJson('/api/library/artists?letter=n')->assertOk()->assertJsonPath('data', []);
+        $this->getJson('/api/library/artists?letter=%23')->assertOk()->assertJsonCount(4, 'data');
+        $this->getJson('/api/library/artists?letter=AB')->assertUnprocessable();
+    }
+
     public function test_artists_are_paged_by_an_opaque_cursor(): void
     {
         foreach (range(1, 52) as $i) {

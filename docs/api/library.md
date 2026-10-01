@@ -20,7 +20,7 @@ Duplicates from before that are merged by an admin running `php artisan library:
 
 ## Browse
 
-### `GET /api/library/artists?cursor=`
+### `GET /api/library/artists?cursor=&letter=`
 
 `{ "data": [ ArtistItem, … ], "next_cursor": "…"|null }` — artists with at least one album, alphabetical (case-insensitive, a leading "The " ignored), 50 per page. Pass `next_cursor` back as `cursor` until it is `null`. The cursor is opaque; an invalid one returns Laravel's `422` validation error.
 
@@ -122,3 +122,8 @@ The same paths also serve the older `POST /api/devices/{id}/library/play` (`trac
 ### Capability
 
 A device lists `library_playback` in `capabilities` when either path exists for it: a DLNA library driver, or (Spotify connected and) being the Spotify device or mapped to a Spotify Connect name (`App\Domain\Device\DeviceCapabilities`). It says nothing about a particular album or playlist — use its `playable` with `device_id` for that.
+
+
+### Jumping to a letter
+
+`GET /api/library/artists?letter=M` starts the list at the first artist sorting at or after that letter (a leading "The " is ignored, like the sort). `#` is the start of the list. `next_cursor` continues from there. Used by the clients' A-Z bar.

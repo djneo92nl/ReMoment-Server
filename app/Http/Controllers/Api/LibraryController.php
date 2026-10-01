@@ -35,8 +35,20 @@ class LibraryController extends Controller
 
     public function artists(Request $request): JsonResponse
     {
-        $request->validate(['cursor' => ['nullable', 'string', 'max:200']]);
+        $request->validate([
+            'cursor' => ['nullable', 'string', 'max:200'],
+            'letter' => ['nullable', 'string', 'regex:/^[A-Za-z#]$/'],
+        ]);
         $offset = $this->decodeCursor($request->query('cursor'));
+
+        // Jump to a letter (the clients' A-Z bar): start at the first artist sorting at or after
+        // it; "#" is the start (digits and symbols sort before letters). Paging continues from there.
+        $letter = $request->query('letter');
+        if ($letter !== null && $letter !== '#' && $request->query('cursor') === null) {
+            $offset = Artist::query()->whereHas('albums')
+                ->whereRaw(self::ARTIST_SORT_NAME.' < ?', [strtolower($letter)])
+                ->count();
+        }
 
         $artists = $this->artistItems(Artist::query()->whereHas('albums'))
             ->orderByRaw(self::ARTIST_SORT_NAME)
