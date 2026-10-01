@@ -32,7 +32,7 @@ Caveat: `state` only fires on writes through `DeviceCache::updateState()`. When 
 ## Server side
 
 - `App\Services\MqttService` is a **singleton** holding one connection per process, reconnecting once on a failed publish. The client ID is `{MQTT_CLIENT_ID}-{pid}`, so each long-running listener gets its own session (the broker would otherwise disconnect clients sharing an ID).
-- Configuration is in `config/mqtt.php`: `MQTT_HOST`, `MQTT_PORT`, `MQTT_CLIENT_ID`, and `MQTT_WS_URL` (the browser's broker URL; default `ws(s)://{page host}:9001`).
+- Configuration is in `config/mqtt.php`: `MQTT_HOST`, `MQTT_PORT`, `MQTT_CLIENT_ID`, `MQTT_WS_URL` (the browser's broker URL; default `ws(s)://{page host}:9001`), and `MQTT_PUBLIC_HOST` / `MQTT_PUBLIC_PORT` (the broker address advertised to firmware clients by `GET /api/info`; default request host / `MQTT_PORT`).
 - Listeners are registered explicitly in `AppServiceProvider`. Event auto-discovery is disabled in `bootstrap/app.php` (`withEvents(discover: false)`) because it registered every listener a second time.
 
 ## Browser side

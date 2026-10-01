@@ -18,6 +18,7 @@ Detailed documentation lives in `docs/`. CLAUDE.md holds enough context to under
 docs/
   api/
     client-devices.md       Client device registration flow, all endpoints, firmware guide
+    server-info.md          GET /api/info bootstrap endpoint (API/MQTT/artwork addresses for clients)
   architecture/
     client-devices.md       DB schema, model, controller, admin UI internals
     device-drivers.md       Driver contracts, existing drivers, guide for adding a new brand
@@ -64,6 +65,10 @@ php artisan dlna:scan {server_id}
 ## REST API Reference
 
 Base URL: `/api` — no authentication required.
+
+### Server Info
+
+**`GET /api/info`** — bootstrap info for client devices: `{ name, version, api_version, base_url, api_base_url, artwork_base_url, mqtt: { host, port, topic_prefix } }`. Addresses are as the client reached the server; `mqtt.host` is `MQTT_PUBLIC_HOST` or the request host (never the Docker-internal `MQTT_HOST`). See `docs/api/server-info.md`.
 
 ### Device List & Detail
 

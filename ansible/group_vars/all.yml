@@ -13,3 +13,7 @@ app_gid: 1000
 mqtt_host: mosquitto
 mqtt_port: 1883
 mqtt_client_id: remoment-server
+# Broker address client devices should use (see GET /api/info).
+# Leave empty to use whatever host the client reached the server on.
+mqtt_public_host: ''
+mqtt_public_port: 1883
