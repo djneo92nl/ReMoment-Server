@@ -77,6 +77,7 @@ class ClientArtworkApiTest extends TestCase
             'proxy_320' => "/storage/artwork/{$hash}/320.jpg",
             'proxy_120' => "/storage/artwork/{$hash}/120.jpg",
             'proxy_bg' => "/storage/artwork/{$hash}/bg_1024x600.jpg",
+            'proxy_bg_320x480' => "/storage/artwork/{$hash}/bg_320x480.jpg",
         ];
     }
 
@@ -88,6 +89,7 @@ class ClientArtworkApiTest extends TestCase
             'proxy_320' => "/storage/artwork/{$hash}/320.jpg",
             'proxy_120' => "/storage/artwork/{$hash}/120.jpg",
             'proxy_bg' => "/storage/artwork/{$hash}/bg_1024x600.jpg",
+            'proxy_bg_320x480' => "/storage/artwork/{$hash}/bg_320x480.jpg",
             'colors' => ['#111111'],
             'safe_colors' => ['#aaaaaa'],
         ]);
@@ -126,6 +128,7 @@ class ClientArtworkApiTest extends TestCase
         foreach ($logos as $logo) {
             Storage::disk('public')->assertExists("artwork/{$logo['hash']}/320.jpg");
             $this->assertStringEndsWith("/artwork/{$logo['hash']}/bg_1024x600.jpg", $logo['proxy_bg']);
+            $this->assertStringEndsWith("/artwork/{$logo['hash']}/bg_320x480.jpg", $logo['proxy_bg_320x480']);
         }
     }
 
@@ -172,7 +175,7 @@ class ClientArtworkApiTest extends TestCase
         $url = 'https://x.test/expired.jpg';
         $hash = md5($url);
         $this->album('Expired', [['url' => $url]]);
-        foreach (['320.jpg', '120.jpg', 'bg_1024x600.jpg'] as $file) {
+        foreach (['320.jpg', '120.jpg', 'bg_1024x600.jpg', 'bg_320x480.jpg'] as $file) {
             Storage::disk('public')->put("artwork/{$hash}/{$file}", 'jpg');
         }
 
@@ -184,6 +187,7 @@ class ClientArtworkApiTest extends TestCase
             'proxy_320' => Storage::disk('public')->url("artwork/{$hash}/320.jpg"),
             'proxy_120' => Storage::disk('public')->url("artwork/{$hash}/120.jpg"),
             'proxy_bg' => Storage::disk('public')->url("artwork/{$hash}/bg_1024x600.jpg"),
+            'proxy_bg_320x480' => Storage::disk('public')->url("artwork/{$hash}/bg_320x480.jpg"),
         ]], $items);
     }
 

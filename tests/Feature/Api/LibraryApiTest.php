@@ -95,7 +95,7 @@ class LibraryApiTest extends TestCase
     {
         ArtworkCache::put($url, [
             'proxy_512' => '/storage/a/512.jpg', 'proxy_320' => '/storage/a/320.jpg', 'proxy_120' => '/storage/a/120.jpg',
-            'proxy_bg' => '/storage/a/bg.jpg', 'colors' => [], 'safe_colors' => [],
+            'proxy_bg' => '/storage/a/bg.jpg', 'proxy_bg_320x480' => '/storage/a/bg_320x480.jpg', 'colors' => [], 'safe_colors' => [],
         ]);
     }
 

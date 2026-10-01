@@ -13,8 +13,9 @@ final class ArtworkCache
      * Keys every entry written by ProcessArtwork has. Entries cached before a
      * key was added count as missing, so they get regenerated on next play
      * (DispatchArtworkProcessing) or by `library:backfill-artwork`.
+     * The background keys are ArtworkBackgrounds::key() of each size.
      */
-    public const REQUIRED_KEYS = ['proxy_512', 'proxy_320', 'proxy_120', 'proxy_bg', 'colors', 'safe_colors'];
+    public const REQUIRED_KEYS = ['proxy_512', 'proxy_320', 'proxy_120', 'proxy_bg', 'proxy_bg_320x480', 'colors', 'safe_colors'];
 
     public static function put(string $originalUrl, array $data): void
     {

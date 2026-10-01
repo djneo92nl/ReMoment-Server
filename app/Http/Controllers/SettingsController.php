@@ -210,10 +210,9 @@ class SettingsController extends Controller
     {
         $clientCount = Client::count();
         $pendingCount = Client::where('status', 'pending')->count();
-        $artworkExport = SdCardExport::meta();
-        $artworkExportPendingSince = SdCardExport::pendingSince();
+        $artworkExports = SdCardExport::all();
 
-        return view('settings.clients', compact('clientCount', 'pendingCount', 'artworkExport', 'artworkExportPendingSince'));
+        return view('settings.clients', compact('clientCount', 'pendingCount', 'artworkExports'));
     }
 
     public function startAllListeners()

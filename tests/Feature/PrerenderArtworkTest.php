@@ -77,17 +77,20 @@ class PrerenderArtworkTest extends TestCase
     public function test_it_queues_only_recent_covers_with_incomplete_artwork(): void
     {
         Queue::fake();
-        foreach (['complete', 'outdated', 'missing'] as $i => $name) {
+        foreach (['complete', 'outdated', 'missing', 'no-portrait'] as $i => $name) {
             $this->play($this->album("https://x.test/{$name}.jpg"), '2026-09-0'.($i + 1).' 10:00:00');
         }
         $this->album('https://x.test/never-played.jpg');
         ArtworkCache::put('https://x.test/complete.jpg', $this->completeEntry());
         ArtworkCache::put('https://x.test/outdated.jpg', ['proxy_512' => 'a', 'proxy_320' => 'b', 'colors' => [], 'safe_colors' => []]);
+        $noPortrait = $this->completeEntry();
+        unset($noPortrait['proxy_bg_320x480']);
+        ArtworkCache::put('https://x.test/no-portrait.jpg', $noPortrait);
 
         $this->artisan('artwork:prerender')->assertSuccessful();
 
         $queued = Queue::pushed(ProcessArtwork::class)->map(fn (ProcessArtwork $job) => $job->originalUrl)->sort()->values()->all();
-        $this->assertSame(['https://x.test/missing.jpg', 'https://x.test/outdated.jpg'], $queued);
+        $this->assertSame(['https://x.test/missing.jpg', 'https://x.test/no-portrait.jpg', 'https://x.test/outdated.jpg'], $queued);
     }
 
     public function test_it_is_bounded_per_run_and_does_not_requeue_pending_covers(): void

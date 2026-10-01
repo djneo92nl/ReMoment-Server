@@ -2,26 +2,35 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Artwork\ArtworkBackgrounds;
 use App\Domain\Artwork\SdCardExport;
 use App\Jobs\BuildSdCardExport;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
-/** Admin actions for the SD card artwork zip on /settings/clients. */
+/** Admin actions for the SD card artwork zips (one per background size) on /settings/clients. */
 class ArtworkExportController extends Controller
 {
-    public function store()
+    public function store(Request $request)
     {
-        SdCardExport::markPending();
-        BuildSdCardExport::dispatch();
+        $size = $request->validate([
+            'size' => ['nullable', Rule::in(array_keys(ArtworkBackgrounds::SIZES))],
+        ])['size'] ?? ArtworkBackgrounds::DEFAULT;
 
-        return back()->with('success', 'Building the SD card artwork zip. Refresh this page in a minute to download it.');
+        SdCardExport::markPending($size);
+        BuildSdCardExport::dispatch(null, $size);
+
+        return back()->with('success', "Building the {$size} SD card artwork zip. Refresh this page in a minute to download it.");
     }
 
-    public function download(): StreamedResponse
+    public function download(Request $request): StreamedResponse
     {
-        abort_if(SdCardExport::meta() === null, 404);
+        $size = (string) $request->query('size', ArtworkBackgrounds::DEFAULT);
 
-        return Storage::disk('local')->download(SdCardExport::ZIP_PATH, SdCardExport::DOWNLOAD_NAME, ['Content-Type' => 'application/zip']);
+        abort_unless(ArtworkBackgrounds::isSize($size) && SdCardExport::meta($size) !== null, 404);
+
+        return Storage::disk('local')->download(SdCardExport::zipPath($size), SdCardExport::downloadName($size), ['Content-Type' => 'application/zip']);
     }
 }

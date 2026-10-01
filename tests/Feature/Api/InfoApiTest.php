@@ -44,7 +44,7 @@ class InfoApiTest extends TestCase
 
         $dir = 'artwork/'.md5(SourceLogo::url('music'));
         $this->assertSame(Storage::disk('public')->url("{$dir}/320.jpg"), $placeholder['proxy_320']);
-        Storage::disk('public')->assertExists(["{$dir}/320.jpg", "{$dir}/120.jpg", "{$dir}/512.jpg", "{$dir}/bg_1024x600.jpg"]);
+        Storage::disk('public')->assertExists(["{$dir}/320.jpg", "{$dir}/120.jpg", "{$dir}/512.jpg", "{$dir}/bg_1024x600.jpg", "{$dir}/bg_320x480.jpg"]);
         $this->assertNotEmpty($placeholder['colors']);
         $this->assertNotEmpty($placeholder['safe_colors']);
     }

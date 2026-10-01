@@ -59,11 +59,15 @@ final class LibraryArtwork
             ->values();
     }
 
-    /** Files a client caches, as artwork entry key => file name in artwork/{md5(url)}/. */
+    /**
+     * Files a client caches, as artwork entry key => file name in
+     * artwork/{md5(url)}/: the covers and every ArtworkBackgrounds size.
+     */
     public const CLIENT_FILES = [
         'proxy_320' => '320.jpg',
         'proxy_120' => '120.jpg',
         'proxy_bg' => 'bg_1024x600.jpg',
+        'proxy_bg_320x480' => 'bg_320x480.jpg',
     ];
 
     /** Path of one processed file on the public disk. */

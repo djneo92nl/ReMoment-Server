@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Domain\Artwork\ArtworkBackgrounds;
 use App\Domain\Artwork\ArtworkCache;
 use App\Domain\Artwork\LogoRenderer;
 use App\Domain\Artwork\SourceLogo;
@@ -32,15 +33,6 @@ class ProcessArtwork implements ShouldQueue
 
     /** Square proxies, in pixels; each becomes `proxy_{size}` in the cache payload. */
     public const SQUARE_SIZES = [512, 320, 120];
-
-    /**
-     * Full-screen backgrounds rendered behind the cover on client displays:
-     * cache payload key => [width, height]. Add a size here to support
-     * another screen, e.g. 'proxy_bg_320x480' => [320, 480] for a 3.5" portrait client.
-     */
-    public const BACKGROUNDS = [
-        'proxy_bg' => [1024, 600], // 7" ESP32-S3 touch remote (landscape)
-    ];
 
     /**
      * JPEG quality. All JPEGs are baseline (non-progressive): the ESP32's
@@ -80,10 +72,12 @@ class ProcessArtwork implements ShouldQueue
             $payload["proxy_{$size}"] = $disk->url($path);
         }
 
-        foreach (self::BACKGROUNDS as $key => [$width, $height]) {
-            $path = "{$dir}/bg_{$width}x{$height}.jpg";
+        // Full-screen backgrounds behind the cover on the client displays (ArtworkBackgrounds).
+        foreach (array_keys(ArtworkBackgrounds::SIZES) as $size) {
+            [$width, $height] = ArtworkBackgrounds::dimensions($size);
+            $path = "{$dir}/".ArtworkBackgrounds::file($size);
             $disk->put($path, $this->renderBackground($manager, $imageData, $width, $height));
-            $payload[$key] = $disk->url($path);
+            $payload[ArtworkBackgrounds::key($size)] = $disk->url($path);
         }
 
         $palette = ColorThief::getPalette($disk->path("{$dir}/512.jpg"), 5);

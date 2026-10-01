@@ -8,50 +8,75 @@ use Illuminate\Support\Facades\Storage;
 /**
  * The SD card artwork zip for the ESP32 touch client: covers and
  * backgrounds of the recently played albums plus the source logos, laid
- * out exactly as the client reads them from the card root. Built by
- * BuildSdCardExport into the private `local` disk; see
- * docs/architecture/sd-card-export.md.
+ * out exactly as the client reads them from the card root. One zip per
+ * background size (ArtworkBackgrounds::SIZES), since a client's card has a
+ * single backgrounds folder for its screen. Built by BuildSdCardExport into
+ * the private `local` disk; see docs/architecture/sd-card-export.md.
  */
 final class SdCardExport
 {
-    public const ZIP_PATH = 'exports/remoment-sd-artwork.zip';
-
-    public const META_PATH = 'exports/remoment-sd-artwork.json';
-
-    public const DOWNLOAD_NAME = 'remoment-sd-artwork.zip';
-
     /** Zip entry for a file, by hash: the client SD card layout. */
     public const COVER_ENTRY = 'remoment/covers/%s.jpg';
 
     public const BACKGROUND_ENTRY = 'remoment/backgrounds/%s.jpg';
 
-    private const PENDING_KEY = 'artwork:sd-export:pending';
+    private const PENDING_KEY = 'artwork:sd-export:pending:%s';
 
-    /** @return array{built_at: string, bytes: int, albums: int, logos: int, skipped: int, limit: int}|null */
-    public static function meta(): ?array
+    public static function zipPath(string $size = ArtworkBackgrounds::DEFAULT): string
+    {
+        return 'exports/'.self::downloadName($size);
+    }
+
+    public static function metaPath(string $size = ArtworkBackgrounds::DEFAULT): string
+    {
+        return "exports/remoment-sd-artwork-{$size}.json";
+    }
+
+    public static function downloadName(string $size = ArtworkBackgrounds::DEFAULT): string
+    {
+        return "remoment-sd-artwork-{$size}.zip";
+    }
+
+    /** @return array{built_at: string, bytes: int, albums: int, logos: int, skipped: int, limit: int, size: string}|null */
+    public static function meta(string $size = ArtworkBackgrounds::DEFAULT): ?array
     {
         $disk = Storage::disk('local');
 
-        if (!$disk->exists(self::ZIP_PATH) || !$disk->exists(self::META_PATH)) {
+        if (!$disk->exists(self::zipPath($size)) || !$disk->exists(self::metaPath($size))) {
             return null;
         }
 
-        return json_decode((string) $disk->get(self::META_PATH), true) ?: null;
+        return json_decode((string) $disk->get(self::metaPath($size)), true) ?: null;
     }
 
-    public static function markPending(): void
+    /**
+     * Every size with its last build and pending flag, for the admin card.
+     *
+     * @return array<string, array{label: string, meta: array|null, pending_since: string|null}>
+     */
+    public static function all(): array
     {
-        Cache::put(self::PENDING_KEY, now()->toIso8601String(), now()->addHour());
+        $exports = [];
+        foreach (ArtworkBackgrounds::SIZES as $size => $label) {
+            $exports[$size] = ['label' => $label, 'meta' => self::meta($size), 'pending_since' => self::pendingSince($size)];
+        }
+
+        return $exports;
     }
 
-    public static function clearPending(): void
+    public static function markPending(string $size = ArtworkBackgrounds::DEFAULT): void
     {
-        Cache::forget(self::PENDING_KEY);
+        Cache::put(sprintf(self::PENDING_KEY, $size), now()->toIso8601String(), now()->addHour());
+    }
+
+    public static function clearPending(string $size = ArtworkBackgrounds::DEFAULT): void
+    {
+        Cache::forget(sprintf(self::PENDING_KEY, $size));
     }
 
     /** When a queued build was requested, while it hasn't finished (or failed) yet. */
-    public static function pendingSince(): ?string
+    public static function pendingSince(string $size = ArtworkBackgrounds::DEFAULT): ?string
     {
-        return Cache::get(self::PENDING_KEY);
+        return Cache::get(sprintf(self::PENDING_KEY, $size));
     }
 }

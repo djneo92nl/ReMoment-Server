@@ -49,7 +49,7 @@ class SdCardExportTest extends TestCase
     private function processed(string $url): string
     {
         $hash = md5($url);
-        foreach (['320.jpg', '120.jpg', '512.jpg', 'bg_1024x600.jpg'] as $file) {
+        foreach (['320.jpg', '120.jpg', '512.jpg', 'bg_1024x600.jpg', 'bg_320x480.jpg'] as $file) {
             Storage::disk('public')->put("artwork/{$hash}/{$file}", "{$file} of {$url}");
         }
         ArtworkCache::put($url, array_merge(array_fill_keys(ArtworkCache::REQUIRED_KEYS, '/storage/x.jpg'), ['colors' => ['#111111'], 'safe_colors' => ['#999999']]));
@@ -66,10 +66,10 @@ class SdCardExportTest extends TestCase
         return $album;
     }
 
-    private function openZip(): ZipArchive
+    private function openZip(string $size = '1024x600'): ZipArchive
     {
         $zip = new ZipArchive;
-        $this->assertTrue($zip->open(Storage::disk('local')->path(SdCardExport::ZIP_PATH)));
+        $this->assertTrue($zip->open(Storage::disk('local')->path(SdCardExport::zipPath($size))));
 
         return $zip;
     }
@@ -110,9 +110,50 @@ class SdCardExportTest extends TestCase
         $this->assertSame(ZipArchive::CM_STORE, $zip->statName("remoment/covers/{$recent}.jpg")['comp_method']);
         $this->assertStringContainsString('ROOT of the SD card', $zip->getFromName('README.txt'));
 
-        $this->assertSame(['albums' => 1, 'logos' => 8, 'skipped' => 1, 'limit' => 500], array_intersect_key($meta, array_flip(['albums', 'logos', 'skipped', 'limit'])));
+        $this->assertStringContainsString('1024x600 blurred background', $zip->getFromName('README.txt'));
+
+        $this->assertSame(['albums' => 1, 'logos' => 8, 'skipped' => 1, 'limit' => 500, 'size' => '1024x600'], array_intersect_key($meta, array_flip(['albums', 'logos', 'skipped', 'limit', 'size'])));
         $this->assertSame($meta, SdCardExport::meta());
-        $this->assertSame(filesize(Storage::disk('local')->path(SdCardExport::ZIP_PATH)), $meta['bytes']);
+        $this->assertSame('exports/remoment-sd-artwork-1024x600.zip', SdCardExport::zipPath());
+        $this->assertSame(filesize(Storage::disk('local')->path(SdCardExport::zipPath())), $meta['bytes']);
+    }
+
+    public function test_the_portrait_size_puts_its_backgrounds_in_the_same_folder_beside_the_landscape_zip(): void
+    {
+        $recent = $this->processed('https://x.test/recent.jpg');
+        $this->playedAlbum('https://x.test/recent.jpg', '2026-09-02 10:00:00');
+
+        $this->artisan('artwork:export-sd')->assertSuccessful();
+        $this->artisan('artwork:export-sd', ['--size' => '320x480'])->assertSuccessful();
+
+        $portrait = $this->openZip('320x480');
+        $this->assertSame('bg_320x480.jpg of https://x.test/recent.jpg', $portrait->getFromName("remoment/backgrounds/{$recent}.jpg"));
+        $this->assertSame('320.jpg of https://x.test/recent.jpg', $portrait->getFromName("remoment/covers/{$recent}.jpg"));
+        $this->assertStringContainsString('320x480 blurred background', $portrait->getFromName('README.txt'));
+        $this->assertSame('bg_1024x600.jpg of https://x.test/recent.jpg', $this->openZip()->getFromName("remoment/backgrounds/{$recent}.jpg"));
+
+        $this->assertSame('320x480', SdCardExport::meta('320x480')['size']);
+        $this->assertSame('1024x600', SdCardExport::meta()['size']);
+    }
+
+    public function test_a_cover_without_the_portrait_background_is_skipped_in_that_size_only(): void
+    {
+        $hash = $this->processed('https://x.test/old.jpg');
+        Storage::disk('public')->delete("artwork/{$hash}/bg_320x480.jpg");
+        $this->playedAlbum('https://x.test/old.jpg', '2026-09-02 10:00:00');
+
+        $this->assertSame(1, (new BuildSdCardExport(null, '320x480'))->handle()['skipped']);
+        $this->assertSame(0, (new BuildSdCardExport)->handle()['skipped']);
+    }
+
+    public function test_an_unknown_size_is_rejected(): void
+    {
+        Queue::fake();
+
+        $this->artisan('artwork:export-sd', ['--size' => '800x480'])->assertFailed();
+
+        Queue::assertNothingPushed();
+        $this->assertNull(SdCardExport::meta('800x480'));
     }
 
     public function test_it_takes_only_the_last_n_albums(): void
@@ -148,8 +189,12 @@ class SdCardExportTest extends TestCase
 
         $this->artisan('artwork:export-sd', ['--queue' => true])->assertSuccessful();
 
-        Queue::assertPushed(BuildSdCardExport::class);
+        Queue::assertPushed(BuildSdCardExport::class, fn (BuildSdCardExport $job) => $job->size === '1024x600');
         $this->assertNotNull(SdCardExport::pendingSince());
+
+        $this->artisan('artwork:export-sd', ['--queue' => true, '--size' => '320x480'])->assertSuccessful();
+        Queue::assertPushed(BuildSdCardExport::class, fn (BuildSdCardExport $job) => $job->size === '320x480');
+        $this->assertNotNull(SdCardExport::pendingSince('320x480'));
     }
 
     public function test_admin_can_queue_a_build_and_download_the_zip(): void
@@ -173,7 +218,42 @@ class SdCardExportTest extends TestCase
 
         $this->actingAs($admin)->get('/settings/clients/artwork-export/download')
             ->assertOk()
-            ->assertDownload(SdCardExport::DOWNLOAD_NAME);
+            ->assertDownload('remoment-sd-artwork-1024x600.zip');
+        $this->actingAs($admin)->get('/settings/clients/artwork-export/download?size=320x480')->assertNotFound();
+    }
+
+    public function test_admin_picks_the_size_and_the_card_shows_each_built_zip(): void
+    {
+        Queue::fake();
+        $admin = User::factory()->create();
+
+        $this->actingAs($admin)->get('/settings/clients')
+            ->assertOk()
+            ->assertSee('<option value="320x480">', false)
+            ->assertSee('3.5" portrait');
+
+        $this->actingAs($admin)->post('/settings/clients/artwork-export', ['size' => '320x480'])->assertRedirect();
+        Queue::assertPushed(BuildSdCardExport::class, fn (BuildSdCardExport $job) => $job->size === '320x480');
+        $this->actingAs($admin)->post('/settings/clients/artwork-export', ['size' => 'nope'])->assertSessionHasErrors('size');
+        Queue::assertPushed(BuildSdCardExport::class, 1);
+
+        (new BuildSdCardExport(null, '320x480'))->handle();
+        (new BuildSdCardExport)->handle();
+
+        $this->actingAs($admin)->get('/settings/clients')
+            ->assertOk()
+            ->assertSee('artwork-export/download?size=320x480', false)
+            ->assertSee('artwork-export/download?size=1024x600', false)
+            ->assertDontSee('Building');
+
+        $this->actingAs($admin)->get('/settings/clients/artwork-export/download?size=320x480')
+            ->assertOk()
+            ->assertDownload('remoment-sd-artwork-320x480.zip');
+    }
+
+    public function test_builds_of_different_sizes_are_unique_per_size(): void
+    {
+        $this->assertNotSame((new BuildSdCardExport)->uniqueId(), (new BuildSdCardExport(null, '320x480'))->uniqueId());
     }
 
     public function test_download_is_404_before_the_first_build(): void
