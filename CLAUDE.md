@@ -131,6 +131,7 @@ Always check `capabilities` before calling a feature endpoint — calling an uns
     "type": "music",
     "endTime": "2026-07-05T12:03:33",
     "artwork": {
+      "kind": "album",
       "proxy_512": "http://remoment.local/storage/artwork/abc123/512.jpg",
       "proxy_320": "http://remoment.local/storage/artwork/abc123/320.jpg",
       "proxy_120": "http://remoment.local/storage/artwork/abc123/120.jpg",
@@ -142,7 +143,7 @@ Always check `capabilities` before calling a feature endpoint — calling an uns
 }
 ```
 
-`now_playing` is `null` when the device is in standby or unreachable. `artwork` is absent on the first play of a new URL (processed asynchronously), present on all subsequent plays. Artwork URLs are prefixed with `APP_URL` (root-relative `/storage/…` when it is empty); clients should take the path from `/storage/` on and prefix `artwork_base_url` from `GET /api/info`. `proxy_512`/`proxy_320`/`proxy_120` are square covers, `proxy_bg` a blurred, darkened 1024×600 background for the 7" client; all are **baseline** JPEGs (ESP32 TJpgDec can't decode progressive). `safe_colors` are `colors` lightened to ≥65% lightness for text/accents on dark backgrounds. An entry cached before a key existed may lack it until regenerated. `radio` and `source` keys are absent when not applicable — use whichever is present to identify playback type.
+`now_playing` is `null` when the device is in standby or unreachable. `artwork.kind` says what the image is: `album` (track/album cover), `radio` (the station's image from the stream or from its `image_url` in `/radio`, else a generated radio logo) or `source` (a generated logo for the source — Spotify, line-in, Bluetooth, TV, AirPlay/Cast, CD, or a music note — when nothing playing has an image). Logos have the same keys and go through the same pipeline as covers, so clients need no special case. A real image's `artwork` is absent on the first play of a new URL (processed asynchronously), present on all subsequent plays; logos are always present. Artwork URLs are prefixed with `APP_URL` (root-relative `/storage/…` when it is empty); clients should take the path from `/storage/` on and prefix `artwork_base_url` from `GET /api/info`. `proxy_512`/`proxy_320`/`proxy_120` are square covers, `proxy_bg` a blurred, darkened 1024×600 background for the 7" client; all are **baseline** JPEGs (ESP32 TJpgDec can't decode progressive). `safe_colors` are `colors` lightened to ≥65% lightness for text/accents on dark backgrounds. An entry cached before a key existed may lack it until regenerated. `radio` and `source` keys are absent when not applicable — use whichever is present to identify playback type.
 
 ### Media Controls
 
@@ -296,12 +297,12 @@ The Mosquitto broker runs in Docker on port 1883. Each device's MQTT base topic 
 
 | Topic | Trigger | Payload |
 |-------|---------|---------|
-| `remoment/player/{id}/data` | New track starts | `{ "track": "Name", "artist": "Name", "artwork": { "proxy_512": "…", "proxy_320": "…", "proxy_120": "…", "proxy_bg": "…", "colors": ["#…"], "safe_colors": ["#…"] } }` (same `artwork` object as the REST API; ~600 bytes, so MQTT clients need a buffer above PubSubClient's 256-byte default) |
+| `remoment/player/{id}/data` | New track starts | `{ "track": "Name", "artist": "Name", "artwork": { "kind": "album", "proxy_512": "…", "proxy_320": "…", "proxy_120": "…", "proxy_bg": "…", "colors": ["#…"], "safe_colors": ["#…"] } }` (same `artwork` object as the REST API; ~600 bytes, so MQTT clients need a buffer above PubSubClient's 256-byte default) |
 | `remoment/player/{id}/progress` | Every second while playing | Progress as a percentage of the track, 0–100 (integer string) |
 | `remoment/player/{id}/state` | State transition (retained) | `{ "state": "playing" }` — `playing` / `paused` / `standby` / `unreachable` |
 | `remoment/player/{id}/volume` | Volume level changes (retained) | `{ "volume": 45 }` |
 
-`artwork` is absent in the MQTT payload if not yet processed. Published by the `PublishNowPlayingToMqtt`, `PublishProgressToMqtt`, `PublishStateToMqtt` and `PublishVolumeToMqtt` listeners. The server only publishes and never subscribes. Browsers subscribe over the WebSocket listener on port 9001 to drive live UI refreshes; see `docs/architecture/live-updates.md`.
+`artwork` is absent in the MQTT payload if a real image is not yet processed; `kind` is `album` | `radio` | `source` as in the REST API. Published by the `PublishNowPlayingToMqtt`, `PublishProgressToMqtt`, `PublishStateToMqtt` and `PublishVolumeToMqtt` listeners. The server only publishes and never subscribes. Browsers subscribe over the WebSocket listener on port 9001 to drive live UI refreshes; see `docs/architecture/live-updates.md`.
 
 ---
 
@@ -394,6 +395,8 @@ When a new track starts playing, `DispatchArtworkProcessing` dispatches the `Pro
 All JPEGs are encoded baseline (`JpegEncoder(progressive: false)`; Intervention's GD encoder calls `imageinterlace(false)`), regardless of the source image, because the ESP32's TJpgDec decoder can't read progressive JPEGs.
 
 `app/Domain/Artwork/ArtworkCache.php` provides static helpers for reading/writing the cache. `ArtworkCache::has()` is true only for **complete** entries (all `REQUIRED_KEYS`): an entry cached before a size was added is still served by `get()`, but is regenerated on next play, and `php artisan library:backfill-artwork` (scheduled daily) re-queues outdated entries for album covers as well as covers without colors. Artwork is absent on first play of a new URL (async), present on all subsequent plays.
+
+**Logos for playback without an image** (`app/Domain/Artwork/`): `NowPlayingArtwork` picks the image for a `NowPlaying` (cover → radio station `image_url` from `/radio` → generated logo) and adds `kind`; it is used by both `PublishNowPlayingToMqtt` and `DeviceDetailResource`. `SourceLogo` maps the source's `sourceType`/`name`/`connector`/`category` to a logo key (`spotify`, `radio`, `line_in`, `bluetooth`, `tv`, `cast`, `cd`, default `music`) and addresses it by a pseudo URL `remoment:logo/v{VERSION}/{key}`, so its hash is the same on every server. `LogoRenderer` draws the glyph (off-white line icon on a #181818 square, GD, 4× supersampled, deterministic); `ProcessArtwork` renders it instead of downloading. Missing logo entries are rendered synchronously (~0.2s, a handful of logos). Bump `SourceLogo::VERSION` when a glyph changes so clients' hash-keyed caches pick it up.
 
 Run `php artisan storage:link` once on new environments to create the `public/storage` symlink.
 

@@ -3,6 +3,8 @@
 namespace App\Jobs;
 
 use App\Domain\Artwork\ArtworkCache;
+use App\Domain\Artwork\LogoRenderer;
+use App\Domain\Artwork\SourceLogo;
 use App\Models\Media\Album;
 use ColorThief\ColorThief;
 use Illuminate\Bus\Queueable;
@@ -46,6 +48,10 @@ class ProcessArtwork implements ShouldQueue
     /** Percentage of the blurred cover's brightness left after the black overlay. */
     private const BACKGROUND_BRIGHTNESS = 40;
 
+    /**
+     * @param  string  $originalUrl  An image URL, or a SourceLogo pseudo URL
+     *                               for a generated logo (drawn locally, not downloaded).
+     */
     public function __construct(public readonly string $originalUrl) {}
 
     public function handle(): void
@@ -60,7 +66,7 @@ class ProcessArtwork implements ShouldQueue
         $dir = "artwork/{$hash}";
         $disk = Storage::disk('public');
 
-        $imageData = Http::timeout(30)->get($this->originalUrl)->throw()->body();
+        $imageData = $this->imageData();
 
         $manager = new ImageManager(new Driver);
         $payload = [];
@@ -117,6 +123,15 @@ class ProcessArtwork implements ShouldQueue
         return $this->encodeJpeg($image);
     }
 
+    private function imageData(): string
+    {
+        $logo = SourceLogo::keyFromUrl($this->originalUrl);
+
+        return $logo !== null
+            ? LogoRenderer::render($logo)
+            : Http::timeout(30)->get($this->originalUrl)->throw()->body();
+    }
+
     private function encodeJpeg(ImageInterface $image): string
     {
         return (string) $image->encode(new JpegEncoder(quality: self::JPEG_QUALITY, progressive: false));
@@ -124,7 +139,7 @@ class ProcessArtwork implements ShouldQueue
 
     private function applyColorsToAlbums(array $colors): void
     {
-        if (empty($colors)) {
+        if (empty($colors) || SourceLogo::isLogoUrl($this->originalUrl)) {
             return;
         }
 

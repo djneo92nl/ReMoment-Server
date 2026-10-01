@@ -22,7 +22,7 @@ All under `remoment/player/{device_id}/`:
 |---|---|---|---|
 | `state` | yes | `DeviceCache::updateState()` sees a transition (not on every heartbeat write) | `{"state":"playing"}` — `playing`/`paused`/`standby`/`unreachable` |
 | `volume` | yes | `VolumeUpdated` with a level different from the last one published | `{"volume":45}` |
-| `data` | no | `NowPlayingUpdated` (new track) | `{"track","artist","artwork"?}` — `artwork` is the `ArtworkCache` entry: `proxy_512`, `proxy_320`, `proxy_120`, `proxy_bg` (1024×600 background) URLs plus `colors`/`safe_colors`; see CLAUDE.md "Artwork Caching" |
+| `data` | no | `NowPlayingUpdated` (new track) | `{"track","artist","artwork"?}` — `artwork` is `kind` (`album`/`radio`/`source`) plus the `ArtworkCache` entry: `proxy_512`, `proxy_320`, `proxy_120`, `proxy_bg` (1024×600 background) URLs plus `colors`/`safe_colors`; see CLAUDE.md "Artwork Caching". Without any image (line-in, TV, a station without a logo) it is a generated source/radio logo with the same keys, so it is absent only while a real image is first processed |
 | `progress` | no | `ProgressUpdated`, about once a second while playing | Percentage `0`–`100` as a plain string |
 
 The `data` payload is around 600 bytes with artwork. PubSubClient (ESP32/ESP8266) drops messages above its 256-byte default buffer, so firmware must call `setBufferSize()` (1024 or more).

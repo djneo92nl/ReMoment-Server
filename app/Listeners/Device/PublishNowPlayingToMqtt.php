@@ -2,7 +2,7 @@
 
 namespace App\Listeners\Device;
 
-use App\Domain\Artwork\ArtworkCache;
+use App\Domain\Artwork\NowPlayingArtwork;
 use App\Events\Device\NowPlayingUpdated;
 use App\Services\MqttService;
 
@@ -28,8 +28,7 @@ class PublishNowPlayingToMqtt
             'artist' => $nowPlaying->track?->artist?->name,
         ];
 
-        $url = ArtworkCache::extractImageUrl($nowPlaying);
-        $artwork = $url ? ArtworkCache::get($url) : null;
+        $artwork = NowPlayingArtwork::resolve($nowPlaying);
         if ($artwork !== null) {
             $data['artwork'] = $artwork;
         }

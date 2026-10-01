@@ -2,7 +2,7 @@
 
 namespace App\Http\Resources\Api;
 
-use App\Domain\Artwork\ArtworkCache;
+use App\Domain\Artwork\NowPlayingArtwork;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
 use App\Models\Media\Track;
@@ -21,8 +21,7 @@ class DeviceDetailResource extends JsonResource
             $nowPlaying = $cachedNowPlaying?->toArray();
 
             if ($nowPlaying !== null && $cachedNowPlaying !== null) {
-                $url = ArtworkCache::extractImageUrl($cachedNowPlaying);
-                $artwork = $url ? ArtworkCache::get($url) : null;
+                $artwork = NowPlayingArtwork::resolve($cachedNowPlaying);
                 if ($artwork !== null) {
                     $nowPlaying['artwork'] = $artwork;
                 }
