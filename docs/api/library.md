@@ -10,7 +10,11 @@ Browse the shared media library, keep household favorites, and play albums or ar
 
 **AlbumItem** — `{ "id": 12, "name": "Absolution", "artist_name": "Muse", "year": 2003|null, "artwork": Artwork|null, "favorite": false }`.
 
-`year` comes from `albums.released_at`. Artists and albums are the library's rows: the same name can appear twice when it came from two sources (e.g. a DLNA scan and Spotify).
+`year` comes from `albums.released_at`. Artists, albums and tracks are the library's rows, **one per artist/album/track whatever the source**: a DLNA scan, the Spotify import and plays resolve to the same record by a normalized name (case, "The ", diacritics, punctuation, "feat." credits and edition suffixes like "(Remastered 2011)" or "- Deluxe Edition" ignored; "(Live)" and the like kept apart). A track can then have both a DLNA URL and a Spotify URI. See `docs/architecture/library-identity.md`.
+
+### Merged records and stale ids
+
+Duplicates from before that are merged by an admin running `php artisan library:merge-duplicates`: the oldest record keeps its id, the others' **ids disappear**. A client holding such an id gets `404` from `GET /api/library/artists/{id}`, `GET /api/library/albums/{id}` and the `PUT …/favorite` endpoints, and a `422` validation error for `album_id`/`artist_id`/`track_id`/`start_track_id` in the play requests. Treat either as "gone": drop the cached id and re-read the list (`/api/library/artists`, `recent`, `favorites`), where the merged record appears with its surviving id. Favorites survive a merge (the earliest `favorited_at` is kept). Artwork `hash`es are per cover URL, so cached covers stay valid.
 
 ## Browse
 
@@ -67,7 +71,7 @@ POST /api/devices/{id}/library/play-artist  body: { "artist_id": 5, "shuffle": t
 Two paths, tried in this order:
 
 1. **DLNA** — when the device's driver implements `LibraryPlaybackInterface` (B&O ASE, Sonos, Mozart) and at least one track has a DLNA URL (`dlna_url` metadata from a DLNA scan). The tracks are queued on the device; tracks without a URL are skipped.
-2. **Spotify** — when Spotify is connected, the device is the Spotify virtual device or a local device mapped to a Spotify Connect name (`/settings/spotify-connect`, the mapping the Spotify listener routes by), and at least one track has a Spotify URI (`external_id` `spotify:track:…`: tracks from the Spotify library import or from playing Spotify). The server looks up the Connect device by its mapped name in `GET /v1/me/player/devices` (the Spotify device plays on whatever Connect device is active) and calls `PUT /v1/me/player/play`:
+2. **Spotify** — when Spotify is connected, the device is the Spotify virtual device or a local device mapped to a Spotify Connect name (`/settings/spotify-connect`, the mapping the Spotify listener routes by), and at least one track has a Spotify URI (`external_id` `spotify:track:…`: tracks from the Spotify library import or from playing Spotify — or kept as `external_id` metadata with source `spotify` on a track that is also on DLNA). The server looks up the Connect device by its mapped name in `GET /v1/me/player/devices` (the Spotify device plays on whatever Connect device is active) and calls `PUT /v1/me/player/play`:
    - an **album** plays as its Spotify album context — the full album, also tracks not in the library — offset at the start track (or a random library track when shuffling). The album URI is looked up once from one of its tracks (`GET /v1/tracks/{id}`) and stored as album metadata `spotify_album_uri`. If that fails, the album's library tracks are played as a list of URIs;
    - an **artist** plays its library tracks as a list of URIs (at most 100);
    - then shuffle is set to `shuffle` on that device (best effort).

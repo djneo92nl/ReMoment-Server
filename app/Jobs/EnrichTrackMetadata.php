@@ -17,6 +17,9 @@ class EnrichTrackMetadata implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    /** A record merged away by library:merge-duplicates no longer exists; drop the job. */
+    public bool $deleteWhenMissingModels = true;
+
     public int $tries = 3;
 
     public int $backoff = 60;

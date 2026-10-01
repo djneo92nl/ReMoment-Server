@@ -26,6 +26,7 @@ docs/
     device-discovery.md     Discovery commands, listener startup, device_meta keys
     discovery-for-clients.md mDNS advertisement (_remoment._tcp via host Avahi) so clients find the server
     lastfm.md                Scrobbling, now-playing, auth flow, artist enrichment, backfill
+    library-identity.md      One record per artist/album/track across sources: name keys, find-or-create, library:merge-duplicates
     live-updates.md          MQTT-over-WebSocket push to Livewire + /receiver, topics, fallback polling
     sd-card-export.md        Admin zip of recent covers/backgrounds + logos in the touch client's SD layout
     plugin-architecture.md  Design doc: extracting drivers into composable packages
@@ -61,8 +62,12 @@ php artisan device:discovery
 # Sync B&O source/JID data for all ASE devices
 php artisan devices:sync-sources
 
-# Scan a DLNA server's library (triggered via UI or manually)
-php artisan dlna:scan {server_id}
+# Scan DLNA servers' libraries (triggered via UI or manually)
+php artisan library:scan [--server=192.168.1.20]
+
+# Merge library duplicates across sources (DLNA / Spotify / plays) — dry run first
+php artisan library:merge-duplicates --dry-run
+php artisan library:merge-duplicates [--force]
 
 # Queue missing artwork for the last N played albums (scheduled daily)
 php artisan artwork:prerender [--limit=500] [--max-jobs=100]
@@ -322,7 +327,7 @@ PUT  /api/library/albums/{id}/favorite     body: { "favorite": true }   → { "f
 PUT  /api/library/artists/{id}/favorite    body: { "favorite": true }   → { "favorite": true }
 ```
 
-ArtistItem `{ id, name, album_count, artwork, favorite }`; AlbumItem `{ id, name, artist_name, year, artwork, favorite }`. Favorites are household-wide (`favorited_at` on `albums`/`artists`; the web album/artist pages toggle them too).
+ArtistItem `{ id, name, album_count, artwork, favorite }`; AlbumItem `{ id, name, artist_name, year, artwork, favorite }`. Favorites are household-wide (`favorited_at` on `albums`/`artists`; the web album/artist pages toggle them too). There is one record per artist/album/track across sources (see [Library identity](#library-identity)); ids of records merged by `library:merge-duplicates` disappear, so clients get `404` (or `422` in play bodies) for a stale id and should re-read the list.
 
 **Playing from the library**
 
@@ -333,7 +338,7 @@ POST /api/devices/{id}/library/play-album      body: { "album_id": 12, "start_tr
 POST /api/devices/{id}/library/play-artist     body: { "artist_id": 5, "shuffle": true }                        → { "status": "ok", "artist": "…" }
 ```
 
-`App\Domain\Library\LibraryPlayback` (shared with the web play buttons) tries **DLNA** first — the device's `LibraryPlaybackInterface` driver, for tracks with a `dlna_url` — then **Spotify** — when Spotify is connected and the device is the Spotify device or mapped to a Spotify Connect name, for tracks with a Spotify URI (`external_id` `spotify:track:…`): an album plays as its Spotify album context (URI looked up once, stored as album metadata `spotify_album_uri`), an artist as a list of track URIs, a Spotify playlist as its context. A device has `library_playback` when either path exists. Errors: `422` `not_playable` (play-album/artist: neither path works), `422` `no_dlna_url` (`/library/play` on a DLNA device without a stream for the track), `422` `unsupported` (`/library/play`, `/play-playlist` without `library_playback`), `503` unreachable, `502` `driver_error` (device or Spotify failed, or Spotify doesn't list the mapped speaker).
+`App\Domain\Library\LibraryPlayback` (shared with the web play buttons) tries **DLNA** first — the device's `LibraryPlaybackInterface` driver, for tracks with a `dlna_url` — then **Spotify** — when Spotify is connected and the device is the Spotify device or mapped to a Spotify Connect name, for tracks with a Spotify URI (`external_id` `spotify:track:…`): (the track's own `external_id`, or kept as `external_id` metadata with source `spotify` on a merged track): an album plays as its Spotify album context (URI looked up once, stored as album metadata `spotify_album_uri`), an artist as a list of track URIs, a Spotify playlist as its context. A device has `library_playback` when either path exists. Errors: `422` `not_playable` (play-album/artist: neither path works), `422` `no_dlna_url` (`/library/play` on a DLNA device without a stream for the track), `422` `unsupported` (`/library/play`, `/play-playlist` without `library_playback`), `503` unreachable, `502` `driver_error` (device or Spotify failed, or Spotify doesn't list the mapped speaker).
 
 ### Client Device API
 
@@ -431,7 +436,7 @@ All drivers implement interfaces from `app/Integrations/Contracts/`:
 
 ### Domain vs. Model Layer
 
-- `app/Domain/` – Non-Eloquent value objects used in events and cache: `NowPlaying`, `TrackData`, `ArtistData`, `AlbumData`, `Radio`, `Source`
+- `app/Domain/` – Non-Eloquent value objects used in events and cache: `NowPlaying`, `TrackData`, `ArtistData`, `AlbumData`, `Radio`, `Source`; plus domain services such as `Domain/Library` (`LibraryPlayback`, `LibraryIdentity`, `Normalizer`, `LibraryMerger`)
 - `app/Models/` – Eloquent models for persistence: `Device`, `DeviceSource`, `DeviceMeta`, `DlnaServer`, `MultiroomPreset`, `Play`, `Client`, media models (`Track`, `Album`, `Artist`, `Metadata`)
 
 Domain objects represent live state; Eloquent models represent stored history.
@@ -479,7 +484,7 @@ Run `php artisan storage:link` once on new environments to create the `public/st
 
 ### Playback History
 
-`StorePlaybackHistory` (queued) persists each play to the `plays` table via the `Play` Eloquent model. `ClosePlaybackHistory` sets `ended_at` when playback stops. Plays can be browsed at `/history`.
+`StorePlaybackHistory` (queued) persists each play to the `plays` table via the `Play` Eloquent model, finding the track (and its artist/album) through `LibraryIdentity`, so a play counts for the scanned or imported track. `ClosePlaybackHistory` sets `ended_at` when playback stops. Plays can be browsed at `/history`.
 
 ### DLNA Library
 
@@ -488,9 +493,17 @@ DLNA servers are discovered on the network and their tracks imported into the sh
 **Models:**
 - `DlnaServer` — `friendly_name`, `ip`, `port`, `control_url`, `last_scanned_at`
 - Tracks are stored as `Track` Eloquent models with `source = 'dlna'` and an `external_id` of `{server_id}:{dlna_object_id}`
-- The stream URL is stored as a `Metadata` row: `key = 'dlna_url'`, `source = 'dlna:{server_id}'`, `type = 'url'`
+- The stream URL is stored as a `Metadata` row: `key = 'dlna_url'`, `source = 'dlna:{server_id}'` (one per server), `type = 'url'`
 
-**Scanner:** `DlnaLibraryScanner` recursively browses the DLNA content tree via `DlnaContentDirectoryClient` (SOAP/UPnP), creating `Artist`, `Album`, `Track`, and `Metadata` records. Triggered via the Settings UI or `php artisan dlna:scan {server_id}`.
+**Scanner:** `DlnaLibraryScanner` recursively browses the DLNA content tree via `DlnaContentDirectoryClient` (SOAP/UPnP), finding or creating `Artist`, `Album` and `Track` records through `LibraryIdentity` (a track already imported from Spotify or recorded from a play is reused and gets the `dlna_url`) and `Metadata` records. Triggered via the Settings UI or `php artisan library:scan [--server=ip]`.
+
+### Library Identity
+
+One record per artist, album and track across all sources (DLNA scan, Spotify import, plays); see `docs/architecture/library-identity.md`.
+
+- `App\Domain\Library\Normalizer` — comparison keys stored in `name_key` on `artists`/`albums`/`tracks` (set by a `saving` hook): case, diacritics, punctuation, `&`/"and", whitespace; artists also a leading "The " and "feat." credits; albums/tracks trailing pure edition markers ("(Remastered 2011)", "- Deluxe Edition"; not "(Live)", "(Acoustic)", "(Mono)", "(Remix)"); tracks a "(feat. …)" credit. Bump `Normalizer::VERSION` when a rule changes.
+- `App\Domain\Library\LibraryIdentity` — find-or-create used by every creation path: artist by key; album by artist + key; track by external id (own, or kept as `external_id` metadata), then album + key (album-less: artist + key, preferring an album track), durations within 5 s. A second source's external id is kept as `external_id` metadata, so a track can have both a DLNA URL and a Spotify URI.
+- `php artisan library:merge-duplicates [--dry-run] [--force]` (`LibraryMerger`) merges existing duplicates into the oldest record, one transaction per group: re-points tracks/albums/plays/playlist entries/metadata, keeps the earliest `favorited_at` and the processed cover, deletes the rest. Idempotent; never run automatically (merged ids disappear).
 
 **Playback:** `LibraryPlaybackInterface::playLibraryTrack(Track $track)` fetches the DLNA URL from metadata and streams it to the device. On Sonos this uses a `SonosTrack` wrapper; on ASE it calls `playDlnaTrack()`.
 
