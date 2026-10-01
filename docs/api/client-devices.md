@@ -29,7 +29,10 @@ POST /api/clients/register
     { hardware_id, firmware_version, build_number, metadata }
     │
     ▼
-← { registration_token: "…", status: "pending" }
+← { registration_token: "…", pairing_code: "K7M3QX", status: "pending" }
+    │
+    ▼
+Show "Waiting for approval" + pairing_code on screen
     │
     ▼
 Poll GET /api/clients/status/{registration_token}
@@ -63,7 +66,7 @@ All endpoints return JSON. No global authentication header is needed — the tok
 
 ### `POST /api/clients/register`
 
-Registers the client and returns a `registration_token` used to poll for approval. Safe to call on every boot when a `hardware_id` is supplied — re-registering a known `hardware_id` updates the existing record (IP, firmware) and returns the same `registration_token`.
+Registers the client and returns a `registration_token` used to poll for approval, plus a short `pairing_code` to show on the client's screen. Safe to call on every boot when a `hardware_id` is supplied — re-registering a known `hardware_id` updates the existing record (IP, firmware) and returns the same `registration_token` and `pairing_code`.
 
 **Request body** (all fields optional):
 
@@ -93,6 +96,7 @@ The server records the caller's IP address automatically from the TCP connection
 ```json
 {
   "registration_token": "VZdfJspbGT7xD9avqXDFoRsfw31EKoiT6qDLenxDD0h37uSi",
+  "pairing_code": "K7M3QX",
   "status": "pending"
 }
 ```
@@ -102,9 +106,12 @@ The server records the caller's IP address automatically from the TCP connection
 ```json
 {
   "registration_token": "VZdfJspbGT7xD9avqXDFoRsfw31EKoiT6qDLenxDD0h37uSi",
+  "pairing_code": "K7M3QX",
   "status": "pending"
 }
 ```
+
+`pairing_code` is always 6 characters from the alphabet `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (uppercase, no `0`/`O`/`1`/`I`), so it is safe to render in any font. It is stable for a given `hardware_id`. Show it on the client's screen while waiting for approval — the admin sees the same code next to the pending registration at `/settings/clients` and uses it to pick the right device. It is not a credential and is never needed in a request.
 
 If the client was already approved, `status` will be `"approved"` but the `registration_token` is returned, not the `api_token`. Use `GET /status/{registration_token}` to retrieve the `api_token`.
 
@@ -229,6 +236,8 @@ On boot:
 1. If `api_token` is set → call `GET /devices` directly, skip registration
 2. If only `registration_token` is set → poll `GET /status/{token}` until approved
 3. If neither → call `POST /register` and store `registration_token`
+
+While waiting for approval, show the `pairing_code` on screen. Either store it alongside `registration_token`, or call `POST /register` again on boot (with the same `hardware_id`) to get it back — the code does not change.
 
 ### Polling the receiver
 

@@ -24,6 +24,7 @@ Client devices (ESP8266, ESP32, Raspberry Pi, software integrations) register wi
 | `status` | enum `pending\|approved` | `pending` | Pending until admin approves |
 | `hardware_id` | string(100) nullable unique | null | MAC / chip ID; enables idempotent re-registration |
 | `registration_token` | string(64) unique | — | Generated on first registration; returned to client immediately |
+| `pairing_code` | string(8) nullable unique | null | 6-char human-readable code shown on the client screen and in the admin UI; generated on registration (backfilled by migration for older rows) |
 | `api_token` | string(64) nullable unique | null | Generated on approval; null until then |
 | `ip_address` | string(45) nullable | null | Updated from request IP on register and heartbeat |
 | `firmware_version` | string(50) nullable | null | |
@@ -52,7 +53,7 @@ Primary key is `(client_id, device_id)`.
 ```php
 protected $fillable = [
     'name', 'type', 'status', 'hardware_id',
-    'registration_token', 'api_token',
+    'registration_token', 'pairing_code', 'api_token',
     'ip_address', 'firmware_version', 'build_number',
     'metadata', 'last_seen_at', 'approved_at',
 ];
@@ -74,6 +75,8 @@ return $this->belongsToMany(Device::class)
 
 **`Client::generateToken(): string`** — returns `Str::random(48)`. Used for both `registration_token` (on create) and `api_token` (on approval).
 
+**`Client::generatePairingCode(): string`** — returns `PAIRING_CODE_LENGTH` (6) random characters from `PAIRING_CODE_ALPHABET` (`ABCDEFGHJKLMNPQRSTUVWXYZ23456789` — no `0`/`O`/`1`/`I`), retrying until no other client has it. 32⁶ ≈ 10⁹ combinations, so collisions are practically nonexistent; the retry loop plus the unique index guarantee uniqueness anyway.
+
 **DB default gotcha:** `status` defaults to `'pending'` at the database level, but the Eloquent model instance returned by `Client::create()` does not automatically reload DB-generated defaults. Always pass `'status' => 'pending'` explicitly to `create()`.
 
 ---
@@ -85,8 +88,10 @@ Four public methods, all unauthenticated.
 ### `register(Request $request): JsonResponse`
 
 1. Validates optional fields: `hardware_id`, `firmware_version`, `build_number`, `metadata`
-2. If `hardware_id` provided and a matching `clients` row exists: updates that row (IP + firmware), returns existing `registration_token` with HTTP 200
-3. Otherwise: creates new `Client` with `status = 'pending'` (set explicitly, not relying on DB default) and a new token, returns HTTP 201
+2. If `hardware_id` provided and a matching `clients` row exists: updates that row (IP + firmware; assigns a `pairing_code` if the row predates them), returns existing `registration_token` + `pairing_code` with HTTP 200
+3. Otherwise: creates new `Client` with `status = 'pending'` (set explicitly, not relying on DB default), a new token and a new pairing code, returns HTTP 201
+
+Response: `{ registration_token, pairing_code, status }`
 
 ### `status(string $registrationToken): JsonResponse`
 
@@ -170,7 +175,7 @@ Only one form is open at a time. Opening a new approve/edit form does not close 
 
 The view renders two logical sections:
 
-1. **Pending registrations** — amber-highlighted block, only shown when at least one pending client exists. Each row shows IP, hardware_id, firmware, build, metadata, and registration time. Approve opens an inline form (name + type selector). Reject requires a confirmation.
+1. **Pending registrations** — amber-highlighted block, only shown when at least one pending client exists. Each row leads with the `pairing_code` in a large monospace badge (the admin matches it against the code on the client's screen), followed by IP, hardware_id, firmware, build, metadata, and registration time. Approve opens an inline form (name + type selector). Reject requires a confirmation.
 
 2. **Approved clients** — white card, one row per approved client. Shows: type badge (`single`/`multi`), name, IP, firmware, build, last seen, assigned device chips, truncated `api_token` with an Alpine.js copy-to-clipboard button, edit / regenerate / delete actions.
 
@@ -217,6 +222,8 @@ Shell template using `x-app-layout`. Passes `$clientCount` and `$pendingCount` i
 ## Token Design
 
 Both `registration_token` and `api_token` are 48-character random strings (`Str::random(48)`). They are stored plaintext — there is no hashing. The system is designed for a trusted local network, not public internet exposure.
+
+`pairing_code` is deliberately short and not secret: it only helps the admin tell pending registrations apart. It grants nothing — approval still happens in the admin UI, and the client keeps polling with its `registration_token`.
 
 `registration_token` is issued immediately and never changes. It is safe to re-send on every boot (re-registration with a known `hardware_id` returns the same token).
 

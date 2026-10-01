@@ -22,6 +22,13 @@
                 @foreach($pending as $client)
                     <div class="px-8 py-6">
                         <div class="flex flex-wrap items-start justify-between gap-4 mb-4">
+                            <div class="flex flex-wrap items-start gap-5">
+                            @if($client->pairing_code)
+                                <div class="shrink-0" title="Should match the code shown on the client's screen">
+                                    <div class="text-[10px] uppercase tracking-widest text-amber-700/70 dark:text-amber-400/70 mb-1">Pairing code</div>
+                                    <div class="font-mono text-2xl font-semibold tracking-[0.25em] text-amber-900 dark:text-amber-200 bg-white dark:bg-stone-900 border border-amber-200 dark:border-amber-800/60 rounded-xl px-4 py-2">{{ $client->pairing_code }}</div>
+                                </div>
+                            @endif
                             <div>
                                 <div class="flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-gray-100">
                                     <span class="font-mono">{{ $client->ip_address ?? 'unknown IP' }}</span>
@@ -43,6 +50,7 @@
                                     @endif
                                     <span class="text-gray-400 dark:text-gray-600">registered {{ $client->created_at->diffForHumans() }}</span>
                                 </div>
+                            </div>
                             </div>
 
                             @if($approvingId !== $client->id)
@@ -256,7 +264,7 @@
             <div class="flex flex-wrap gap-2 items-baseline">
                 <span class="text-emerald-600 dark:text-emerald-400 font-semibold">POST</span>
                 <span class="text-gray-700 dark:text-gray-300">/api/clients/register</span>
-                <span class="text-gray-400 dark:text-gray-600 font-sans">→ registration_token</span>
+                <span class="text-gray-400 dark:text-gray-600 font-sans">→ registration_token + pairing_code</span>
             </div>
             <div class="flex flex-wrap gap-2 items-baseline">
                 <span class="text-blue-600 dark:text-blue-400 font-semibold">GET</span>
@@ -277,6 +285,7 @@
         <p class="mt-4 text-xs text-gray-400 dark:text-gray-600">
             Registration body: <span class="font-mono">hardware_id</span>, <span class="font-mono">firmware_version</span>, <span class="font-mono">build_number</span>, <span class="font-mono">metadata</span> (all optional).
             Use <span class="font-mono">hardware_id</span> (MAC / chip ID) for idempotent re-registration on reboot.
+            Clients should show the returned <span class="font-mono">pairing_code</span> on screen so it can be matched here before approving.
         </p>
     </div>
 

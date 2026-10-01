@@ -25,10 +25,14 @@ class ClientController extends Controller
         if (!empty($data['hardware_id'])) {
             $existing = Client::where('hardware_id', $data['hardware_id'])->first();
             if ($existing) {
-                $existing->update(array_merge($data, ['ip_address' => $ip]));
+                $existing->update(array_merge($data, [
+                    'ip_address' => $ip,
+                    'pairing_code' => $existing->pairing_code ?? Client::generatePairingCode(),
+                ]));
 
                 return response()->json([
                     'registration_token' => $existing->registration_token,
+                    'pairing_code' => $existing->pairing_code,
                     'status' => $existing->status,
                 ]);
             }
@@ -38,10 +42,12 @@ class ClientController extends Controller
             'ip_address' => $ip,
             'status' => 'pending',
             'registration_token' => Client::generateToken(),
+            'pairing_code' => Client::generatePairingCode(),
         ]));
 
         return response()->json([
             'registration_token' => $client->registration_token,
+            'pairing_code' => $client->pairing_code,
             'status' => $client->status,
         ], 201);
     }

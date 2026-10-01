@@ -2,9 +2,11 @@
 
 namespace Tests\Feature\Api;
 
+use App\Livewire\ClientManager;
 use App\Models\Client;
 use App\Models\Device;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Tests\Support\FakePlayerDriver;
 use Tests\TestCase;
 
@@ -46,7 +48,7 @@ class ClientApiTest extends TestCase
         ]);
 
         $response->assertCreated()
-            ->assertJsonStructure(['registration_token', 'status'])
+            ->assertJsonStructure(['registration_token', 'pairing_code', 'status'])
             ->assertJsonPath('status', 'pending');
 
         $this->assertDatabaseHas('clients', ['hardware_id' => 'esp-001', 'status' => 'pending', 'build_number' => 42]);
@@ -62,6 +64,48 @@ class ClientApiTest extends TestCase
 
         $this->assertSame(1, Client::count());
         $this->assertSame('1.3.0', Client::first()->firmware_version);
+    }
+
+    public function test_pairing_code_is_short_unambiguous_and_stored(): void
+    {
+        $code = $this->postJson('/api/clients/register', ['hardware_id' => 'esp-001'])->json('pairing_code');
+
+        $this->assertMatchesRegularExpression('/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/', $code);
+        $this->assertSame($code, Client::first()->pairing_code);
+    }
+
+    public function test_pairing_code_is_stable_across_re_registration(): void
+    {
+        $first = $this->postJson('/api/clients/register', ['hardware_id' => 'esp-001'])->json('pairing_code');
+
+        $this->postJson('/api/clients/register', ['hardware_id' => 'esp-001'])
+            ->assertOk()
+            ->assertJsonPath('pairing_code', $first);
+    }
+
+    public function test_re_registering_a_legacy_client_without_code_assigns_one(): void
+    {
+        Client::create(['hardware_id' => 'esp-old', 'status' => 'pending', 'registration_token' => Client::generateToken()]);
+
+        $code = $this->postJson('/api/clients/register', ['hardware_id' => 'esp-old'])->assertOk()->json('pairing_code');
+
+        $this->assertNotEmpty($code);
+        $this->assertSame($code, Client::first()->pairing_code);
+    }
+
+    public function test_different_clients_get_different_pairing_codes(): void
+    {
+        $a = $this->postJson('/api/clients/register', ['hardware_id' => 'esp-a'])->json('pairing_code');
+        $b = $this->postJson('/api/clients/register', ['hardware_id' => 'esp-b'])->json('pairing_code');
+
+        $this->assertNotSame($a, $b);
+    }
+
+    public function test_admin_ui_shows_pairing_code_for_pending_clients(): void
+    {
+        $code = $this->postJson('/api/clients/register', ['hardware_id' => 'esp-001'])->json('pairing_code');
+
+        Livewire::test(ClientManager::class)->assertSee($code);
     }
 
     public function test_register_validates_input(): void

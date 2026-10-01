@@ -269,7 +269,7 @@ Error: `{ "error": "no_dlna_url", "message": "This track has no DLNA stream URL.
 Four endpoints used by firmware and software clients to self-register, poll for admin approval, and retrieve assigned devices.
 
 ```
-POST  /api/clients/register                           → registration_token
+POST  /api/clients/register                           → registration_token + pairing_code
 GET   /api/clients/status/{registration_token}        → pending | approved + api_token + devices
 GET   /api/clients/{api_token}/devices                → assigned device list
 PUT   /api/clients/{api_token}/heartbeat              → updates IP, firmware, last_seen_at
