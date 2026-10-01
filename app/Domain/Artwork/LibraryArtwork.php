@@ -6,6 +6,7 @@ use App\Models\Media\Album;
 use App\Models\Play;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Album covers of the library in "most recently played first" order, as
@@ -52,6 +53,44 @@ final class LibraryArtwork
             ->filter()
             ->unique()
             ->values();
+    }
+
+    /** Files a client caches, as artwork entry key => file name in artwork/{md5(url)}/. */
+    public const CLIENT_FILES = [
+        'proxy_320' => '320.jpg',
+        'proxy_120' => '120.jpg',
+        'proxy_bg' => 'bg_1024x600.jpg',
+    ];
+
+    /** Path of one processed file on the public disk. */
+    public static function path(string $url, string $key): string
+    {
+        return 'artwork/'.md5($url).'/'.self::CLIENT_FILES[$key];
+    }
+
+    /**
+     * The client's file URLs for a cover: from its cache entry, or from the
+     * files on disk when the entry expired (the cache TTL is 30 days, the
+     * files stay) — the same URLs either way. Null unless all are there.
+     *
+     * @return array<string, string>|null
+     */
+    public static function clientFiles(string $url, ?array $entry): ?array
+    {
+        $disk = Storage::disk('public');
+        $files = [];
+
+        foreach (array_keys(self::CLIENT_FILES) as $key) {
+            if (isset($entry[$key])) {
+                $files[$key] = $entry[$key];
+            } elseif ($disk->exists($path = self::path($url, $key))) {
+                $files[$key] = $disk->url($path);
+            } else {
+                return null;
+            }
+        }
+
+        return $files;
     }
 
     /** An album's cover: the first image, stored as a URL string or as {url}. */

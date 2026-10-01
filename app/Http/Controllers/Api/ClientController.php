@@ -3,6 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Domain\Artwork\ArtworkCache;
+use App\Domain\Artwork\LibraryArtwork;
+use App\Domain\Artwork\NowPlayingArtwork;
+use App\Domain\Artwork\SourceLogo;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\DeviceListResource;
 use App\Models\Client;
@@ -10,7 +13,6 @@ use App\Models\Device;
 use App\Models\Media\Album;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 class ClientController extends Controller
 {
@@ -104,11 +106,12 @@ class ClientController extends Controller
     public const ARTWORK_PAGE_SIZE = 200;
 
     /**
-     * Processed artwork of every library album, for clients to pre-cache by
-     * hash. Pages scan ARTWORK_PAGE_SIZE albums in id order (cursor = last
-     * album id seen), so a page can hold fewer items, or none, while
-     * next_cursor is still set. Albums without processed artwork are skipped;
-     * the daily library:backfill-artwork processes them.
+     * Processed artwork for clients to pre-cache by hash: the generated
+     * source logos (first page only), then library albums most recently
+     * played first, then the never-played rest. The cursor is an offset into
+     * that album order; a page scans ARTWORK_PAGE_SIZE albums and skips those
+     * without processed artwork, so it can hold fewer items, or none, while
+     * next_cursor is still set. See docs/api/client-devices.md.
      */
     public function artwork(Request $request, string $apiToken): JsonResponse
     {
@@ -117,17 +120,15 @@ class ClientController extends Controller
         $validated = $request->validate([
             'cursor' => ['nullable', 'integer', 'min:0'],
         ]);
-        $cursor = (int) ($validated['cursor'] ?? 0);
+        $offset = (int) ($validated['cursor'] ?? 0);
 
-        $albums = Album::query()
-            ->whereNotNull('images')
-            ->where('id', '>', $cursor)
-            ->orderBy('id')
+        $albums = LibraryArtwork::albumsByRecency()
+            ->offset($offset)
             ->limit(self::ARTWORK_PAGE_SIZE)
-            ->get(['id', 'images']);
+            ->get();
 
         $urls = $albums
-            ->map(fn (Album $album) => $this->coverUrl($album->images ?? []))
+            ->map(fn (Album $album) => LibraryArtwork::coverUrl($album->images))
             ->filter()
             ->unique()
             ->values();
@@ -135,45 +136,28 @@ class ClientController extends Controller
         $entries = ArtworkCache::getMany($urls->all());
 
         $items = $urls
-            ->map(fn (string $url) => $this->precacheItem($url, $entries[$url] ?? null))
+            ->map(fn (string $url) => $this->precacheItem(NowPlayingArtwork::KIND_ALBUM, $url, $entries[$url] ?? null))
             ->filter()
             ->values();
 
+        if ($offset === 0) {
+            $logos = collect(SourceLogo::KEYS)
+                ->map(fn (string $key) => $this->precacheItem(NowPlayingArtwork::KIND_SOURCE, SourceLogo::url($key), NowPlayingArtwork::logo($key)))
+                ->filter();
+            $items = $logos->concat($items)->values();
+        }
+
         return response()->json([
             'data' => $items,
-            'next_cursor' => $albums->count() === self::ARTWORK_PAGE_SIZE ? $albums->last()->id : null,
+            'next_cursor' => $albums->count() === self::ARTWORK_PAGE_SIZE ? $offset + self::ARTWORK_PAGE_SIZE : null,
         ]);
     }
 
-    /**
-     * From the cache entry, or from the files on disk when the entry expired
-     * (cache TTL is 30 days, the files stay) — same URLs either way.
-     */
-    private function precacheItem(string $url, ?array $entry): ?array
+    private function precacheItem(string $kind, string $url, ?array $entry): ?array
     {
-        $hash = md5($url);
+        $files = LibraryArtwork::clientFiles($url, $entry);
 
-        if (isset($entry['proxy_320'], $entry['proxy_120'])) {
-            return ['hash' => $hash, 'proxy_320' => $entry['proxy_320'], 'proxy_120' => $entry['proxy_120']];
-        }
-
-        $disk = Storage::disk('public');
-        $paths = ['proxy_320' => "artwork/{$hash}/320.jpg", 'proxy_120' => "artwork/{$hash}/120.jpg"];
-
-        foreach ($paths as $path) {
-            if (!$disk->exists($path)) {
-                return null;
-            }
-        }
-
-        return ['hash' => $hash] + array_map(fn (string $path) => $disk->url($path), $paths);
-    }
-
-    private function coverUrl(array $images): ?string
-    {
-        $first = $images[0] ?? null;
-
-        return (is_array($first) ? ($first['url'] ?? null) : $first) ?: null;
+        return $files === null ? null : ['kind' => $kind, 'hash' => md5($url)] + $files;
     }
 
     private function resolveDevices(Client $client)

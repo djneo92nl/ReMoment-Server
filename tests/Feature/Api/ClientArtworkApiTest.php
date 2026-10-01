@@ -3,13 +3,18 @@
 namespace Tests\Feature\Api;
 
 use App\Domain\Artwork\ArtworkCache;
+use App\Domain\Artwork\SourceLogo;
 use App\Http\Controllers\Api\ClientController;
 use App\Models\Client;
+use App\Models\Device;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
+use App\Models\Media\Track;
+use App\Models\Play;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Tests\Support\FakePlayerDriver;
 use Tests\TestCase;
 
 /** Contract tests for GET /api/clients/{api_token}/artwork (see docs/api/client-devices.md). */
@@ -24,6 +29,11 @@ class ClientArtworkApiTest extends TestCase
         parent::setUp();
 
         $this->artist = Artist::create(['name' => 'A', 'source' => 'spotify']);
+
+        // Rendering the eight logos takes a second or so; only the logo test needs real ones.
+        foreach (SourceLogo::KEYS as $key) {
+            $this->cacheProcessed(SourceLogo::url($key));
+        }
     }
 
     private function token(): string
@@ -39,6 +49,35 @@ class ClientArtworkApiTest extends TestCase
     private function album(string $name, ?array $images): Album
     {
         return Album::create(['artist_id' => $this->artist->id, 'name' => $name, 'source' => 'spotify', 'images' => $images]);
+    }
+
+    /** The album items of a response (the first page also lists the source logos). */
+    private function albumItems($response): array
+    {
+        return collect($response->json('data'))->where('kind', 'album')->values()->all();
+    }
+
+    private function play(Album $album, string $at): void
+    {
+        $device = Device::firstOrCreate(['device_name' => 'Living Room'], [
+            'ip_address' => '10.0.0.10', 'device_brand_name' => 'Test', 'device_product_type' => 'Speaker',
+            'device_driver' => FakePlayerDriver::class, 'device_driver_name' => 'Fake',
+        ]);
+        $track = Track::create(['album_id' => $album->id, 'artist_id' => $this->artist->id, 'name' => 'T', 'source' => 'spotify']);
+        Play::create(['device_id' => $device->id, 'track_id' => $track->id, 'source_type' => 'spotify', 'played_at' => $at]);
+    }
+
+    private function item(string $url): array
+    {
+        $hash = md5($url);
+
+        return [
+            'kind' => 'album',
+            'hash' => $hash,
+            'proxy_320' => "/storage/artwork/{$hash}/320.jpg",
+            'proxy_120' => "/storage/artwork/{$hash}/120.jpg",
+            'proxy_bg' => "/storage/artwork/{$hash}/bg_1024x600.jpg",
+        ];
     }
 
     private function cacheProcessed(string $url): void
@@ -64,23 +103,58 @@ class ClientArtworkApiTest extends TestCase
         $this->cacheProcessed($url);
         $this->cacheProcessed('https://x.test/plain.jpg');
 
-        $this->getJson("/api/clients/{$this->token()}/artwork")
+        $response = $this->getJson("/api/clients/{$this->token()}/artwork")
             ->assertOk()
-            ->assertExactJson([
-                'data' => [
-                    [
-                        'hash' => md5($url),
-                        'proxy_320' => '/storage/artwork/'.md5($url).'/320.jpg',
-                        'proxy_120' => '/storage/artwork/'.md5($url).'/120.jpg',
-                    ],
-                    [
-                        'hash' => md5('https://x.test/plain.jpg'),
-                        'proxy_320' => '/storage/artwork/'.md5('https://x.test/plain.jpg').'/320.jpg',
-                        'proxy_120' => '/storage/artwork/'.md5('https://x.test/plain.jpg').'/120.jpg',
-                    ],
-                ],
-                'next_cursor' => null,
-            ]);
+            ->assertJsonPath('next_cursor', null);
+
+        $this->assertSame([$this->item($url), $this->item('https://x.test/plain.jpg')], $this->albumItems($response));
+    }
+
+    public function test_the_first_page_starts_with_every_source_logo(): void
+    {
+        foreach (SourceLogo::KEYS as $key) {
+            ArtworkCache::forget(SourceLogo::url($key));
+        }
+
+        $response = $this->getJson("/api/clients/{$this->token()}/artwork")->assertOk();
+
+        $logos = collect($response->json('data'))->where('kind', 'source');
+        $this->assertSame(
+            array_map(fn (string $key) => md5(SourceLogo::url($key)), SourceLogo::KEYS),
+            $logos->pluck('hash')->all()
+        );
+        foreach ($logos as $logo) {
+            Storage::disk('public')->assertExists("artwork/{$logo['hash']}/320.jpg");
+            $this->assertStringEndsWith("/artwork/{$logo['hash']}/bg_1024x600.jpg", $logo['proxy_bg']);
+        }
+    }
+
+    public function test_recently_played_albums_come_first_then_the_rest(): void
+    {
+        $neverPlayed = $this->album('Never played', [['url' => 'https://x.test/never.jpg']]);
+        $older = $this->album('Older', [['url' => 'https://x.test/older.jpg']]);
+        $newest = $this->album('Newest', [['url' => 'https://x.test/newest.jpg']]);
+        $this->play($older, '2026-09-01 10:00:00');
+        $this->play($newest, '2026-09-02 10:00:00');
+        foreach (['never', 'older', 'newest'] as $name) {
+            $this->cacheProcessed("https://x.test/{$name}.jpg");
+        }
+
+        $response = $this->getJson("/api/clients/{$this->token()}/artwork");
+
+        $this->assertSame(
+            [md5('https://x.test/newest.jpg'), md5('https://x.test/older.jpg'), md5('https://x.test/never.jpg')],
+            array_column($this->albumItems($response), 'hash')
+        );
+    }
+
+    public function test_covers_without_a_background_are_left_out(): void
+    {
+        $url = 'https://x.test/old-entry.jpg';
+        $this->album('Old entry', [['url' => $url]]);
+        ArtworkCache::put($url, ['proxy_512' => 'a', 'proxy_320' => 'b', 'proxy_120' => 'c', 'colors' => [], 'safe_colors' => []]);
+
+        $this->assertSame([], $this->albumItems($this->getJson("/api/clients/{$this->token()}/artwork")));
     }
 
     public function test_albums_sharing_a_cover_are_listed_once(): void
@@ -90,7 +164,7 @@ class ClientArtworkApiTest extends TestCase
         $this->album('Standard', [['url' => $url]]);
         $this->cacheProcessed($url);
 
-        $this->getJson("/api/clients/{$this->token()}/artwork")->assertJsonCount(1, 'data');
+        $this->assertCount(1, $this->albumItems($this->getJson("/api/clients/{$this->token()}/artwork")));
     }
 
     public function test_an_expired_cache_entry_falls_back_to_the_files_on_disk(): void
@@ -98,34 +172,41 @@ class ClientArtworkApiTest extends TestCase
         $url = 'https://x.test/expired.jpg';
         $hash = md5($url);
         $this->album('Expired', [['url' => $url]]);
-        Storage::disk('public')->put("artwork/{$hash}/320.jpg", 'jpg');
-        Storage::disk('public')->put("artwork/{$hash}/120.jpg", 'jpg');
+        foreach (['320.jpg', '120.jpg', 'bg_1024x600.jpg'] as $file) {
+            Storage::disk('public')->put("artwork/{$hash}/{$file}", 'jpg');
+        }
 
-        $this->getJson("/api/clients/{$this->token()}/artwork")
-            ->assertJsonPath('data.0.hash', $hash)
-            ->assertJsonPath('data.0.proxy_320', Storage::disk('public')->url("artwork/{$hash}/320.jpg"))
-            ->assertJsonPath('data.0.proxy_120', Storage::disk('public')->url("artwork/{$hash}/120.jpg"));
+        $items = $this->albumItems($this->getJson("/api/clients/{$this->token()}/artwork"));
+
+        $this->assertSame([[
+            'kind' => 'album',
+            'hash' => $hash,
+            'proxy_320' => Storage::disk('public')->url("artwork/{$hash}/320.jpg"),
+            'proxy_120' => Storage::disk('public')->url("artwork/{$hash}/120.jpg"),
+            'proxy_bg' => Storage::disk('public')->url("artwork/{$hash}/bg_1024x600.jpg"),
+        ]], $items);
     }
 
-    public function test_it_paginates_with_an_album_id_cursor(): void
+    public function test_it_paginates_with_an_offset_cursor(): void
     {
         $size = ClientController::ARTWORK_PAGE_SIZE;
-        $albums = collect(range(1, $size + 5))->map(function (int $i) {
+        foreach (range(1, $size + 5) as $i) {
             $url = "https://x.test/{$i}.jpg";
             $this->cacheProcessed($url);
-
-            return $this->album("Album {$i}", [['url' => $url]]);
-        });
+            $this->album("Album {$i}", [['url' => $url]]);
+        }
         $token = $this->token();
 
-        $first = $this->getJson("/api/clients/{$token}/artwork")->assertOk()->assertJsonCount($size, 'data');
-        $this->assertSame($albums[$size - 1]->id, $first->json('next_cursor'));
+        $first = $this->getJson("/api/clients/{$token}/artwork")->assertOk();
+        $this->assertCount($size, $this->albumItems($first));
+        $this->assertCount($size + count(SourceLogo::KEYS), $first->json('data'));
+        $this->assertSame($size, $first->json('next_cursor'));
 
         $second = $this->getJson("/api/clients/{$token}/artwork?cursor={$first->json('next_cursor')}")
             ->assertOk()
             ->assertJsonCount(5, 'data')
             ->assertJsonPath('next_cursor', null);
-        $this->assertSame(md5("https://x.test/{$size}.jpg"), $first->json('data.'.($size - 1).'.hash'));
+        $this->assertSame([], collect($second->json('data'))->where('kind', 'source')->all(), 'Logos are only on the first page');
         $this->assertSame(md5('https://x.test/'.($size + 1).'.jpg'), $second->json('data.0.hash'));
     }
 
@@ -134,7 +215,7 @@ class ClientArtworkApiTest extends TestCase
         Queue::fake();
         $this->album('Not processed', [['url' => 'https://x.test/unprocessed.jpg']]);
 
-        $this->getJson("/api/clients/{$this->token()}/artwork")->assertOk()->assertJsonPath('data', []);
+        $this->assertSame([], $this->albumItems($this->getJson("/api/clients/{$this->token()}/artwork")->assertOk()));
 
         Queue::assertNothingPushed();
     }

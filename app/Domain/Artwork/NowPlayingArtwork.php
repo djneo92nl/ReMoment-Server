@@ -68,6 +68,15 @@ final class NowPlayingArtwork
         return is_array($entry) ? ['kind' => $kind] + $entry : null;
     }
 
+    /** A generated logo's artwork entry (without `kind`), rendered if missing. */
+    public static function logo(string $key): ?array
+    {
+        $url = SourceLogo::url($key);
+        $entry = ArtworkCache::get($url);
+
+        return is_array($entry) && ArtworkCache::isComplete($entry) ? $entry : self::renderLogo($url);
+    }
+
     private static function renderLogo(string $url): ?array
     {
         try {

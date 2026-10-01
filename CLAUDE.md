@@ -289,7 +289,7 @@ PUT   /api/clients/{api_token}/heartbeat              → updates IP, firmware, 
 GET   /api/clients/{api_token}/artwork?cursor=        → processed library covers to pre-cache, by hash
 ```
 
-The artwork list is `{ data: [{ hash, proxy_320, proxy_120 }], next_cursor }`: all library albums whose cover is already processed (unprocessed ones are left to the daily backfill), 200 albums scanned per page by album id; follow `next_cursor` until `null`.
+The artwork list is `{ data: [{ kind, hash, proxy_320, proxy_120, proxy_bg }], next_cursor }`: the eight source logos (`kind: "source"`, first page only), then library albums whose cover is fully processed (`kind: "album"`), most recently played first, then the never-played rest by id. 200 albums are scanned per page (an offset cursor), so pages can be short; follow `next_cursor` until `null`. Unprocessed covers are skipped, not queued.
 
 See `docs/api/client-devices.md` for full request/response shapes, the registration flow, firmware implementation notes, and an Arduino sketch outline.
 

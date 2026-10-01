@@ -202,11 +202,16 @@ Returns `HTTP 404` for an unknown token.
 
 ### `GET /api/clients/{api_token}/artwork`
 
-Lists the processed artwork of the library, so a client can pre-cache covers (e.g. on SD) before they are played. Covers are keyed by `hash`, the same `md5(original image URL)` that appears in every artwork path (`/storage/artwork/{hash}/320.jpg`) of `now_playing.artwork` and the MQTT `/data` payload, so a cached cover is found again when that album plays.
+Lists processed artwork so a client can pre-cache it (e.g. on SD) before it is played, newest first, so a client sweeping while idle gets the most likely covers early. Items are keyed by `hash`, the same `md5(original image URL)` that appears in every artwork path (`/storage/artwork/{hash}/320.jpg`) of `now_playing.artwork` and the MQTT `/data` payload, so a cached file is found again when that album or source plays.
 
-**Which albums:** every album in the library (`albums` table: Spotify library import and DLNA scans), whatever devices the client is assigned — the library is shared, and any device can play any of it. Only covers that the server has already processed are listed; albums with a cover that hasn't been processed yet are skipped (not queued by this call), and picked up by the daily `library:backfill-artwork`, so they appear on a later sweep. Generated source/radio logos are not included.
+**What is listed, in this order:**
+1. The eight generated source logos (`kind: "source"`: Spotify, Bluetooth, AirPlay/Cast, radio, line-in, CD, TV, music note), first page only. They are rendered on the spot if missing, so they are always there.
+2. Library albums (`kind: "album"`) that have been played, by their last play in the playback history, newest first.
+3. The rest of the library (`albums` table: Spotify library import and DLNA scans), by album id.
 
-**Query:** `cursor` (optional) — the `next_cursor` of the previous page; omit for the first page.
+The library is shared, so this is the same for every client, whatever devices it is assigned. Only covers whose 320, 120 and 1024×600 background files have all been processed are listed; others are skipped (not queued by this call). `artwork:prerender` (daily) processes the last 500 played albums and `library:backfill-artwork` (daily) the rest of the library, so skipped covers appear on a later sweep.
+
+**Query:** `cursor` (optional) — the `next_cursor` of the previous page; omit for the first page. Treat it as opaque.
 
 **Response:**
 
@@ -214,22 +219,31 @@ Lists the processed artwork of the library, so a client can pre-cache covers (e.
 {
   "data": [
     {
+      "kind": "source",
+      "hash": "6910ad50fb63f947ac24032558d3b570",
+      "proxy_320": "http://remoment.local/storage/artwork/6910ad50fb63f947ac24032558d3b570/320.jpg",
+      "proxy_120": "http://remoment.local/storage/artwork/6910ad50fb63f947ac24032558d3b570/120.jpg",
+      "proxy_bg": "http://remoment.local/storage/artwork/6910ad50fb63f947ac24032558d3b570/bg_1024x600.jpg"
+    },
+    {
+      "kind": "album",
       "hash": "9b2d5c0a7e1f4b3c8d6a2e5f1c0b7a9d",
       "proxy_320": "http://remoment.local/storage/artwork/9b2d5c0a7e1f4b3c8d6a2e5f1c0b7a9d/320.jpg",
-      "proxy_120": "http://remoment.local/storage/artwork/9b2d5c0a7e1f4b3c8d6a2e5f1c0b7a9d/120.jpg"
+      "proxy_120": "http://remoment.local/storage/artwork/9b2d5c0a7e1f4b3c8d6a2e5f1c0b7a9d/120.jpg",
+      "proxy_bg": "http://remoment.local/storage/artwork/9b2d5c0a7e1f4b3c8d6a2e5f1c0b7a9d/bg_1024x600.jpg"
     }
   ],
-  "next_cursor": 1834
+  "next_cursor": 200
 }
 ```
 
-URLs have the same form as in `now_playing.artwork`: take the path from `/storage/` on and prefix `artwork_base_url` from `GET /api/info`. Both files are baseline JPEGs (320×320 and 120×120).
+URLs have the same form as in `now_playing.artwork`: take the path from `/storage/` on and prefix `artwork_base_url` from `GET /api/info`. All files are baseline JPEGs (320×320, 120×120, 1024×600).
 
-**Pagination:** each page scans 200 albums in id order, and `next_cursor` (an album id) is set when there may be more. A page can therefore hold fewer than 200 items, or none, while `next_cursor` is still set — keep requesting `?cursor={next_cursor}` until it is `null`. Albums that share a cover are listed once per page, but the same `hash` can appear on more than one page; skip hashes you already have.
+**Pagination:** each page scans 200 albums of the order above (plus the logos on the first page), and `next_cursor` is set when there may be more. A page can therefore hold fewer than 200 album items, or none, while `next_cursor` is still set — keep requesting `?cursor={next_cursor}` until it is `null`. The cursor is a position in the recency order, so plays during a sweep can shift it a little: an item may be listed twice (skip hashes you already have), and the album that just started playing may be passed over — you get that one from now-playing anyway. Albums sharing a cover are listed once per page.
 
-Returns `HTTP 404` for an unknown token and `422` for a non-integer `cursor`.
+Returns `HTTP 404` for an unknown token and `422` for an invalid `cursor`.
 
-**Suggested firmware use:** run a sweep after boot or once a day while idle, download only hashes missing from the SD cache, and throttle downloads so playback updates stay responsive.
+**Suggested firmware use:** run a sweep after boot or once a day while idle, download only hashes missing from the SD cache, newest first, and throttle downloads so playback updates stay responsive. For a first fill, the SD card export (admin, `/settings/clients`) is faster.
 
 ---
 
