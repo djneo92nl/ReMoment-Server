@@ -367,7 +367,7 @@ The Mosquitto broker runs in Docker on port 1883. Each device's MQTT base topic 
 
 | Topic | Trigger | Payload |
 |-------|---------|---------|
-| `remoment/player/{id}/data` | New track starts (retained); cleared on standby/unreachable | `{ "track": "Name", "artist": "Name", "artwork": { "kind": "album", "proxy_512": "…", "proxy_320": "…", "proxy_120": "…", "proxy_bg": "…", "proxy_bg_320x480": "…", "colors": ["#…"], "safe_colors": ["#…"] } }` (same `artwork` object as the REST API; ~700 bytes, so MQTT clients need a buffer above PubSubClient's 256-byte default). An **empty (zero-length) payload** means nothing is playing |
+| `remoment/player/{id}/data` | New track starts (retained); cleared on standby/unreachable | `{ "track": "Name", "artist": "Name", "album": "Name"|null, "duration": 213|null, "artwork": { "kind": "album", "proxy_512": "…", "proxy_320": "…", "proxy_120": "…", "proxy_bg": "…", "proxy_bg_320x480": "…", "colors": ["#…"], "safe_colors": ["#…"] } }` (same `artwork` object as the REST API; ~800 bytes, so MQTT clients need a buffer above PubSubClient's 256-byte default). An **empty (zero-length) payload** means nothing is playing |
 | `remoment/player/{id}/progress` | Every second while playing | Progress as a percentage of the track, 0–100 (integer string) |
 | `remoment/player/{id}/state` | State transition (retained) | `{ "state": "playing" }` — `playing` / `paused` / `standby` / `unreachable` |
 | `remoment/player/{id}/volume` | Volume or mute changes (retained) | `{ "volume": 45, "muted": false }` |

@@ -3,6 +3,7 @@
 namespace Tests\Feature\Listeners\Device;
 
 use App\Domain\Artwork\SourceLogo;
+use App\Domain\Media\AlbumData;
 use App\Domain\Media\ArtistData;
 use App\Domain\Media\NowPlaying;
 use App\Domain\Media\TrackData;
@@ -21,8 +22,8 @@ class PublishNowPlayingToMqttTest extends TestCase
         $trackName = 'Bohemian Rhapsody';
         $artistName = 'Queen';
 
-        $track = new TrackData(name: $trackName, artist: new ArtistData(name: $artistName));
-        $nowPlaying = new NowPlaying(track: $track);
+        $track = new TrackData(name: $trackName, artist: new ArtistData(name: $artistName), duration: 354);
+        $nowPlaying = new NowPlaying(track: $track, album: new AlbumData(name: 'A Night at the Opera'));
 
         // A track without an image gets the generated music-note logo.
         $this->mock(MqttService::class, function (MockInterface $mock) use ($deviceId, $trackName, $artistName) {
@@ -33,6 +34,8 @@ class PublishNowPlayingToMqttTest extends TestCase
 
                     return $payload['track'] === $trackName
                         && $payload['artist'] === $artistName
+                        && $payload['album'] === 'A Night at the Opera'
+                        && $payload['duration'] === 354
                         && $payload['artwork']['kind'] === 'source'
                         && str_contains($payload['artwork']['proxy_320'], md5(SourceLogo::url('music')));
                 }), 0, true);

@@ -29,6 +29,9 @@ class PublishNowPlayingToMqtt
         $data = [
             'track' => $nowPlaying->track?->name,
             'artist' => $nowPlaying->track?->artist?->name,
+            // Clients show "1:35 / 3:40": /progress is only a percentage
+            'album' => $nowPlaying->album?->name,
+            'duration' => $nowPlaying->track?->duration,
         ];
 
         $artwork = NowPlayingArtwork::resolve($nowPlaying);
