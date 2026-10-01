@@ -61,6 +61,9 @@ php artisan devices:sync-sources
 
 # Scan a DLNA server's library (triggered via UI or manually)
 php artisan dlna:scan {server_id}
+
+# Queue missing artwork for the last N played albums (scheduled daily)
+php artisan artwork:prerender [--limit=500] [--max-jobs=100]
 ```
 
 ## REST API Reference
@@ -398,6 +401,8 @@ When a new track starts playing, `DispatchArtworkProcessing` dispatches the `Pro
 All JPEGs are encoded baseline (`JpegEncoder(progressive: false)`; Intervention's GD encoder calls `imageinterlace(false)`), regardless of the source image, because the ESP32's TJpgDec decoder can't read progressive JPEGs.
 
 `app/Domain/Artwork/ArtworkCache.php` provides static helpers for reading/writing the cache. `ArtworkCache::has()` is true only for **complete** entries (all `REQUIRED_KEYS`): an entry cached before a size was added is still served by `get()`, but is regenerated on next play, and `php artisan library:backfill-artwork` (scheduled daily) re-queues outdated entries for album covers as well as covers without colors. Artwork is absent on first play of a new URL (async), present on all subsequent plays.
+
+**Recently played albums** (`app/Domain/Artwork/LibraryArtwork.php`): `albumsByRecency()` orders library albums by their last play in `plays` (newest first), then never-played albums by id; `recentCoverUrls()` gives the covers of the last `config('artwork.recent_albums')` (`ARTWORK_RECENT_ALBUMS`, default 500) distinct albums played. `php artisan artwork:prerender` (scheduled daily) queues `ProcessArtwork` for those whose entry isn't complete (`ArtworkCache::has()`), at most `artwork.prerender_max_jobs` (`ARTWORK_PRERENDER_MAX_JOBS`, default 100) per run, newest first, and doesn't re-queue a cover it queued in the last 12 hours — so a big backlog is worked off over several days without flooding the queue.
 
 **Logos for playback without an image** (`app/Domain/Artwork/`): `NowPlayingArtwork` picks the image for a `NowPlaying` (cover → radio station `image_url` from `/radio` → generated logo) and adds `kind`; it is used by both `PublishNowPlayingToMqtt` and `DeviceDetailResource`. `SourceLogo` maps the source's `sourceType`/`name`/`connector`/`category` to a logo key (`spotify`, `radio`, `line_in`, `bluetooth`, `tv`, `cast`, `cd`, default `music`) and addresses it by a pseudo URL `remoment:logo/v{VERSION}/{key}`, so its hash is the same on every server. `LogoRenderer` draws the glyph (off-white line icon on a #181818 square, GD, 4× supersampled, deterministic); `ProcessArtwork` renders it instead of downloading. Missing logo entries are rendered synchronously (~0.2s, a handful of logos). Bump `SourceLogo::VERSION` when a glyph changes so clients' hash-keyed caches pick it up.
 
