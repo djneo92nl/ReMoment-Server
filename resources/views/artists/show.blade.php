@@ -3,7 +3,17 @@
         <div class="flex items-start gap-4">
             <x-back-button href="{{ route('artists.index') }}" class="mt-1" />
             <div>
-                <h1 class="text-3xl md:text-4xl font-medium tracking-tight dark:text-gray-100 text-gray-900">{{ $artist->name }}</h1>
+                <div class="flex items-center gap-3">
+                    <h1 class="text-3xl md:text-4xl font-medium tracking-tight dark:text-gray-100 text-gray-900">{{ $artist->name }}</h1>
+                    <form method="POST" action="{{ route('artists.favorite', $artist) }}">
+                        @csrf
+                        <button type="submit"
+                                title="{{ $artist->favorited_at ? 'Remove from favorites' : 'Add to favorites' }}"
+                                class="text-xl transition-colors {{ $artist->favorited_at ? 'text-rose-500 hover:text-rose-600' : 'text-gray-300 hover:text-rose-400 dark:text-stone-600' }}">
+                            <i class="{{ $artist->favorited_at ? 'fa-solid' : 'fa-regular' }} fa-heart"></i>
+                        </button>
+                    </form>
+                </div>
                 <p class="mt-1.5 text-gray-500 dark:text-gray-500">
                     {{ number_format($totalPlays) }} {{ Str::plural('play', $totalPlays) }}
                     @if($totalSeconds > 0)

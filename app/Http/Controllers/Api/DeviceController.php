@@ -8,12 +8,14 @@ use App\Domain\Device\PlaybackModes;
 use App\Domain\Device\RepeatMode;
 use App\Domain\Device\SpotifyRouting;
 use App\Domain\Device\State;
+use App\Domain\Library\LibraryPlayback;
+use App\Domain\Library\NotPlayableException;
+use App\Domain\Library\PlaybackFailedException;
 use App\Events\Device\PlaybackModesUpdated;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\DeviceDetailResource;
 use App\Http\Resources\Api\DeviceListResource;
 use App\Integrations\Common\UnsupportedOperationException;
-use App\Integrations\Contracts\LibraryPlaybackInterface;
 use App\Integrations\Contracts\LikeInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
@@ -27,6 +29,8 @@ use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\SourcesInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
+use App\Models\Media\Album;
+use App\Models\Media\Artist;
 use App\Models\Media\Playlist;
 use App\Models\Media\Track;
 use App\Models\RadioStation;
@@ -499,7 +503,7 @@ class DeviceController extends Controller
         return response()->json(['status' => 'ok']);
     }
 
-    public function libraryPlay(Request $request, Device $device): JsonResponse
+    public function libraryPlay(Request $request, Device $device, LibraryPlayback $library): JsonResponse
     {
         $request->validate(['track_id' => ['required', 'integer', 'exists:tracks,id']]);
 
@@ -507,31 +511,19 @@ class DeviceController extends Controller
             return $error;
         }
 
-        $driver = $device->driver;
-
-        if (!($driver instanceof LibraryPlaybackInterface)) {
+        if (!LibraryPlayback::availableFor($device)) {
             return $this->unsupported('library_playback');
         }
 
         $track = Track::with('metadata', 'artist', 'album')->findOrFail($request->integer('track_id'));
 
-        if (!$track->getDlnaUrl()) {
-            return response()->json(['error' => 'no_dlna_url', 'message' => 'This track has no DLNA stream URL.'], 422);
-        }
-
-        try {
-            $driver->playLibraryTrack($track);
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'driver_error',
-                'message' => 'The device did not respond: '.$e->getMessage(),
-            ], 502);
-        }
-
-        return response()->json(['status' => 'ok', 'track' => $track->name]);
+        return $this->playFromLibrary(fn () => $library->playTrack($device, $track), ['track' => $track->name],
+            // Kept for DLNA devices, which answered this before Spotify playback existed.
+            LibraryPlayback::canPlayDlna($device) ? ['error' => 'no_dlna_url', 'message' => 'This track has no DLNA stream URL.'] : null,
+        );
     }
 
-    public function libraryPlayPlaylist(Request $request, Device $device): JsonResponse
+    public function libraryPlayPlaylist(Request $request, Device $device, LibraryPlayback $library): JsonResponse
     {
         $request->validate(['playlist_id' => ['required', 'integer', 'exists:playlists,id']]);
 
@@ -539,24 +531,63 @@ class DeviceController extends Controller
             return $error;
         }
 
-        $driver = $device->driver;
-
-        if (!($driver instanceof LibraryPlaybackInterface)) {
+        if (!LibraryPlayback::availableFor($device)) {
             return $this->unsupported('library_playback');
         }
 
         $playlist = Playlist::findOrFail($request->integer('playlist_id'));
 
-        try {
-            $driver->playLibraryPlaylist($playlist);
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'driver_error',
-                'message' => 'The device did not respond: '.$e->getMessage(),
-            ], 502);
+        return $this->playFromLibrary(fn () => $library->playPlaylist($device, $playlist), ['playlist' => $playlist->name]);
+    }
+
+    /** Plays a library album by DLNA or Spotify; see docs/api/library.md. */
+    public function libraryPlayAlbum(Request $request, Device $device, LibraryPlayback $library): JsonResponse
+    {
+        $data = $request->validate([
+            'album_id' => ['required', 'integer', 'exists:albums,id'],
+            'start_track_id' => ['nullable', 'integer', Rule::exists('tracks', 'id')->where('album_id', $request->integer('album_id'))],
+            'shuffle' => ['nullable', 'boolean'],
+        ]);
+
+        if ($error = $this->assertReachable($device)) {
+            return $error;
         }
 
-        return response()->json(['status' => 'ok', 'playlist' => $playlist->name]);
+        $album = Album::findOrFail($data['album_id']);
+        $start = isset($data['start_track_id']) ? Track::find($data['start_track_id']) : null;
+
+        return $this->playFromLibrary(fn () => $library->playAlbum($device, $album, $start, $request->boolean('shuffle')), ['album' => $album->name]);
+    }
+
+    /** Plays all library tracks of an artist by DLNA or Spotify; see docs/api/library.md. */
+    public function libraryPlayArtist(Request $request, Device $device, LibraryPlayback $library): JsonResponse
+    {
+        $data = $request->validate([
+            'artist_id' => ['required', 'integer', 'exists:artists,id'],
+            'shuffle' => ['nullable', 'boolean'],
+        ]);
+
+        if ($error = $this->assertReachable($device)) {
+            return $error;
+        }
+
+        $artist = Artist::findOrFail($data['artist_id']);
+
+        return $this->playFromLibrary(fn () => $library->playArtist($device, $artist, $request->boolean('shuffle')), ['artist' => $artist->name]);
+    }
+
+    /** Runs a LibraryPlayback call and maps its outcome to the API's responses. */
+    private function playFromLibrary(\Closure $play, array $response, ?array $notPlayable = null): JsonResponse
+    {
+        try {
+            $play();
+        } catch (NotPlayableException $e) {
+            return response()->json($notPlayable ?? ['error' => 'not_playable', 'message' => $e->getMessage()], 422);
+        } catch (PlaybackFailedException $e) {
+            return response()->json(['error' => 'driver_error', 'message' => $e->getMessage()], 502);
+        }
+
+        return response()->json(['status' => 'ok'] + $response);
     }
 
     private function mapPeerIdsToDevices(array $ids, Device $exclude): \Illuminate\Support\Collection

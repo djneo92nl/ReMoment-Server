@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Integrations\Contracts\LibraryPlaybackInterface;
+use App\Domain\Library\LibraryPlayback;
+use App\Domain\Library\NotPlayableException;
+use App\Domain\Library\PlaybackFailedException;
 use App\Models\Device;
 use App\Models\Media\Artist;
 use App\Models\Play;
@@ -58,39 +60,27 @@ class ArtistController extends Controller
         ));
     }
 
-    public function play(Request $request, Artist $artist, Device $device)
+    public function play(Request $request, Artist $artist, Device $device, LibraryPlayback $library)
     {
-        $tracks = $artist->tracks()
-            ->orderBy('album_id')->orderBy('id') // grouped by album, best-effort order within
-            ->with(['metadata' => fn ($q) => $q->where('key', 'dlna_url')])
-            ->get();
-
-        if ($request->boolean('shuffle')) {
-            $tracks = $tracks->shuffle();
-        }
-
-        $playableCount = $tracks->filter(fn ($t) => (bool) $t->getDlnaUrl())->count();
-
-        if ($playableCount === 0) {
-            return back()->with('error', "\"{$artist->name}\" has no playable tracks.");
-        }
-
         try {
-            $driver = $device->driver;
-
-            if (!($driver instanceof LibraryPlaybackInterface)) {
-                return back()->with('error', "{$device->device_name} does not support library playback.");
-            }
-
-            $driver->playLibraryTracks($tracks);
-        } catch (\Throwable $e) {
+            $result = $library->playArtist($device, $artist, $request->boolean('shuffle'));
+        } catch (NotPlayableException) {
+            return back()->with('error', "\"{$artist->name}\" has no tracks {$device->device_name} can play.");
+        } catch (PlaybackFailedException $e) {
             return back()->with('error', "Could not play \"{$artist->name}\" on {$device->device_name}: {$e->getMessage()}");
         }
 
-        $message = $playableCount < $tracks->count()
-            ? "Playing {$playableCount} of {$tracks->count()} tracks by \"{$artist->name}\" on {$device->device_name}."
+        $message = $result->playable < $result->total
+            ? "Playing {$result->playable} of {$result->total} tracks by \"{$artist->name}\" on {$device->device_name}."
             : "Playing \"{$artist->name}\" on {$device->device_name}.";
 
         return back()->with('success', $message);
+    }
+
+    public function favorite(Artist $artist)
+    {
+        $artist->update(['favorited_at' => $artist->favorited_at ? null : now()]);
+
+        return back();
     }
 }

@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Integrations\Contracts\LibraryPlaybackInterface;
-use App\Integrations\Spotify\Services\PlaylistPlaybackService;
+use App\Domain\Library\LibraryPlayback;
+use App\Domain\Library\NotPlayableException;
 use App\Models\Device;
 use App\Models\DeviceMeta;
 use App\Models\Media\Playlist;
@@ -58,17 +58,9 @@ class PlaylistController extends Controller
     public function play(Playlist $playlist, Device $device)
     {
         try {
-            if ($playlist->source === 'spotify') {
-                app(PlaylistPlaybackService::class)->playOnDevice($playlist, $device);
-            } else {
-                $driver = $device->driver;
-
-                if (!($driver instanceof LibraryPlaybackInterface)) {
-                    return back()->with('error', "{$device->device_name} does not support library playback.");
-                }
-
-                $driver->playLibraryPlaylist($playlist);
-            }
+            app(LibraryPlayback::class)->playPlaylist($device, $playlist);
+        } catch (NotPlayableException) {
+            return back()->with('error', "{$device->device_name} can't play \"{$playlist->name}\".");
         } catch (\Throwable $e) {
             return back()->with('error', "Could not play \"{$playlist->name}\" on {$device->device_name}: {$e->getMessage()}");
         }

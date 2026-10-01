@@ -18,6 +18,7 @@ Detailed documentation lives in `docs/`. CLAUDE.md holds enough context to under
 docs/
   api/
     client-devices.md       Client device registration flow, all endpoints, firmware guide
+    library.md              Library browse, favorites, play album/artist on a device (DLNA or Spotify)
     server-info.md          GET /api/info bootstrap endpoint (API/MQTT/artwork addresses for clients)
   architecture/
     client-devices.md       DB schema, model, controller, admin UI internals
@@ -307,15 +308,32 @@ DELETE /api/devices/{id}/multiroom/leave                          → { "status"
 
 For Sonos, `joinable` is always empty (returns `[]`); the UI falls back to showing all Sonos devices.
 
-### DLNA Library Playback
+### Library
+
+Browse, favorites and playback for clients; full shapes in `docs/api/library.md`. Artwork in these responses is the small object `{ hash, proxy_120, proxy_320 }` or `null` while unprocessed (queued at most once an hour per image).
 
 ```
-POST /api/devices/{id}/library/play   body: { "track_id": 42 }   → { "status": "ok", "track": "Song Title" }
+GET  /api/library/artists?cursor=          → { data: [ArtistItem], next_cursor }   alphabetical ("The " ignored), 50/page, only artists with albums
+GET  /api/library/artists/{id}             → { id, name, favorite, albums: [AlbumItem] }   newest year first, then name
+GET  /api/library/albums/{id}?device_id=   → { id, name, artist: {id, name}, year, artwork, favorite, playable, tracks: [{ id, name, duration, playable }] }
+GET  /api/library/recent?limit=30          → { data: [AlbumItem] }   most recently played distinct albums (limit 1–100)
+GET  /api/library/favorites                → { albums: [AlbumItem], artists: [ArtistItem] }   most recently favorited first
+PUT  /api/library/albums/{id}/favorite     body: { "favorite": true }   → { "favorite": true }
+PUT  /api/library/artists/{id}/favorite    body: { "favorite": true }   → { "favorite": true }
 ```
 
-`track_id` must exist in the `tracks` table and have a DLNA URL in `metadata` (key `dlna_url`). The device must have `library_playback` capability.
+ArtistItem `{ id, name, album_count, artwork, favorite }`; AlbumItem `{ id, name, artist_name, year, artwork, favorite }`. Favorites are household-wide (`favorited_at` on `albums`/`artists`; the web album/artist pages toggle them too).
 
-Error: `{ "error": "no_dlna_url", "message": "This track has no DLNA stream URL." }` → `422`
+**Playing from the library**
+
+```
+POST /api/devices/{id}/library/play            body: { "track_id": 42 }                                        → { "status": "ok", "track": "Song Title" }
+POST /api/devices/{id}/library/play-playlist   body: { "playlist_id": 3 }                                      → { "status": "ok", "playlist": "…" }
+POST /api/devices/{id}/library/play-album      body: { "album_id": 12, "start_track_id": 34, "shuffle": false } → { "status": "ok", "album": "…" }
+POST /api/devices/{id}/library/play-artist     body: { "artist_id": 5, "shuffle": true }                        → { "status": "ok", "artist": "…" }
+```
+
+`App\Domain\Library\LibraryPlayback` (shared with the web play buttons) tries **DLNA** first — the device's `LibraryPlaybackInterface` driver, for tracks with a `dlna_url` — then **Spotify** — when Spotify is connected and the device is the Spotify device or mapped to a Spotify Connect name, for tracks with a Spotify URI (`external_id` `spotify:track:…`): an album plays as its Spotify album context (URI looked up once, stored as album metadata `spotify_album_uri`), an artist as a list of track URIs, a Spotify playlist as its context. A device has `library_playback` when either path exists. Errors: `422` `not_playable` (play-album/artist: neither path works), `422` `no_dlna_url` (`/library/play` on a DLNA device without a stream for the track), `422` `unsupported` (`/library/play`, `/play-playlist` without `library_playback`), `503` unreachable, `502` `driver_error` (device or Spotify failed, or Spotify doesn't list the mapped speaker).
 
 ### Client Device API
 
@@ -384,14 +402,14 @@ All drivers implement interfaces from `app/Integrations/Contracts/`:
 - `VolumeControlInterface` – volume and mute
 - `SourcesInterface` / `SourceActivationInterface` – list and activate sources (ASE only)
 - `MultiRoomInterface` – join/leave multiroom sessions (ASE + Sonos)
-- `LibraryPlaybackInterface` – play a local DLNA track (ASE + Sonos)
+- `LibraryPlaybackInterface` – play a local DLNA track (ASE + Sonos); the `library_playback` capability also covers Spotify playback of library tracks (see Library above)
 - `SeekInterface` – jump within the current track (Sonos, Spotify, Mozart)
 - `QueueInterface` – list up-next tracks (Sonos, Spotify)
 - `ShuffleInterface` / `RepeatInterface` – set shuffle and repeat (Sonos, Spotify, Mozart)
 - `LikeInterface` – like/save the playing track (Spotify)
 - `PowerInterface` – wake / standby (ASE, Mozart; Mozart can't be woken and throws `UnsupportedOperationException`, answered with 422)
 
-`App\Domain\Device\Capabilities::forDriver()` maps these contracts to the API capability strings from the driver class name, without instantiating the driver.
+`App\Domain\Device\Capabilities::forDriver()` maps these contracts to the API capability strings from the driver class name, without instantiating the driver. What a device reports is `App\Domain\Device\DeviceCapabilities::for()`: that, plus Spotify's playback capabilities while Spotify is routed to it, plus `library_playback` when Spotify can play the library on it.
 
 ### Integration Drivers
 

@@ -15,6 +15,11 @@ class Artist extends Model
     protected $fillable = [
         'name',
         'source',
+        'favorited_at',
+    ];
+
+    protected $casts = [
+        'favorited_at' => 'datetime',
     ];
 
     public function albums(): HasMany

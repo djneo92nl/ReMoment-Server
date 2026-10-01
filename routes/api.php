@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\ClientController;
 use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\InfoController;
+use App\Http\Controllers\Api\LibraryController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/info', InfoController::class);
@@ -38,6 +39,16 @@ Route::delete('/devices/{device}/multiroom/leave', [DeviceController::class, 'mu
 
 Route::post('/devices/{device}/library/play', [DeviceController::class, 'libraryPlay']);
 Route::post('/devices/{device}/library/play-playlist', [DeviceController::class, 'libraryPlayPlaylist']);
+Route::post('/devices/{device}/library/play-album', [DeviceController::class, 'libraryPlayAlbum']);
+Route::post('/devices/{device}/library/play-artist', [DeviceController::class, 'libraryPlayArtist']);
+
+Route::get('/library/artists', [LibraryController::class, 'artists']);
+Route::get('/library/artists/{artist}', [LibraryController::class, 'artist']);
+Route::put('/library/artists/{artist}/favorite', [LibraryController::class, 'favoriteArtist']);
+Route::get('/library/albums/{album}', [LibraryController::class, 'album']);
+Route::put('/library/albums/{album}/favorite', [LibraryController::class, 'favoriteAlbum']);
+Route::get('/library/recent', [LibraryController::class, 'recent']);
+Route::get('/library/favorites', [LibraryController::class, 'favorites']);
 
 Route::post('/clients/register', [ClientController::class, 'register']);
 Route::get('/clients/status/{registrationToken}', [ClientController::class, 'status']);

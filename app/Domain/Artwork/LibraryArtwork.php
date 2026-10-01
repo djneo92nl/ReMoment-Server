@@ -21,20 +21,24 @@ final class LibraryArtwork
      */
     public static function albumsByRecency(): Builder
     {
-        $lastPlayed = Play::query()
-            ->join('tracks', 'tracks.id', '=', 'plays.track_id')
-            ->whereNotNull('tracks.album_id')
-            ->groupBy('tracks.album_id')
-            ->select('tracks.album_id')
-            ->selectRaw('MAX(plays.played_at) as last_played_at');
-
         return Album::query()
-            ->leftJoinSub($lastPlayed, 'recent', 'recent.album_id', '=', 'albums.id')
+            ->leftJoinSub(self::lastPlayedPerAlbum(), 'recent', 'recent.album_id', '=', 'albums.id')
             ->whereNotNull('albums.images')
             ->select('albums.id', 'albums.images', 'recent.last_played_at')
             ->orderByRaw('CASE WHEN recent.last_played_at IS NULL THEN 1 ELSE 0 END')
             ->orderByDesc('recent.last_played_at')
             ->orderBy('albums.id');
+    }
+
+    /** Subquery of `album_id` => `last_played_at` (the album's latest play). */
+    public static function lastPlayedPerAlbum(): Builder
+    {
+        return Play::query()
+            ->join('tracks', 'tracks.id', '=', 'plays.track_id')
+            ->whereNotNull('tracks.album_id')
+            ->groupBy('tracks.album_id')
+            ->select('tracks.album_id')
+            ->selectRaw('MAX(plays.played_at) as last_played_at');
     }
 
     /**

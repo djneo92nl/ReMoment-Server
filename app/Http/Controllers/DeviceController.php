@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Device\DeviceCache;
+use App\Domain\Device\DeviceCapabilities;
 use App\Domain\Device\SpotifyRouting;
-use App\Integrations\Contracts\LibraryPlaybackInterface;
+use App\Domain\Library\LibraryPlayback;
+use App\Domain\Library\NotPlayableException;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
@@ -66,7 +68,7 @@ class DeviceController extends Controller
     {
         $device->load('meta');
 
-        $capabilities = SpotifyRouting::capabilities($device);
+        $capabilities = DeviceCapabilities::for($device);
         $volume = null;
         try {
             $driver = $device->driver;
@@ -166,16 +168,12 @@ class DeviceController extends Controller
         return back()->with('success', "Switched to {$deviceSource->friendly_name}.");
     }
 
-    public function playTrack(Track $track, Device $device)
+    public function playTrack(Track $track, Device $device, LibraryPlayback $library)
     {
         try {
-            $driver = $device->driver;
-
-            if (!($driver instanceof LibraryPlaybackInterface)) {
-                return back()->with('error', "{$device->device_name} does not support library playback.");
-            }
-
-            $driver->playLibraryTrack($track);
+            $library->playTrack($device, $track);
+        } catch (NotPlayableException) {
+            return back()->with('error', "{$device->device_name} can't play \"{$track->name}\".");
         } catch (\Throwable $e) {
             return back()->with('error', "Could not play \"{$track->name}\" on {$device->device_name}: {$e->getMessage()}");
         }

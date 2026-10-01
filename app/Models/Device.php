@@ -4,7 +4,7 @@ namespace App\Models;
 
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
-use App\Integrations\Contracts\LibraryPlaybackInterface;
+use App\Domain\Library\LibraryPlayback;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -111,7 +111,7 @@ class Device extends Model
     public static function libraryCapable(): Collection
     {
         return static::all()->filter(
-            fn (self $device) => is_a($device->device_driver, LibraryPlaybackInterface::class, true)
+            fn (self $device) => LibraryPlayback::availableFor($device)
         )->values();
     }
 }

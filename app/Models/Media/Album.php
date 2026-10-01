@@ -20,12 +20,14 @@ class Album extends Model
         'images',
         'colors',
         'released_at',
+        'favorited_at',
     ];
 
     protected $casts = [
         'images' => 'array',
         'colors' => 'array',
         'released_at' => 'date',
+        'favorited_at' => 'datetime',
     ];
 
     public function artist(): BelongsTo
