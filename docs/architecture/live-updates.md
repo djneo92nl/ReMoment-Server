@@ -22,8 +22,10 @@ All under `remoment/player/{device_id}/`:
 |---|---|---|---|
 | `state` | yes | `DeviceCache::updateState()` sees a transition (not on every heartbeat write) | `{"state":"playing"}` — `playing`/`paused`/`standby`/`unreachable` |
 | `volume` | yes | `VolumeUpdated` with a level different from the last one published | `{"volume":45}` |
-| `data` | no | `NowPlayingUpdated` (new track) | `{"track","artist","artwork"?}` |
+| `data` | no | `NowPlayingUpdated` (new track) | `{"track","artist","artwork"?}` — `artwork` is the `ArtworkCache` entry: `proxy_512`, `proxy_320`, `proxy_120`, `proxy_bg` (1024×600 background) URLs plus `colors`/`safe_colors`; see CLAUDE.md "Artwork Caching" |
 | `progress` | no | `ProgressUpdated`, about once a second while playing | Percentage `0`–`100` as a plain string |
+
+The `data` payload is around 600 bytes with artwork. PubSubClient (ESP32/ESP8266) drops messages above its 256-byte default buffer, so firmware must call `setBufferSize()` (1024 or more).
 
 `state` and `volume` are retained so a firmware client that connects later gets the current value immediately.
 

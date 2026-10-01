@@ -13,7 +13,9 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Intervention\Image\Drivers\Gd\Driver;
+use Intervention\Image\Encoders\JpegEncoder;
 use Intervention\Image\ImageManager;
+use Intervention\Image\Interfaces\ImageInterface;
 
 class ProcessArtwork implements ShouldQueue
 {
@@ -23,46 +25,101 @@ class ProcessArtwork implements ShouldQueue
 
     public int $backoff = 60;
 
+    /** Square proxies, in pixels; each becomes `proxy_{size}` in the cache payload. */
+    public const SQUARE_SIZES = [512, 320, 120];
+
+    /**
+     * Full-screen backgrounds rendered behind the cover on client displays:
+     * cache payload key => [width, height]. Add a size here to support
+     * another screen, e.g. 'proxy_bg_320x480' => [320, 480] for a 3.5" portrait client.
+     */
+    public const BACKGROUNDS = [
+        'proxy_bg' => [1024, 600], // 7" ESP32-S3 touch remote (landscape)
+    ];
+
+    /**
+     * JPEG quality. All JPEGs are baseline (non-progressive): the ESP32's
+     * TJpgDec decoder can't read progressive files.
+     */
+    private const JPEG_QUALITY = 85;
+
+    /** Percentage of the blurred cover's brightness left after the black overlay. */
+    private const BACKGROUND_BRIGHTNESS = 40;
+
     public function __construct(public readonly string $originalUrl) {}
 
     public function handle(): void
     {
-        if ($cached = ArtworkCache::get($this->originalUrl)) {
-            $this->applyColorsToAlbums($cached['colors'] ?? []);
+        if (ArtworkCache::has($this->originalUrl)) {
+            $this->applyColorsToAlbums(ArtworkCache::get($this->originalUrl)['colors'] ?? []);
 
             return;
         }
 
         $hash = md5($this->originalUrl);
         $dir = "artwork/{$hash}";
+        $disk = Storage::disk('public');
 
         $imageData = Http::timeout(30)->get($this->originalUrl)->throw()->body();
 
         $manager = new ImageManager(new Driver);
+        $payload = [];
 
-        foreach ([512, 320] as $size) {
-            $encoded = $manager->read($imageData)->cover($size, $size)->toJpeg(85);
-            Storage::disk('public')->put("{$dir}/{$size}.jpg", $encoded);
+        foreach (self::SQUARE_SIZES as $size) {
+            $path = "{$dir}/{$size}.jpg";
+            $disk->put($path, $this->encodeJpeg($manager->read($imageData)->cover($size, $size)));
+            $payload["proxy_{$size}"] = $disk->url($path);
         }
 
-        $path512 = Storage::disk('public')->path("{$dir}/512.jpg");
-        $palette = ColorThief::getPalette($path512, 5);
+        foreach (self::BACKGROUNDS as $key => [$width, $height]) {
+            $path = "{$dir}/bg_{$width}x{$height}.jpg";
+            $disk->put($path, $this->renderBackground($manager, $imageData, $width, $height));
+            $payload[$key] = $disk->url($path);
+        }
+
+        $palette = ColorThief::getPalette($disk->path("{$dir}/512.jpg"), 5);
 
         $colors = array_map(
             fn (array $rgb) => sprintf('#%02x%02x%02x', $rgb[0], $rgb[1], $rgb[2]),
             $palette
         );
 
-        $safeColors = array_map(fn (string $hex) => $this->ensureL($hex, 0.65), $colors);
+        $payload['colors'] = $colors;
+        $payload['safe_colors'] = array_map(fn (string $hex) => $this->ensureL($hex, 0.65), $colors);
 
-        ArtworkCache::put($this->originalUrl, [
-            'proxy_512' => Storage::disk('public')->url("{$dir}/512.jpg"),
-            'proxy_320' => Storage::disk('public')->url("{$dir}/320.jpg"),
-            'colors' => $colors,
-            'safe_colors' => $safeColors,
-        ]);
+        ArtworkCache::put($this->originalUrl, $payload);
 
         $this->applyColorsToAlbums($colors);
+    }
+
+    /**
+     * The cover scaled to fill the screen, heavily blurred and darkened, so a
+     * sharp cover and white text sit on top of it with good contrast.
+     */
+    private function renderBackground(ImageManager $manager, string $imageData, int $width, int $height): string
+    {
+        // Blurring at full size with GD's 3x3 kernel would take hundreds of
+        // passes. Instead shrink to 1/32, blur, and scale back up in doubling
+        // steps with a light blur after each, which hides GD's blocky upscaling.
+        $w = max(1, intdiv($width, 32));
+        $h = max(1, intdiv($height, 32));
+        $image = $manager->read($imageData)->cover($w, $h)->blur(3);
+
+        while ($w < $width || $h < $height) {
+            $w = min($width, $w * 2);
+            $h = min($height, $h * 2);
+            $image->resize($w, $h)->blur(2);
+        }
+
+        $overlay = $manager->create($width, $height)->fill('000000');
+        $image->place($overlay, 'top-left', 0, 0, 100 - self::BACKGROUND_BRIGHTNESS);
+
+        return $this->encodeJpeg($image);
+    }
+
+    private function encodeJpeg(ImageInterface $image): string
+    {
+        return (string) $image->encode(new JpegEncoder(quality: self::JPEG_QUALITY, progressive: false));
     }
 
     private function applyColorsToAlbums(array $colors): void

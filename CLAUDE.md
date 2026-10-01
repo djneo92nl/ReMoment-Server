@@ -131,15 +131,18 @@ Always check `capabilities` before calling a feature endpoint — calling an uns
     "type": "music",
     "endTime": "2026-07-05T12:03:33",
     "artwork": {
-      "proxy_512": "/storage/artwork/abc123/512.jpg",
-      "proxy_320": "/storage/artwork/abc123/320.jpg",
-      "colors": ["#1a2b3c", "#4d5e6f", "#7a8b9c", "#0d1e2f", "#3c4d5e"]
+      "proxy_512": "http://remoment.local/storage/artwork/abc123/512.jpg",
+      "proxy_320": "http://remoment.local/storage/artwork/abc123/320.jpg",
+      "proxy_120": "http://remoment.local/storage/artwork/abc123/120.jpg",
+      "proxy_bg": "http://remoment.local/storage/artwork/abc123/bg_1024x600.jpg",
+      "colors": ["#1a2b3c", "#4d5e6f", "#7a8b9c", "#0d1e2f", "#3c4d5e"],
+      "safe_colors": ["#5d7fa3", "#4d5e6f", "#7a8b9c", "#4f86c4", "#3c4d5e"]
     }
   }
 }
 ```
 
-`now_playing` is `null` when the device is in standby or unreachable. `artwork` is absent on the first play of a new URL (processed asynchronously), present on all subsequent plays. `radio` and `source` keys are absent when not applicable — use whichever is present to identify playback type.
+`now_playing` is `null` when the device is in standby or unreachable. `artwork` is absent on the first play of a new URL (processed asynchronously), present on all subsequent plays. Artwork URLs are prefixed with `APP_URL` (root-relative `/storage/…` when it is empty); clients should take the path from `/storage/` on and prefix `artwork_base_url` from `GET /api/info`. `proxy_512`/`proxy_320`/`proxy_120` are square covers, `proxy_bg` a blurred, darkened 1024×600 background for the 7" client; all are **baseline** JPEGs (ESP32 TJpgDec can't decode progressive). `safe_colors` are `colors` lightened to ≥65% lightness for text/accents on dark backgrounds. An entry cached before a key existed may lack it until regenerated. `radio` and `source` keys are absent when not applicable — use whichever is present to identify playback type.
 
 ### Media Controls
 
@@ -293,7 +296,7 @@ The Mosquitto broker runs in Docker on port 1883. Each device's MQTT base topic 
 
 | Topic | Trigger | Payload |
 |-------|---------|---------|
-| `remoment/player/{id}/data` | New track starts | `{ "track": "Name", "artist": "Name", "artwork": { "proxy_512": "…", "proxy_320": "…", "colors": ["#…"] } }` |
+| `remoment/player/{id}/data` | New track starts | `{ "track": "Name", "artist": "Name", "artwork": { "proxy_512": "…", "proxy_320": "…", "proxy_120": "…", "proxy_bg": "…", "colors": ["#…"], "safe_colors": ["#…"] } }` (same `artwork` object as the REST API; ~600 bytes, so MQTT clients need a buffer above PubSubClient's 256-byte default) |
 | `remoment/player/{id}/progress` | Every second while playing | Progress as a percentage of the track, 0–100 (integer string) |
 | `remoment/player/{id}/state` | State transition (retained) | `{ "state": "playing" }` — `playing` / `paused` / `standby` / `unreachable` |
 | `remoment/player/{id}/volume` | Volume level changes (retained) | `{ "volume": 45 }` |
@@ -383,12 +386,14 @@ Domain objects represent live state; Eloquent models represent stored history.
 
 When a new track starts playing, `DispatchArtworkProcessing` dispatches the `ProcessArtwork` queued job. The job:
 1. Downloads the original image URL from the music service
-2. Resizes to 512×512 and 320×320 JPEG proxies, stored under `storage/app/public/artwork/{md5(url)}/`
+2. Resizes to square JPEG proxies (`SQUARE_SIZES`: 512, 320, 120 → `{size}.jpg`) and renders full-screen client backgrounds (`BACKGROUNDS`: `proxy_bg` → `bg_1024x600.jpg`; the cover scaled to fill, shrunk to 1/32 and scaled back up with blur passes, then overlaid with 60% black), stored under `storage/app/public/artwork/{md5(url)}/`. Add a background size by adding an entry to `ProcessArtwork::BACKGROUNDS` (and its key to `ArtworkCache::REQUIRED_KEYS`)
 3. Extracts 5 dominant colors via ColorThief
 4. Stores proxy URLs + hex colors in Redis (`artwork:{md5}`, 30-day TTL) via `ArtworkCache`
 5. Updates any matching `albums.colors` column in the database
 
-`app/Domain/Artwork/ArtworkCache.php` provides static helpers for reading/writing the cache. Artwork is absent on first play of a new URL (async), present on all subsequent plays.
+All JPEGs are encoded baseline (`JpegEncoder(progressive: false)`; Intervention's GD encoder calls `imageinterlace(false)`), regardless of the source image, because the ESP32's TJpgDec decoder can't read progressive JPEGs.
+
+`app/Domain/Artwork/ArtworkCache.php` provides static helpers for reading/writing the cache. `ArtworkCache::has()` is true only for **complete** entries (all `REQUIRED_KEYS`): an entry cached before a size was added is still served by `get()`, but is regenerated on next play, and `php artisan library:backfill-artwork` (scheduled daily) re-queues outdated entries for album covers as well as covers without colors. Artwork is absent on first play of a new URL (async), present on all subsequent plays.
 
 Run `php artisan storage:link` once on new environments to create the `public/storage` symlink.
 

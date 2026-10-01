@@ -9,6 +9,13 @@ final class ArtworkCache
 {
     private const TTL = 2592000; // 30 days
 
+    /**
+     * Keys every entry written by ProcessArtwork has. Entries cached before a
+     * key was added count as missing, so they get regenerated on next play
+     * (DispatchArtworkProcessing) or by `library:backfill-artwork`.
+     */
+    public const REQUIRED_KEYS = ['proxy_512', 'proxy_320', 'proxy_120', 'proxy_bg', 'colors', 'safe_colors'];
+
     public static function put(string $originalUrl, array $data): void
     {
         Cache::put(self::key($originalUrl), $data, self::TTL);
@@ -19,9 +26,17 @@ final class ArtworkCache
         return Cache::get(self::key($originalUrl));
     }
 
+    /** Whether a complete entry exists. A partial (outdated) entry is still returned by get(). */
     public static function has(string $originalUrl): bool
     {
-        return Cache::has(self::key($originalUrl));
+        $entry = self::get($originalUrl);
+
+        return is_array($entry) && self::isComplete($entry);
+    }
+
+    public static function isComplete(array $entry): bool
+    {
+        return array_diff(self::REQUIRED_KEYS, array_keys($entry)) === [];
     }
 
     public static function forget(string $originalUrl): void
