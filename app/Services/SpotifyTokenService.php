@@ -17,6 +17,15 @@ class SpotifyTokenService
         'user-library-read',
     ];
 
+    /**
+     * Requested on connect for liking tracks (PUT /api/devices/{id}/like),
+     * but not required: connections made before it was added keep working
+     * and only liking fails until the admin reconnects Spotify.
+     */
+    private const OPTIONAL_SCOPES = [
+        'user-library-modify',
+    ];
+
     private Session $session;
 
     public function __construct()
@@ -31,7 +40,7 @@ class SpotifyTokenService
     public function getAuthorizationUrl(): string
     {
         return $this->session->getAuthorizeUrl([
-            'scope' => self::SCOPES,
+            'scope' => [...self::SCOPES, ...self::OPTIONAL_SCOPES],
         ]);
     }
 

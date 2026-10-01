@@ -3,13 +3,16 @@
 namespace App\Integrations\Sonos;
 
 use App\Domain\Device\QueueItem;
+use App\Domain\Device\RepeatMode;
 use App\Integrations\Contracts\LibraryPlaybackInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
 use App\Integrations\Contracts\QueueInterface;
 use App\Integrations\Contracts\RadioControlInterface;
+use App\Integrations\Contracts\RepeatInterface;
 use App\Integrations\Contracts\SeekInterface;
+use App\Integrations\Contracts\ShuffleInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Integrations\Sonos\Connectors\MultiRoomControls;
 use App\Models\Device;
@@ -24,7 +27,7 @@ use duncan3dc\Sonos\Tracks\Track as SonosTrack;
 use duncan3dc\Sonos\Utils\Time;
 use Illuminate\Support\Collection as TrackCollection;
 
-class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, QueueInterface, RadioControlInterface, SeekInterface, VolumeControlInterface
+class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, QueueInterface, RadioControlInterface, RepeatInterface, SeekInterface, ShuffleInterface, VolumeControlInterface
 {
     use MultiRoomControls;
 
@@ -126,6 +129,33 @@ class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterf
     public function seek(int $seconds): void
     {
         $this->deviceApi->seek(Time::inSeconds(max(0, $seconds)));
+    }
+
+    public function setShuffle(bool $shuffle): void
+    {
+        [, $repeat] = $this->getPlayMode();
+        $this->setPlayMode($shuffle, $repeat ?? RepeatMode::Off);
+    }
+
+    public function setRepeat(RepeatMode $mode): void
+    {
+        [$shuffle] = $this->getPlayMode();
+        $this->setPlayMode($shuffle ?? false, $mode);
+    }
+
+    /** @return array{0: ?bool, 1: ?RepeatMode} */
+    public function getPlayMode(): array
+    {
+        $settings = $this->deviceApi->soap('AVTransport', 'GetTransportSettings')->getArray();
+
+        return PlayMode::parse((string) ($settings['PlayMode'] ?? ''));
+    }
+
+    private function setPlayMode(bool $shuffle, RepeatMode $repeat): void
+    {
+        $this->deviceApi->soap('AVTransport', 'SetPlayMode', [
+            'NewPlayMode' => PlayMode::build($shuffle, $repeat),
+        ]);
     }
 
     public function getUpNext(int $limit = 20): array

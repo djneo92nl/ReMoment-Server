@@ -106,7 +106,7 @@ Response: `{ "data": DeviceDetailResource }`
 
 `state` values: `playing` | `standby` | `paused` | `unreachable`
 
-`capabilities` values: `media_controls` | `volume_control` | `radio_control` | `source_control` | `source_activation` | `multi_room` | `library_playback` | `seek` | `queue`
+`capabilities` values: `media_controls` | `volume_control` | `radio_control` | `source_control` | `source_activation` | `multi_room` | `library_playback` | `seek` | `queue` | `shuffle` | `repeat` | `like`
 
 Always check `capabilities` before calling a feature endpoint — calling an unsupported feature returns `422`.
 
@@ -145,12 +145,13 @@ Always check `capabilities` before calling a feature endpoint — calling an uns
       "proxy_bg": "http://remoment.local/storage/artwork/abc123/bg_1024x600.jpg",
       "colors": ["#1a2b3c", "#4d5e6f", "#7a8b9c", "#0d1e2f", "#3c4d5e"],
       "safe_colors": ["#5d7fa3", "#4d5e6f", "#7a8b9c", "#4f86c4", "#3c4d5e"]
-    }
+    },
+    "modes": { "shuffle": false, "repeat": "off", "liked": null }
   }
 }
 ```
 
-`now_playing` is `null` when the device is in standby or unreachable. `artwork.kind` says what the image is: `album` (track/album cover), `radio` (the station's image from the stream or from its `image_url` in `/radio`, else a generated radio logo) or `source` (a generated logo for the source — Spotify, line-in, Bluetooth, TV, AirPlay/Cast, CD, or a music note — when nothing playing has an image). Logos have the same keys and go through the same pipeline as covers, so clients need no special case. A real image's `artwork` is absent on the first play of a new URL (processed asynchronously), present on all subsequent plays; logos are always present. Artwork URLs are prefixed with `APP_URL` (root-relative `/storage/…` when it is empty); clients should take the path from `/storage/` on and prefix `artwork_base_url` from `GET /api/info`. `proxy_512`/`proxy_320`/`proxy_120` are square covers, `proxy_bg` a blurred, darkened 1024×600 background for the 7" client; all are **baseline** JPEGs (ESP32 TJpgDec can't decode progressive). `safe_colors` are `colors` lightened to ≥65% lightness for text/accents on dark backgrounds. An entry cached before a key existed may lack it until regenerated. `radio` and `source` keys are absent when not applicable — use whichever is present to identify playback type.
+`now_playing` is `null` when the device is in standby or unreachable. `artwork.kind` says what the image is: `album` (track/album cover), `radio` (the station's image from the stream or from its `image_url` in `/radio`, else a generated radio logo) or `source` (a generated logo for the source — Spotify, line-in, Bluetooth, TV, AirPlay/Cast, CD, or a music note — when nothing playing has an image). Logos have the same keys and go through the same pipeline as covers, so clients need no special case. A real image's `artwork` is absent on the first play of a new URL (processed asynchronously), present on all subsequent plays; logos are always present. Artwork URLs are prefixed with `APP_URL` (root-relative `/storage/…` when it is empty); clients should take the path from `/storage/` on and prefix `artwork_base_url` from `GET /api/info`. `proxy_512`/`proxy_320`/`proxy_120` are square covers, `proxy_bg` a blurred, darkened 1024×600 background for the 7" client; all are **baseline** JPEGs (ESP32 TJpgDec can't decode progressive). `safe_colors` are `colors` lightened to ≥65% lightness for text/accents on dark backgrounds. An entry cached before a key existed may lack it until regenerated. `radio` and `source` keys are absent when not applicable — use whichever is present to identify playback type. `modes` is always present: `shuffle` (bool), `repeat` (`off` | `all` | `one`) and `liked` (bool), each `null` when unknown or unsupported; the same object is pushed on MQTT `/modes`.
 
 ### Media Controls
 
@@ -200,6 +201,18 @@ PUT  /api/devices/{id}/seek            body: { "position": 90 }  → { "status":
 ```
 
 `position` is an absolute offset in seconds within the current track.
+
+### Shuffle, Repeat, Like
+
+Require `shuffle` (Sonos, Spotify, Mozart), `repeat` (Sonos, Spotify, Mozart) and `like` (Spotify) respectively.
+
+```
+PUT  /api/devices/{id}/shuffle         body: { "shuffle": true }            → { "shuffle": true }
+PUT  /api/devices/{id}/repeat          body: { "repeat": "all" }            → { "repeat": "all" }
+PUT  /api/devices/{id}/like            body: { "liked": true }              → { "liked": true }
+```
+
+`repeat` is `off` | `all` (the queue/context) | `one` (the current track). `like` saves the playing track to (or removes it from) the Spotify library; it needs the `user-library-modify` scope, so a Spotify connection made before it was added must be reconnected at `/settings`. A successful change is written to `now_playing.modes` and MQTT `/modes` right away, then kept in sync by the device listener.
 
 ### Up Next (queue)
 
@@ -311,8 +324,9 @@ The Mosquitto broker runs in Docker on port 1883. Each device's MQTT base topic 
 | `remoment/player/{id}/progress` | Every second while playing | Progress as a percentage of the track, 0–100 (integer string) |
 | `remoment/player/{id}/state` | State transition (retained) | `{ "state": "playing" }` — `playing` / `paused` / `standby` / `unreachable` |
 | `remoment/player/{id}/volume` | Volume level changes (retained) | `{ "volume": 45 }` |
+| `remoment/player/{id}/modes` | Shuffle/repeat/liked changes (retained) | `{ "shuffle": true, "repeat": "off", "liked": null }` — as `now_playing.modes`; `null` = unknown/unsupported |
 
-`artwork` is absent in the MQTT payload if a real image is not yet processed; `kind` is `album` | `radio` | `source` as in the REST API. Published by the `PublishNowPlayingToMqtt`, `PublishProgressToMqtt`, `PublishStateToMqtt` and `PublishVolumeToMqtt` listeners. The server only publishes and never subscribes. Browsers subscribe over the WebSocket listener on port 9001 to drive live UI refreshes; see `docs/architecture/live-updates.md`.
+`artwork` is absent in the MQTT payload if a real image is not yet processed; `kind` is `album` | `radio` | `source` as in the REST API. Published by the `PublishNowPlayingToMqtt`, `PublishProgressToMqtt`, `PublishStateToMqtt`, `PublishVolumeToMqtt` and `PublishModesToMqtt` listeners. The server only publishes and never subscribes. Browsers subscribe over the WebSocket listener on port 9001 to drive live UI refreshes; see `docs/architecture/live-updates.md`.
 
 ---
 
@@ -326,6 +340,7 @@ Defined in `app/Providers/AppServiceProvider.php`:
 - `ProgressUpdated` → `UpdateDeviceCache`, `PublishProgressToMqtt`
 - `NowPlayingEnded` → `UpdateDeviceCache`, `ClosePlaybackHistory`
 - `VolumeUpdated` → `UpdateDeviceCache`, `PublishVolumeToMqtt`
+- `PlaybackModesUpdated` → `UpdateDeviceCache`, `PublishModesToMqtt`. Fired by listeners with the shuffle/repeat/liked they observe, and by the API after a change.
 - `DeviceStateChanged` → `PublishStateToMqtt`. Fired by `DeviceCache::updateState()` only when the cached state actually changes.
 
 Listeners are registered only here: event auto-discovery is disabled in `bootstrap/app.php`, because it registered every listener twice.
@@ -349,6 +364,8 @@ All drivers implement interfaces from `app/Integrations/Contracts/`:
 - `LibraryPlaybackInterface` – play a local DLNA track (ASE + Sonos)
 - `SeekInterface` – jump within the current track (Sonos, Spotify, Mozart)
 - `QueueInterface` – list up-next tracks (Sonos, Spotify)
+- `ShuffleInterface` / `RepeatInterface` – set shuffle and repeat (Sonos, Spotify, Mozart)
+- `LikeInterface` – like/save the playing track (Spotify)
 
 `App\Domain\Device\Capabilities::forDriver()` maps these contracts to the API capability strings from the driver class name, without instantiating the driver.
 
@@ -363,11 +380,11 @@ All drivers implement interfaces from `app/Integrations/Contracts/`:
 **Sonos** (`app/Integrations/Sonos/`)
 - Communicates via UPnP SOAP to device IP
 - Library: `duncan3dc/sonos` v3
-- Capabilities: media controls, volume, radio, multiroom, library playback, seek, queue
+- Capabilities: media controls, volume, radio, multiroom, library playback, seek, queue, shuffle, repeat
 
 **Spotify** (`app/Integrations/Spotify/`)
 - Virtual device — polls Spotify Web API every 3 seconds
-- Capabilities: media controls, seek, queue (cloud-controlled)
+- Capabilities: media controls, seek, queue, shuffle, repeat, like (cloud-controlled). Modes are reported for the Spotify device itself, not for a mapped local speaker
 - Can route playback to a mapped local device via `spotify_connect_name` device meta key
 
 ### Domain vs. Model Layer
@@ -388,7 +405,9 @@ Domain objects represent live state; Eloquent models represent stored history.
 | `device:{id}:last_seen` | Timestamp | 3600s |
 | `spotify_routed_to` | device ID integer | 30s |
 | `listener_running_{id}` | boolean flag | 10s |
+| `device:{id}:modes` | last known shuffle/repeat/liked (`PlaybackModes` array) | 3600s |
 | `mqtt_published_volume_{id}` | last volume published to MQTT (dedupe) | 3600s |
+| `mqtt_published_modes_{id}` | last `/modes` payload published to MQTT (dedupe) | 3600s |
 | `health:scheduler` / `health:queue` | ISO timestamp heartbeats for `/settings/health` | 86400s |
 
 `State` enum values: `playing` | `standby` | `paused` | `unreachable`

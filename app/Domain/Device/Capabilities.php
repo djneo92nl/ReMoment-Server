@@ -3,11 +3,14 @@
 namespace App\Domain\Device;
 
 use App\Integrations\Contracts\LibraryPlaybackInterface;
+use App\Integrations\Contracts\LikeInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
 use App\Integrations\Contracts\QueueInterface;
 use App\Integrations\Contracts\RadioControlInterface;
+use App\Integrations\Contracts\RepeatInterface;
 use App\Integrations\Contracts\SeekInterface;
+use App\Integrations\Contracts\ShuffleInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\SourcesInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
@@ -29,6 +32,9 @@ final class Capabilities
         'library_playback' => LibraryPlaybackInterface::class,
         'seek' => SeekInterface::class,
         'queue' => QueueInterface::class,
+        'shuffle' => ShuffleInterface::class,
+        'repeat' => RepeatInterface::class,
+        'like' => LikeInterface::class,
     ];
 
     /** @return string[] */

@@ -2,12 +2,14 @@
 
 namespace App\Listeners\Device;
 
+use App\Domain\Device\Cache\Modes;
 use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
 use App\Domain\Media\NowPlaying;
 use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
+use App\Events\Device\PlaybackModesUpdated;
 use App\Events\Device\ProgressUpdated;
 use App\Events\Device\VolumeUpdated;
 
@@ -63,6 +65,12 @@ class UpdateDeviceCache
 
         if ($event instanceof VolumeUpdated) {
             Volume::updateVolume($deviceId, $event->volume);
+
+            return;
+        }
+
+        if ($event instanceof PlaybackModesUpdated) {
+            Modes::put($deviceId, $event->modes);
 
             return;
         }

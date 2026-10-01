@@ -21,6 +21,10 @@ Route::put('/devices/{device}/mute', [DeviceController::class, 'setMute']);
 Route::put('/devices/{device}/seek', [DeviceController::class, 'seek']);
 Route::get('/devices/{device}/queue', [DeviceController::class, 'queue']);
 
+Route::put('/devices/{device}/shuffle', [DeviceController::class, 'setShuffle']);
+Route::put('/devices/{device}/repeat', [DeviceController::class, 'setRepeat']);
+Route::put('/devices/{device}/like', [DeviceController::class, 'setLike']);
+
 Route::get('/devices/{device}/sources', [DeviceController::class, 'sources']);
 Route::post('/devices/{device}/sources/activate', [DeviceController::class, 'activateSource']);
 

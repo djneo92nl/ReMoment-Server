@@ -2,16 +2,23 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Device\Cache\Modes;
+use App\Domain\Device\PlaybackModes;
+use App\Domain\Device\RepeatMode;
 use App\Domain\Device\State;
+use App\Events\Device\PlaybackModesUpdated;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\DeviceDetailResource;
 use App\Http\Resources\Api\DeviceListResource;
 use App\Integrations\Contracts\LibraryPlaybackInterface;
+use App\Integrations\Contracts\LikeInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
 use App\Integrations\Contracts\QueueInterface;
 use App\Integrations\Contracts\RadioControlInterface;
+use App\Integrations\Contracts\RepeatInterface;
 use App\Integrations\Contracts\SeekInterface;
+use App\Integrations\Contracts\ShuffleInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\SourcesInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
@@ -22,6 +29,7 @@ use App\Models\RadioStation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Validation\Rule;
 
 class DeviceController extends Controller
 {
@@ -115,6 +123,72 @@ class DeviceController extends Controller
         }
 
         return response()->json(['up_next' => array_map(fn ($item) => $item->toArray(), $items)]);
+    }
+
+    public function setShuffle(Request $request, Device $device): JsonResponse
+    {
+        $request->validate(['shuffle' => ['required', 'boolean']]);
+        $shuffle = $request->boolean('shuffle');
+
+        return $this->changeMode($device, ShuffleInterface::class, 'shuffle',
+            fn (ShuffleInterface $driver) => $driver->setShuffle($shuffle),
+            fn (PlaybackModes $modes) => $modes->withShuffle($shuffle),
+            ['shuffle' => $shuffle],
+        );
+    }
+
+    public function setRepeat(Request $request, Device $device): JsonResponse
+    {
+        $request->validate(['repeat' => ['required', 'string', Rule::enum(RepeatMode::class)]]);
+        $repeat = RepeatMode::from($request->string('repeat')->value());
+
+        return $this->changeMode($device, RepeatInterface::class, 'repeat',
+            fn (RepeatInterface $driver) => $driver->setRepeat($repeat),
+            fn (PlaybackModes $modes) => $modes->withRepeat($repeat),
+            ['repeat' => $repeat->value],
+        );
+    }
+
+    public function setLike(Request $request, Device $device): JsonResponse
+    {
+        $request->validate(['liked' => ['required', 'boolean']]);
+        $liked = $request->boolean('liked');
+
+        return $this->changeMode($device, LikeInterface::class, 'like',
+            fn (LikeInterface $driver) => $driver->setLiked($liked),
+            fn (PlaybackModes $modes) => $modes->withLiked($liked),
+            ['liked' => $liked],
+        );
+    }
+
+    /**
+     * Applies a shuffle/repeat/like change, then records it right away (cache
+     * + MQTT `/modes`) instead of waiting for the device listener to see it.
+     */
+    private function changeMode(Device $device, string $contract, string $capability, \Closure $apply, \Closure $update, array $response): JsonResponse
+    {
+        if ($error = $this->assertReachable($device)) {
+            return $error;
+        }
+
+        $driver = $device->driver;
+
+        if (!($driver instanceof $contract)) {
+            return $this->unsupported($capability);
+        }
+
+        try {
+            $apply($driver);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'driver_error',
+                'message' => 'The device did not respond: '.$e->getMessage(),
+            ], 502);
+        }
+
+        event(new PlaybackModesUpdated((string) $device->id, $update(Modes::get($device->id))));
+
+        return response()->json($response);
     }
 
     public function playRadio(Device $device, RadioStation $station): JsonResponse

@@ -4,14 +4,19 @@ namespace App\Integrations\Spotify;
 
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\QueueItem;
+use App\Domain\Device\RepeatMode;
+use App\Integrations\Contracts\LikeInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
 use App\Integrations\Contracts\QueueInterface;
+use App\Integrations\Contracts\RepeatInterface;
 use App\Integrations\Contracts\SeekInterface;
+use App\Integrations\Contracts\ShuffleInterface;
 use App\Models\Device;
 use App\Services\SpotifyTokenService;
+use Illuminate\Support\Facades\Cache;
 
-class MusicPlayerDriver implements MediaControlsInterface, MusicPlayerDriverInterface, QueueInterface, SeekInterface
+class MusicPlayerDriver implements LikeInterface, MediaControlsInterface, MusicPlayerDriverInterface, QueueInterface, RepeatInterface, SeekInterface, ShuffleInterface
 {
     public function __construct(public Device $device) {}
 
@@ -65,6 +70,57 @@ class MusicPlayerDriver implements MediaControlsInterface, MusicPlayerDriverInte
             duration: ($ms = data_get($item, 'duration_ms')) ? intdiv((int) $ms, 1000) : null,
             uri: data_get($item, 'uri'),
         ), $items);
+    }
+
+    public function setShuffle(bool $shuffle): void
+    {
+        $this->api()->shuffle(['state' => $shuffle]);
+    }
+
+    public function setRepeat(RepeatMode $mode): void
+    {
+        $this->api()->repeat(['state' => self::spotifyRepeatState($mode)]);
+    }
+
+    /** Saves the playing track to (or removes it from) the user's Liked Songs. */
+    public function setLiked(bool $liked): void
+    {
+        $api = $this->api();
+        $trackId = data_get($api->getMyCurrentPlaybackInfo(), 'item.id');
+
+        if (!$trackId) {
+            throw new \RuntimeException('Nothing is playing on Spotify.');
+        }
+
+        $liked ? $api->addMyTracks(['ids' => [$trackId]]) : $api->deleteMyTracks([$trackId]);
+
+        // So the listener reports the new value instead of its cached lookup.
+        Cache::put(self::likedCacheKey($trackId), $liked, 3600);
+    }
+
+    public static function likedCacheKey(string $trackId): string
+    {
+        return "spotify:liked:{$trackId}";
+    }
+
+    /** Spotify names repeat-all "context" and repeat-one "track". */
+    public static function spotifyRepeatState(RepeatMode $mode): string
+    {
+        return match ($mode) {
+            RepeatMode::Off => 'off',
+            RepeatMode::All => 'context',
+            RepeatMode::One => 'track',
+        };
+    }
+
+    public static function repeatModeFromSpotify(?string $state): ?RepeatMode
+    {
+        return match ($state) {
+            'off' => RepeatMode::Off,
+            'context' => RepeatMode::All,
+            'track' => RepeatMode::One,
+            default => null,
+        };
     }
 
     private function api(): \SpotifyWebAPI\SpotifyWebAPI

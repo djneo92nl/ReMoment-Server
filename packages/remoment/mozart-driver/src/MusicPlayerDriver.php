@@ -11,13 +11,16 @@ namespace Remoment\MozartDriver;
 use App\Domain\Device\AvailableSource;
 use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\DeviceCache;
+use App\Domain\Device\RepeatMode;
 use App\Domain\Device\State;
 use App\Integrations\Contracts\LibraryPlaybackInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
 use App\Integrations\Contracts\RadioControlInterface;
+use App\Integrations\Contracts\RepeatInterface;
 use App\Integrations\Contracts\SeekInterface;
+use App\Integrations\Contracts\ShuffleInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\SourcesInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
@@ -30,7 +33,7 @@ use Djneo92nl\BeoMozart\MozartClient;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
-class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, RadioControlInterface, SeekInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
+class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, RadioControlInterface, RepeatInterface, SeekInterface, ShuffleInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
 {
     public MozartClient $client;
 
@@ -85,6 +88,38 @@ class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterf
     public function seek(int $seconds): void
     {
         $this->client->playback()->seek(max(0, $seconds) * 1000);
+    }
+
+    // --- ShuffleInterface / RepeatInterface (PlayQueueSettings) ---
+    // NOTE: Mozart names repeat-off "none" and repeat-one "track".
+
+    public function setShuffle(bool $shuffle): void
+    {
+        $this->client->playback()->setQueueSettings(['shuffle' => $shuffle]);
+    }
+
+    public function setRepeat(RepeatMode $mode): void
+    {
+        $this->client->playback()->setQueueSettings(['repeat' => self::mozartRepeat($mode)]);
+    }
+
+    public static function mozartRepeat(RepeatMode $mode): string
+    {
+        return match ($mode) {
+            RepeatMode::Off => 'none',
+            RepeatMode::All => 'all',
+            RepeatMode::One => 'track',
+        };
+    }
+
+    public static function repeatModeFromMozart(mixed $repeat): ?RepeatMode
+    {
+        return match ($repeat) {
+            'none' => RepeatMode::Off,
+            'all' => RepeatMode::All,
+            'track' => RepeatMode::One,
+            default => null,
+        };
     }
 
     // --- VolumeControlInterface ---

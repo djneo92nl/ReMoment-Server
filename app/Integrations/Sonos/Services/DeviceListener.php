@@ -3,6 +3,7 @@
 namespace App\Integrations\Sonos\Services;
 
 use App\Domain\Device\DeviceCache;
+use App\Domain\Device\PlaybackModes;
 use App\Domain\Device\State;
 use App\Domain\Media\AlbumData;
 use App\Domain\Media\ArtistData;
@@ -11,8 +12,10 @@ use App\Domain\Media\Radio;
 use App\Domain\Media\TrackData;
 use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
+use App\Events\Device\PlaybackModesUpdated;
 use App\Events\Device\ProgressUpdated;
 use App\Events\Device\VolumeUpdated;
+use App\Integrations\Sonos\PlayMode;
 use duncan3dc\Sonos\Controller;
 use duncan3dc\Sonos\Interfaces\Devices\DeviceInterface;
 use duncan3dc\Sonos\Interfaces\NetworkInterface;
@@ -41,6 +44,7 @@ class DeviceListener
         $lastNowPlayingKey = null;
         $lastPositionSeconds = null;
         $lastVolume = null;
+        $lastModes = null;
 
         DeviceCache::updateState($deviceId, State::Unreachable);
 
@@ -57,6 +61,12 @@ class DeviceListener
                 if ($lastVolume === null || $volume !== $lastVolume) {
                     event(new VolumeUpdated(deviceId: $deviceId, volume: $volume));
                     $lastVolume = $volume;
+                }
+
+                $modes = $this->readModes($controller);
+                if ($lastModes === null || !$modes->equals($lastModes)) {
+                    event(new PlaybackModesUpdated(deviceId: $deviceId, modes: $modes));
+                    $lastModes = $modes;
                 }
 
                 if ($state === PlayState::Stopped) {
@@ -112,6 +122,21 @@ class DeviceListener
         }
 
         return $this->controller;
+    }
+
+    /** Shuffle and repeat from the transport's PlayMode; Sonos has no "liked". */
+    protected function readModes(Controller $controller): PlaybackModes
+    {
+        try {
+            $settings = $controller->soap('AVTransport', 'GetTransportSettings')->getArray();
+        } catch (\Throwable) {
+            // Not worth marking the speaker unreachable over.
+            return new PlaybackModes;
+        }
+
+        [$shuffle, $repeat] = PlayMode::parse((string) ($settings['PlayMode'] ?? ''));
+
+        return new PlaybackModes(shuffle: $shuffle, repeat: $repeat);
     }
 
     protected function buildNowPlaying(SonosState $details): ?NowPlaying

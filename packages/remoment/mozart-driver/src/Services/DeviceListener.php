@@ -3,6 +3,7 @@
 namespace Remoment\MozartDriver\Services;
 
 use App\Domain\Device\DeviceCache;
+use App\Domain\Device\PlaybackModes;
 use App\Domain\Device\State;
 use App\Domain\Media\AlbumData;
 use App\Domain\Media\ArtistData;
@@ -11,12 +12,14 @@ use App\Domain\Media\Radio;
 use App\Domain\Media\TrackData;
 use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
+use App\Events\Device\PlaybackModesUpdated;
 use App\Events\Device\ProgressUpdated;
 use App\Events\Device\VolumeUpdated;
 use Djneo92nl\BeoMozart\Enums\RenderingStateValue;
 use Djneo92nl\BeoMozart\WebSocket\EventClassifier;
 use Djneo92nl\BeoMozart\WebSocket\NotificationClient;
 use Illuminate\Support\Facades\Log;
+use Remoment\MozartDriver\MusicPlayerDriver;
 
 class DeviceListener
 {
@@ -77,6 +80,15 @@ class DeviceListener
 
     protected function applyEvent(string $eventType, mixed $eventData, string $deviceId): void
     {
+        if ($this->isQueueSettings($eventData)) {
+            event(new PlaybackModesUpdated(deviceId: $deviceId, modes: new PlaybackModes(
+                shuffle: isset($eventData['shuffle']) ? (bool) $eventData['shuffle'] : null,
+                repeat: MusicPlayerDriver::repeatModeFromMozart($eventData['repeat'] ?? null),
+            )));
+
+            return;
+        }
+
         $kind = $this->resolveEventKind($eventType, $eventData);
 
         switch ($kind) {
@@ -126,6 +138,18 @@ class DeviceListener
             default:
                 Log::info("Mozart listener [{$deviceId}]: unrecognized WS event type [{$eventType}]");
         }
+    }
+
+    /**
+     * PlayQueueSettings { repeat: all|track|none, shuffle: bool } — no other
+     * notification payload has these keys. Sniffed here since the eventType
+     * for it is undocumented, like every other Mozart eventType.
+     */
+    protected function isQueueSettings(mixed $eventData): bool
+    {
+        return is_array($eventData)
+            && (array_key_exists('shuffle', $eventData) || array_key_exists('repeat', $eventData))
+            && !array_key_exists('albumName', $eventData);
     }
 
     protected function applyRenderingState(string $value, string $deviceId): void

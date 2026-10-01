@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Api;
 
 use App\Domain\Artwork\NowPlayingArtwork;
+use App\Domain\Device\Cache\Modes;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
 use App\Models\Media\Track;
@@ -25,6 +26,8 @@ class DeviceDetailResource extends JsonResource
                 if ($artwork !== null) {
                     $nowPlaying['artwork'] = $artwork;
                 }
+
+                $nowPlaying['modes'] = Modes::get($this->id)->toArray();
 
                 $track = $this->resolveTrack($cachedNowPlaying);
                 if ($track) {

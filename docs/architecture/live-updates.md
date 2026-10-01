@@ -9,7 +9,8 @@ DeviceListener ──events──▶ UpdateDeviceCache ──▶ DeviceCache::up
                                           DeviceStateChanged ──▶ PublishStateToMqtt
 NowPlayingUpdated ──▶ PublishNowPlayingToMqtt ─┐
 ProgressUpdated   ──▶ PublishProgressToMqtt  ──┼──▶ Mosquitto :1883 ──(ws :9001)──▶ public/js/remoment-live.js
-VolumeUpdated     ──▶ PublishVolumeToMqtt    ──┘                                       │
+VolumeUpdated     ──▶ PublishVolumeToMqtt    ──┤
+PlaybackModes…    ──▶ PublishModesToMqtt     ──┘                                       │
                                                            Livewire: $wire.$refresh() ◀┤
                                                            /receiver: pollNow()       ◀┘
 ```
@@ -22,12 +23,13 @@ All under `remoment/player/{device_id}/`:
 |---|---|---|---|
 | `state` | yes | `DeviceCache::updateState()` sees a transition (not on every heartbeat write) | `{"state":"playing"}` — `playing`/`paused`/`standby`/`unreachable` |
 | `volume` | yes | `VolumeUpdated` with a level different from the last one published | `{"volume":45}` |
+| `modes` | yes | `PlaybackModesUpdated` with values different from the last ones published (listeners report on every poll; the API after a change) | `{"shuffle":true,"repeat":"off","liked":null}` — `repeat` is `off`/`all`/`one`; `null` = unknown or unsupported. Same object as `now_playing.modes` |
 | `data` | no | `NowPlayingUpdated` (new track) | `{"track","artist","artwork"?}` — `artwork` is `kind` (`album`/`radio`/`source`) plus the `ArtworkCache` entry: `proxy_512`, `proxy_320`, `proxy_120`, `proxy_bg` (1024×600 background) URLs plus `colors`/`safe_colors`; see CLAUDE.md "Artwork Caching". Without any image (line-in, TV, a station without a logo) it is a generated source/radio logo with the same keys, so it is absent only while a real image is first processed |
 | `progress` | no | `ProgressUpdated`, about once a second while playing | Percentage `0`–`100` as a plain string |
 
 The `data` payload is around 600 bytes with artwork. PubSubClient (ESP32/ESP8266) drops messages above its 256-byte default buffer, so firmware must call `setBufferSize()` (1024 or more).
 
-`state` and `volume` are retained so a firmware client that connects later gets the current value immediately.
+`state`, `volume` and `modes` are retained so a firmware client that connects later gets the current value immediately.
 
 Caveat: `state` only fires on writes through `DeviceCache::updateState()`. When a listener dies, its `device:{id}:state` key expires silently (TTL 3600s) and no `unreachable` message is sent — the UI's safety refresh (below) and `/settings/health` cover that case.
 
@@ -49,7 +51,7 @@ Two Alpine components are registered for Livewire views:
 
 | Component | Where | Behavior |
 |---|---|---|
-| `liveDevice(deviceId, fallbackMs = 1000, safetyMs = 30000)` | Root element of `DeviceCard`, `Nowplaying`, `DeviceQueue` (replaces `wire:poll.1s`) | Debounced `$wire.$refresh()` on non-retained `state`/`data`/`volume` messages for that device. Polls every `fallbackMs` while disconnected and every `safetyMs` while connected. |
+| `liveDevice(deviceId, fallbackMs = 1000, safetyMs = 30000)` | Root element of `DeviceCard`, `Nowplaying`, `DeviceQueue` (replaces `wire:poll.1s`) | Debounced `$wire.$refresh()` on non-retained `state`/`data`/`volume`/`modes` messages for that device. Polls every `fallbackMs` while disconnected and every `safetyMs` while connected. |
 | `progressTicker(deviceId, position, duration, playing)` | `<x-progress-ticker>` | Advances the bar and elapsed time locally every second. Calls `$wire.$refresh()` when the pushed `progress` percentage differs from the local estimate by more than 3 (e.g. after a seek from another client). Click-to-seek calls `$wire.seek(seconds)` when `seekable`. |
 
 `<x-progress-ticker>` is `wire:key`ed on position and play state, so each fresh server render re-seeds the ticker.

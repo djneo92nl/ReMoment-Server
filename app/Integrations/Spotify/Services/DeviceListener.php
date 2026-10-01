@@ -3,6 +3,7 @@
 namespace App\Integrations\Spotify\Services;
 
 use App\Domain\Device\DeviceCache;
+use App\Domain\Device\PlaybackModes;
 use App\Domain\Device\State;
 use App\Domain\Media\AlbumData;
 use App\Domain\Media\ArtistData;
@@ -10,9 +11,12 @@ use App\Domain\Media\NowPlaying;
 use App\Domain\Media\TrackData;
 use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
+use App\Events\Device\PlaybackModesUpdated;
 use App\Events\Device\ProgressUpdated;
+use App\Integrations\Spotify\MusicPlayerDriver;
 use App\Models\DeviceMeta;
 use App\Services\SpotifyTokenService;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use SpotifyWebAPI\SpotifyWebAPIException;
 
@@ -21,6 +25,8 @@ class DeviceListener
     protected int $pollIntervalSeconds = 3;
 
     protected ?\Closure $onError = null;
+
+    protected ?PlaybackModes $lastModes = null;
 
     public function __construct(protected SpotifyTokenService $tokenService) {}
 
@@ -74,6 +80,10 @@ class DeviceListener
 
                 $isPlaying = (bool) ($playback['is_playing'] ?? false);
                 $item = $playback['item'] ?? null;
+
+                if ($item !== null) {
+                    $this->reportModes($deviceId, $playback, $api);
+                }
 
                 if (!$isPlaying || $item === null) {
                     if ($lastNowPlayingKey !== null) {
@@ -171,6 +181,53 @@ class DeviceListener
                 sleep($retryDelaySeconds);
             }
         }
+    }
+
+    /**
+     * Shuffle/repeat come with every poll; whether the track is liked is
+     * looked up once per track. Reported for the Spotify device itself (not
+     * a mapped local speaker), since only it can change them.
+     */
+    protected function reportModes(string $deviceId, array $playback, \SpotifyWebAPI\SpotifyWebAPI $api): void
+    {
+        $modes = $this->modesFromPlayback($playback, $this->likedFor($playback['item']['id'] ?? null, $api));
+
+        if ($this->lastModes === null || !$this->lastModes->equals($modes)) {
+            event(new PlaybackModesUpdated(deviceId: $deviceId, modes: $modes));
+            $this->lastModes = $modes;
+        }
+    }
+
+    public function modesFromPlayback(array $playback, ?bool $liked): PlaybackModes
+    {
+        return new PlaybackModes(
+            shuffle: isset($playback['shuffle_state']) ? (bool) $playback['shuffle_state'] : null,
+            repeat: MusicPlayerDriver::repeatModeFromSpotify($playback['repeat_state'] ?? null),
+            liked: $liked,
+        );
+    }
+
+    /** Cached per track; MusicPlayerDriver::setLiked() writes the same key. */
+    protected function likedFor(?string $trackId, \SpotifyWebAPI\SpotifyWebAPI $api): ?bool
+    {
+        if (!$trackId) {
+            return null;
+        }
+
+        $cached = Cache::get(MusicPlayerDriver::likedCacheKey($trackId));
+        if (is_bool($cached)) {
+            return $cached;
+        }
+
+        try {
+            $liked = (bool) ($api->myTracksContains([$trackId])[0] ?? false);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        Cache::put(MusicPlayerDriver::likedCacheKey($trackId), $liked, 3600);
+
+        return $liked;
     }
 
     protected function buildNowPlaying(array $item, array $playback): ?NowPlaying
