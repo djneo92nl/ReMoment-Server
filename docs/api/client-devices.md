@@ -58,7 +58,7 @@ send transport commands, send PUT /heartbeat periodically
 
 ## Endpoints
 
-Base URL: `http://{server}/api`
+Base URL: `http://{server}/api` — find `{server}` via mDNS (`_remoment._tcp`, see `docs/architecture/discovery-for-clients.md`), then call `GET /api/info` (`docs/api/server-info.md`) for the MQTT broker address.
 
 All endpoints return JSON. No global authentication header is needed — the token passed in the URL is the credential.
 

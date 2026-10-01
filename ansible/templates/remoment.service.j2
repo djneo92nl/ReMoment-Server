@@ -1,0 +1,13 @@
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<!-- Managed by ansible (setup.yml). Lets client devices find ReMoment via mDNS.
+     See docs/architecture/discovery-for-clients.md. -->
+<service-group>
+  <name replace-wildcards="yes">ReMoment on %h</name>
+  <service>
+    <type>_remoment._tcp</type>
+    <port>{{ app_port }}</port>
+    <txt-record>path=/api</txt-record>
+    <txt-record>api_version={{ remoment_api_version }}</txt-record>
+  </service>
+</service-group>

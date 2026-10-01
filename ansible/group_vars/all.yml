@@ -5,6 +5,10 @@ app_branch: main
 app_url: http://remoment.local                          # Change to your server's URL or IP
 app_port: 80
 
+# Client-facing API contract version, advertised in the mDNS TXT record.
+# Keep in sync with App\Http\Controllers\Api\InfoController::API_VERSION.
+remoment_api_version: 1
+
 # UID/GID of the deploy user on the server (run: id -u && id -g)
 app_uid: 1000
 app_gid: 1000

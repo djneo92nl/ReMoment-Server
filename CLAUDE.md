@@ -23,6 +23,7 @@ docs/
     client-devices.md       DB schema, model, controller, admin UI internals
     device-drivers.md       Driver contracts, existing drivers, guide for adding a new brand
     device-discovery.md     Discovery commands, listener startup, device_meta keys
+    discovery-for-clients.md mDNS advertisement (_remoment._tcp via host Avahi) so clients find the server
     lastfm.md                Scrobbling, now-playing, auth flow, artist enrichment, backfill
     live-updates.md          MQTT-over-WebSocket push to Livewire + /receiver, topics, fallback polling
     plugin-architecture.md  Design doc: extracting drivers into composable packages
@@ -486,6 +487,8 @@ Defined in `compose.yaml` via Laravel Sail:
 - **mosquitto** – MQTT broker (port 1883; WebSockets on 9001 for browser live updates)
 - **meilisearch** – search (port 7700)
 - **Vite dev server** – port 5173
+
+Client devices find the server via mDNS (`_remoment._tcp`, TXT `path=/api`, `api_version`), advertised by Avahi on the Docker **host** — set up by `ansible/setup.yml`, not inside a container. See `docs/architecture/discovery-for-clients.md`.
 
 ---
 

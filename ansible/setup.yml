@@ -75,3 +75,30 @@
           owner: "{{ ansible_user }}"
           group: "{{ ansible_user }}"
           mode: '0755'
+
+    # mDNS advertisement for client devices runs on the host, not in Docker:
+    # multicast does not cross the compose bridge network reliably.
+    # See docs/architecture/discovery-for-clients.md.
+    - name: Install Avahi (mDNS responder)
+      ansible.builtin.apt:
+          name: avahi-daemon
+          state: present
+
+    - name: Advertise ReMoment as _remoment._tcp
+      ansible.builtin.template:
+          src: templates/remoment.service.j2
+          dest: /etc/avahi/services/remoment.service
+          mode: '0644'
+      notify: Restart Avahi
+
+    - name: Enable and start Avahi
+      ansible.builtin.systemd:
+          name: avahi-daemon
+          enabled: true
+          state: started
+
+  handlers:
+    - name: Restart Avahi
+      ansible.builtin.systemd:
+          name: avahi-daemon
+          state: restarted
