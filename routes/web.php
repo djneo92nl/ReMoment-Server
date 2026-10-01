@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AlbumController;
 use App\Http\Controllers\ArtistController;
+use App\Http\Controllers\ArtworkExportController;
 use App\Http\Controllers\DeviceController;
 use App\Http\Controllers\GenreController;
 use App\Http\Controllers\HistoryController;
@@ -89,6 +90,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/settings/lastfm/disconnect', [LastfmAuthController::class, 'disconnect'])->name('lastfm.disconnect');
 
     Route::get('/settings/clients', [SettingsController::class, 'clients'])->name('settings.clients');
+    Route::post('/settings/clients/artwork-export', [ArtworkExportController::class, 'store'])->name('settings.clients.artwork-export');
+    Route::get('/settings/clients/artwork-export/download', [ArtworkExportController::class, 'download'])->name('settings.clients.artwork-export.download');
 });
 
 require __DIR__.'/auth.php';

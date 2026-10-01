@@ -243,7 +243,7 @@ URLs have the same form as in `now_playing.artwork`: take the path from `/storag
 
 Returns `HTTP 404` for an unknown token and `422` for an invalid `cursor`.
 
-**Suggested firmware use:** run a sweep after boot or once a day while idle, download only hashes missing from the SD cache, newest first, and throttle downloads so playback updates stay responsive. For a first fill, the SD card export (admin, `/settings/clients`) is faster.
+**Suggested firmware use:** run a sweep after boot or once a day while idle, download only hashes missing from the SD cache, newest first, and throttle downloads so playback updates stay responsive. For a first fill, the SD card export (admin, `/settings/clients`, see `docs/architecture/sd-card-export.md`) is faster: it holds the same hashes in the card layout `remoment/covers/{hash}.jpg` and `remoment/backgrounds/{hash}.jpg`.
 
 ---
 

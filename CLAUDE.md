@@ -26,6 +26,7 @@ docs/
     discovery-for-clients.md mDNS advertisement (_remoment._tcp via host Avahi) so clients find the server
     lastfm.md                Scrobbling, now-playing, auth flow, artist enrichment, backfill
     live-updates.md          MQTT-over-WebSocket push to Livewire + /receiver, topics, fallback polling
+    sd-card-export.md        Admin zip of recent covers/backgrounds + logos in the touch client's SD layout
     plugin-architecture.md  Design doc: extracting drivers into composable packages
     setup-wizard.md          First-time setup wizard: steps, Setting flags, auto-redirect middleware
   frontend/
@@ -64,6 +65,9 @@ php artisan dlna:scan {server_id}
 
 # Queue missing artwork for the last N played albums (scheduled daily)
 php artisan artwork:prerender [--limit=500] [--max-jobs=100]
+
+# Build the SD card artwork zip for the touch client (also on /settings/clients)
+php artisan artwork:export-sd [--limit=500] [--queue]
 ```
 
 ## REST API Reference
@@ -404,6 +408,8 @@ All JPEGs are encoded baseline (`JpegEncoder(progressive: false)`; Intervention'
 
 **Recently played albums** (`app/Domain/Artwork/LibraryArtwork.php`): `albumsByRecency()` orders library albums by their last play in `plays` (newest first), then never-played albums by id; `recentCoverUrls()` gives the covers of the last `config('artwork.recent_albums')` (`ARTWORK_RECENT_ALBUMS`, default 500) distinct albums played. `php artisan artwork:prerender` (scheduled daily) queues `ProcessArtwork` for those whose entry isn't complete (`ArtworkCache::has()`), at most `artwork.prerender_max_jobs` (`ARTWORK_PRERENDER_MAX_JOBS`, default 100) per run, newest first, and doesn't re-queue a cover it queued in the last 12 hours — so a big backlog is worked off over several days without flooding the queue.
 
+**SD card export:** `php artisan artwork:export-sd` or `/settings/clients` builds `storage/app/private/exports/remoment-sd-artwork.zip` (queued `BuildSdCardExport`): `remoment/covers/{hash}.jpg` (320.jpg) and `remoment/backgrounds/{hash}.jpg` (bg_1024x600.jpg) byte copies for the recent albums and the source logos, plus a README.txt; extract at the SD card root. See `docs/architecture/sd-card-export.md`.
+
 **Logos for playback without an image** (`app/Domain/Artwork/`): `NowPlayingArtwork` picks the image for a `NowPlaying` (cover → radio station `image_url` from `/radio` → generated logo) and adds `kind`; it is used by both `PublishNowPlayingToMqtt` and `DeviceDetailResource`. `SourceLogo` maps the source's `sourceType`/`name`/`connector`/`category` to a logo key (`spotify`, `radio`, `line_in`, `bluetooth`, `tv`, `cast`, `cd`, default `music`) and addresses it by a pseudo URL `remoment:logo/v{VERSION}/{key}`, so its hash is the same on every server. `LogoRenderer` draws the glyph (off-white line icon on a #181818 square, GD, 4× supersampled, deterministic); `ProcessArtwork` renders it instead of downloading. Missing logo entries are rendered synchronously (~0.2s, a handful of logos). Bump `SourceLogo::VERSION` when a glyph changes so clients' hash-keyed caches pick it up.
 
 Run `php artisan storage:link` once on new environments to create the `public/storage` symlink.
@@ -544,7 +550,7 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 - `/settings/health` — scheduler, queue worker, MQTT broker and per-device listener health
 - `/settings/dlna` — discover DLNA servers, trigger library scans
 - `/settings/spotify-connect` — map Spotify Connect speaker names to local devices
-- `/settings/clients` — manage client device registrations; approve/reject pending, assign devices, view tokens
+- `/settings/clients` — manage client device registrations; approve/reject pending, assign devices, view tokens; build/download the SD card artwork zip (see `docs/architecture/sd-card-export.md`)
 
 ### Controllers
 

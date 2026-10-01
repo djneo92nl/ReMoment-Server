@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Artwork\SdCardExport;
 use App\Domain\Device\DeviceCache;
 use App\Integrations\Spotify\MusicPlayerDriver as SpotifyDriver;
 use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
@@ -209,8 +210,10 @@ class SettingsController extends Controller
     {
         $clientCount = Client::count();
         $pendingCount = Client::where('status', 'pending')->count();
+        $artworkExport = SdCardExport::meta();
+        $artworkExportPendingSince = SdCardExport::pendingSince();
 
-        return view('settings.clients', compact('clientCount', 'pendingCount'));
+        return view('settings.clients', compact('clientCount', 'pendingCount', 'artworkExport', 'artworkExportPendingSince'));
     }
 
     public function startAllListeners()
