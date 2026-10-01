@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Artwork\RadioStationArtwork;
 use App\Domain\Device\Cache\Modes;
 use App\Domain\Device\PlaybackModes;
 use App\Domain\Device\RepeatMode;
@@ -220,6 +221,36 @@ class DeviceController extends Controller
         event(new PlaybackModesUpdated((string) $device->id, $update(Modes::get($device->id))));
 
         return response()->json($response);
+    }
+
+    /** The stations playRadio() accepts for this device, in /radio's order (by name). */
+    public function radioStations(Device $device): JsonResponse
+    {
+        if ($error = $this->assertReachable($device)) {
+            return $error;
+        }
+
+        $driver = $device->driver;
+
+        if (!($driver instanceof RadioControlInterface)) {
+            return $this->unsupported('radio_control');
+        }
+
+        $stations = RadioStation::query()
+            ->with('meta')
+            ->orderBy('name')
+            ->get()
+            ->filter(fn (RadioStation $station) => $driver->canPlayRadioStation($station))
+            ->map(fn (RadioStation $station) => [
+                'id' => $station->id,
+                'name' => $station->name,
+                // RadioStation has no genre yet; kept in the shape for clients.
+                'genre' => null,
+                'artwork' => RadioStationArtwork::resolve($station),
+            ])
+            ->values();
+
+        return response()->json(['stations' => $stations]);
     }
 
     public function playRadio(Device $device, RadioStation $station): JsonResponse

@@ -264,10 +264,13 @@ POST /api/devices/{id}/sources/activate  body: { "source_id": "MUSIC" }   → { 
 ### Radio
 
 ```
+GET  /api/devices/{id}/radio                → { "stations": [ RadioStationItem, … ] }
 POST /api/devices/{id}/radio/{station_id}   → { "status": "ok", "station": "Radio 1" }
 ```
 
-`station_id` is the `RadioStation` model ID. The device must have `radio_control` capability and a compatible radio platform.
+`station_id` is the `RadioStation` model ID. The device must have `radio_control` capability and a compatible radio platform. `GET` lists exactly the stations with an identifier for the device's platform (`beoradio` for ASE/Mozart, `tunein` for Sonos), ordered by name like `/radio`; `422` without `radio_control`, `503` while unreachable (building the driver may contact the device).
+
+**RadioStationItem shape:** `{ "id": 3, "name": "Radio 1", "genre": null, "artwork": { "kind": "radio", "proxy_512": "…", … } | null }`. `genre` is always `null` for now (stations have no genre field). `artwork` is the same object as `now_playing.artwork`: the station's `image_url`, else the generated radio logo. An `image_url` that isn't processed yet gives `null` and is queued (at most once an hour per image), so the request never waits for a download.
 
 ### Multiroom
 
