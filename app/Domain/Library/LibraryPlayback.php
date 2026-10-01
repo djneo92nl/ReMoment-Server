@@ -145,24 +145,40 @@ class LibraryPlayback
         throw new NotPlayableException("\"{$track->name}\" can't be played on {$device->device_name}.");
     }
 
-    /** A Spotify playlist plays as its Spotify context; any other through the device's library driver. */
-    public function playPlaylist(Device $device, Playlist $playlist): PlaybackResult
+    /** Tracks in playlist order, with what playback reads; $limit for a listing. */
+    public static function playlistTracks(Playlist $playlist, ?int $limit = null): Collection
     {
+        return $playlist->tracks()
+            ->orderBy('playlist_track.id')
+            ->with(['artist', 'metadata' => fn ($q) => $q->whereIn('key', self::PLAYBACK_METADATA)])
+            ->when($limit !== null, fn ($q) => $q->limit($limit))
+            ->get();
+    }
+
+    /**
+     * A Spotify playlist plays as its Spotify context (offset at $start, or a
+     * random track when shuffling) on a device that can play Spotify; any
+     * playlist otherwise as its tracks, like an album (DLNA, then Spotify
+     * track URIs). Sets the playlist's `last_played_at` once started.
+     */
+    public function playPlaylist(Device $device, Playlist $playlist, ?Track $start = null, bool $shuffle = false): PlaybackResult
+    {
+        $tracks = self::playlistTracks($playlist);
         $spotifyUri = str_starts_with((string) $playlist->external_id, 'spotify:playlist:') ? $playlist->external_id : null;
 
         if ($spotifyUri !== null && self::canPlaySpotify($device)) {
-            $this->playOnSpotify($device, collect(), context: $spotifyUri);
+            $spotifyTracks = $tracks->filter(fn (Track $t) => self::spotifyUri($t) !== null)->values();
+            $uris = self::order($spotifyTracks, $start, $shuffle)->map(fn (Track $t) => self::spotifyUri($t));
+            $this->playOnSpotify($device, $uris, $start ? self::spotifyUri($start) : null, $shuffle, context: $spotifyUri);
 
-            return new PlaybackResult(PlaybackResult::VIA_SPOTIFY, 0, 0);
+            $result = new PlaybackResult(PlaybackResult::VIA_SPOTIFY, $spotifyTracks->count(), $tracks->count());
+        } else {
+            $result = $this->playTracks($device, $tracks, $start, $shuffle);
         }
 
-        if (self::canPlayDlna($device)) {
-            $this->onDriver(fn () => $device->driver->playLibraryPlaylist($playlist));
+        $playlist->forceFill(['last_played_at' => now()])->save();
 
-            return new PlaybackResult(PlaybackResult::VIA_DLNA, 0, 0);
-        }
-
-        throw new NotPlayableException("\"{$playlist->name}\" can't be played on {$device->device_name}.");
+        return $result;
     }
 
     /**

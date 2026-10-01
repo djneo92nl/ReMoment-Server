@@ -523,9 +523,14 @@ class DeviceController extends Controller
         );
     }
 
+    /** Plays a library playlist, optionally from a track of it and shuffled; see docs/api/library.md. */
     public function libraryPlayPlaylist(Request $request, Device $device, LibraryPlayback $library): JsonResponse
     {
-        $request->validate(['playlist_id' => ['required', 'integer', 'exists:playlists,id']]);
+        $data = $request->validate([
+            'playlist_id' => ['required', 'integer', 'exists:playlists,id'],
+            'start_track_id' => ['nullable', 'integer', Rule::exists('playlist_track', 'track_id')->where('playlist_id', $request->integer('playlist_id'))],
+            'shuffle' => ['nullable', 'boolean'],
+        ]);
 
         if ($error = $this->assertReachable($device)) {
             return $error;
@@ -535,9 +540,10 @@ class DeviceController extends Controller
             return $this->unsupported('library_playback');
         }
 
-        $playlist = Playlist::findOrFail($request->integer('playlist_id'));
+        $playlist = Playlist::findOrFail($data['playlist_id']);
+        $start = isset($data['start_track_id']) ? Track::with('metadata')->find($data['start_track_id']) : null;
 
-        return $this->playFromLibrary(fn () => $library->playPlaylist($device, $playlist), ['playlist' => $playlist->name]);
+        return $this->playFromLibrary(fn () => $library->playPlaylist($device, $playlist, $start, $request->boolean('shuffle')), ['playlist' => $playlist->name]);
     }
 
     /** Plays a library album by DLNA or Spotify; see docs/api/library.md. */

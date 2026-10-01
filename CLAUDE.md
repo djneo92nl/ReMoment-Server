@@ -18,7 +18,7 @@ Detailed documentation lives in `docs/`. CLAUDE.md holds enough context to under
 docs/
   api/
     client-devices.md       Client device registration flow, all endpoints, firmware guide
-    library.md              Library browse, favorites, play album/artist on a device (DLNA or Spotify)
+    library.md              Library browse (artists, albums, playlists), favorites, play album/artist/playlist on a device (DLNA or Spotify), playlist artwork
     server-info.md          GET /api/info bootstrap endpoint (API/MQTT/artwork addresses for clients)
   architecture/
     client-devices.md       DB schema, model, controller, admin UI internals
@@ -69,7 +69,7 @@ php artisan library:scan [--server=192.168.1.20]
 php artisan library:merge-duplicates --dry-run
 php artisan library:merge-duplicates [--force]
 
-# Queue missing artwork for the last N played albums (scheduled daily)
+# Queue missing artwork for playlist covers and the last N played albums (scheduled daily)
 php artisan artwork:prerender [--limit=500] [--max-jobs=100]
 
 # Build the SD card artwork zip for the touch client (also on /settings/clients)
@@ -322,24 +322,26 @@ Browse, favorites and playback for clients; full shapes in `docs/api/library.md`
 GET  /api/library/artists?cursor=          → { data: [ArtistItem], next_cursor }   alphabetical ("The " ignored), 50/page, only artists with albums
 GET  /api/library/artists/{id}             → { id, name, favorite, albums: [AlbumItem] }   newest year first, then name
 GET  /api/library/albums/{id}?device_id=   → { id, name, artist: {id, name}, year, artwork, favorite, playable, tracks: [{ id, name, duration, playable }] }
+GET  /api/library/playlists?cursor=        → { data: [PlaylistItem], next_cursor }   recently played (last_played_at) first, then by name, 50/page, only playlists with tracks
+GET  /api/library/playlists/{id}?device_id= → { id, name, owner, artwork, playable, tracks: [{ id, name, artist_name, duration, playable }] }   playlist order, first 200
 GET  /api/library/recent?limit=30          → { data: [AlbumItem] }   most recently played distinct albums (limit 1–100)
 GET  /api/library/favorites                → { albums: [AlbumItem], artists: [ArtistItem] }   most recently favorited first
 PUT  /api/library/albums/{id}/favorite     body: { "favorite": true }   → { "favorite": true }
 PUT  /api/library/artists/{id}/favorite    body: { "favorite": true }   → { "favorite": true }
 ```
 
-ArtistItem `{ id, name, album_count, artwork, favorite }`; AlbumItem `{ id, name, artist_name, year, artwork, favorite }`. Favorites are household-wide (`favorited_at` on `albums`/`artists`; the web album/artist pages toggle them too). There is one record per artist/album/track across sources (see [Library identity](#library-identity)); ids of records merged by `library:merge-duplicates` disappear, so clients get `404` (or `422` in play bodies) for a stale id and should re-read the list.
+ArtistItem `{ id, name, album_count, artwork, favorite }`; AlbumItem `{ id, name, artist_name, year, artwork, favorite }`; PlaylistItem `{ id, name, track_count, owner, artwork }` (`owner` = Spotify owner or `null`; `artwork` = the generated playlist cover, see [Artwork](#artwork-caching--processing)). A playlist counts as played when started from the server (API or web), which sets `playlists.last_played_at`. Favorites are household-wide (`favorited_at` on `albums`/`artists`; the web album/artist pages toggle them too). There is one record per artist/album/track across sources (see [Library identity](#library-identity)); ids of records merged by `library:merge-duplicates` disappear, so clients get `404` (or `422` in play bodies) for a stale id and should re-read the list.
 
 **Playing from the library**
 
 ```
 POST /api/devices/{id}/library/play            body: { "track_id": 42 }                                        → { "status": "ok", "track": "Song Title" }
-POST /api/devices/{id}/library/play-playlist   body: { "playlist_id": 3 }                                      → { "status": "ok", "playlist": "…" }
+POST /api/devices/{id}/library/play-playlist   body: { "playlist_id": 3, "start_track_id": 12, "shuffle": false } → { "status": "ok", "playlist": "…" }
 POST /api/devices/{id}/library/play-album      body: { "album_id": 12, "start_track_id": 34, "shuffle": false } → { "status": "ok", "album": "…" }
 POST /api/devices/{id}/library/play-artist     body: { "artist_id": 5, "shuffle": true }                        → { "status": "ok", "artist": "…" }
 ```
 
-`App\Domain\Library\LibraryPlayback` (shared with the web play buttons) tries **DLNA** first — the device's `LibraryPlaybackInterface` driver, for tracks with a `dlna_url` — then **Spotify** — when Spotify is connected and the device is the Spotify device or mapped to a Spotify Connect name, for tracks with a Spotify URI (`external_id` `spotify:track:…`): (the track's own `external_id`, or kept as `external_id` metadata with source `spotify` on a merged track): an album plays as its Spotify album context (URI looked up once, stored as album metadata `spotify_album_uri`), an artist as a list of track URIs, a Spotify playlist as its context. A device has `library_playback` when either path exists. Errors: `422` `not_playable` (play-album/artist: neither path works), `422` `no_dlna_url` (`/library/play` on a DLNA device without a stream for the track), `422` `unsupported` (`/library/play`, `/play-playlist` without `library_playback`), `503` unreachable, `502` `driver_error` (device or Spotify failed, or Spotify doesn't list the mapped speaker).
+`App\Domain\Library\LibraryPlayback` (shared with the web play buttons) tries **DLNA** first — the device's `LibraryPlaybackInterface` driver, for tracks with a `dlna_url` — then **Spotify** — when Spotify is connected and the device is the Spotify device or mapped to a Spotify Connect name, for tracks with a Spotify URI (`external_id` `spotify:track:…`): (the track's own `external_id`, or kept as `external_id` metadata with source `spotify` on a merged track): an album plays as its Spotify album context (URI looked up once, stored as album metadata `spotify_album_uri`), an artist as a list of track URIs, a Spotify playlist as its context (offset at `start_track_id`, or random when shuffling); other playlists play their tracks like an album. `start_track_id`/`shuffle` are optional on play-album and play-playlist. A device has `library_playback` when either path exists. Errors: `422` `not_playable` (play-album/artist/playlist: neither path works), `422` `no_dlna_url` (`/library/play` on a DLNA device without a stream for the track), `422` `unsupported` (`/library/play`, `/play-playlist` without `library_playback`), `503` unreachable, `502` `driver_error` (device or Spotify failed, or Spotify doesn't list the mapped speaker).
 
 ### Client Device API
 
@@ -353,7 +355,7 @@ PUT   /api/clients/{api_token}/heartbeat              → updates IP, firmware, 
 GET   /api/clients/{api_token}/artwork?cursor=        → processed library covers to pre-cache, by hash
 ```
 
-The artwork list is `{ data: [{ kind, hash, proxy_320, proxy_120, proxy_bg, proxy_bg_320x480 }], next_cursor }`: the eight source logos (`kind: "source"`, first page only), then library albums whose cover is fully processed (`kind: "album"`), most recently played first, then the never-played rest by id. 200 albums are scanned per page (an offset cursor), so pages can be short; follow `next_cursor` until `null`. Unprocessed covers are skipped, not queued.
+The artwork list is `{ data: [{ kind, hash, proxy_320, proxy_120, proxy_bg, proxy_bg_320x480 }], next_cursor }`: the eight source logos (`kind: "source"`, first page only), processed playlist covers that aren't just an album's cover (`kind: "playlist"`: composites and playlists' own images, recently played first, first page only), then library albums whose cover is fully processed (`kind: "album"`), most recently played first, then the never-played rest by id. 200 albums are scanned per page (an offset cursor), so pages can be short; follow `next_cursor` until `null`. Unprocessed covers are skipped, not queued.
 
 See `docs/api/client-devices.md` for full request/response shapes, the registration flow, firmware implementation notes, and an Arduino sketch outline.
 
@@ -480,6 +482,8 @@ All JPEGs are encoded baseline (`JpegEncoder(progressive: false)`; Intervention'
 **SD card export:** `php artisan artwork:export-sd [--size=1024x600|320x480]` or `/settings/clients` (size selector) builds `storage/app/private/exports/remoment-sd-artwork-{size}.zip` (queued `BuildSdCardExport`, one zip per size): `remoment/covers/{hash}.jpg` (320.jpg) and `remoment/backgrounds/{hash}.jpg` (`bg_{size}.jpg`, the client's single backgrounds folder) byte copies for the recent albums and the source logos, plus a README.txt; extract at the SD card root. See `docs/architecture/sd-card-export.md`.
 
 **Logos for playback without an image** (`app/Domain/Artwork/`): `NowPlayingArtwork` picks the image for a `NowPlaying` (cover → radio station `image_url` from `/radio` → generated logo) and adds `kind`; it is used by both `PublishNowPlayingToMqtt` and `DeviceDetailResource`. `SourceLogo` maps the source's `sourceType`/`name`/`connector`/`category` to a logo key (`spotify`, `radio`, `line_in`, `bluetooth`, `tv`, `cast`, `cd`, default `music`) and addresses it by a pseudo URL `remoment:logo/v{VERSION}/{key}`, so its hash is the same on every server. `LogoRenderer` draws the glyph (off-white line icon on a #181818 square, GD, 4× supersampled, deterministic); `ProcessArtwork` renders it instead of downloading. Missing logo entries are rendered synchronously (~0.2s, a handful of logos). Bump `SourceLogo::VERSION` when a glyph changes so clients' hash-keyed caches pick it up.
+
+**Playlist covers** (`app/Domain/Artwork/PlaylistArtwork.php`): a 2×2 mosaic of the covers of the 4 albums with the most tracks in the playlist (ties by playlist order; distinct cover URLs), drawn by `PlaylistCompositeRenderer` (1024² PNG from each cover's processed 512 proxy, else downloaded directly) and processed by `ProcessArtwork` like any cover under the pseudo URL `remoment:playlist/v{VERSION}/{md5 of the 4 cover URLs}`. The URL is a hash, so the job is dispatched with its 4 source URLs (`new ProcessArtwork($url, $sources)`; a composite without matching sources is skipped). 1–3 distinct covers → the first album's cover; none → the playlist's own image. The mosaic is used even when the playlist has its own image, for a consistent look. `artwork:prerender` queues missing playlist covers first (they share `--max-jobs`), `library:backfill-artwork` queues missing/outdated ones; a changed playlist gets a new URL, so a new composite. Bump `PlaylistArtwork::VERSION` when the layout changes.
 
 Run `php artisan storage:link` once on new environments to create the `public/storage` symlink.
 

@@ -15,15 +15,18 @@ final class LibraryItemArtwork
 {
     private const KEYS = ['proxy_120', 'proxy_320'];
 
-    /** @return array{hash: string, proxy_120: string, proxy_320: string}|null */
-    public static function forUrl(?string $url): ?array
+    /**
+     * @param  array<int, string>  $sources  For a playlist composite: its covers (see ProcessArtwork)
+     * @return array{hash: string, proxy_120: string, proxy_320: string}|null
+     */
+    public static function forUrl(?string $url, array $sources = []): ?array
     {
         if ($url === null || $url === '') {
             return null;
         }
 
         if (!ArtworkCache::has($url) && Cache::add('artwork:library-queued:'.md5($url), true, now()->addHour())) {
-            ProcessArtwork::dispatch($url);
+            ProcessArtwork::dispatch($url, $sources);
         }
 
         $entry = ArtworkCache::get($url);

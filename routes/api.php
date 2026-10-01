@@ -47,6 +47,8 @@ Route::get('/library/artists/{artist}', [LibraryController::class, 'artist']);
 Route::put('/library/artists/{artist}/favorite', [LibraryController::class, 'favoriteArtist']);
 Route::get('/library/albums/{album}', [LibraryController::class, 'album']);
 Route::put('/library/albums/{album}/favorite', [LibraryController::class, 'favoriteAlbum']);
+Route::get('/library/playlists', [LibraryController::class, 'playlists']);
+Route::get('/library/playlists/{playlist}', [LibraryController::class, 'playlist']);
 Route::get('/library/recent', [LibraryController::class, 'recent']);
 Route::get('/library/favorites', [LibraryController::class, 'favorites']);
 

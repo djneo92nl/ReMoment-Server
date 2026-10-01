@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Domain\Artwork\ArtworkCache;
+use App\Domain\Artwork\PlaylistArtwork;
 use App\Jobs\ProcessArtwork;
 use App\Models\Media\Album;
 use Illuminate\Console\Command;
@@ -11,7 +12,7 @@ class BackfillAlbumArtwork extends Command
 {
     protected $signature = 'library:backfill-artwork';
 
-    protected $description = 'Queue color/artwork extraction for album covers with no colors yet, or whose cached proxies are outdated';
+    protected $description = 'Queue color/artwork extraction for album covers with no colors yet, or whose cached proxies are outdated, and for playlist covers that are missing or outdated';
 
     public function handle(): int
     {
@@ -31,17 +32,24 @@ class BackfillAlbumArtwork extends Command
             ->unique()
             ->values();
 
-        if ($urls->isEmpty()) {
+        // Playlist covers (composites included) that are missing or outdated;
+        // a composite's URL changes with its covers, so a changed playlist shows up here too.
+        $playlists = PlaylistArtwork::all()
+            ->reject(fn (array $choice) => ArtworkCache::has($choice['url']) || $urls->contains($choice['url']));
+
+        $jobs = $urls->map(fn (string $url) => ['url' => $url, 'sources' => []])->concat($playlists);
+
+        if ($jobs->isEmpty()) {
             $this->info('Nothing to backfill.');
 
             return self::SUCCESS;
         }
 
-        $this->info("Queuing artwork processing for {$urls->count()} unique cover(s)...");
-        $bar = $this->output->createProgressBar($urls->count());
+        $this->info("Queuing artwork processing for {$jobs->count()} unique cover(s)...");
+        $bar = $this->output->createProgressBar($jobs->count());
 
-        foreach ($urls as $url) {
-            ProcessArtwork::dispatch($url);
+        foreach ($jobs as $job) {
+            ProcessArtwork::dispatch($job['url'], $job['sources']);
             $bar->advance();
         }
 

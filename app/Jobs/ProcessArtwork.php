@@ -5,6 +5,8 @@ namespace App\Jobs;
 use App\Domain\Artwork\ArtworkBackgrounds;
 use App\Domain\Artwork\ArtworkCache;
 use App\Domain\Artwork\LogoRenderer;
+use App\Domain\Artwork\PlaylistArtwork;
+use App\Domain\Artwork\PlaylistCompositeRenderer;
 use App\Domain\Artwork\SourceLogo;
 use App\Domain\Device\DeviceCache;
 use App\Listeners\Device\PublishNowPlayingToMqtt;
@@ -17,6 +19,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\Encoders\JpegEncoder;
@@ -44,13 +47,22 @@ class ProcessArtwork implements ShouldQueue
     private const BACKGROUND_BRIGHTNESS = 40;
 
     /**
-     * @param  string  $originalUrl  An image URL, or a SourceLogo pseudo URL
-     *                               for a generated logo (drawn locally, not downloaded).
+     * @param  string  $originalUrl  An image URL, a SourceLogo pseudo URL
+     *                               for a generated logo (drawn locally, not downloaded),
+     *                               or a PlaylistArtwork composite pseudo URL.
+     * @param  array<int, string>  $sources  For a composite: the 4 cover URLs it is made of
+     *                                       (its URL is their hash, so they can't be derived from it).
      */
-    public function __construct(public readonly string $originalUrl) {}
+    public function __construct(public readonly string $originalUrl, public readonly array $sources = []) {}
 
     public function handle(): void
     {
+        if (PlaylistArtwork::isCompositeUrl($this->originalUrl) && !PlaylistArtwork::matches($this->originalUrl, $this->sources)) {
+            Log::warning("ProcessArtwork: skipped playlist composite {$this->originalUrl} without its matching covers.");
+
+            return;
+        }
+
         if (ArtworkCache::has($this->originalUrl)) {
             $this->applyColorsToAlbums(ArtworkCache::get($this->originalUrl)['colors'] ?? []);
 
@@ -140,6 +152,10 @@ class ProcessArtwork implements ShouldQueue
 
     private function imageData(): string
     {
+        if (PlaylistArtwork::isCompositeUrl($this->originalUrl)) {
+            return PlaylistCompositeRenderer::render($this->sources);
+        }
+
         $logo = SourceLogo::keyFromUrl($this->originalUrl);
 
         return $logo !== null
@@ -154,7 +170,7 @@ class ProcessArtwork implements ShouldQueue
 
     private function applyColorsToAlbums(array $colors): void
     {
-        if (empty($colors) || SourceLogo::isLogoUrl($this->originalUrl)) {
+        if (empty($colors) || SourceLogo::isLogoUrl($this->originalUrl) || PlaylistArtwork::isCompositeUrl($this->originalUrl)) {
             return;
         }
 

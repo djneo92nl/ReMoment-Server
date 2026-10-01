@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Domain\Artwork\ArtworkCache;
 use App\Domain\Artwork\LibraryArtwork;
 use App\Domain\Artwork\NowPlayingArtwork;
+use App\Domain\Artwork\PlaylistArtwork;
 use App\Domain\Artwork\SourceLogo;
 use App\Domain\Device\SpotifyRouting;
 use App\Http\Controllers\Controller;
@@ -108,7 +109,7 @@ class ClientController extends Controller
 
     /**
      * Processed artwork for clients to pre-cache by hash: the generated
-     * source logos (first page only), then library albums most recently
+     * source logos and playlist covers (first page only), then library albums most recently
      * played first, then the never-played rest. The cursor is an offset into
      * that album order; a page scans ARTWORK_PAGE_SIZE albums and skips those
      * without processed artwork, so it can hold fewer items, or none, while
@@ -145,13 +146,30 @@ class ClientController extends Controller
             $logos = collect(SourceLogo::KEYS)
                 ->map(fn (string $key) => $this->precacheItem(NowPlayingArtwork::KIND_SOURCE, SourceLogo::url($key), NowPlayingArtwork::logo($key)))
                 ->filter();
-            $items = $logos->concat($items)->values();
+            $items = $logos->concat($this->playlistItems())->concat($items)->values();
         }
 
         return response()->json([
             'data' => $items,
             'next_cursor' => $albums->count() === self::ARTWORK_PAGE_SIZE ? $offset + self::ARTWORK_PAGE_SIZE : null,
         ]);
+    }
+
+    /**
+     * Playlist covers that are not simply an album's cover (those are in the
+     * album items): composites and playlists' own images, recent first.
+     */
+    private function playlistItems(): \Illuminate\Support\Collection
+    {
+        $urls = PlaylistArtwork::all()
+            ->reject(fn (array $choice) => $choice['from'] === PlaylistArtwork::FROM_ALBUM)
+            ->pluck('url');
+        $entries = ArtworkCache::getMany($urls->all());
+
+        return $urls
+            ->map(fn (string $url) => $this->precacheItem(PlaylistArtwork::KIND, $url, $entries[$url] ?? null))
+            ->filter()
+            ->values();
     }
 
     private function precacheItem(string $kind, string $url, ?array $entry): ?array

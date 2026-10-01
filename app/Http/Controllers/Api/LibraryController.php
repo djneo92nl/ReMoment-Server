@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Domain\Artwork\LibraryArtwork;
 use App\Domain\Artwork\LibraryItemArtwork;
+use App\Domain\Artwork\PlaylistArtwork;
 use App\Domain\Library\LibraryPlayback;
 use App\Http\Controllers\Controller;
 use App\Models\Device;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
+use App\Models\Media\Playlist;
 use App\Models\Media\Track;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -22,6 +24,11 @@ use Illuminate\Validation\ValidationException;
 class LibraryController extends Controller
 {
     public const ARTISTS_PAGE_SIZE = 50;
+
+    public const PLAYLISTS_PAGE_SIZE = 50;
+
+    /** Tracks listed in a playlist's detail. */
+    public const PLAYLIST_TRACKS = 200;
 
     /** Artist name for sorting: lower case, without a leading "The ". */
     private const ARTIST_SORT_NAME = "LOWER(CASE WHEN LOWER(artists.name) LIKE 'the %' THEN SUBSTR(artists.name, 5) ELSE artists.name END)";
@@ -86,6 +93,68 @@ class LibraryController extends Controller
             'playable' => $items->contains('playable', true),
             'tracks' => $items,
         ]);
+    }
+
+    /** Playlists with tracks, recently played first (Playlist::withTracksByRecency). */
+    public function playlists(Request $request): JsonResponse
+    {
+        $request->validate(['cursor' => ['nullable', 'string', 'max:200']]);
+        $offset = $this->decodeCursor($request->query('cursor'));
+
+        $playlists = Playlist::query()
+            ->withTracksByRecency()
+            ->withCount('tracks')
+            ->with(['metadata' => fn ($q) => $q->where('key', 'spotify_owner')])
+            ->offset($offset)
+            ->limit(self::PLAYLISTS_PAGE_SIZE + 1)
+            ->get();
+
+        $hasMore = $playlists->count() > self::PLAYLISTS_PAGE_SIZE;
+        $playlists = $playlists->take(self::PLAYLISTS_PAGE_SIZE);
+        $artwork = PlaylistArtwork::choose($playlists);
+
+        return response()->json([
+            'data' => $playlists->map(fn (Playlist $playlist) => [
+                'id' => $playlist->id,
+                'name' => $playlist->name,
+                'track_count' => (int) $playlist->tracks_count,
+                'owner' => $this->owner($playlist),
+                'artwork' => isset($artwork[$playlist->id])
+                    ? LibraryItemArtwork::forUrl($artwork[$playlist->id]['url'], $artwork[$playlist->id]['sources'])
+                    : null,
+            ])->values(),
+            'next_cursor' => $hasMore ? $this->encodeCursor($offset + self::PLAYLISTS_PAGE_SIZE) : null,
+        ]);
+    }
+
+    public function playlist(Request $request, Playlist $playlist): JsonResponse
+    {
+        $request->validate(['device_id' => ['nullable', 'integer', 'exists:devices,id']]);
+        $device = $request->filled('device_id') ? Device::find($request->integer('device_id')) : null;
+
+        $playlist->load(['metadata' => fn ($q) => $q->where('key', 'spotify_owner')]);
+        $items = LibraryPlayback::playlistTracks($playlist, self::PLAYLIST_TRACKS)->map(fn (Track $track) => [
+            'id' => $track->id,
+            'name' => $track->name,
+            'artist_name' => $track->artist?->name,
+            'duration' => $track->duration,
+            'playable' => LibraryPlayback::trackPlayable($track, $device),
+        ])->values();
+
+        return response()->json([
+            'id' => $playlist->id,
+            'name' => $playlist->name,
+            'owner' => $this->owner($playlist),
+            'artwork' => PlaylistArtwork::itemFor($playlist),
+            'playable' => $items->contains('playable', true),
+            'tracks' => $items,
+        ]);
+    }
+
+    /** The Spotify owner's display name (from the eager loaded metadata); null for local playlists. */
+    private function owner(Playlist $playlist): ?string
+    {
+        return $playlist->metadata->firstWhere('key', 'spotify_owner')?->value ?: null;
     }
 
     /** Most recently played distinct albums, newest first. */
