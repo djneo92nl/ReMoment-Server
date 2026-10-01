@@ -6,6 +6,7 @@ use App\Domain\Artwork\ArtworkCache;
 use App\Domain\Artwork\LibraryArtwork;
 use App\Domain\Artwork\NowPlayingArtwork;
 use App\Domain\Artwork\SourceLogo;
+use App\Domain\Device\SpotifyRouting;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\DeviceListResource;
 use App\Models\Client;
@@ -160,14 +161,18 @@ class ClientController extends Controller
         return $files === null ? null : ['kind' => $kind, 'hash' => md5($url)] + $files;
     }
 
+    /**
+     * The client's devices; the Spotify virtual device is left out while
+     * Spotify is routed to a speaker in the same list (SpotifyRouting::visible).
+     */
     private function resolveDevices(Client $client)
     {
         $assigned = $client->devices;
 
         if ($client->type === 'multi' && $assigned->isEmpty()) {
-            return Device::orderBy('device_name')->get();
+            $assigned = Device::orderBy('device_name')->get();
         }
 
-        return $assigned;
+        return SpotifyRouting::visible($assigned);
     }
 }

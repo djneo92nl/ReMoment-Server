@@ -3,6 +3,8 @@
 namespace App\Livewire;
 
 use App\Domain\Device\DeviceCache;
+use App\Domain\Device\SpotifyRouting;
+use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\SeekInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Media\Track;
@@ -36,7 +38,7 @@ class Nowplaying extends Component
             if ($driver instanceof VolumeControlInterface) {
                 $this->volume = $driver->getVolume();
             }
-            $this->supportsSeek = $driver instanceof SeekInterface;
+            $this->supportsSeek = SpotifyRouting::driverFor($device, SeekInterface::class) instanceof SeekInterface;
         } catch (\Throwable) {
             $this->volume = 0;
         }
@@ -80,7 +82,7 @@ class Nowplaying extends Component
     public function seek(int $seconds)
     {
         try {
-            $driver = $this->device->driver;
+            $driver = SpotifyRouting::driverFor($this->device, SeekInterface::class);
             if ($driver instanceof SeekInterface) {
                 $driver->seek($seconds);
             }
@@ -107,7 +109,7 @@ class Nowplaying extends Component
     public function play()
     {
         try {
-            $this->device->driver->play();
+            SpotifyRouting::driverFor($this->device, MediaControlsInterface::class)->play();
             $this->controlError = null;
         } catch (\Throwable $e) {
             $this->controlError = 'Command failed: '.$e->getMessage();
@@ -117,7 +119,7 @@ class Nowplaying extends Component
     public function pause()
     {
         try {
-            $this->device->driver->pause();
+            SpotifyRouting::driverFor($this->device, MediaControlsInterface::class)->pause();
             $this->controlError = null;
         } catch (\Throwable $e) {
             $this->controlError = 'Command failed: '.$e->getMessage();
@@ -127,7 +129,7 @@ class Nowplaying extends Component
     public function next()
     {
         try {
-            $this->device->driver->next();
+            SpotifyRouting::driverFor($this->device, MediaControlsInterface::class)->next();
             $this->controlError = null;
         } catch (\Throwable $e) {
             $this->controlError = 'Command failed: '.$e->getMessage();
@@ -137,7 +139,7 @@ class Nowplaying extends Component
     public function previous()
     {
         try {
-            $this->device->driver->previous();
+            SpotifyRouting::driverFor($this->device, MediaControlsInterface::class)->previous();
             $this->controlError = null;
         } catch (\Throwable $e) {
             $this->controlError = 'Command failed: '.$e->getMessage();

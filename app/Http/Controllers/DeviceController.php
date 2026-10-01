@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Domain\Device\Capabilities;
 use App\Domain\Device\DeviceCache;
+use App\Domain\Device\SpotifyRouting;
 use App\Integrations\Contracts\LibraryPlaybackInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
@@ -17,25 +17,13 @@ class DeviceController extends Controller
 {
     public function index(Request $request)
     {
-        $spotifyRoutedDeviceId = DeviceCache::getSpotifyRoutedDeviceId();
         $showHidden = $request->boolean('hidden');
 
         $all = Device::all();
         $hiddenCount = $all->where('hidden', true)->count();
 
-        $devices = $all
-            ->filter(function (Device $device) use ($spotifyRoutedDeviceId, $showHidden) {
-                // Hide the Spotify virtual device while a mapped local device is actively playing Spotify
-                if ($spotifyRoutedDeviceId !== null && $device->device_driver_name === 'Spotify') {
-                    return false;
-                }
-
-                if ($device->hidden && !$showHidden) {
-                    return false;
-                }
-
-                return true;
-            })
+        // The Spotify virtual device is hidden while Spotify plays on a mapped speaker in the list.
+        $devices = SpotifyRouting::visible($all->filter(fn (Device $device) => !$device->hidden || $showHidden))
             ->sortByDesc(fn ($d) => match ($d->state) {
                 \App\Domain\Device\State::Playing => 3,
                 \App\Domain\Device\State::Paused => 2,
@@ -78,7 +66,7 @@ class DeviceController extends Controller
     {
         $device->load('meta');
 
-        $capabilities = Capabilities::forDriver($device->device_driver);
+        $capabilities = SpotifyRouting::capabilities($device);
         $volume = null;
         try {
             $driver = $device->driver;

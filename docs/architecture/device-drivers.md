@@ -62,7 +62,19 @@ Implements media controls, volume, radio, multiroom, library playback, seek, que
 
 **Path:** `app/Integrations/Spotify/`
 
-Virtual device — implements `MediaControlsInterface`, `SeekInterface`, `QueueInterface` (`GET /v1/me/player/queue`), `ShuffleInterface`, `RepeatInterface` (`off`/`context`/`track`) and `LikeInterface` (saves the playing track to Liked Songs; needs the `user-library-modify` scope, requested on connect but not required, so older connections must reconnect to like). The listener reports `shuffle_state`/`repeat_state` from every poll and looks up whether a track is liked once per track (cached under `spotify:liked:{track id}`, which `setLiked()` overwrites); modes are published for the Spotify device, not a mapped local speaker. Polls the Spotify Web API rather than a local network device; see [Spotify Connect → Local Device Mapping](../../CLAUDE.md) in CLAUDE.md for how it routes playback to a physical device.
+Virtual device — implements `MediaControlsInterface`, `SeekInterface`, `QueueInterface` (`GET /v1/me/player/queue`), `ShuffleInterface`, `RepeatInterface` (`off`/`context`/`track`) and `LikeInterface` (saves the playing track to Liked Songs; needs the `user-library-modify` scope, requested on connect but not required, so older connections must reconnect to like). The listener reports `shuffle_state`/`repeat_state` from every poll and looks up whether a track is liked once per track (cached under `spotify:liked:{track id}`, which `setLiked()` overwrites); while playback is routed to a mapped local speaker, modes are published for that speaker (`PlaybackModesUpdated` with `routed: true`), and when routing ends or moves the speaker gets its own driver's last values back (`Modes::own()`, else all `null`). Polls the Spotify Web API rather than a local network device; see [Spotify Connect → Local Device Mapping](../../CLAUDE.md) in CLAUDE.md for how it routes playback to a physical device.
+
+#### Spotify routing (one device)
+
+`App\Domain\Device\SpotifyRouting` makes the routed speaker and the Spotify device one device:
+
+- `driverFor(Device, contract)` — the driver that executes a contract for a device. For the routed speaker, the contracts in `DELEGATED_CONTRACTS` (`MediaControlsInterface`, `SeekInterface`, `QueueInterface`, `ShuffleInterface`, `RepeatInterface`, `LikeInterface`) resolve to the Spotify device's driver; everything else (volume, mute, power, sources, multiroom, radio, library) to the speaker's own. The API `DeviceController` and the `DeviceCard`/`Nowplaying` Livewire components pick drivers through it, so the `instanceof` (422) check sees the merged set.
+- `capabilities(Device)` — `Capabilities::forDriver()` plus Spotify's delegated capabilities while routed; used by `DeviceListResource` (and so every endpoint returning devices) and the web device page.
+- `visible(Collection)` — drops the Spotify device from a list while the routed speaker is in it; used by `GET /api/devices`, the client endpoints and `/devices`.
+- `modesDeviceId(Device)` — where an API mode change is recorded (the routed speaker, also when requested on the Spotify device).
+- Modes: `HoldOwnModesWhileSpotifyRouted` (first `PlaybackModesUpdated` listener) keeps each device's own reports in `Modes::own()` and holds them back while Spotify is routed to it; the Spotify listener's `moveModesTo()` calls `restoreOwnModes()` for the previous speaker when routing ends or moves, and clears the Spotify device's modes when playback moves onto a speaker.
+
+The Spotify listener's per-poll logic is `DeviceListener::poll(int $spotifyDeviceId, SpotifyWebAPI $api)`, so it can be tested with a mocked API client (`tests/Feature/SpotifyRoutingTest.php`).
 
 ## Adding a New Driver
 

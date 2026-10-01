@@ -4,6 +4,7 @@ namespace App\Integrations\Spotify\Services;
 
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\PlaybackModes;
+use App\Domain\Device\SpotifyRouting;
 use App\Domain\Device\State;
 use App\Domain\Media\AlbumData;
 use App\Domain\Media\ArtistData;
@@ -18,6 +19,7 @@ use App\Models\DeviceMeta;
 use App\Services\SpotifyTokenService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use SpotifyWebAPI\SpotifyWebAPI;
 use SpotifyWebAPI\SpotifyWebAPIException;
 
 class DeviceListener
@@ -27,6 +29,15 @@ class DeviceListener
     protected ?\Closure $onError = null;
 
     protected ?PlaybackModes $lastModes = null;
+
+    /** Device the Spotify modes were last reported for (the routed speaker or the Spotify device). */
+    protected ?int $modesDeviceId = null;
+
+    protected ?string $lastNowPlayingKey = null;
+
+    protected ?int $lastPositionSeconds = null;
+
+    protected ?int $lastEffectiveDeviceId = null;
 
     public function __construct(protected SpotifyTokenService $tokenService) {}
 
@@ -41,9 +52,7 @@ class DeviceListener
         $retryDelaySeconds = 1;
         $maxRetryDelaySeconds = 30;
 
-        $lastNowPlayingKey = null;
-        $lastPositionSeconds = null;
-        $lastEffectiveDeviceId = $deviceId;
+        $this->lastEffectiveDeviceId = (int) $deviceId;
 
         DeviceCache::updateState($deviceId, State::Unreachable);
 
@@ -61,85 +70,7 @@ class DeviceListener
                     continue;
                 }
 
-                $playback = $api->getMyCurrentPlaybackInfo(['additional_types' => 'track']);
-
-                if ($playback === null || empty($playback)) {
-                    // 204 No Content — nothing playing
-                    if ($lastNowPlayingKey !== null) {
-                        event(new NowPlayingEnded(deviceId: $lastEffectiveDeviceId));
-                        $lastNowPlayingKey = null;
-                        $lastPositionSeconds = null;
-                    }
-                    DeviceCache::clearSpotifyRoutedDevice();
-                    DeviceCache::updateState($deviceId, State::Standby);
-                    $retryDelaySeconds = 1;
-                    sleep($this->pollIntervalSeconds);
-
-                    continue;
-                }
-
-                $isPlaying = (bool) ($playback['is_playing'] ?? false);
-                $item = $playback['item'] ?? null;
-
-                if ($item !== null) {
-                    $this->reportModes($deviceId, $playback, $api);
-                }
-
-                if (!$isPlaying || $item === null) {
-                    if ($lastNowPlayingKey !== null) {
-                        event(new NowPlayingEnded(deviceId: $lastEffectiveDeviceId));
-                        $lastNowPlayingKey = null;
-                        $lastPositionSeconds = null;
-                    }
-                    DeviceCache::clearSpotifyRoutedDevice();
-                    DeviceCache::updateState($deviceId, State::Standby);
-                    $retryDelaySeconds = 1;
-                    sleep($this->pollIntervalSeconds);
-
-                    continue;
-                }
-
-                // Route to a local device if this Spotify Connect speaker is mapped
-                $spotifyDeviceName = $playback['device']['name'] ?? null;
-                $localDeviceId = $this->resolveLocalDevice($spotifyDeviceName);
-                $effectiveDeviceId = $localDeviceId ?? $deviceId;
-
-                // Device changed — end playback on the previous effective device
-                if ($effectiveDeviceId !== $lastEffectiveDeviceId && $lastNowPlayingKey !== null) {
-                    event(new NowPlayingEnded(deviceId: $lastEffectiveDeviceId));
-                    $lastNowPlayingKey = null;
-                    $lastPositionSeconds = null;
-                }
-                $lastEffectiveDeviceId = $effectiveDeviceId;
-
-                if ($localDeviceId !== null) {
-                    DeviceCache::setSpotifyRoutedDevice($localDeviceId);
-                    // Keep Spotify virtual device quiet
-                    DeviceCache::updateState($deviceId, State::Standby);
-                } else {
-                    DeviceCache::clearSpotifyRoutedDevice();
-                }
-
-                $nowPlaying = $this->buildNowPlaying($item, $playback);
-
-                if ($nowPlaying !== null) {
-                    $key = $this->nowPlayingKey($nowPlaying);
-
-                    if ($key !== $lastNowPlayingKey) {
-                        event(new NowPlayingUpdated(
-                            deviceId: $effectiveDeviceId,
-                            nowPlaying: $nowPlaying,
-                            sourceType: 'spotify',
-                        ));
-                        $lastNowPlayingKey = $key;
-                    }
-
-                    $positionSeconds = (int) round(($playback['progress_ms'] ?? 0) / 1000);
-                    if (abs($positionSeconds - ($lastPositionSeconds ?? -999)) > 2) {
-                        event(new ProgressUpdated(deviceId: $effectiveDeviceId, progress: $positionSeconds));
-                        $lastPositionSeconds = $positionSeconds;
-                    }
-                }
+                $this->poll((int) $deviceId, $api);
 
                 $retryDelaySeconds = 1;
                 sleep($this->pollIntervalSeconds);
@@ -151,11 +82,7 @@ class DeviceListener
                     continue;
                 }
 
-                if ($lastNowPlayingKey !== null) {
-                    event(new NowPlayingEnded(deviceId: $lastEffectiveDeviceId));
-                    $lastNowPlayingKey = null;
-                    $lastPositionSeconds = null;
-                }
+                $this->stopPlayback((int) $deviceId);
                 Log::error("Spotify listener [{$deviceId}] API error: {$e->getMessage()}", ['exception' => $e]);
                 if ($this->onError) {
                     ($this->onError)($e);
@@ -166,11 +93,7 @@ class DeviceListener
                 sleep($retryDelaySeconds);
 
             } catch (\Throwable $e) {
-                if ($lastNowPlayingKey !== null) {
-                    event(new NowPlayingEnded(deviceId: $lastEffectiveDeviceId));
-                    $lastNowPlayingKey = null;
-                    $lastPositionSeconds = null;
-                }
+                $this->stopPlayback((int) $deviceId);
                 Log::error("Spotify listener [{$deviceId}] error: {$e->getMessage()}", ['exception' => $e]);
                 if ($this->onError) {
                     ($this->onError)($e);
@@ -184,17 +107,150 @@ class DeviceListener
     }
 
     /**
-     * Shuffle/repeat come with every poll; whether the track is liked is
-     * looked up once per track. Reported for the Spotify device itself (not
-     * a mapped local speaker), since only it can change them.
+     * One poll of `GET /v1/me/player` for the Spotify device $deviceId.
+     * Playing on a mapped Spotify Connect speaker routes the playback and
+     * the modes to that local device (see SpotifyRouting).
      */
-    protected function reportModes(string $deviceId, array $playback, \SpotifyWebAPI\SpotifyWebAPI $api): void
+    public function poll(int $deviceId, SpotifyWebAPI $api): void
     {
+        $this->lastEffectiveDeviceId ??= $deviceId;
+
+        $playback = $api->getMyCurrentPlaybackInfo(['additional_types' => 'track']);
+
+        if (empty($playback)) {
+            // 204 No Content — nothing playing
+            $this->stopPlayback($deviceId);
+            DeviceCache::updateState($deviceId, State::Standby);
+
+            return;
+        }
+
+        $isPlaying = (bool) ($playback['is_playing'] ?? false);
+        $item = $playback['item'] ?? null;
+
+        // Route to a local device if this Spotify Connect speaker is mapped
+        $localDeviceId = $item !== null ? $this->resolveLocalDevice($playback['device']['name'] ?? null) : null;
+
+        if (!$isPlaying || $item === null) {
+            $this->endNowPlaying();
+
+            // Paused on a mapped speaker: stay routed, so play/next on it still
+            // reach Spotify — unless the speaker now plays something by itself.
+            if ($localDeviceId !== null && DeviceCache::getState($localDeviceId) !== State::Playing) {
+                DeviceCache::setSpotifyRoutedDevice($localDeviceId);
+            } else {
+                $localDeviceId = null;
+                DeviceCache::clearSpotifyRoutedDevice();
+            }
+            DeviceCache::updateState($deviceId, State::Standby);
+
+            if ($item !== null) {
+                $this->reportModes($localDeviceId ?? $deviceId, $deviceId, $playback, $api);
+            } else {
+                $this->moveModesTo($deviceId, $deviceId);
+            }
+
+            return;
+        }
+
+        $effectiveDeviceId = $localDeviceId ?? $deviceId;
+
+        // Device changed — end playback on the previous effective device
+        if ($effectiveDeviceId !== $this->lastEffectiveDeviceId) {
+            $this->endNowPlaying();
+        }
+        $this->lastEffectiveDeviceId = $effectiveDeviceId;
+
+        if ($localDeviceId !== null) {
+            DeviceCache::setSpotifyRoutedDevice($localDeviceId);
+            // Keep Spotify virtual device quiet
+            DeviceCache::updateState($deviceId, State::Standby);
+        } else {
+            DeviceCache::clearSpotifyRoutedDevice();
+        }
+
+        $this->reportModes($effectiveDeviceId, $deviceId, $playback, $api);
+
+        $nowPlaying = $this->buildNowPlaying($item, $playback);
+
+        if ($nowPlaying !== null) {
+            $key = $this->nowPlayingKey($nowPlaying);
+
+            if ($key !== $this->lastNowPlayingKey) {
+                event(new NowPlayingUpdated(
+                    deviceId: (string) $effectiveDeviceId,
+                    nowPlaying: $nowPlaying,
+                    sourceType: 'spotify',
+                ));
+                $this->lastNowPlayingKey = $key;
+            }
+
+            $positionSeconds = (int) round(($playback['progress_ms'] ?? 0) / 1000);
+            if (abs($positionSeconds - ($this->lastPositionSeconds ?? -999)) > 2) {
+                event(new ProgressUpdated(deviceId: (string) $effectiveDeviceId, progress: $positionSeconds));
+                $this->lastPositionSeconds = $positionSeconds;
+            }
+        }
+    }
+
+    protected function endNowPlaying(): void
+    {
+        if ($this->lastNowPlayingKey !== null) {
+            event(new NowPlayingEnded(deviceId: (string) $this->lastEffectiveDeviceId));
+            $this->lastNowPlayingKey = null;
+            $this->lastPositionSeconds = null;
+        }
+    }
+
+    /** Nothing plays (or Spotify can't be reached): end playback and routing. */
+    protected function stopPlayback(int $deviceId): void
+    {
+        $this->endNowPlaying();
+        DeviceCache::clearSpotifyRoutedDevice();
+        $this->moveModesTo($deviceId, $deviceId);
+    }
+
+    /**
+     * Shuffle/repeat come with every poll; whether the track is liked is
+     * looked up once per track. Reported for $targetId: the local speaker
+     * Spotify is routed to, or the Spotify device itself.
+     */
+    protected function reportModes(int $targetId, int $spotifyDeviceId, array $playback, SpotifyWebAPI $api): void
+    {
+        $this->moveModesTo($targetId, $spotifyDeviceId);
+
         $modes = $this->modesFromPlayback($playback, $this->likedFor($playback['item']['id'] ?? null, $api));
 
         if ($this->lastModes === null || !$this->lastModes->equals($modes)) {
-            event(new PlaybackModesUpdated(deviceId: $deviceId, modes: $modes));
+            event(new PlaybackModesUpdated(
+                deviceId: (string) $targetId,
+                modes: $modes,
+                routed: $targetId !== $spotifyDeviceId,
+            ));
             $this->lastModes = $modes;
+        }
+    }
+
+    /**
+     * When Spotify's modes move to another device, the previous one gets its
+     * own back: a local speaker the values its own driver last reported (or
+     * none), the Spotify device none, since its playback is on a speaker now.
+     */
+    protected function moveModesTo(int $targetId, int $spotifyDeviceId): void
+    {
+        $previous = $this->modesDeviceId;
+        $this->modesDeviceId = $targetId;
+
+        if ($previous === null || $previous === $targetId) {
+            return;
+        }
+
+        $this->lastModes = null;
+
+        if ($previous === $spotifyDeviceId) {
+            event(new PlaybackModesUpdated(deviceId: (string) $previous, modes: new PlaybackModes));
+        } else {
+            SpotifyRouting::restoreOwnModes($previous);
         }
     }
 
@@ -208,7 +264,7 @@ class DeviceListener
     }
 
     /** Cached per track; MusicPlayerDriver::setLiked() writes the same key. */
-    protected function likedFor(?string $trackId, \SpotifyWebAPI\SpotifyWebAPI $api): ?bool
+    protected function likedFor(?string $trackId, SpotifyWebAPI $api): ?bool
     {
         if (!$trackId) {
             return null;

@@ -25,6 +25,29 @@ final class Modes
     public static function forget(int $deviceId): void
     {
         Cache::forget(self::key($deviceId));
+        Cache::forget(self::ownKey($deviceId));
+    }
+
+    /**
+     * What the device's own listener last reported, kept apart from what is
+     * shown while Spotify is routed to the device (see SpotifyRouting), so it
+     * can be restored afterwards. Null when its listener reported nothing.
+     */
+    public static function own(int $deviceId): ?PlaybackModes
+    {
+        $value = Cache::get(self::ownKey($deviceId));
+
+        return is_array($value) ? PlaybackModes::fromArray($value) : null;
+    }
+
+    public static function putOwn(int $deviceId, PlaybackModes $modes): void
+    {
+        Cache::put(self::ownKey($deviceId), $modes->toArray(), self::TTL);
+    }
+
+    private static function ownKey(int $deviceId): string
+    {
+        return "device:{$deviceId}:own_modes";
     }
 
     private static function key(int $deviceId): string

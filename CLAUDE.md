@@ -80,7 +80,7 @@ Base URL: `/api` — no authentication required.
 
 ### Device List & Detail
 
-**`GET /api/devices`** — list all devices.
+**`GET /api/devices`** — list all devices. While Spotify is routed to a mapped speaker, the Spotify virtual device is left out (see [Spotify routing](#spotify-routing)).
 
 Response: `{ "data": [ DeviceListResource, … ] }`
 
@@ -108,7 +108,17 @@ Response: `{ "data": DeviceDetailResource }`
 
 `capabilities` values: `media_controls` | `volume_control` | `radio_control` | `source_control` | `source_activation` | `multi_room` | `library_playback` | `seek` | `queue` | `shuffle` | `repeat` | `like` | `power`
 
-Always check `capabilities` before calling a feature endpoint — calling an unsupported feature returns `422`.
+Always check `capabilities` before calling a feature endpoint — calling an unsupported feature returns `422`. `capabilities` can change at runtime: a speaker Spotify is routed to also lists Spotify's playback capabilities (see below).
+
+#### Spotify routing
+
+While a speaker mapped to a Spotify Connect name (`/settings/spotify-connect`) plays Spotify, it and the Spotify virtual device behave as **one device**, everywhere (web, REST, MQTT), via `App\Domain\Device\SpotifyRouting`:
+
+- Playback, progress, modes and state are reported on the **speaker's** id; the Spotify device stays in `standby`.
+- On the speaker's id, `play`/`pause`/`stop`/`next`/`previous`, `seek`, `queue`, `shuffle`, `repeat` and `like` are executed by the **Spotify** driver on the Connect device. Volume, mute, power, sources, multiroom, radio and library playback stay with the speaker's own driver.
+- The speaker's `capabilities` are its own plus Spotify's `media_controls`, `seek`, `queue`, `shuffle`, `repeat`, `like`; the `422` check uses the same merged set. They drop back when routing ends, so clients should re-read `capabilities` (or treat non-null `/modes` values as supported).
+- `GET /api/devices`, `GET /api/clients/{api_token}/devices`, the approved `GET /api/clients/status/…` and the web `/devices` grid leave out the Spotify device — but only when the routed speaker is in that same list, so a client assigned only the Spotify device (or not the speaker) keeps it.
+- Routing lasts while Spotify plays on the speaker, and while it is paused there unless the speaker reports playing something else by itself. When it ends (or moves to another speaker), the speaker's `modes` go back to what its own driver last reported, or all `null` if its driver reports none. The Spotify device's `modes` are cleared while its playback is on a speaker.
 
 **DeviceDetailResource** — all fields from DeviceListResource plus `now_playing`:
 
@@ -212,7 +222,7 @@ PUT  /api/devices/{id}/repeat          body: { "repeat": "all" }            → 
 PUT  /api/devices/{id}/like            body: { "liked": true }              → { "liked": true }
 ```
 
-`repeat` is `off` | `all` (the queue/context) | `one` (the current track). `like` saves the playing track to (or removes it from) the Spotify library; it needs the `user-library-modify` scope, so a Spotify connection made before it was added must be reconnected at `/settings`. A successful change is written to `now_playing.modes` and MQTT `/modes` right away, then kept in sync by the device listener.
+`repeat` is `off` | `all` (the queue/context) | `one` (the current track). `like` saves the playing track to (or removes it from) the Spotify library; it needs the `user-library-modify` scope, so a Spotify connection made before it was added must be reconnected at `/settings`. A successful change is written to `now_playing.modes` and MQTT `/modes` right away, then kept in sync by the device listener. On a speaker Spotify is routed to, these go to Spotify (see [Spotify routing](#spotify-routing)).
 
 ### Power
 
@@ -337,7 +347,7 @@ The Mosquitto broker runs in Docker on port 1883. Each device's MQTT base topic 
 | `remoment/player/{id}/progress` | Every second while playing | Progress as a percentage of the track, 0–100 (integer string) |
 | `remoment/player/{id}/state` | State transition (retained) | `{ "state": "playing" }` — `playing` / `paused` / `standby` / `unreachable` |
 | `remoment/player/{id}/volume` | Volume or mute changes (retained) | `{ "volume": 45, "muted": false }` |
-| `remoment/player/{id}/modes` | Shuffle/repeat/liked changes (retained) | `{ "shuffle": true, "repeat": "off", "liked": null }` — as `now_playing.modes`; `null` = unknown/unsupported |
+| `remoment/player/{id}/modes` | Shuffle/repeat/liked changes (retained) | `{ "shuffle": true, "repeat": "off", "liked": null }` — as `now_playing.modes`; `null` = unknown/unsupported. While Spotify is routed to a speaker, Spotify's modes are published on the speaker's id; afterwards its own (or all `null`) |
 
 `/data` is retained so a client subscribing later (e.g. after switching device) gets the current track at once; when the device goes to standby or becomes unreachable the server publishes an empty retained payload, which also removes the retained track from the broker, so clients must treat an empty `/data` as "nothing playing". It is republished from the cache when a device comes back, and identical payloads aren't repeated. `artwork` is absent in the MQTT payload if a real image is not yet processed; `kind` is `album` | `radio` | `source` as in the REST API. Published by the `PublishNowPlayingToMqtt`, `PublishProgressToMqtt`, `PublishStateToMqtt`, `PublishVolumeToMqtt` and `PublishModesToMqtt` listeners. The server only publishes and never subscribes. Browsers subscribe over the WebSocket listener on port 9001 to drive live UI refreshes; see `docs/architecture/live-updates.md`.
 
@@ -353,7 +363,7 @@ Defined in `app/Providers/AppServiceProvider.php`:
 - `ProgressUpdated` → `UpdateDeviceCache`, `PublishProgressToMqtt`
 - `NowPlayingEnded` → `UpdateDeviceCache`, `ClosePlaybackHistory`
 - `VolumeUpdated` (volume + optional `muted`) → `UpdateDeviceCache`, `PublishVolumeToMqtt`
-- `PlaybackModesUpdated` → `UpdateDeviceCache`, `PublishModesToMqtt`. Fired by listeners with the shuffle/repeat/liked they observe, and by the API after a change.
+- `PlaybackModesUpdated` → `HoldOwnModesWhileSpotifyRouted`, `UpdateDeviceCache`, `PublishModesToMqtt`. Fired by listeners with the shuffle/repeat/liked they observe, and by the API after a change. The first listener remembers a device's own reports (`Modes::own()`) and stops them (returns `false`) while Spotify is routed to that device; Spotify's reports for it carry `routed: true`.
 - `DeviceStateChanged` → `PublishStateToMqtt`, `SyncNowPlayingDataWithState` (clears the retained `/data` on standby/unreachable, republishes the cached track when a device comes back). Fired by `DeviceCache::updateState()` only when the cached state actually changes.
 
 Listeners are registered only here: event auto-discovery is disabled in `bootstrap/app.php`, because it registered every listener twice.
@@ -398,7 +408,7 @@ All drivers implement interfaces from `app/Integrations/Contracts/`:
 
 **Spotify** (`app/Integrations/Spotify/`)
 - Virtual device — polls Spotify Web API every 3 seconds
-- Capabilities: media controls, seek, queue, shuffle, repeat, like (cloud-controlled). Modes are reported for the Spotify device itself, not for a mapped local speaker
+- Capabilities: media controls, seek, queue, shuffle, repeat, like (cloud-controlled). While routed to a mapped speaker, its modes are reported for, and its playback commands accepted on, that speaker (see [Spotify routing](#spotify-routing))
 - Can route playback to a mapped local device via `spotify_connect_name` device meta key
 
 ### Domain vs. Model Layer
@@ -420,6 +430,7 @@ Domain objects represent live state; Eloquent models represent stored history.
 | `spotify_routed_to` | device ID integer | 30s |
 | `listener_running_{id}` | boolean flag | 10s |
 | `device:{id}:modes` | last known shuffle/repeat/liked (`PlaybackModes` array) | 3600s |
+| `device:{id}:own_modes` | what the device's own listener last reported, restored after Spotify routing | 3600s |
 | `mqtt_published_volume_{id}` | last `/volume` payload published to MQTT (dedupe) | 3600s |
 | `mqtt_published_data_{id}` | md5 of the last `/data` payload published (dedupe; forgotten when cleared) | 3600s |
 | `mqtt_published_modes_{id}` | last `/modes` payload published to MQTT (dedupe) | 3600s |
@@ -471,8 +482,11 @@ The Spotify virtual device listener polls `GET /v1/me/player` every 3 seconds. W
 
 1. Checks the playing Spotify Connect device name against `device_meta` rows with `key = 'spotify_connect_name'`
 2. If a match exists, routes the `NowPlayingUpdated` event to the matched local device ID
-3. The Spotify virtual device is kept in `Standby` state; the mapped local device shows the playback
-4. If the Spotify Connect speaker changes mid-playback, the previous effective device receives `NowPlayingEnded` first
+3. The Spotify virtual device is kept in `Standby` state; the mapped local device shows the playback, and its modes
+4. If the Spotify Connect speaker changes mid-playback, the previous effective device receives `NowPlayingEnded` first and gets its own modes back
+5. `spotify_routed_to` (30 s TTL, refreshed every poll) holds the speaker; it is kept while paused on the speaker unless the speaker itself reports `playing`
+
+`SpotifyRouting` turns that into one device for commands, capabilities and device lists; see [Spotify routing](#spotify-routing).
 
 Mappings are managed in the Settings UI at `/settings/spotify-connect`. Stored as:
 ```

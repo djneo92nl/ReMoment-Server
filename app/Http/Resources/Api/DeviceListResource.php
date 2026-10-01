@@ -2,7 +2,7 @@
 
 namespace App\Http\Resources\Api;
 
-use App\Domain\Device\Capabilities;
+use App\Domain\Device\SpotifyRouting;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -19,7 +19,7 @@ class DeviceListResource extends JsonResource
             'ip_address' => $this->ip_address,
             'state' => $this->state?->value,
             'last_seen' => $this->last_seen,
-            'capabilities' => Capabilities::forDriver($this->device_driver),
+            'capabilities' => SpotifyRouting::capabilities($this->resource),
             'mqtt_topic' => "remoment/player/{$this->id}",
         ];
     }

@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\DeviceCache;
+use App\Domain\Device\SpotifyRouting;
 use App\Domain\Device\State;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
@@ -60,7 +61,7 @@ class DeviceCard extends Component
             $this->supportsMultiRoom = $driver instanceof MultiRoomInterface;
             $this->supportsSourceActivation = $driver instanceof SourceActivationInterface;
             $this->supportsRadio = $driver instanceof RadioControlInterface;
-            $this->supportsSeek = $driver instanceof SeekInterface;
+            $this->supportsSeek = SpotifyRouting::driverFor($device, SeekInterface::class) instanceof SeekInterface;
             // Asking the device costs a network round trip, so only the
             // single-device page reads it; grid cards start unmuted.
             if ($this->standalone && $driver instanceof VolumeControlInterface) {
@@ -117,22 +118,22 @@ class DeviceCard extends Component
 
     public function play(): void
     {
-        $this->withDriver(fn ($d) => $d->play());
+        $this->withPlaybackDriver(fn ($d) => $d->play());
     }
 
     public function pause(): void
     {
-        $this->withDriver(fn ($d) => $d->pause());
+        $this->withPlaybackDriver(fn ($d) => $d->pause());
     }
 
     public function next(): void
     {
-        $this->withDriver(fn ($d) => $d->next());
+        $this->withPlaybackDriver(fn ($d) => $d->next());
     }
 
     public function previous(): void
     {
-        $this->withDriver(fn ($d) => $d->previous());
+        $this->withPlaybackDriver(fn ($d) => $d->previous());
     }
 
     public function standby(): void
@@ -143,7 +144,7 @@ class DeviceCard extends Component
     public function seek(int $seconds): void
     {
         try {
-            $driver = $this->device->driver;
+            $driver = SpotifyRouting::driverFor($this->device, SeekInterface::class);
             if ($driver instanceof SeekInterface) {
                 $driver->seek($seconds);
             }
@@ -334,6 +335,19 @@ class DeviceCard extends Component
     {
         $this->listenerRunning = DeviceCache::isListenerRunning($this->device->id);
         $this->volume = (int) (Volume::getVolume($this->device->id) ?: 0);
+    }
+
+    /** Transport goes to the Spotify driver while Spotify is routed to this device. */
+    private function withPlaybackDriver(callable $callback): void
+    {
+        try {
+            $driver = SpotifyRouting::driverFor($this->device, MediaControlsInterface::class);
+            if ($driver instanceof MediaControlsInterface) {
+                $callback($driver);
+            }
+        } catch (\Throwable) {
+            // silently ignore driver errors in card context
+        }
     }
 
     private function withDriver(callable $callback): void

@@ -171,7 +171,7 @@ Returns the current assigned device list and updates `last_seen_at` on the clien
 }
 ```
 
-Device shape is identical to `GET /api/devices` (`DeviceListResource`). For `multi` clients with no explicit assignments, all devices are returned. Returns `HTTP 404` for an unknown token.
+Device shape is identical to `GET /api/devices` (`DeviceListResource`). For `multi` clients with no explicit assignments, all devices are returned. While Spotify plays on a mapped speaker that is in the client's list, the Spotify virtual device is left out (here and in the approved `status` response) and the speaker carries the playback and Spotify's controls; a client whose list doesn't include that speaker (e.g. assigned only the Spotify device) keeps the Spotify device. See "Spotify routing" in CLAUDE.md. Returns `HTTP 404` for an unknown token.
 
 ---
 
@@ -306,7 +306,7 @@ POST /api/devices/{id}/next
 POST /api/devices/{id}/previous
 ```
 
-Always check the `capabilities` array from `GET /devices` before showing transport controls — a device without `media_controls` will return `422`.
+Always check the `capabilities` array from `GET /devices` before showing transport controls — a device without `media_controls` will return `422`. Capabilities can change while running: a speaker Spotify is routed to gains `media_controls`, `seek`, `queue`, `shuffle`, `repeat` and `like` for as long as it plays (or is paused on) Spotify, so refresh the device list now and then, and treat non-null `/modes` values as supported.
 
 ### MQTT (optional)
 

@@ -6,6 +6,7 @@ use App\Domain\Artwork\RadioStationArtwork;
 use App\Domain\Device\Cache\Modes;
 use App\Domain\Device\PlaybackModes;
 use App\Domain\Device\RepeatMode;
+use App\Domain\Device\SpotifyRouting;
 use App\Domain\Device\State;
 use App\Events\Device\PlaybackModesUpdated;
 use App\Http\Controllers\Controller;
@@ -38,7 +39,7 @@ class DeviceController extends Controller
 {
     public function index(): AnonymousResourceCollection
     {
-        return DeviceListResource::collection(Device::all());
+        return DeviceListResource::collection(SpotifyRouting::visible(Device::all()));
     }
 
     public function show(Device $device): DeviceDetailResource
@@ -52,7 +53,7 @@ class DeviceController extends Controller
             return $error;
         }
 
-        $driver = $device->driver;
+        $driver = SpotifyRouting::driverFor($device, MediaControlsInterface::class);
 
         if (!($driver instanceof MediaControlsInterface)) {
             return $this->unsupported('media_controls');
@@ -84,7 +85,7 @@ class DeviceController extends Controller
             return $error;
         }
 
-        $driver = $device->driver;
+        $driver = SpotifyRouting::driverFor($device, SeekInterface::class);
 
         if (!($driver instanceof SeekInterface)) {
             return $this->unsupported('seek');
@@ -110,7 +111,7 @@ class DeviceController extends Controller
             return $error;
         }
 
-        $driver = $device->driver;
+        $driver = SpotifyRouting::driverFor($device, QueueInterface::class);
 
         if (!($driver instanceof QueueInterface)) {
             return $this->unsupported('queue');
@@ -196,6 +197,7 @@ class DeviceController extends Controller
     /**
      * Applies a shuffle/repeat/like change, then records it right away (cache
      * + MQTT `/modes`) instead of waiting for the device listener to see it.
+     * On the speaker Spotify is routed to, the Spotify driver applies it.
      */
     private function changeMode(Device $device, string $contract, string $capability, \Closure $apply, \Closure $update, array $response): JsonResponse
     {
@@ -203,7 +205,7 @@ class DeviceController extends Controller
             return $error;
         }
 
-        $driver = $device->driver;
+        $driver = SpotifyRouting::driverFor($device, $contract);
 
         if (!($driver instanceof $contract)) {
             return $this->unsupported($capability);
@@ -218,7 +220,9 @@ class DeviceController extends Controller
             ], 502);
         }
 
-        event(new PlaybackModesUpdated((string) $device->id, $update(Modes::get($device->id))));
+        // While Spotify is routed to a speaker, its modes are reported for the speaker.
+        $modesDeviceId = SpotifyRouting::modesDeviceId($device);
+        event(new PlaybackModesUpdated((string) $modesDeviceId, $update(Modes::get($modesDeviceId)), routed: SpotifyRouting::routedDeviceId() === $modesDeviceId));
 
         return response()->json($response);
     }

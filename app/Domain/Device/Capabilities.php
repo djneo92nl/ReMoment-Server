@@ -39,6 +39,26 @@ final class Capabilities
         'power' => PowerInterface::class,
     ];
 
+    /**
+     * @param  string[]  $contracts
+     * @return string[]
+     */
+    public static function forContracts(array $contracts): array
+    {
+        return array_keys(array_intersect(self::MAP, $contracts));
+    }
+
+    /**
+     * Unique capabilities in the canonical order.
+     *
+     * @param  string[]  $capabilities
+     * @return string[]
+     */
+    public static function sort(array $capabilities): array
+    {
+        return array_values(array_intersect(array_keys(self::MAP), $capabilities));
+    }
+
     /** @return string[] */
     public static function forDriver(?string $driverClass): array
     {

@@ -10,6 +10,7 @@ use App\Events\Device\ProgressUpdated;
 use App\Events\Device\VolumeUpdated;
 use App\Listeners\Device\ClosePlaybackHistory;
 use App\Listeners\Device\DispatchArtworkProcessing;
+use App\Listeners\Device\HoldOwnModesWhileSpotifyRouted;
 use App\Listeners\Device\PublishModesToMqtt;
 use App\Listeners\Device\PublishNowPlayingToMqtt;
 use App\Listeners\Device\PublishProgressToMqtt;
@@ -48,6 +49,8 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(NowPlayingEnded::class, [ClosePlaybackHistory::class, 'handle']);
         Event::listen(VolumeUpdated::class, UpdateDeviceCache::class);
         Event::listen(VolumeUpdated::class, PublishVolumeToMqtt::class);
+        // Must stay first: it holds back a speaker's own modes while Spotify is routed to it.
+        Event::listen(PlaybackModesUpdated::class, HoldOwnModesWhileSpotifyRouted::class);
         Event::listen(PlaybackModesUpdated::class, UpdateDeviceCache::class);
         Event::listen(PlaybackModesUpdated::class, PublishModesToMqtt::class);
         Event::listen(DeviceStateChanged::class, PublishStateToMqtt::class);
