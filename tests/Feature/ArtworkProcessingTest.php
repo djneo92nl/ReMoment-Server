@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Domain\Artwork\ArtworkCache;
+use App\Domain\Device\DeviceCache;
 use App\Domain\Media\AlbumData;
 use App\Domain\Media\ArtistData;
 use App\Domain\Media\NowPlaying;
@@ -11,6 +12,7 @@ use App\Events\Device\NowPlayingUpdated;
 use App\Jobs\ProcessArtwork;
 use App\Listeners\Device\DispatchArtworkProcessing;
 use App\Listeners\Device\PublishNowPlayingToMqtt;
+use App\Models\Device;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -177,6 +179,21 @@ class ArtworkProcessingTest extends TestCase
         (new DispatchArtworkProcessing)->handle(new NowPlayingUpdated('1', $this->nowPlaying(), 'media'));
 
         Queue::assertPushed(ProcessArtwork::class, fn (ProcessArtwork $job) => $job->originalUrl === self::URL);
+    }
+
+    public function test_finishing_a_cover_republishes_data_for_devices_still_playing_it(): void
+    {
+        $this->fakeHttp();
+        $playing = Device::create(['device_name' => 'Kitchen', 'device_brand_name' => 'Test', 'device_product_type' => 'Test', 'device_driver_name' => 'Test', 'ip_address' => '10.0.0.1']);
+        $other = Device::create(['device_name' => 'Bedroom', 'device_brand_name' => 'Test', 'device_product_type' => 'Test', 'device_driver_name' => 'Test', 'ip_address' => '10.0.0.2']);
+        (new DeviceCache)->updateNowPlaying($playing->id, $this->nowPlaying());
+
+        (new ProcessArtwork(self::URL))->handle();
+
+        $data = collect($this->mqtt->published)->firstWhere('topic', "remoment/player/{$playing->id}/data");
+        $this->assertNotNull($data, 'the playing device gets /data again once its cover is ready');
+        $this->assertArrayHasKey('proxy_320', json_decode($data['message'], true)['artwork']);
+        $this->assertNull(collect($this->mqtt->published)->firstWhere('topic', "remoment/player/{$other->id}/data"));
     }
 
     public function test_mqtt_data_payload_carries_the_new_artwork_keys(): void

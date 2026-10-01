@@ -5,6 +5,9 @@ namespace App\Jobs;
 use App\Domain\Artwork\ArtworkCache;
 use App\Domain\Artwork\LogoRenderer;
 use App\Domain\Artwork\SourceLogo;
+use App\Domain\Device\DeviceCache;
+use App\Listeners\Device\PublishNowPlayingToMqtt;
+use App\Models\Device;
 use App\Models\Media\Album;
 use ColorThief\ColorThief;
 use Illuminate\Bus\Queueable;
@@ -96,6 +99,24 @@ class ProcessArtwork implements ShouldQueue
         ArtworkCache::put($this->originalUrl, $payload);
 
         $this->applyColorsToAlbums($colors);
+        $this->republishNowPlaying();
+    }
+
+    /**
+     * The first play of a new cover goes out on MQTT without artwork (it's processed here,
+     * asynchronously). Re-send /data for every device still playing it, so clients get the
+     * artwork now instead of on the next track.
+     */
+    private function republishNowPlaying(): void
+    {
+        $publisher = app(PublishNowPlayingToMqtt::class);
+
+        foreach (Device::pluck('id') as $deviceId) {
+            $nowPlaying = DeviceCache::getNowPlaying($deviceId);
+            if ($nowPlaying !== null && ArtworkCache::extractImageUrl($nowPlaying) === $this->originalUrl) {
+                $publisher->publish($deviceId, $nowPlaying);
+            }
+        }
     }
 
     /**
