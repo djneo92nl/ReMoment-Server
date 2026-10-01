@@ -37,3 +37,4 @@ Route::post('/clients/register', [ClientController::class, 'register']);
 Route::get('/clients/status/{registrationToken}', [ClientController::class, 'status']);
 Route::get('/clients/{apiToken}/devices', [ClientController::class, 'devices']);
 Route::put('/clients/{apiToken}/heartbeat', [ClientController::class, 'heartbeat']);
+Route::get('/clients/{apiToken}/artwork', [ClientController::class, 'artwork']);

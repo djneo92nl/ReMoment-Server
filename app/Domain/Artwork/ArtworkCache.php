@@ -26,6 +26,28 @@ final class ArtworkCache
         return Cache::get(self::key($originalUrl));
     }
 
+    /**
+     * Entries for several URLs in one cache round trip.
+     *
+     * @param  array<int, string>  $originalUrls
+     * @return array<string, array|null> keyed by original URL
+     */
+    public static function getMany(array $originalUrls): array
+    {
+        if ($originalUrls === []) {
+            return [];
+        }
+
+        $keys = [];
+        foreach ($originalUrls as $url) {
+            $keys[$url] = self::key($url);
+        }
+
+        $entries = Cache::many(array_values($keys));
+
+        return array_map(fn (string $key) => $entries[$key] ?? null, $keys);
+    }
+
     /** Whether a complete entry exists. A partial (outdated) entry is still returned by get(). */
     public static function has(string $originalUrl): bool
     {

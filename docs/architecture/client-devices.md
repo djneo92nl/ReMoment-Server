@@ -110,6 +110,15 @@ Response: `{ registration_token, pairing_code, status }`
 1. Looks up client by `api_token`; 404 if missing
 2. Updates `ip_address` (from `$request->ip()`), optional `firmware_version` / `build_number`, and `last_seen_at`
 
+### `artwork(Request $request, string $apiToken): JsonResponse`
+
+1. Looks up client by `api_token`; 404 if missing (does not touch `last_seen_at`)
+2. Scans `ARTWORK_PAGE_SIZE` (200) albums with `images`, `id > cursor`, in id order
+3. Takes each album's cover (`images[0]`, string or `{url}`), dedupes, and reads their `ArtworkCache` entries in one `Cache::many()`; an expired entry falls back to `artwork/{md5}/320.jpg` + `120.jpg` on the public disk
+4. Returns `{ data: [{hash, proxy_320, proxy_120}], next_cursor }`; `next_cursor` is the last scanned album id when the page was full
+
+It never queues processing; covers without processed artwork are left to the daily `library:backfill-artwork`.
+
 ### `resolveDevices(Client $client)` (private)
 
 Device resolution rules:
@@ -133,6 +142,7 @@ POST   /api/clients/register
 GET    /api/clients/status/{registrationToken}
 GET    /api/clients/{apiToken}/devices
 PUT    /api/clients/{apiToken}/heartbeat
+GET    /api/clients/{apiToken}/artwork
 ```
 
 ---

@@ -276,14 +276,17 @@ Error: `{ "error": "no_dlna_url", "message": "This track has no DLNA stream URL.
 
 ### Client Device API
 
-Four endpoints used by firmware and software clients to self-register, poll for admin approval, and retrieve assigned devices.
+Five endpoints used by firmware and software clients to self-register, poll for admin approval, retrieve assigned devices, and pre-cache artwork.
 
 ```
 POST  /api/clients/register                           → registration_token + pairing_code
 GET   /api/clients/status/{registration_token}        → pending | approved + api_token + devices
 GET   /api/clients/{api_token}/devices                → assigned device list
 PUT   /api/clients/{api_token}/heartbeat              → updates IP, firmware, last_seen_at
+GET   /api/clients/{api_token}/artwork?cursor=        → processed library covers to pre-cache, by hash
 ```
+
+The artwork list is `{ data: [{ hash, proxy_320, proxy_120 }], next_cursor }`: all library albums whose cover is already processed (unprocessed ones are left to the daily backfill), 200 albums scanned per page by album id; follow `next_cursor` until `null`.
 
 See `docs/api/client-devices.md` for full request/response shapes, the registration flow, firmware implementation notes, and an Arduino sketch outline.
 
