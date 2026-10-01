@@ -22,14 +22,16 @@ All under `remoment/player/{device_id}/`:
 | Topic | Retained | Published when | Payload |
 |---|---|---|---|
 | `state` | yes | `DeviceCache::updateState()` sees a transition (not on every heartbeat write) | `{"state":"playing"}` — `playing`/`paused`/`standby`/`unreachable` |
-| `volume` | yes | `VolumeUpdated` with a level different from the last one published | `{"volume":45}` |
+| `volume` | yes | `VolumeUpdated` with a level or mute state different from the last one published | `{"volume":45,"muted":false}` — a listener that doesn't report mute keeps the last known value (`false` if never known) |
 | `modes` | yes | `PlaybackModesUpdated` with values different from the last ones published (listeners report on every poll; the API after a change) | `{"shuffle":true,"repeat":"off","liked":null}` — `repeat` is `off`/`all`/`one`; `null` = unknown or unsupported. Same object as `now_playing.modes` |
-| `data` | no | `NowPlayingUpdated` (new track) | `{"track","artist","artwork"?}` — `artwork` is `kind` (`album`/`radio`/`source`) plus the `ArtworkCache` entry: `proxy_512`, `proxy_320`, `proxy_120`, `proxy_bg` (1024×600 background) URLs plus `colors`/`safe_colors`; see CLAUDE.md "Artwork Caching". Without any image (line-in, TV, a station without a logo) it is a generated source/radio logo with the same keys, so it is absent only while a real image is first processed |
+| `data` | yes | `NowPlayingUpdated` (new track), unless identical to the last payload; republished from the cache on a transition from standby/unreachable to playing/paused; an **empty payload** on a transition to standby/unreachable | `{"track","artist","artwork"?}` — `artwork` is `kind` (`album`/`radio`/`source`) plus the `ArtworkCache` entry: `proxy_512`, `proxy_320`, `proxy_120`, `proxy_bg` (1024×600 background) URLs plus `colors`/`safe_colors`; see CLAUDE.md "Artwork Caching". Without any image (line-in, TV, a station without a logo) it is a generated source/radio logo with the same keys, so it is absent only while a real image is first processed |
 | `progress` | no | `ProgressUpdated`, about once a second while playing | Percentage `0`–`100` as a plain string |
 
 The `data` payload is around 600 bytes with artwork. PubSubClient (ESP32/ESP8266) drops messages above its 256-byte default buffer, so firmware must call `setBufferSize()` (1024 or more).
 
-`state`, `volume` and `modes` are retained so a firmware client that connects later gets the current value immediately.
+`state`, `volume`, `modes` and `data` are retained so a firmware client that connects later (or subscribes to another device) gets the current value immediately.
+
+**Empty `/data`:** when a device goes to standby or becomes unreachable, `SyncNowPlayingDataWithState` publishes a zero-length retained payload on `/data`. That removes the retained track from the broker, and live subscribers receive it as an empty message: clients must treat an empty `/data` as "nothing playing" (don't JSON-parse it). `remoment-live.js` passes it on as `data: ''`; `liveDevice` and `/receiver` just re-fetch, so they need no special case. When a device comes back (e.g. a listener recovering from an error, which doesn't re-announce the track it already reported), the cached now-playing is republished. `UpdateDeviceCache` stores the new now-playing before updating the state, so that republish already carries the new track and `PublishNowPlayingToMqtt` skips its identical payload.
 
 Caveat: `state` only fires on writes through `DeviceCache::updateState()`. When a listener dies, its `device:{id}:state` key expires silently (TTL 3600s) and no `unreachable` message is sent — the UI's safety refresh (below) and `/settings/health` cover that case.
 

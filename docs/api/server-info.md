@@ -43,7 +43,7 @@ Unauthenticated, like the rest of the API. Controller: `app/Http/Controllers/Api
 | `artwork_base_url` | same as `base_url` | Prefix for artwork paths, see below |
 | `mqtt.host` | `MQTT_PUBLIC_HOST`, else the request host | Broker host as the client should reach it |
 | `mqtt.port` | `MQTT_PUBLIC_PORT`, else `MQTT_PORT`, else `1883` | Plain MQTT (TCP), not WebSockets |
-| `mqtt.topic_prefix` | constant | Device topics are `{topic_prefix}/{device_id}/{data,progress,state,volume}` |
+| `mqtt.topic_prefix` | constant | Device topics are `{topic_prefix}/{device_id}/{data,progress,state,volume,modes}` |
 | `placeholder` | `NowPlayingArtwork::placeholder()` | Artwork object (same shape as `now_playing.artwork`, `kind: "source"`) of the generic music-note logo. Show it whenever there is no artwork, including the first play of a cover that is still being processed. Rendered on the spot if not cached, so it is always present (`null` only if rendering itself fails). Its hash is the same on every server; cache `proxy_320` (and `proxy_bg`) like any cover |
 
 ### Why the MQTT host isn't `MQTT_HOST`

@@ -16,7 +16,9 @@ class VolumeUpdated
      */
     public function __construct(
         public string $deviceId,
-        public int $volume
+        public int $volume,
+        /** Null when the listener doesn't know; the last known value is kept. */
+        public ?bool $muted = null,
     ) {
         //
     }

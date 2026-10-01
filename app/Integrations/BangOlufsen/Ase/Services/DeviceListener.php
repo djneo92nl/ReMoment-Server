@@ -145,7 +145,11 @@ class DeviceListener
 
                 break;
             case 'VOLUME':
-                event(new VolumeUpdated(deviceId: $deviceId, volume: $data['speaker']['level']));
+                event(new VolumeUpdated(
+                    deviceId: $deviceId,
+                    volume: $data['speaker']['level'],
+                    muted: isset($data['speaker']['muted']) ? (bool) $data['speaker']['muted'] : null,
+                ));
                 break;
             case 'SOURCE':
                 if ($data === []) {

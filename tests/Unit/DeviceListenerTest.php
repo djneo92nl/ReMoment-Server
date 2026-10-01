@@ -135,6 +135,7 @@ class DeviceListenerTest extends TestCase
                 'data' => [
                     'speaker' => [
                         'level' => 42,
+                        'muted' => true,
                     ],
                 ],
             ],
@@ -165,7 +166,8 @@ class DeviceListenerTest extends TestCase
 
         Event::assertDispatched(VolumeUpdated::class, function (VolumeUpdated $event) {
             return $event->deviceId === 'device-1'
-                && $event->volume === 42;
+                && $event->volume === 42
+                && $event->muted === true;
         });
 
         Event::assertDispatched(NowPlayingEnded::class, function (NowPlayingEnded $event) {

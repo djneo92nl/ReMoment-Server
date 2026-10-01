@@ -4,7 +4,7 @@ Full-screen now-playing display, designed for TVs, wall-mounted tablets, and Chr
 
 ## Overview
 
-A standalone Blade template with no Livewire dependency — plain JS fetching `GET /api/devices/{id}`. When the MQTT WebSocket broker is reachable it re-fetches on push (`state` / `data` messages) and only polls every 15s as a safety net; otherwise it polls every 3 seconds. See [Live Updates](../architecture/live-updates.md). Accepts a `?device={id}` query parameter to skip the picker. If only one device exists it auto-selects.
+A standalone Blade template with no Livewire dependency — plain JS fetching `GET /api/devices/{id}`. When the MQTT WebSocket broker is reachable it re-fetches on push (`state` / `data` messages; an empty `data` payload — nothing playing — is just another re-fetch trigger) and only polls every 15s as a safety net; otherwise it polls every 3 seconds. See [Live Updates](../architecture/live-updates.md). Accepts a `?device={id}` query parameter to skip the picker. If only one device exists it auto-selects.
 
 ## Features
 

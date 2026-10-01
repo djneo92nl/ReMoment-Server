@@ -310,7 +310,7 @@ Always check the `capabilities` array from `GET /devices` before showing transpo
 
 ### MQTT (optional)
 
-Each device publishes to `remoment/player/{id}/data` (track change) and `remoment/player/{id}/progress` (every second). The `mqtt_topic` field in `DeviceListResource` gives you the base topic. MQTT lets you avoid polling for progress updates.
+Each device publishes to `remoment/player/{id}/data` (track change; retained, an empty payload means nothing is playing), `/progress` (every second), `/state`, `/volume` (`{ "volume": 45, "muted": false }`) and `/modes` (`{ "shuffle", "repeat", "liked" }`), the last four retained. The `mqtt_topic` field in `DeviceListResource` gives you the base topic. MQTT lets you avoid polling for progress updates. See the MQTT table in CLAUDE.md and `docs/architecture/live-updates.md` for payloads.
 
 ---
 

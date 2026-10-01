@@ -106,7 +106,7 @@ class DeviceListenerTest extends TestCase
         ]);
 
         Event::assertDispatched(VolumeUpdated::class, function (VolumeUpdated $event) {
-            return $event->deviceId === '1' && $event->volume === 55;
+            return $event->deviceId === '1' && $event->volume === 55 && $event->muted === false;
         });
     }
 

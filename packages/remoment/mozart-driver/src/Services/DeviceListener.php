@@ -125,7 +125,11 @@ class DeviceListener
 
                 $level = $eventData['level']['level'] ?? null;
                 if ($level !== null) {
-                    event(new VolumeUpdated(deviceId: $deviceId, volume: (int) $level));
+                    event(new VolumeUpdated(
+                        deviceId: $deviceId,
+                        volume: (int) $level,
+                        muted: isset($eventData['muted']['muted']) ? (bool) $eventData['muted']['muted'] : null,
+                    ));
                 }
                 break;
 

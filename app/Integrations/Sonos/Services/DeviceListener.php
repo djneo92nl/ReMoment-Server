@@ -44,6 +44,7 @@ class DeviceListener
         $lastNowPlayingKey = null;
         $lastPositionSeconds = null;
         $lastVolume = null;
+        $lastMuted = null;
         $lastModes = null;
 
         DeviceCache::updateState($deviceId, State::Unreachable);
@@ -57,10 +58,12 @@ class DeviceListener
                 $state = $controller->getState();
                 $details = $controller->getStateDetails();
                 $volume = $controller->getVolume();
+                $muted = $controller->isMuted();
 
-                if ($lastVolume === null || $volume !== $lastVolume) {
-                    event(new VolumeUpdated(deviceId: $deviceId, volume: $volume));
+                if ($lastVolume === null || $volume !== $lastVolume || $muted !== $lastMuted) {
+                    event(new VolumeUpdated(deviceId: $deviceId, volume: $volume, muted: $muted));
                     $lastVolume = $volume;
+                    $lastMuted = $muted;
                 }
 
                 $modes = $this->readModes($controller);

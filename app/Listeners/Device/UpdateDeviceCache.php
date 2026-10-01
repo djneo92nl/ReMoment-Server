@@ -35,9 +35,10 @@ class UpdateDeviceCache
         }
 
         if ($event instanceof NowPlayingUpdated) {
-            DeviceCache::updateState($deviceId, State::Playing);
-
+            // Now-playing first: a state transition republishes it to MQTT /data.
             (new DeviceCache)->updateNowPlaying($deviceId, $event->nowPlaying);
+
+            DeviceCache::updateState($deviceId, State::Playing);
 
             return;
         }
@@ -65,6 +66,10 @@ class UpdateDeviceCache
 
         if ($event instanceof VolumeUpdated) {
             Volume::updateVolume($deviceId, $event->volume);
+
+            if ($event->muted !== null) {
+                Volume::updateMuted($deviceId, $event->muted);
+            }
 
             return;
         }

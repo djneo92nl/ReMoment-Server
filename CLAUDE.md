@@ -333,13 +333,13 @@ The Mosquitto broker runs in Docker on port 1883. Each device's MQTT base topic 
 
 | Topic | Trigger | Payload |
 |-------|---------|---------|
-| `remoment/player/{id}/data` | New track starts | `{ "track": "Name", "artist": "Name", "artwork": { "kind": "album", "proxy_512": "…", "proxy_320": "…", "proxy_120": "…", "proxy_bg": "…", "colors": ["#…"], "safe_colors": ["#…"] } }` (same `artwork` object as the REST API; ~600 bytes, so MQTT clients need a buffer above PubSubClient's 256-byte default) |
+| `remoment/player/{id}/data` | New track starts (retained); cleared on standby/unreachable | `{ "track": "Name", "artist": "Name", "artwork": { "kind": "album", "proxy_512": "…", "proxy_320": "…", "proxy_120": "…", "proxy_bg": "…", "colors": ["#…"], "safe_colors": ["#…"] } }` (same `artwork` object as the REST API; ~600 bytes, so MQTT clients need a buffer above PubSubClient's 256-byte default). An **empty (zero-length) payload** means nothing is playing |
 | `remoment/player/{id}/progress` | Every second while playing | Progress as a percentage of the track, 0–100 (integer string) |
 | `remoment/player/{id}/state` | State transition (retained) | `{ "state": "playing" }` — `playing` / `paused` / `standby` / `unreachable` |
-| `remoment/player/{id}/volume` | Volume level changes (retained) | `{ "volume": 45 }` |
+| `remoment/player/{id}/volume` | Volume or mute changes (retained) | `{ "volume": 45, "muted": false }` |
 | `remoment/player/{id}/modes` | Shuffle/repeat/liked changes (retained) | `{ "shuffle": true, "repeat": "off", "liked": null }` — as `now_playing.modes`; `null` = unknown/unsupported |
 
-`artwork` is absent in the MQTT payload if a real image is not yet processed; `kind` is `album` | `radio` | `source` as in the REST API. Published by the `PublishNowPlayingToMqtt`, `PublishProgressToMqtt`, `PublishStateToMqtt`, `PublishVolumeToMqtt` and `PublishModesToMqtt` listeners. The server only publishes and never subscribes. Browsers subscribe over the WebSocket listener on port 9001 to drive live UI refreshes; see `docs/architecture/live-updates.md`.
+`/data` is retained so a client subscribing later (e.g. after switching device) gets the current track at once; when the device goes to standby or becomes unreachable the server publishes an empty retained payload, which also removes the retained track from the broker, so clients must treat an empty `/data` as "nothing playing". It is republished from the cache when a device comes back, and identical payloads aren't repeated. `artwork` is absent in the MQTT payload if a real image is not yet processed; `kind` is `album` | `radio` | `source` as in the REST API. Published by the `PublishNowPlayingToMqtt`, `PublishProgressToMqtt`, `PublishStateToMqtt`, `PublishVolumeToMqtt` and `PublishModesToMqtt` listeners. The server only publishes and never subscribes. Browsers subscribe over the WebSocket listener on port 9001 to drive live UI refreshes; see `docs/architecture/live-updates.md`.
 
 ---
 
@@ -352,9 +352,9 @@ Defined in `app/Providers/AppServiceProvider.php`:
 - `NowPlayingUpdated` → `UpdateDeviceCache`, `StorePlaybackHistory` (queued), `PublishNowPlayingToMqtt`, `DispatchArtworkProcessing`
 - `ProgressUpdated` → `UpdateDeviceCache`, `PublishProgressToMqtt`
 - `NowPlayingEnded` → `UpdateDeviceCache`, `ClosePlaybackHistory`
-- `VolumeUpdated` → `UpdateDeviceCache`, `PublishVolumeToMqtt`
+- `VolumeUpdated` (volume + optional `muted`) → `UpdateDeviceCache`, `PublishVolumeToMqtt`
 - `PlaybackModesUpdated` → `UpdateDeviceCache`, `PublishModesToMqtt`. Fired by listeners with the shuffle/repeat/liked they observe, and by the API after a change.
-- `DeviceStateChanged` → `PublishStateToMqtt`. Fired by `DeviceCache::updateState()` only when the cached state actually changes.
+- `DeviceStateChanged` → `PublishStateToMqtt`, `SyncNowPlayingDataWithState` (clears the retained `/data` on standby/unreachable, republishes the cached track when a device comes back). Fired by `DeviceCache::updateState()` only when the cached state actually changes.
 
 Listeners are registered only here: event auto-discovery is disabled in `bootstrap/app.php`, because it registered every listener twice.
 
@@ -420,7 +420,8 @@ Domain objects represent live state; Eloquent models represent stored history.
 | `spotify_routed_to` | device ID integer | 30s |
 | `listener_running_{id}` | boolean flag | 10s |
 | `device:{id}:modes` | last known shuffle/repeat/liked (`PlaybackModes` array) | 3600s |
-| `mqtt_published_volume_{id}` | last volume published to MQTT (dedupe) | 3600s |
+| `mqtt_published_volume_{id}` | last `/volume` payload published to MQTT (dedupe) | 3600s |
+| `mqtt_published_data_{id}` | md5 of the last `/data` payload published (dedupe; forgotten when cleared) | 3600s |
 | `mqtt_published_modes_{id}` | last `/modes` payload published to MQTT (dedupe) | 3600s |
 | `health:scheduler` / `health:queue` | ISO timestamp heartbeats for `/settings/health` | 86400s |
 

@@ -16,6 +16,7 @@ use App\Listeners\Device\PublishProgressToMqtt;
 use App\Listeners\Device\PublishStateToMqtt;
 use App\Listeners\Device\PublishVolumeToMqtt;
 use App\Listeners\Device\StorePlaybackHistory;
+use App\Listeners\Device\SyncNowPlayingDataWithState;
 use App\Listeners\Device\UpdateDeviceCache;
 use App\Services\MqttService;
 use Illuminate\Support\Facades\Event;
@@ -50,5 +51,6 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(PlaybackModesUpdated::class, UpdateDeviceCache::class);
         Event::listen(PlaybackModesUpdated::class, PublishModesToMqtt::class);
         Event::listen(DeviceStateChanged::class, PublishStateToMqtt::class);
+        Event::listen(DeviceStateChanged::class, SyncNowPlayingDataWithState::class);
     }
 }

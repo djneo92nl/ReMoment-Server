@@ -35,7 +35,7 @@ class PublishNowPlayingToMqttTest extends TestCase
                         && $payload['artist'] === $artistName
                         && $payload['artwork']['kind'] === 'source'
                         && str_contains($payload['artwork']['proxy_320'], md5(SourceLogo::url('music')));
-                }));
+                }), 0, true);
         });
 
         $event = new NowPlayingUpdated($deviceId, $nowPlaying, 'media');
