@@ -10,10 +10,12 @@ use App\Events\Device\PlaybackModesUpdated;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\DeviceDetailResource;
 use App\Http\Resources\Api\DeviceListResource;
+use App\Integrations\Common\UnsupportedOperationException;
 use App\Integrations\Contracts\LibraryPlaybackInterface;
 use App\Integrations\Contracts\LikeInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
+use App\Integrations\Contracts\PowerInterface;
 use App\Integrations\Contracts\QueueInterface;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\RepeatInterface;
@@ -159,6 +161,35 @@ class DeviceController extends Controller
             fn (PlaybackModes $modes) => $modes->withLiked($liked),
             ['liked' => $liked],
         );
+    }
+
+    public function setPower(Request $request, Device $device): JsonResponse
+    {
+        $request->validate(['on' => ['required', 'boolean']]);
+        $on = $request->boolean('on');
+
+        if ($error = $this->assertReachable($device)) {
+            return $error;
+        }
+
+        $driver = $device->driver;
+
+        if (!($driver instanceof PowerInterface)) {
+            return $this->unsupported('power');
+        }
+
+        try {
+            $on ? $driver->powerOn() : $driver->standby();
+        } catch (UnsupportedOperationException $e) {
+            return response()->json(['error' => 'unsupported', 'message' => $e->getMessage()], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'driver_error',
+                'message' => 'The device did not respond: '.$e->getMessage(),
+            ], 502);
+        }
+
+        return response()->json(['on' => $on]);
     }
 
     /**

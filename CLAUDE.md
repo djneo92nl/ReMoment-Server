@@ -106,7 +106,7 @@ Response: `{ "data": DeviceDetailResource }`
 
 `state` values: `playing` | `standby` | `paused` | `unreachable`
 
-`capabilities` values: `media_controls` | `volume_control` | `radio_control` | `source_control` | `source_activation` | `multi_room` | `library_playback` | `seek` | `queue` | `shuffle` | `repeat` | `like`
+`capabilities` values: `media_controls` | `volume_control` | `radio_control` | `source_control` | `source_activation` | `multi_room` | `library_playback` | `seek` | `queue` | `shuffle` | `repeat` | `like` | `power`
 
 Always check `capabilities` before calling a feature endpoint — calling an unsupported feature returns `422`.
 
@@ -213,6 +213,16 @@ PUT  /api/devices/{id}/like            body: { "liked": true }              → 
 ```
 
 `repeat` is `off` | `all` (the queue/context) | `one` (the current track). `like` saves the playing track to (or removes it from) the Spotify library; it needs the `user-library-modify` scope, so a Spotify connection made before it was added must be reconnected at `/settings`. A successful change is written to `now_playing.modes` and MQTT `/modes` right away, then kept in sync by the device listener.
+
+### Power
+
+Requires `power` (B&O ASE, Mozart).
+
+```
+PUT  /api/devices/{id}/power           body: { "on": false }                → { "on": false }
+```
+
+`on: true` wakes the device, `on: false` puts it in standby. Mozart can only be put in standby: `on: true` returns `422` `{ "error": "unsupported", "message": "This device cannot be switched on remotely." }`. The resulting state arrives through the listener (`state` / MQTT `/state`).
 
 ### Up Next (queue)
 
@@ -366,6 +376,7 @@ All drivers implement interfaces from `app/Integrations/Contracts/`:
 - `QueueInterface` – list up-next tracks (Sonos, Spotify)
 - `ShuffleInterface` / `RepeatInterface` – set shuffle and repeat (Sonos, Spotify, Mozart)
 - `LikeInterface` – like/save the playing track (Spotify)
+- `PowerInterface` – wake / standby (ASE, Mozart; Mozart can't be woken and throws `UnsupportedOperationException`, answered with 422)
 
 `App\Domain\Device\Capabilities::forDriver()` maps these contracts to the API capability strings from the driver class name, without instantiating the driver.
 
@@ -375,7 +386,7 @@ All drivers implement interfaces from `app/Integrations/Contracts/`:
 - `MusicPlayerDriver` — all audio capabilities
 - `VideoPlayerDriver` — HDMI/video plus library playback
 - Communicates via REST to `{ip}:8080/BeoZone/Zone/…`
-- Capabilities: all interfaces including source activation, multiroom (JID-based), library playback
+- Capabilities: all interfaces including source activation, multiroom (JID-based), library playback, power (`BeoDevice/powerManagement/standby`, `powerState` `on` / `standby`)
 
 **Sonos** (`app/Integrations/Sonos/`)
 - Communicates via UPnP SOAP to device IP

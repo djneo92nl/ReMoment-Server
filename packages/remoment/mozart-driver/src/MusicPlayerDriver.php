@@ -13,10 +13,12 @@ use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\RepeatMode;
 use App\Domain\Device\State;
+use App\Integrations\Common\UnsupportedOperationException;
 use App\Integrations\Contracts\LibraryPlaybackInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
+use App\Integrations\Contracts\PowerInterface;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\RepeatInterface;
 use App\Integrations\Contracts\SeekInterface;
@@ -33,7 +35,7 @@ use Djneo92nl\BeoMozart\MozartClient;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
-class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, RadioControlInterface, RepeatInterface, SeekInterface, ShuffleInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
+class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, PowerInterface, RadioControlInterface, RepeatInterface, SeekInterface, ShuffleInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
 {
     public MozartClient $client;
 
@@ -120,6 +122,19 @@ class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterf
             'track' => RepeatMode::One,
             default => null,
         };
+    }
+
+    // --- PowerInterface ---
+    // NOTE: the Mozart spec has a standby endpoint but no power-on one.
+
+    public function powerOn(): void
+    {
+        throw new UnsupportedOperationException('This device cannot be switched on remotely.');
+    }
+
+    public function standby(): void
+    {
+        $this->client->power()->standby();
     }
 
     // --- VolumeControlInterface ---

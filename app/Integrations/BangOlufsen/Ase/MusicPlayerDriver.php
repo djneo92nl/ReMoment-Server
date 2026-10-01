@@ -14,6 +14,7 @@ use App\Integrations\Common\HttpConnector;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
+use App\Integrations\Contracts\PowerInterface;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\SourcesInterface;
@@ -21,7 +22,7 @@ use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
 use App\Models\RadioStation;
 
-class MusicPlayerDriver implements MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, RadioControlInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
+class MusicPlayerDriver implements MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, PowerInterface, RadioControlInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
 {
     use ContentControls;
     use DeviceControls;

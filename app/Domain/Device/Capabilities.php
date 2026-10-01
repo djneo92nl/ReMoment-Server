@@ -6,6 +6,7 @@ use App\Integrations\Contracts\LibraryPlaybackInterface;
 use App\Integrations\Contracts\LikeInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
+use App\Integrations\Contracts\PowerInterface;
 use App\Integrations\Contracts\QueueInterface;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\RepeatInterface;
@@ -35,6 +36,7 @@ final class Capabilities
         'shuffle' => ShuffleInterface::class,
         'repeat' => RepeatInterface::class,
         'like' => LikeInterface::class,
+        'power' => PowerInterface::class,
     ];
 
     /** @return string[] */

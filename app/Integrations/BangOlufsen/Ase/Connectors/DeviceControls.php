@@ -13,6 +13,13 @@ trait DeviceControls
         return $response['standby']['powerState'] ?? 'unknown';
     }
 
+    public function powerOn(): void
+    {
+        $this->deviceApiClient()->put('BeoDevice/powerManagement/standby', [
+            'standby' => ['powerState' => 'on'],
+        ]);
+    }
+
     public function standby(): void
     {
         $this->deviceApiClient()->put('BeoDevice/powerManagement/standby', [

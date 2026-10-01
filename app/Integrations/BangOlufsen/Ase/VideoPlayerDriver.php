@@ -14,13 +14,14 @@ use App\Integrations\Contracts\LibraryPlaybackInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
+use App\Integrations\Contracts\PowerInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\SourcesInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
 use Illuminate\Support\Facades\Cache;
 
-class VideoPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
+class VideoPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, PowerInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
 {
     use ContentControls;
     use DeviceControls;
