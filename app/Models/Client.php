@@ -12,11 +12,14 @@ class Client extends Model
         'name', 'type', 'status', 'hardware_id',
         'registration_token', 'pairing_code', 'api_token',
         'ip_address', 'firmware_version', 'build_number',
+        'battery_percent', 'battery_charging',
         'metadata', 'last_seen_at', 'approved_at',
     ];
 
     protected $casts = [
         'metadata' => 'array',
+        'battery_percent' => 'integer',
+        'battery_charging' => 'boolean',
         'last_seen_at' => 'datetime',
         'approved_at' => 'datetime',
     ];

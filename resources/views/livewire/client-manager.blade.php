@@ -143,6 +143,12 @@
                                         @if($client->build_number)
                                             <span>build {{ $client->build_number }}</span>
                                         @endif
+                                        @if($client->battery_percent !== null)
+                                            <span class="{{ $client->battery_percent < 10 ? 'text-red-500' : ($client->battery_percent < 20 ? 'text-yellow-500' : '') }}">
+                                                <i class="fa-solid {{ $client->battery_charging ? 'fa-plug' : 'fa-battery-half' }}"></i>
+                                                {{ $client->battery_percent }}%{{ $client->battery_charging ? ' charging' : '' }}
+                                            </span>
+                                        @endif
                                         @if($client->last_seen_at)
                                             <span>seen {{ $client->last_seen_at->diffForHumans() }}</span>
                                         @else

@@ -29,6 +29,8 @@ Client devices (ESP8266, ESP32, Raspberry Pi, software integrations) register wi
 | `ip_address` | string(45) nullable | null | Updated from request IP on register and heartbeat |
 | `firmware_version` | string(50) nullable | null | |
 | `build_number` | unsigned int nullable | null | |
+| `battery_percent` | unsigned tinyint nullable | null | 0–100, reported on heartbeat; null = no battery / never reported |
+| `battery_charging` | boolean nullable | null | true while on external power, reported on heartbeat |
 | `metadata` | json nullable | null | Arbitrary client-supplied key/value (board type, notes, etc.) |
 | `last_seen_at` | timestamp nullable | null | Updated on `GET /devices` and heartbeat |
 | `approved_at` | timestamp nullable | null | Set when admin approves |

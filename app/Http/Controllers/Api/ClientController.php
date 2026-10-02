@@ -94,6 +94,8 @@ class ClientController extends Controller
         $data = $request->validate([
             'firmware_version' => ['nullable', 'string', 'max:50'],
             'build_number' => ['nullable', 'integer', 'min:0'],
+            'battery_percent' => ['nullable', 'integer', 'between:0,100'],
+            'battery_charging' => ['nullable', 'boolean'],
         ]);
 
         $client->update(array_merge($data, [

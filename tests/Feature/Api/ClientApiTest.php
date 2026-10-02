@@ -177,4 +177,27 @@ class ClientApiTest extends TestCase
         $this->assertSame(7, (int) $client->build_number);
         $this->assertNotNull($client->last_seen_at);
     }
+
+    public function test_heartbeat_stores_battery_state(): void
+    {
+        $client = $this->approve(Client::create(['status' => 'pending', 'registration_token' => Client::generateToken()]));
+
+        $this->putJson("/api/clients/{$client->api_token}/heartbeat", ['battery_percent' => 15, 'battery_charging' => true])
+            ->assertOk();
+
+        $client->refresh();
+        $this->assertSame(15, $client->battery_percent);
+        $this->assertTrue($client->battery_charging);
+
+        $this->putJson("/api/clients/{$client->api_token}/heartbeat", ['firmware_version' => '2.0.1'])->assertOk();
+        $this->assertSame(15, $client->fresh()->battery_percent);
+    }
+
+    public function test_heartbeat_rejects_out_of_range_battery(): void
+    {
+        $client = $this->approve(Client::create(['status' => 'pending', 'registration_token' => Client::generateToken()]));
+
+        $this->putJson("/api/clients/{$client->api_token}/heartbeat", ['battery_percent' => 101])
+            ->assertUnprocessable();
+    }
 }

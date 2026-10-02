@@ -184,9 +184,15 @@ Updates the client's IP address, firmware version, build number, and `last_seen_
 ```json
 {
   "firmware_version": "1.0.3",
-  "build_number": 43
+  "build_number": 43,
+  "battery_percent": 82,
+  "battery_charging": false
 }
 ```
+
+`battery_percent` (integer 0–100) and `battery_charging` (boolean) are for battery-powered clients; omit them if there is no battery. They are stored on the client (shown in `/settings/clients`) and overwrite the previous values when sent; omitted fields keep their last value.
+
+Suggested client behavior (decided on the client, no server round-trip): show a battery icon only below 20% (yellow, red below 10%) and the battery level on the client's settings screen at any level; show a plug icon while `battery_charging`; below 20% lower the screen brightness and turn the LED off.
 
 The server updates `ip_address` from the TCP connection automatically.
 
