@@ -255,7 +255,7 @@ GET  /api/devices/{id}/queue?limit=20  → { "up_next": [ QueueItem, … ] }
 
 `limit` is 1–100 (default 20). Returns only the tracks after the current one. The list is empty when the device isn't playing from a queue (radio, line-in).
 
-**QueueItem shape:** `{ "name": "…", "artist": "…"|null, "album": "…"|null, "image": "https://…"|null, "duration": 200|null, "uri": "…"|null }`
+**QueueItem shape:** `{ "name": "…", "artist": "…"|null, "album": "…"|null, "image": "https://…"|null, "duration": 200|null, "uri": "…"|null, "artwork": { hash, proxy_120, proxy_320 }|null }`. `artwork` is the small library artwork object (see Library): the item's `image` is processed through the artwork pipeline (queued at most once an hour per image, never waited for), so it is `null` until processed.
 
 Validation errors return Laravel's standard `422` `{ "message", "errors" }`. Unknown devices and routes return `404`.
 

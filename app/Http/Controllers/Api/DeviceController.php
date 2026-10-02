@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Artwork\LibraryItemArtwork;
 use App\Domain\Artwork\RadioStationArtwork;
 use App\Domain\Device\Cache\Modes;
 use App\Domain\Device\PlaybackModes;
@@ -130,7 +131,7 @@ class DeviceController extends Controller
             ], 502);
         }
 
-        return response()->json(['up_next' => array_map(fn ($item) => $item->toArray(), $items)]);
+        return response()->json(['up_next' => array_map(fn ($item) => $item->toArray() + ['artwork' => LibraryItemArtwork::forUrl($item->image)], $items)]);
     }
 
     public function setShuffle(Request $request, Device $device): JsonResponse

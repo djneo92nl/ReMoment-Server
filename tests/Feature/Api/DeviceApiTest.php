@@ -7,8 +7,10 @@ use App\Domain\Device\State;
 use App\Domain\Media\ArtistData;
 use App\Domain\Media\NowPlaying;
 use App\Domain\Media\TrackData;
+use App\Jobs\ProcessArtwork;
 use App\Models\Device;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\Support\FakeBareDriver;
 use Tests\Support\FakePlayerDriver;
 use Tests\TestCase;
@@ -242,18 +244,24 @@ class DeviceApiTest extends TestCase
 
     public function test_queue_returns_up_next_items(): void
     {
+        Queue::fake();
         $device = $this->makeDevice(state: State::Playing);
 
         $this->getJson("/api/devices/{$device->id}/queue")
             ->assertOk()
-            ->assertJsonStructure(['up_next' => ['*' => ['name', 'artist', 'album', 'image', 'duration', 'uri']]])
+            ->assertJsonStructure(['up_next' => ['*' => ['name', 'artist', 'album', 'image', 'duration', 'uri', 'artwork']]])
             ->assertJsonPath('up_next.0.name', 'Next Song')
             ->assertJsonPath('up_next.0.duration', 200)
-            ->assertJsonPath('up_next.1.artist', null);
+            ->assertJsonPath('up_next.0.artwork', null)
+            ->assertJsonPath('up_next.1.artist', null)
+            ->assertJsonPath('up_next.1.artwork', null);
+
+        Queue::assertPushed(ProcessArtwork::class, fn ($job) => $job->originalUrl === 'https://img.test/1.jpg');
     }
 
     public function test_queue_respects_limit(): void
     {
+        Queue::fake();
         $device = $this->makeDevice(state: State::Playing);
 
         $this->getJson("/api/devices/{$device->id}/queue?limit=1")->assertJsonCount(1, 'up_next');
