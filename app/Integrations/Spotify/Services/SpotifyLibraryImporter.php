@@ -3,8 +3,8 @@
 namespace App\Integrations\Spotify\Services;
 
 use App\Domain\Artwork\ArtworkCache;
+use App\Domain\Library\Enrichment;
 use App\Domain\Library\LibraryIdentity;
-use App\Jobs\EnrichTrackMetadata;
 use App\Jobs\ProcessArtwork;
 use App\Models\Media\Metadata;
 use App\Models\Media\Playlist;
@@ -116,7 +116,7 @@ class SpotifyLibraryImporter
         );
 
         if ($track->wasRecentlyCreated) {
-            EnrichTrackMetadata::dispatch($track);
+            Enrichment::queue($track);
         }
 
         return $track;

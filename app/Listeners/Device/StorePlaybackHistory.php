@@ -2,10 +2,10 @@
 
 namespace App\Listeners\Device;
 
+use App\Domain\Library\Enrichment;
 use App\Domain\Library\LibraryIdentity;
 use App\Events\Device\NowPlayingUpdated;
 use App\Integrations\Contracts\RadioControlInterface;
-use App\Jobs\EnrichTrackMetadata;
 use App\Jobs\ScrobbleToLastfm;
 use App\Jobs\SendNowPlayingToLastfm;
 use App\Models\Device;
@@ -211,7 +211,7 @@ class StorePlaybackHistory implements ShouldQueue
         );
 
         if ($track->wasRecentlyCreated) {
-            EnrichTrackMetadata::dispatch($track);
+            Enrichment::queue($track);
         }
 
         // --- Resolve radio station when track is playing via a radio source ---

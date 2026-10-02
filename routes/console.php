@@ -15,6 +15,7 @@ Schedule::command('library:sync-spotify')->daily();
 Schedule::command('library:backfill-artwork')->daily();
 Schedule::command('artwork:prerender')->daily();
 Schedule::command('library:backfill-lastfm')->daily();
+Schedule::command('library:enrich')->daily();
 
 // Health heartbeats — see App\Domain\Health\Heartbeat and /settings/health.
 Schedule::call(function () {

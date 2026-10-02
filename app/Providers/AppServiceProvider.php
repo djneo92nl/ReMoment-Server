@@ -20,7 +20,9 @@ use App\Listeners\Device\StorePlaybackHistory;
 use App\Listeners\Device\SyncNowPlayingDataWithState;
 use App\Listeners\Device\UpdateDeviceCache;
 use App\Services\MqttService;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -38,6 +40,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // MusicBrainz asks for at most one request per second; shared by every enrichment worker.
+        RateLimiter::for('musicbrainz', fn () => Limit::perSecond(1));
+
         Event::listen(NowPlayingUpdated::class, [UpdateDeviceCache::class, 'handle']);
         Event::listen(NowPlayingUpdated::class, [StorePlaybackHistory::class, 'handle']);
         Event::listen(NowPlayingUpdated::class, PublishNowPlayingToMqtt::class);

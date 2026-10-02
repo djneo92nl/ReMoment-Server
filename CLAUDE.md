@@ -25,6 +25,7 @@ docs/
     device-drivers.md       Driver contracts, existing drivers, guide for adding a new brand
     device-discovery.md     Discovery commands, listener startup, device_meta keys
     discovery-for-clients.md mDNS advertisement (_remoment._tcp via host Avahi) so clients find the server
+    metadata-enrichment.md  Per-source enrichment jobs (MusicBrainz, lyrics, Spotify, Last.fm): markers, retries, rate limits, library:enrich
     lastfm.md                Scrobbling, now-playing, auth flow, artist enrichment, backfill
     library-identity.md      One record per artist/album/track across sources: name keys, find-or-create, library:merge-duplicates
     live-updates.md          MQTT-over-WebSocket push to Livewire + /receiver, topics, fallback polling
@@ -64,6 +65,9 @@ php artisan devices:sync-sources
 
 # Scan DLNA servers' libraries (triggered via UI or manually)
 php artisan library:scan [--server=192.168.1.20]
+
+# Queue MusicBrainz/lyrics/Spotify/Last.fm enrichment for tracks still missing a source (scheduled daily)
+php artisan library:enrich [--limit=200] [--dry-run]
 
 # Merge library duplicates across sources (DLNA / Spotify / plays) — dry run first
 php artisan library:merge-duplicates --dry-run

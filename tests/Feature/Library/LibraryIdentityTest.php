@@ -151,7 +151,10 @@ class LibraryIdentityTest extends TestCase
             'total' => count($savedTracks),
         ]);
 
-        $this->mock(SpotifyTokenService::class, fn ($mock) => $mock->shouldReceive('makeApiClient')->andReturn($api));
+        $this->mock(SpotifyTokenService::class, function ($mock) use ($api) {
+            $mock->shouldReceive('makeApiClient')->andReturn($api);
+            $mock->shouldReceive('isConnected')->andReturn(true);
+        });
 
         app(SpotifyLibraryImporter::class)->importSavedTracks();
     }

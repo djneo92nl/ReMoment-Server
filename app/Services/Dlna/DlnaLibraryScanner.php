@@ -3,6 +3,7 @@
 namespace App\Services\Dlna;
 
 use App\Domain\Artwork\ArtworkCache;
+use App\Domain\Library\Enrichment;
 use App\Domain\Library\LibraryIdentity;
 use App\Jobs\ProcessArtwork;
 use App\Models\DlnaServer;
@@ -28,6 +29,9 @@ class DlnaLibraryScanner
         $this->browseContainer($client, '0', $server, $progress);
 
         $server->update(['last_scanned_at' => now()]);
+
+        // Enrich a bounded batch of the new tracks now; the daily library:enrich works off the rest.
+        Enrichment::queueBacklog(Enrichment::SCAN_BATCH);
 
         return $this->tracksImported;
     }
