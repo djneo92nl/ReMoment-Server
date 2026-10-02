@@ -79,6 +79,10 @@ class DlnaLibraryScanner
             $albumData['images'] = [['url' => $item['album_art']]];
         }
 
+        if (!empty($item['released_at'])) {
+            $albumData['released_at'] = $item['released_at'];
+        }
+
         $album = LibraryIdentity::album($artist, $albumName, 'dlna', $albumData);
 
         if ($album->wasRecentlyCreated) {
@@ -108,9 +112,46 @@ class DlnaLibraryScanner
             ],
         );
 
+        $this->storeTags($track, $item, $server);
+
+        if (!empty($item['released_at']) && $album->released_at === null) {
+            $album->update(['released_at' => $item['released_at']]);
+        }
+
         if (!empty($item['album_art']) && empty($album->images)) {
             $album->update(['images' => [['url' => $item['album_art']]]]);
             $this->maybeProcessArtwork($item['album_art']);
+        }
+    }
+
+    /**
+     * The tags and audio properties the server reports, as track metadata with source `dlna:{server}`.
+     * Only values that are new or changed are written, so a rescan of a big library stays cheap.
+     */
+    private function storeTags(Track $track, array $item, DlnaServer $server): void
+    {
+        $audio = $item['audio'] ?? [];
+
+        $tags = array_filter([
+            'genres' => $item['genres'] ? [json_encode($item['genres'], JSON_UNESCAPED_UNICODE), 'json'] : null,
+            'track_number' => $item['track_number'] ? [(string) $item['track_number'], 'int'] : null,
+            'disc_number' => $item['disc_number'] ? [(string) $item['disc_number'], 'int'] : null,
+            'album_artist' => $item['album_artist'] ? [$item['album_artist'], 'string'] : null,
+            'bitrate' => isset($audio['bitrate']) ? [(string) $audio['bitrate'], 'int'] : null,
+            'sample_rate' => isset($audio['sample_rate']) ? [(string) $audio['sample_rate'], 'int'] : null,
+            'bit_depth' => isset($audio['bit_depth']) ? [(string) $audio['bit_depth'], 'int'] : null,
+            'channels' => isset($audio['channels']) ? [(string) $audio['channels'], 'int'] : null,
+            'file_size' => isset($audio['file_size']) ? [(string) $audio['file_size'], 'int'] : null,
+            'mime_type' => isset($audio['mime_type']) ? [$audio['mime_type'], 'string'] : null,
+        ]);
+
+        $source = 'dlna:'.$server->id;
+        $existing = $track->metadata()->where('source', $source)->pluck('value', 'key');
+
+        foreach ($tags as $key => [$value, $type]) {
+            if ($existing->get($key) !== $value) {
+                Enrichment::save($track, $key, $value, $type, $source);
+            }
         }
     }
 

@@ -58,7 +58,7 @@ class DlnaContentDirectoryClient
                 'SOAPAction' => '"urn:schemas-upnp-org:service:ContentDirectory:1#Browse"',
             ])->withBody($soap, 'text/xml')->post($this->controlUrl);
 
-            if (! $response->successful()) {
+            if (!$response->successful()) {
                 return null;
             }
 
@@ -72,7 +72,7 @@ class DlnaContentDirectoryClient
     private function parseDidlLite(string $soapResponse): array
     {
         $xml = simplexml_load_string($soapResponse, 'SimpleXMLElement', LIBXML_NOCDATA);
-        if (! $xml) {
+        if (!$xml) {
             return ['items' => [], 'containers' => [], 'total' => 0];
         }
 
@@ -87,7 +87,7 @@ class DlnaContentDirectoryClient
         }
 
         $didl = simplexml_load_string($resultXml, 'SimpleXMLElement', LIBXML_NOCDATA);
-        if (! $didl) {
+        if (!$didl) {
             return ['items' => [], 'containers' => [], 'total' => $total];
         }
 
@@ -97,7 +97,7 @@ class DlnaContentDirectoryClient
         $items = [];
         foreach ($didl->item ?? [] as $item) {
             $class = (string) $item->children('urn:schemas-upnp-org:metadata-1-0/upnp/')->class;
-            if (! str_starts_with($class, 'object.item.audioItem')) {
+            if (!str_starts_with($class, 'object.item.audioItem')) {
                 continue;
             }
 
@@ -106,7 +106,8 @@ class DlnaContentDirectoryClient
 
             $res = $item->res ?? null;
             $url = $res ? (string) $res : null;
-            $durationRaw = $res ? ((string) ($res->attributes()->duration ?? '')) : '';
+            $resAttributes = $res ? $res->attributes() : null;
+            $durationRaw = $resAttributes ? ((string) ($resAttributes->duration ?? '')) : '';
 
             $items[] = [
                 'id' => (string) $item->attributes()->id,
@@ -117,6 +118,11 @@ class DlnaContentDirectoryClient
                 'album_art' => (string) ($upnp->albumArtURI ?? ''),
                 'url' => $url,
                 'duration' => $this->parseDuration($durationRaw),
+                'disc_number' => (int) ($upnp->originalDiscNumber ?? 0) ?: null,
+                'genres' => $this->genres($upnp),
+                'album_artist' => $this->albumArtist($upnp),
+                'released_at' => $this->parseDate((string) $dc->date),
+                'audio' => $this->audioProperties($resAttributes),
             ];
         }
 
@@ -130,6 +136,74 @@ class DlnaContentDirectoryClient
         }
 
         return compact('items', 'containers', 'total');
+    }
+
+    /** @return list<string> distinct genres, in order */
+    private function genres(\SimpleXMLElement $upnp): array
+    {
+        $genres = [];
+        foreach ($upnp->genre as $genre) {
+            $name = trim((string) $genre);
+            if ($name !== '' && !in_array($name, $genres, true)) {
+                $genres[] = $name;
+            }
+        }
+
+        return $genres;
+    }
+
+    /** Servers such as MinimServer mark it as `<upnp:artist role="AlbumArtist">`. */
+    private function albumArtist(\SimpleXMLElement $upnp): ?string
+    {
+        foreach ($upnp->artist as $artist) {
+            if (strcasecmp((string) ($artist->attributes()->role ?? ''), 'AlbumArtist') === 0 && trim((string) $artist) !== '') {
+                return trim((string) $artist);
+            }
+        }
+
+        return null;
+    }
+
+    /** `2011`, `2011-03` or `2011-03-15` to a full date, so it fits `albums.released_at`. */
+    private function parseDate(string $raw): ?string
+    {
+        if (!preg_match('/^(\d{4})(?:-(\d{2}))?(?:-(\d{2}))?/', trim($raw), $m) || (int) $m[1] < 1000) {
+            return null;
+        }
+
+        $month = (int) ($m[2] ?? 1) ?: 1;
+        $day = (int) ($m[3] ?? 1) ?: 1;
+
+        return checkdate($month, $day, (int) $m[1]) ? sprintf('%04d-%02d-%02d', $m[1], $month, $day) : null;
+    }
+
+    /**
+     * The audio properties a server advertises on `<res>`; absent or zero ones are left out.
+     * UPnP gives `bitrate` in bytes per second, so it is converted to kbps.
+     *
+     * @return array{bitrate?: int, sample_rate?: int, bit_depth?: int, channels?: int, file_size?: int, mime_type?: string}
+     */
+    private function audioProperties(?\SimpleXMLElement $attributes): array
+    {
+        if ($attributes === null) {
+            return [];
+        }
+
+        $audio = array_filter([
+            'bitrate' => (int) round(((int) $attributes->bitrate) * 8 / 1000),
+            'sample_rate' => (int) $attributes->sampleFrequency,
+            'bit_depth' => (int) $attributes->bitsPerSample,
+            'channels' => (int) $attributes->nrAudioChannels,
+            'file_size' => (int) $attributes->size,
+        ]);
+
+        // protocolInfo is "http-get:*:audio/flac:*"; the third field is the MIME type.
+        $mime = strtolower(explode(':', (string) $attributes->protocolInfo)[2] ?? '');
+        if (str_contains($mime, '/')) {
+            $audio['mime_type'] = $mime;
+        }
+
+        return $audio;
     }
 
     private function parseDuration(string $raw): ?int
