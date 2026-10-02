@@ -207,4 +207,26 @@ class MusicBrainzDetailsTest extends TestCase
         $this->get("/albums/{$album->id}")->assertOk()
             ->assertSee('Album · 2011 · Fancy Label · 12 tracks')->assertSee('An album about things.');
     }
+
+    public function test_album_page_lists_track_credits_quality_and_genres(): void
+    {
+        $album = $this->album($this->artist());
+        $track = \App\Models\Media\Track::create(['artist_id' => $album->artist_id, 'album_id' => $album->id, 'name' => 'Song', 'source' => 'dlna']);
+        foreach ([['credits', json_encode([
+            ['role' => 'instrument', 'name' => 'Gui Tarist', 'detail' => 'guitar'],
+            ['role' => 'composer', 'name' => 'Com Poser'],
+        ]), 'json'], ['mime_type', 'audio/flac', 'string'], ['bit_depth', '16', 'int'], ['sample_rate', '44100', 'int'],
+            ['bitrate', '1411', 'int'], ['channels', '2', 'int'], ['isrc', 'NLA000000001', 'string'], ['explicit', '1', 'bool'],
+            ['track_number', '7', 'int'], ['genres', json_encode(['jazz']), 'json']] as [$key, $value, $type]) {
+            Enrichment::save($track, $key, $value, $type, 'test');
+        }
+
+        $this->assertSame(['composer' => ['Com Poser'], 'instrument' => ['Gui Tarist (guitar)']], $track->fresh()->credits(), 'in role order');
+        $this->assertSame('FLAC · 16-bit / 44.1 kHz · 1411 kbps · stereo', $track->fresh()->audioQuality());
+
+        $this->get("/albums/{$album->id}")->assertOk()
+            ->assertSee('FLAC · 16-bit / 44.1 kHz · 1411 kbps · stereo')
+            ->assertSeeInOrder(['Composer', 'Com Poser', 'Instrument', 'Gui Tarist (guitar)'])
+            ->assertSee('Jazz')->assertSee('NLA000000001')->assertSee('Explicit');
+    }
 }

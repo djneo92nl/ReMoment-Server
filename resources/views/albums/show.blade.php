@@ -127,14 +127,27 @@
                 @if($album->tracks->isNotEmpty())
                     <div class="border-t border-gray-100 dark:border-stone-800 divide-y divide-gray-50 dark:divide-stone-800/50">
                         @foreach($album->tracks as $i => $track)
-                            @php $dlnaUrl = $track->getDlnaUrl(); $lyrics = $track->lyricsPlain(); @endphp
-                            <div x-data="{ lyricsOpen: false }">
+                            @php
+                                $dlnaUrl = $track->getDlnaUrl();
+                                $lyrics = $track->lyricsPlain();
+                                $quality = $track->audioQuality();
+                                $credits = $track->credits();
+                                $trackGenres = $track->genres();
+                                $isrc = $track->metaValue('isrc');
+                                $popularity = $track->metaValue('spotify_popularity');
+                                $recordingMbid = $track->metaValue('mbid');
+                                $hasInfo = $quality || $credits || $trackGenres || $isrc || $popularity !== null;
+                            @endphp
+                            <div x-data="{ panel: null }">
                                 <div class="flex items-center gap-4 px-6 py-3 hover:bg-gray-50 dark:hover:bg-stone-800/30 transition-colors group">
-                                    <span class="w-5 text-center text-xs text-gray-300 dark:text-stone-600 flex-shrink-0">{{ $i + 1 }}</span>
+                                    <span class="w-5 text-center text-xs text-gray-300 dark:text-stone-600 flex-shrink-0">{{ $track->metaValue('track_number') ?? $i + 1 }}</span>
                                     <div class="flex-1 min-w-0">
                                         <p class="text-sm text-gray-900 dark:text-gray-100 truncate flex items-center gap-1.5">
                                             {{ $track->name }}
                                             <x-source-icon :source="$track->source" />
+                                            @if($track->metaValue('explicit') === '1')
+                                                <span class="px-1 rounded bg-gray-200 dark:bg-stone-700 text-[9px] font-semibold text-gray-500 dark:text-gray-400" title="Explicit">E</span>
+                                            @endif
                                         </p>
                                         @if($track->duration)
                                             <p class="text-xs text-gray-400 dark:text-gray-600 mt-0.5">{{ gmdate('g:i', $track->duration) }}</p>
@@ -145,9 +158,17 @@
                                             {{ number_format($track->plays_count) }}×
                                         </span>
                                     @endif
+                                    @if($hasInfo)
+                                        <button @click="panel = panel === 'info' ? null : 'info'"
+                                                :class="panel === 'info' ? 'opacity-100 text-blue-500 dark:text-blue-400' : 'opacity-0 group-hover:opacity-100 text-gray-400'"
+                                                class="transition-opacity w-7 h-7 rounded-full flex items-center justify-center hover:bg-gray-100 dark:hover:bg-stone-700 flex-shrink-0"
+                                                title="Track details">
+                                            <i class="fa-solid fa-circle-info text-xs"></i>
+                                        </button>
+                                    @endif
                                     @if($lyrics)
-                                        <button @click="lyricsOpen = !lyricsOpen"
-                                                :class="lyricsOpen ? 'opacity-100 text-blue-500 dark:text-blue-400' : 'opacity-0 group-hover:opacity-100 text-gray-400'"
+                                        <button @click="panel = panel === 'lyrics' ? null : 'lyrics'"
+                                                :class="panel === 'lyrics' ? 'opacity-100 text-blue-500 dark:text-blue-400' : 'opacity-0 group-hover:opacity-100 text-gray-400'"
                                                 class="transition-opacity w-7 h-7 rounded-full flex items-center justify-center hover:bg-gray-100 dark:hover:bg-stone-700 flex-shrink-0"
                                                 title="Lyrics">
                                             <i class="fa-solid fa-align-left text-xs"></i>
@@ -168,8 +189,38 @@
                                         />
                                     @endif
                                 </div>
+                                @if($hasInfo)
+                                    <div x-show="panel === 'info'" x-cloak class="px-14 py-4 border-t border-gray-50 dark:border-stone-800/50 bg-gray-50/50 dark:bg-stone-800/20">
+                                        <dl class="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1.5 text-xs">
+                                            @if($trackGenres)
+                                                <dt class="text-gray-400 dark:text-gray-600">Genres</dt>
+                                                <dd class="text-gray-700 dark:text-gray-300">{{ implode(', ', $trackGenres) }}</dd>
+                                            @endif
+                                            @if($quality)
+                                                <dt class="text-gray-400 dark:text-gray-600">Quality</dt>
+                                                <dd class="text-gray-700 dark:text-gray-300">{{ $quality }}</dd>
+                                            @endif
+                                            @foreach($credits as $role => $names)
+                                                <dt class="text-gray-400 dark:text-gray-600">{{ ucfirst($role) }}</dt>
+                                                <dd class="text-gray-700 dark:text-gray-300">{{ implode(', ', $names) }}</dd>
+                                            @endforeach
+                                            @if($popularity !== null)
+                                                <dt class="text-gray-400 dark:text-gray-600">Spotify popularity</dt>
+                                                <dd class="text-gray-700 dark:text-gray-300">{{ $popularity }} / 100</dd>
+                                            @endif
+                                            @if($isrc)
+                                                <dt class="text-gray-400 dark:text-gray-600">ISRC</dt>
+                                                <dd class="text-gray-700 dark:text-gray-300 font-mono">{{ $isrc }}</dd>
+                                            @endif
+                                            @if($recordingMbid)
+                                                <dt class="text-gray-400 dark:text-gray-600">MusicBrainz</dt>
+                                                <dd><a href="https://musicbrainz.org/recording/{{ $recordingMbid }}" target="_blank" rel="noopener" class="text-indigo-600 dark:text-indigo-400 hover:underline">Recording page</a></dd>
+                                            @endif
+                                        </dl>
+                                    </div>
+                                @endif
                                 @if($lyrics)
-                                    <div x-show="lyricsOpen" class="px-14 py-4 border-t border-gray-50 dark:border-stone-800/50 bg-gray-50/50 dark:bg-stone-800/20">
+                                    <div x-show="panel === 'lyrics'" x-cloak class="px-14 py-4 border-t border-gray-50 dark:border-stone-800/50 bg-gray-50/50 dark:bg-stone-800/20">
                                         <pre class="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap max-h-72 overflow-y-auto font-sans leading-relaxed">{{ $lyrics }}</pre>
                                     </div>
                                 @endif

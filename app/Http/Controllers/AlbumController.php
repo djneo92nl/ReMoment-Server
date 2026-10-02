@@ -7,6 +7,7 @@ use App\Domain\Library\NotPlayableException;
 use App\Domain\Library\PlaybackFailedException;
 use App\Models\Device;
 use App\Models\Media\Album;
+use App\Models\Media\Track;
 use App\Models\Play;
 use Illuminate\Http\Request;
 
@@ -37,7 +38,7 @@ class AlbumController extends Controller
 
     public function show(Album $album)
     {
-        $album->load(['artist', 'tracks' => fn ($q) => $q->withCount('plays')->with(['metadata' => fn ($q) => $q->whereIn('key', ['dlna_url', 'lyrics_plain'])])->orderByDesc('plays_count')]);
+        $album->load(['artist', 'tracks' => fn ($q) => $q->withCount('plays')->with(['genreRelation', 'metadata' => fn ($q) => $q->whereIn('key', Track::DISPLAY_METADATA)])->orderByDesc('plays_count')]);
 
         $totalPlays = $album->plays()->count();
 

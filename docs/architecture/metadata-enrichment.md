@@ -50,3 +50,10 @@ Every source writes raw genre strings under the metadata key `genres` (artist, a
 - Sync is additive: a genre keeps its best position across sources and never disappears because a source stops reporting it.
 - `Artist/Album/Track::genres()` returns the names, best first. The web genre pages (`/genres`, `/genres/{slug}`; old name URLs redirect) and the API (`GET /api/library/genres`, `/genres/{slug}`, `genres` in artist and album detail) read the tables.
 - `php artisan library:sync-genres` rebuilds them from the stored metadata (the migration runs it once); run it again after changing `GenreNormalizer` rules (bump `GenreNormalizer::VERSION`).
+
+## Where it shows in the web UI
+
+- **Artist page** (`/artists/{id}`): Wikipedia bio (else Last.fm), genres, area/country, type and years, links (`Artist::details()`).
+- **Album page** (`/albums/{id}`): a line of release type · year · label · catalog number · track count, genres (the artist's when the album has none), the Wikipedia summary (`Album::details()`).
+- **Track rows on the album page:** the real track number when a DLNA server sent one, an *E* badge for explicit tracks, and an info button that opens genres, file quality (`Track::audioQuality()`), credits by role (`Track::credits()`), Spotify popularity, ISRC and a MusicBrainz link. `Track::DISPLAY_METADATA` lists the keys the album controller loads.
+- **Genre pages** (`/genres`, `/genres/{slug}`).
