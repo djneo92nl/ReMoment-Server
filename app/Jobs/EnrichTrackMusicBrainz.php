@@ -3,20 +3,31 @@
 namespace App\Jobs;
 
 use App\Domain\Library\Enrichment;
+use App\Domain\Library\Normalizer;
 use App\Jobs\Concerns\EnrichesFromSource;
 use App\Models\Media\Track;
+use App\Services\MusicBrainz\MusicBrainzClient;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Http\Client\Response;
 use Illuminate\Queue\Middleware\RateLimited;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Sleep;
 
+/**
+ * Finds the track's MusicBrainz recording and keeps its ids (recording, artist, release), ISRC and credits.
+ * The artist's and album's own details are fetched once per record by EnrichArtistMusicBrainz and
+ * EnrichAlbumMusicBrainz, queued from here.
+ */
 class EnrichTrackMusicBrainz implements ShouldBeUnique, ShouldQueue
 {
     use EnrichesFromSource;
 
-    private bool $requested = false;
+    /** Relation types worth keeping as credits; others (tribute, remix of ...) aren't. */
+    private const CREDIT_TYPES = [
+        'producer', 'co-producer', 'executive producer', 'engineer', 'recording', 'mix', 'mastering', 'arranger',
+        'conductor', 'composer', 'lyricist', 'writer', 'librettist', 'vocal', 'instrument', 'performer',
+        'remixer', 'programming', 'DJ-mix',
+    ];
+
+    private const MAX_CREDITS = 40;
 
     public function __construct(public readonly Track $track) {}
 
@@ -39,12 +50,12 @@ class EnrichTrackMusicBrainz implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $this->enrich($track);
+        $this->enrich($track, new MusicBrainzClient);
 
         Enrichment::markDone($track, Enrichment::MUSICBRAINZ);
     }
 
-    private function enrich(Track $track): void
+    private function enrich(Track $track, MusicBrainzClient $mb): void
     {
         $query = sprintf(
             'recording:"%s" AND artist:"%s"',
@@ -52,9 +63,7 @@ class EnrichTrackMusicBrainz implements ShouldBeUnique, ShouldQueue
             str_replace('"', '\\"', trim($track->artist->name))
         );
 
-        $response = $this->get('recording', ['query' => $query, 'limit' => 5]);
-
-        $best = collect($response?->json('recordings', []) ?? [])
+        $best = collect($mb->get('recording', ['query' => $query, 'limit' => 5])['recordings'] ?? [])
             ->sortByDesc('score')
             ->first(fn ($r) => ($r['score'] ?? 0) >= 60);
 
@@ -63,66 +72,78 @@ class EnrichTrackMusicBrainz implements ShouldBeUnique, ShouldQueue
         }
 
         $recordingMbid = $best['id'];
-        $artistMbid = $best['artist-credit'][0]['artist']['id'] ?? null;
-        $releaseMbid = $best['releases'][0]['id'] ?? null;
-
         Enrichment::save($track, 'mbid', $recordingMbid, 'string', Enrichment::MUSICBRAINZ);
 
-        $recording = $this->get("recording/{$recordingMbid}", ['inc' => 'isrcs']);
-        if ($isrc = $recording?->json('isrcs.0')) {
+        $recording = $mb->get("recording/{$recordingMbid}", ['inc' => 'isrcs+artist-rels+work-rels+work-level-rels']) ?? [];
+        if ($isrc = $recording['isrcs'][0] ?? null) {
             Enrichment::save($track, 'isrc', $isrc, 'string', Enrichment::MUSICBRAINZ);
         }
+        if ($credits = $this->credits($recording)) {
+            Enrichment::save($track, 'credits', json_encode($credits, JSON_UNESCAPED_UNICODE), 'json', Enrichment::MUSICBRAINZ);
+        }
 
-        if ($artistMbid && $track->artist) {
-            $artist = $this->get("artist/{$artistMbid}", ['inc' => 'tags']);
-            if ($artist) {
-                Enrichment::save($track->artist, 'mbid', $artistMbid, 'string', Enrichment::MUSICBRAINZ);
+        if ($artistMbid = $best['artist-credit'][0]['artist']['id'] ?? null) {
+            Enrichment::save($track->artist, 'mbid', $artistMbid, 'string', Enrichment::MUSICBRAINZ);
 
-                $tags = $artist->json('tags', []);
-                usort($tags, fn ($a, $b) => ($b['count'] ?? 0) - ($a['count'] ?? 0));
-                $genres = array_column(array_slice($tags, 0, 10), 'name');
-                if (!empty($genres)) {
-                    Enrichment::save($track->artist, 'genres', json_encode($genres), 'json', Enrichment::MUSICBRAINZ);
-                }
-
-                if ($country = $artist->json('country')) {
-                    Enrichment::save($track->artist, 'country', $country, 'string', Enrichment::MUSICBRAINZ);
-                }
+            if (!Enrichment::isDone($track->artist, Enrichment::MUSICBRAINZ)) {
+                EnrichArtistMusicBrainz::dispatch($track->artist);
             }
         }
 
-        if ($releaseMbid && $track->album) {
-            $release = $this->get("release/{$releaseMbid}", ['inc' => 'labels']);
-            if ($release) {
-                Enrichment::save($track->album, 'mbid', $releaseMbid, 'string', Enrichment::MUSICBRAINZ);
+        // The recording appears on many releases (singles, compilations); only the one that is this album is its mbid.
+        if ($track->album && ($releaseMbid = $this->releaseOf($best, $track->album->name))) {
+            Enrichment::save($track->album, 'mbid', $releaseMbid, 'string', Enrichment::MUSICBRAINZ);
 
-                if ($label = $release->json('label-info.0.label.name')) {
-                    Enrichment::save($track->album, 'label', $label, 'string', Enrichment::MUSICBRAINZ);
-                }
+            if (!Enrichment::isDone($track->album, Enrichment::MUSICBRAINZ)) {
+                EnrichAlbumMusicBrainz::dispatch($track->album);
             }
         }
     }
 
-    /**
-     * One MusicBrainz call, a second apart from the previous one. A rate limit or outage throws so the
-     * whole job is retried; any other failure (404, bad query) returns null, i.e. "nothing there".
-     */
-    private function get(string $path, array $query): ?Response
+    private function releaseOf(array $recording, string $albumName): ?string
     {
-        if ($this->requested) {
-            Sleep::for(1)->second();
-        }
-        $this->requested = true;
+        $key = Normalizer::album($albumName);
 
-        $response = Http::withHeaders([
-            'User-Agent' => 'ReMoment/1.0 (remko@pionect.nl)',
-            'Accept' => 'application/json',
-        ])->get("https://musicbrainz.org/ws/2/{$path}", $query + ['fmt' => 'json']);
-
-        if ($response->status() === 429 || $response->serverError()) {
-            $response->throw();
+        foreach ($recording['releases'] ?? [] as $release) {
+            if (isset($release['title'], $release['id']) && Normalizer::album($release['title']) === $key) {
+                return $release['id'];
+            }
         }
 
-        return $response->ok() ? $response : null;
+        return null;
+    }
+
+    /**
+     * People credited on the recording and, through its work, on the song: `[{role, name, detail?}]`.
+     *
+     * @return list<array{role: string, name: string, detail?: string}>
+     */
+    private function credits(array $recording): array
+    {
+        $credits = [];
+        $add = function (array $relation) use (&$credits) {
+            $role = $relation['type'] ?? null;
+            $name = $relation['artist']['name'] ?? null;
+
+            if ($role === null || $name === null || !in_array($role, self::CREDIT_TYPES, true)) {
+                return;
+            }
+
+            $credit = ['role' => $role, 'name' => $name];
+            if ($detail = implode(', ', $relation['attributes'] ?? [])) {
+                $credit['detail'] = $detail;
+            }
+            $credits[$role.'|'.$name.'|'.($credit['detail'] ?? '')] ??= $credit;
+        };
+
+        foreach ($recording['relations'] ?? [] as $relation) {
+            $add($relation);
+
+            foreach ($relation['work']['relations'] ?? [] as $workRelation) {
+                $add($workRelation);
+            }
+        }
+
+        return array_slice(array_values($credits), 0, self::MAX_CREDITS);
     }
 }

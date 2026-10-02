@@ -31,7 +31,10 @@
         $heroColors = $coverAlbum?->colors ?? [];
         $genres = $artist->genres();
         $country = $artist->country();
-        $bio = $artist->bio();
+        $details = $artist->details();
+        $bio = $details['bio'];
+        $links = (array) $details['links'];
+        $lifeSpan = $details['begin_date'] ? ($details['end_date'] ? substr($details['begin_date'], 0, 4).' – '.substr($details['end_date'], 0, 4) : 'Since '.substr($details['begin_date'], 0, 4)) : null;
         $similarArtists = $artist->similarArtistModels();
     @endphp
 
@@ -54,13 +57,31 @@
                     @endforeach
                     @if($country)
                         <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-stone-800 text-gray-600 dark:text-gray-400">
-                            <i class="fa-solid fa-earth-americas mr-1"></i>{{ $country }}
+                            <i class="fa-solid fa-earth-americas mr-1"></i>{{ $details['area'] ? $details['area'].', ' : '' }}{{ $country }}
+                        </span>
+                    @endif
+                    @if($details['type'] || $lifeSpan)
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-stone-800 text-gray-600 dark:text-gray-400">
+                            {{ collect([ucfirst((string) $details['type']), $lifeSpan])->filter()->implode(' · ') }}
                         </span>
                     @endif
                 </div>
 
                 @if($bio)
                     <p class="mt-4 text-sm text-gray-500 dark:text-gray-400 leading-relaxed max-w-2xl">{{ $bio }}</p>
+                @endif
+
+                @if($details['wikipedia_url'] || $links)
+                    <div class="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-1 mt-3 text-xs">
+                        @if($details['wikipedia_url'])
+                            <a href="{{ $details['wikipedia_url'] }}" target="_blank" rel="noopener" class="text-indigo-600 dark:text-indigo-400 hover:underline">Wikipedia</a>
+                        @endif
+                        @foreach(['official' => 'Website', 'discogs' => 'Discogs', 'bandcamp' => 'Bandcamp', 'allmusic' => 'AllMusic', 'lastfm' => 'Last.fm', 'instagram' => 'Instagram'] as $linkKey => $linkLabel)
+                            @isset($links[$linkKey])
+                                <a href="{{ $links[$linkKey] }}" target="_blank" rel="noopener" class="text-indigo-600 dark:text-indigo-400 hover:underline">{{ $linkLabel }}</a>
+                            @endisset
+                        @endforeach
+                    </div>
                 @endif
 
                 @if($playableDevices->isNotEmpty())

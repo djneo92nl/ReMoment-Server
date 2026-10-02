@@ -3,6 +3,8 @@
 namespace App\Models\Media;
 
 use App\Domain\Library\Normalizer;
+use App\Models\Media\Concerns\HasGenres;
+use App\Models\Media\Concerns\ReadsMetadata;
 use App\Models\Play;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,6 +14,8 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Album extends Model
 {
+    use HasGenres, ReadsMetadata;
+
     protected $table = 'albums';
 
     protected $fillable = [
@@ -63,6 +67,23 @@ class Album extends Model
 
     public function label(): ?string
     {
-        return $this->metadata()->where('key', 'label')->value('value');
+        return $this->metaValue('label');
+    }
+
+    /** What the web page and the library API show besides name, artist and year. */
+    public function details(): array
+    {
+        return [
+            'label' => $this->label(),
+            'catalog_number' => $this->metaValue('catalog_number'),
+            'release_type' => $this->metaValue('release_type'),
+            'secondary_types' => $this->metaJson('secondary_types'),
+            'release_date' => $this->metaValue('release_date'),
+            'country' => $this->metaValue('country'),
+            'track_count' => ($n = $this->metaValue('track_count')) !== null ? (int) $n : null,
+            'disc_count' => ($n = $this->metaValue('disc_count')) !== null ? (int) $n : null,
+            'summary' => $this->metaValue('wikipedia_extract'),
+            'wikipedia_url' => $this->metaValue('wikipedia_url'),
+        ];
     }
 }

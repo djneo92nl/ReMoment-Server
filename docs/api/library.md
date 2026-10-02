@@ -26,7 +26,9 @@ Duplicates from before that are merged by an admin running `php artisan library:
 
 ### `GET /api/library/artists/{id}`
 
-`{ "id", "name", "favorite", "albums": [ AlbumItem, … ] }` — albums newest year first (unknown year last), then by name.
+`{ "id", "name", "favorite", "genres": [ "Rock", … ], "details": ArtistDetails, "albums": [ AlbumItem, … ] }` — albums newest year first (unknown year last), then by name.
+
+**ArtistDetails** — `{ "type": "group"|"person"|…|null, "country": "GB"|null, "area": "London"|null, "begin_date": "1994"|null, "end_date": null, "bio": "…"|null, "wikipedia_url": "…"|null, "links": { "official": "…", "discogs": "…", … } }`. `bio` is the Wikipedia summary, else the Last.fm bio. Dates are MusicBrainz partial dates (`1994`, `1994-05`, `1994-05-12`). `links` keys that may occur: `official`, `wikidata`, `wikipedia`, `discogs`, `allmusic`, `lastfm`, `bandcamp`, `songkick`, `youtube`, `twitter`, `instagram`, `facebook`, `spotify`, `apple_music`, `deezer`, `tidal`. Every field is filled in as enrichment reaches the artist (see `docs/architecture/metadata-enrichment.md`), so all may be `null`/empty.
 
 ### `GET /api/library/albums/{id}?device_id=`
 
@@ -38,12 +40,26 @@ Duplicates from before that are merged by an admin running `php artisan library:
   "year": 2003,
   "artwork": { "hash": "…", "proxy_120": "…", "proxy_320": "…" },
   "favorite": false,
+  "genres": ["Alternative Rock"],
+  "details": {
+    "label": "Mushroom", "catalog_number": "MUSH-1", "release_type": "album", "secondary_types": ["live"],
+    "release_date": "2003-09-15", "country": "GB", "track_count": 14, "disc_count": 1,
+    "summary": "…", "wikipedia_url": "…"
+  },
   "playable": true,
   "tracks": [ { "id": 34, "name": "Intro", "duration": 213, "playable": true } ]
 }
 ```
 
 Tracks are in best-effort album order (by id — there is no track number column). `duration` is seconds or `null`. A track is `playable` when the server has a stream for it: a DLNA URL, or a Spotify URI. With the optional `device_id`, `playable` is for that device: DLNA tracks need a device with a DLNA library driver, Spotify tracks a device that can play Spotify (below). The album is `playable` when any track is.
+
+### `GET /api/library/genres`
+
+`{ "data": [ { "slug": "alternative-rock", "name": "Alternative Rock", "artist_count": 12, "album_count": 30 }, … ] }` — genres with at least one artist or album, most artists first. Genres are canonical: spellings of one genre ("hip hop", "Hip-Hop") are one entry.
+
+### `GET /api/library/genres/{slug}`
+
+`{ "slug", "name", "artists": [ ArtistItem, … ], "albums": [ AlbumItem, … ] }` — up to 100 of each: artists with albums alphabetically ("The " ignored), albums newest year first. Unknown slug: `404`.
 
 ### `GET /api/library/playlists?cursor=`
 

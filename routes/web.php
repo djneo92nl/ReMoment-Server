@@ -41,7 +41,7 @@ Route::post('/albums/{album}/play/{device}', [AlbumController::class, 'play'])->
 Route::post('/albums/{album}/favorite', [AlbumController::class, 'favorite'])->name('albums.favorite');
 Route::post('/tracks/{track}/play/{device}', [DeviceController::class, 'playTrack'])->name('tracks.play');
 Route::get('/genres', [GenreController::class, 'index'])->name('genres.index');
-Route::get('/genres/{genre}', [GenreController::class, 'show'])->name('genres.show')->where('genre', '.*');
+Route::get('/genres/{slug}', [GenreController::class, 'show'])->name('genres.show');
 Route::get('/library', [LibraryController::class, 'index'])->name('library.index');
 Route::get('/playlists', [PlaylistController::class, 'index'])->name('playlists.index');
 Route::post('/playlists', [PlaylistController::class, 'store'])->name('playlists.store');

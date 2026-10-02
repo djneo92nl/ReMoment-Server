@@ -10,6 +10,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Device;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
+use App\Models\Media\Genre;
 use App\Models\Media\Playlist;
 use App\Models\Media\Track;
 use Illuminate\Database\Eloquent\Builder;
@@ -26,6 +27,9 @@ class LibraryController extends Controller
     public const ARTISTS_PAGE_SIZE = 50;
 
     public const PLAYLISTS_PAGE_SIZE = 50;
+
+    /** Artists and albums listed in a genre's detail. */
+    public const GENRE_ITEMS = 100;
 
     /** Tracks listed in a playlist's detail. */
     public const PLAYLIST_TRACKS = 200;
@@ -77,6 +81,8 @@ class LibraryController extends Controller
             'id' => $artist->id,
             'name' => $artist->name,
             'favorite' => $artist->favorited_at !== null,
+            'genres' => $artist->genres(),
+            'details' => $artist->details(),
             'albums' => $albums->map(fn (Album $album) => $this->albumItem($album))->values(),
         ]);
     }
@@ -102,8 +108,48 @@ class LibraryController extends Controller
             'year' => $album->released_at?->year,
             'artwork' => LibraryItemArtwork::forImages($album->images),
             'favorite' => $album->favorited_at !== null,
+            'genres' => $album->genres(),
+            'details' => $album->details(),
             'playable' => $items->contains('playable', true),
             'tracks' => $items,
+        ]);
+    }
+
+    /** Genres with artists or albums, most artists first. */
+    public function genres(): JsonResponse
+    {
+        $genres = Genre::query()->withCount(['artists', 'albums'])->get()
+            ->filter(fn (Genre $genre) => $genre->artists_count > 0 || $genre->albums_count > 0)
+            ->sortBy([['artists_count', 'desc'], ['albums_count', 'desc'], ['name', 'asc']])
+            ->values();
+
+        return response()->json(['data' => $genres->map(fn (Genre $genre) => [
+            'slug' => $genre->slug,
+            'name' => $genre->name,
+            'artist_count' => $genre->artists_count,
+            'album_count' => $genre->albums_count,
+        ])]);
+    }
+
+    /** A genre's artists (alphabetical, "The " ignored) and albums (newest first), up to GENRE_ITEMS of each. */
+    public function genre(Genre $genre): JsonResponse
+    {
+        $artists = $this->artistItems($genre->artists()->getQuery())
+            ->whereHas('albums')
+            ->orderByRaw(self::ARTIST_SORT_NAME)
+            ->limit(self::GENRE_ITEMS)
+            ->get();
+
+        $albums = $genre->albums()->with('artist')
+            ->orderByRaw('albums.released_at IS NULL')->orderByDesc('albums.released_at')->orderBy('albums.name')
+            ->limit(self::GENRE_ITEMS)
+            ->get();
+
+        return response()->json([
+            'slug' => $genre->slug,
+            'name' => $genre->name,
+            'artists' => $artists->map(fn (Artist $artist) => $this->artistItem($artist))->values(),
+            'albums' => $albums->map(fn (Album $album) => $this->albumItem($album))->values(),
         ]);
     }
 

@@ -3,9 +3,12 @@
 namespace Tests\Feature;
 
 use App\Domain\Library\Enrichment;
+use App\Jobs\EnrichAlbumMusicBrainz;
 use App\Jobs\EnrichArtistLastfm;
+use App\Jobs\EnrichArtistMusicBrainz;
 use App\Jobs\EnrichTrackLyrics;
 use App\Jobs\EnrichTrackMusicBrainz;
+use App\Models\Media\Album;
 use App\Models\Media\Artist;
 use App\Models\Media\Metadata;
 use App\Models\Media\Track;
@@ -65,28 +68,60 @@ class LibraryEnrichmentTest extends TestCase
         $this->assertSame(0, Enrichment::backlog()->count());
     }
 
-    public function test_musicbrainz_job_stores_data_and_marks_done(): void
+    public function test_musicbrainz_track_job_stores_ids_isrc_and_credits_then_queues_details(): void
     {
         Sleep::fake();
+        Queue::fake([EnrichArtistMusicBrainz::class, EnrichAlbumMusicBrainz::class]);
         Http::fake([
             'musicbrainz.org/ws/2/recording?*' => Http::response(['recordings' => [[
                 'id' => 'rec-1', 'score' => 100,
                 'artist-credit' => [['artist' => ['id' => 'art-1']]],
-                'releases' => [['id' => 'rel-1']],
+                'releases' => [['id' => 'single-1', 'title' => 'Song (Single)'], ['id' => 'rel-1', 'title' => 'LP']],
             ]]]),
-            'musicbrainz.org/ws/2/recording/*' => Http::response(['isrcs' => ['NLA000000001']]),
-            'musicbrainz.org/ws/2/artist/*' => Http::response(['tags' => [['name' => 'rock', 'count' => 3]], 'country' => 'NL']),
-            'musicbrainz.org/ws/2/release/*' => Http::response(['label-info' => [['label' => ['name' => 'Label']]]]),
+            'musicbrainz.org/ws/2/recording/*' => Http::response([
+                'isrcs' => ['NLA000000001'],
+                'relations' => [
+                    ['type' => 'producer', 'artist' => ['name' => 'Pro Ducer']],
+                    ['type' => 'instrument', 'attributes' => ['guitar'], 'artist' => ['name' => 'Gui Tarist']],
+                    ['type' => 'tribute', 'artist' => ['name' => 'Ignored']],
+                    ['type' => 'performance', 'work' => ['relations' => [['type' => 'composer', 'artist' => ['name' => 'Com Poser']]]]],
+                ],
+            ]),
         ]);
         $track = $this->track();
-        $track->album()->associate(\App\Models\Media\Album::create(['artist_id' => $track->artist_id, 'name' => 'LP', 'source' => 'dlna']))->save();
+        $track->album()->associate(Album::create(['artist_id' => $track->artist_id, 'name' => 'LP', 'source' => 'dlna']))->save();
 
         (new EnrichTrackMusicBrainz($track))->handle();
 
         $this->assertSame('NLA000000001', $track->metadata()->where('key', 'isrc')->value('value'));
-        $this->assertSame('["rock"]', $track->artist->metadata()->where('key', 'genres')->value('value'));
-        $this->assertSame('Label', $track->album->metadata()->where('key', 'label')->value('value'));
+        $this->assertSame(
+            [['role' => 'producer', 'name' => 'Pro Ducer'], ['role' => 'instrument', 'name' => 'Gui Tarist', 'detail' => 'guitar'], ['role' => 'composer', 'name' => 'Com Poser']],
+            json_decode($track->metadata()->where('key', 'credits')->value('value'), true),
+        );
+        $this->assertSame('art-1', $track->artist->metadata()->where('key', 'mbid')->value('value'));
+        $this->assertSame('rel-1', $track->album->metadata()->where('key', 'mbid')->value('value'), 'only the release that is this album');
         $this->assertTrue(Enrichment::isDone($track, Enrichment::MUSICBRAINZ));
+        Queue::assertPushed(EnrichArtistMusicBrainz::class);
+        Queue::assertPushed(EnrichAlbumMusicBrainz::class);
+    }
+
+    public function test_a_release_that_is_not_the_album_is_not_attached(): void
+    {
+        Sleep::fake();
+        Queue::fake([EnrichArtistMusicBrainz::class, EnrichAlbumMusicBrainz::class]);
+        Http::fake([
+            'musicbrainz.org/ws/2/recording?*' => Http::response(['recordings' => [[
+                'id' => 'rec-1', 'score' => 100, 'releases' => [['id' => 'comp-1', 'title' => 'Hits Of The Year']],
+            ]]]),
+            'musicbrainz.org/ws/2/recording/*' => Http::response([]),
+        ]);
+        $track = $this->track();
+        $track->album()->associate(Album::create(['artist_id' => $track->artist_id, 'name' => 'LP', 'source' => 'dlna']))->save();
+
+        (new EnrichTrackMusicBrainz($track))->handle();
+
+        $this->assertSame(0, $track->album->metadata()->where('key', 'mbid')->count());
+        Queue::assertNotPushed(EnrichAlbumMusicBrainz::class);
     }
 
     public function test_musicbrainz_outage_throws_and_leaves_the_track_unmarked(): void
@@ -142,10 +177,10 @@ class LibraryEnrichmentTest extends TestCase
             $this->track($name);
         }
 
-        $this->artisan('library:enrich --dry-run')->expectsOutputToContain('3 track(s)')->assertSuccessful();
+        $this->artisan('library:enrich --dry-run')->expectsOutputToContain('3 track(s) are missing')->assertSuccessful();
         Queue::assertNothingPushed();
 
-        $this->artisan('library:enrich --limit=2')->expectsOutputToContain('Queued enrichment for 2 of 3')->assertSuccessful();
+        $this->artisan('library:enrich --limit=2')->expectsOutputToContain('Queued enrichment for 2 of 3 track(s)')->assertSuccessful();
         Queue::assertPushed(EnrichTrackMusicBrainz::class, 2);
     }
 }

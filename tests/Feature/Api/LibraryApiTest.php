@@ -226,6 +226,12 @@ class LibraryApiTest extends TestCase
                 'year' => 2003,
                 'artwork' => null,
                 'favorite' => false,
+                'genres' => [],
+                'details' => [
+                    'label' => null, 'catalog_number' => null, 'release_type' => null, 'secondary_types' => [],
+                    'release_date' => null, 'country' => null, 'track_count' => null, 'disc_count' => null,
+                    'summary' => null, 'wikipedia_url' => null,
+                ],
                 'playable' => true,
                 'tracks' => [
                     ['id' => $one->id, 'name' => 'Intro', 'duration' => 200, 'playable' => true],

@@ -3,6 +3,8 @@
 namespace App\Models\Media;
 
 use App\Domain\Library\Normalizer;
+use App\Models\Media\Concerns\HasGenres;
+use App\Models\Media\Concerns\ReadsMetadata;
 use App\Models\Play;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -11,6 +13,8 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Artist extends Model
 {
+    use HasGenres, ReadsMetadata;
+
     protected $table = 'artists';
 
     protected $fillable = [
@@ -53,22 +57,30 @@ class Artist extends Model
         return $this->morphMany(Metadata::class, 'metadatable');
     }
 
-    public function genres(): array
-    {
-        $metas = $this->metadata()->where('key', 'genres')->get();
-        $meta = $metas->firstWhere('source', 'musicbrainz') ?? $metas->first();
-
-        return ($meta?->value) ? (json_decode($meta->value, true) ?? []) : [];
-    }
-
     public function country(): ?string
     {
         return $this->metadata()->where('key', 'country')->value('value');
     }
 
+    /** The Wikipedia summary when there is one, else the Last.fm bio. */
     public function bio(): ?string
     {
-        return $this->metadata()->where('key', 'bio')->value('value');
+        return $this->metaValue('wikipedia_extract') ?? $this->metaValue('bio');
+    }
+
+    /** What the web page and the library API show besides name and genres. */
+    public function details(): array
+    {
+        return [
+            'type' => $this->metaValue('artist_type'),
+            'country' => $this->country(),
+            'area' => $this->metaValue('area'),
+            'begin_date' => $this->metaValue('begin_date'),
+            'end_date' => $this->metaValue('end_date'),
+            'bio' => $this->bio(),
+            'wikipedia_url' => $this->metaValue('wikipedia_url'),
+            'links' => (object) $this->metaJson('links'),
+        ];
     }
 
     public function similarArtists(): array

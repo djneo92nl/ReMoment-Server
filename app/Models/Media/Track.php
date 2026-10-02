@@ -3,6 +3,8 @@
 namespace App\Models\Media;
 
 use App\Domain\Library\Normalizer;
+use App\Models\Media\Concerns\HasGenres;
+use App\Models\Media\Concerns\ReadsMetadata;
 use App\Models\Play;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,6 +13,8 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Track extends Model
 {
+    use HasGenres, ReadsMetadata;
+
     protected $table = 'tracks';
 
     protected $fillable = [

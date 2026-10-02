@@ -55,16 +55,33 @@
                         <p class="text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-1">Album</p>
                         <h2 class="text-xl font-medium text-gray-900 dark:text-gray-100 leading-snug">{{ $album->name }}</h2>
                         <p class="text-sm text-gray-500 dark:text-gray-500 mt-1">{{ $album->artist->name }}</p>
-                        @if($album->label())
-                            <p class="text-xs text-gray-400 dark:text-gray-600 mt-0.5">{{ $album->label() }}</p>
+                        @php
+                            $details = $album->details();
+                            $subline = collect([
+                                $details['release_type'] ? ucfirst($details['release_type']) : null,
+                                $album->released_at?->year,
+                                $details['label'],
+                                $details['catalog_number'],
+                                $details['track_count'] ? $details['track_count'].' '.Str::plural('track', $details['track_count']) : null,
+                            ])->filter()->implode(' · ');
+                        @endphp
+                        @if($subline)
+                            <p class="text-xs text-gray-400 dark:text-gray-600 mt-0.5">{{ $subline }}</p>
                         @endif
-                        @php $genres = $album->artist->genres() @endphp
+                        @php $genres = $album->genres() ?: $album->artist->genres() @endphp
                         @if(count($genres))
                             <div class="flex flex-wrap gap-1.5 mt-2">
                                 @foreach(array_slice($genres, 0, 5) as $genre)
                                     <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 dark:bg-stone-800 text-gray-500 dark:text-gray-500">{{ $genre }}</span>
                                 @endforeach
                             </div>
+                        @endif
+                        @if($details['summary'])
+                            <p class="mt-3 text-sm text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-4">{{ $details['summary'] }}
+                                @if($details['wikipedia_url'])
+                                    <a href="{{ $details['wikipedia_url'] }}" target="_blank" rel="noopener" class="text-indigo-600 dark:text-indigo-400 hover:underline">Wikipedia</a>
+                                @endif
+                            </p>
                         @endif
                         @if(count($colors) > 0)
                             <div class="flex gap-1.5 mt-4">

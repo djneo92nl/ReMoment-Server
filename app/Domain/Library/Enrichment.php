@@ -2,10 +2,14 @@
 
 namespace App\Domain\Library;
 
+use App\Jobs\EnrichAlbumMusicBrainz;
 use App\Jobs\EnrichArtistLastfm;
+use App\Jobs\EnrichArtistMusicBrainz;
 use App\Jobs\EnrichTrackLyrics;
 use App\Jobs\EnrichTrackMusicBrainz;
 use App\Jobs\EnrichTrackSpotify;
+use App\Models\Media\Album;
+use App\Models\Media\Artist;
 use App\Models\Media\Metadata;
 use App\Models\Media\Track;
 use App\Services\SpotifyTokenService;
@@ -52,6 +56,11 @@ class Enrichment
                 'parent_id' => null,
             ]
         );
+
+        // Every source's genres end up in the canonical genres, wherever they are written from.
+        if ($key === 'genres' && method_exists($model, 'genreRelation')) {
+            GenreSync::sync($model, json_decode($value, true) ?: [], $source);
+        }
     }
 
     public static function markDone(Model $model, string $source): void
@@ -113,6 +122,34 @@ class Enrichment
         }
 
         return $tracks->count();
+    }
+
+    /**
+     * Queues the MusicBrainz detail jobs for up to $limit artists and $limit albums that have a MusicBrainz id
+     * (found by the track job) but no details yet; returns how many were queued.
+     */
+    public static function queueEntities(int $limit): int
+    {
+        $artists = self::entityBacklog(Artist::query())->latest('id')->limit($limit)->get();
+        $albums = self::entityBacklog(Album::query())->latest('id')->limit($limit)->get();
+
+        $artists->each(fn (Artist $a) => EnrichArtistMusicBrainz::dispatch($a));
+        $albums->each(fn (Album $a) => EnrichAlbumMusicBrainz::dispatch($a));
+
+        return $artists->count() + $albums->count();
+    }
+
+    /**
+     * @template T of Model
+     *
+     * @param  Builder<T>  $query
+     * @return Builder<T>
+     */
+    public static function entityBacklog(Builder $query): Builder
+    {
+        return $query
+            ->whereHas('metadata', fn ($m) => $m->where('key', 'mbid')->where('source', self::MUSICBRAINZ))
+            ->whereDoesntHave('metadata', fn ($m) => $m->where('key', 'enriched_at')->where('source', self::MUSICBRAINZ));
     }
 
     /** @return Builder<Track> */

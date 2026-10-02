@@ -2,62 +2,45 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Media\Artist;
-use App\Models\Media\Metadata;
+use App\Domain\Library\GenreNormalizer;
+use App\Models\Media\Genre;
 
 class GenreController extends Controller
 {
     public function index()
     {
-        $genres = $this->genreArtistIds()
-            ->map(fn (array $artistIds, string $genre) => [
-                'name' => $genre,
-                'artist_count' => count($artistIds),
-            ])
-            ->sortByDesc('artist_count')
+        $genres = Genre::query()
+            ->withCount(['artists', 'albums'])
+            ->get()
+            ->filter(fn (Genre $genre) => $genre->artists_count > 0 || $genre->albums_count > 0)
+            ->sortBy([['artists_count', 'desc'], ['albums_count', 'desc'], ['name', 'asc']])
             ->values();
 
         return view('genres.index', compact('genres'));
     }
 
-    public function show(string $genre)
+    public function show(string $slug)
     {
-        $artistIds = $this->genreArtistIds()->get($genre, []);
+        $genre = Genre::query()->where('slug', $slug)->first();
 
-        abort_if(empty($artistIds), 404);
+        if ($genre === null) {
+            // Links made before genres were canonical used the plain name.
+            $renamed = Genre::query()->where('name_key', GenreNormalizer::key($slug))->first();
+            abort_if($renamed === null, 404);
 
-        $artists = Artist::query()
-            ->whereIn('id', $artistIds)
+            return redirect()->route('genres.show', $renamed->slug);
+        }
+
+        $artists = $genre->artists()
             ->withCount('plays')
             ->with(['albums' => fn ($q) => $q->withCount('plays')->orderByDesc('plays_count')->orderByDesc('created_at')])
             ->orderByDesc('plays_count')
             ->get();
 
-        return view('genres.show', compact('genre', 'artists'));
-    }
+        $albums = $genre->albums()->with('artist')->withCount('plays')->orderByDesc('plays_count')->orderBy('albums.name')->get();
 
-    /**
-     * @return \Illuminate\Support\Collection<string, array<int>>
-     */
-    private function genreArtistIds(): \Illuminate\Support\Collection
-    {
-        $map = collect();
+        abort_if($artists->isEmpty() && $albums->isEmpty(), 404);
 
-        Metadata::where('key', 'genres')
-            ->where('metadatable_type', Artist::class)
-            ->get(['metadatable_id', 'value', 'source'])
-            ->groupBy('metadatable_id')
-            ->each(function ($metas, $artistId) use ($map) {
-                $meta = $metas->firstWhere('source', 'musicbrainz') ?? $metas->first();
-                $genres = json_decode($meta->value ?? '', true) ?: [];
-
-                foreach ($genres as $genre) {
-                    $existing = $map->get($genre, []);
-                    $existing[] = (int) $artistId;
-                    $map->put($genre, $existing);
-                }
-            });
-
-        return $map;
+        return view('genres.show', compact('genre', 'artists', 'albums'));
     }
 }
