@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\NowHumming;
 use App\Http\Middleware\RedirectToSetupWizard;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
@@ -20,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withEvents(discover: false)
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [RedirectToSetupWizard::class]);
+        $middleware->api(append: [NowHumming::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->renderable(function (\Exception $e, $request) {

@@ -557,6 +557,34 @@
     #lyrics-view { gap: 14px; }
     #vol-row { width: 100%; }
   }
+  /* ── Easter egg: vinyl mode (↑↑↓↓←→←→BA) ── */
+  body.vinyl #artwork-wrap {
+    border-radius: 50%;
+    animation: vinyl-spin 1.8s linear infinite;
+    animation-play-state: paused;
+    box-shadow: 0 0 0 6px #111, 0 20px 60px rgba(0,0,0,0.6);
+  }
+  body.vinyl.is-playing #artwork-wrap { animation-play-state: running; }
+  body.vinyl #artwork-wrap::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle, transparent 18%, rgba(0,0,0,0.55) 18.5%, rgba(0,0,0,0.55) 20%, transparent 20.5%),
+      repeating-radial-gradient(circle, rgba(0,0,0,0.35) 0 1px, transparent 1px 4px),
+      linear-gradient(135deg, rgba(255,255,255,0.12), transparent 40%, rgba(255,255,255,0.08) 60%, transparent);
+  }
+  body.vinyl #artwork-wrap::before {
+    content: '';
+    position: absolute;
+    inset: 42%;
+    z-index: 3;
+    border-radius: 50%;
+    background: radial-gradient(circle, #000 0 12%, var(--vinyl-label, #c0392b) 13%);
+  }
+  @keyframes vinyl-spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
@@ -974,6 +1002,7 @@ function updateUI(d) {
   if (np.position !== undefined) currentProgress = np.position;
   progressLastPollTime = Date.now();
   isCurrentlyPlaying = (state === 'playing');
+  document.body.classList.toggle('is-playing', isCurrentlyPlaying);
 
   updateProgress();
 }
@@ -1062,6 +1091,7 @@ function setArtwork(url, colors) {
     const accent = src ? src[1]            : ensureL(colors[1], 0.58);
     const muted  = src ? (src[2] || src[1]): ensureL(colors[2] || colors[1], 0.68);
     document.getElementById('progress-bar-fill').style.background = accent;
+    document.getElementById('artwork-wrap').style.setProperty('--vinyl-label', accent);
     document.getElementById('state-dot').style.background = accent;
     document.getElementById('artist-name').style.color = hexToRgba(muted, 0.9);
     document.getElementById('album-name').style.color  = hexToRgba(muted, 0.55);
@@ -1307,6 +1337,21 @@ document.getElementById('switch-btn').addEventListener('click', e => {
 });
 
 document.addEventListener('click', () => toggleSwitcher(false));
+
+// Easter egg: ↑↑↓↓←→←→BA toggles vinyl mode.
+const KONAMI = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+let konamiIdx = 0;
+document.addEventListener('keydown', e => {
+  const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  konamiIdx = key === KONAMI[konamiIdx] ? konamiIdx + 1 : (key === KONAMI[0] ? 1 : 0);
+  if (konamiIdx === KONAMI.length) {
+    konamiIdx = 0;
+    document.body.classList.toggle('vinyl');
+  }
+});
+
+console.log('%c♪ ReMoment%c\nLooking under the hood? The REST API lives at /api, no auth needed.\nTry ↑↑↓↓←→←→BA here.',
+  'font: 600 20px monospace; color: #e879f9', 'font: 12px monospace; color: #9ca3af');
 
 setInterval(() => { updateProgress(); syncLyricsLine(); }, 1000);
 init();

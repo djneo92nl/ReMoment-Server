@@ -4,6 +4,7 @@ namespace App\Domain\Device;
 
 use App\Domain\Media\NowPlaying;
 use App\Events\Device\DeviceStateChanged;
+use App\Models\Device;
 use Illuminate\Support\Facades\Cache;
 
 final class DeviceCache
@@ -50,6 +51,20 @@ final class DeviceCache
         $value = Cache::get(self::nowPlayingKey($deviceId));
 
         return $value ? $value : null;
+    }
+
+    /**
+     * Now-playing of the first device that is currently playing, if any.
+     */
+    public static function firstPlaying(): ?NowPlaying
+    {
+        foreach (Device::pluck('id') as $id) {
+            if (self::getState($id) === State::Playing && $nowPlaying = self::getNowPlaying($id)) {
+                return $nowPlaying;
+            }
+        }
+
+        return null;
     }
 
     public static function getState(int $deviceId): ?State
