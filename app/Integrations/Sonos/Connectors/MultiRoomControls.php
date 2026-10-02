@@ -16,7 +16,7 @@ trait MultiRoomControls
     public function getMultiRoomId(): ?string
     {
         return $this->device->meta()->where('key', 'sonos_uuid')->value('value')
-            ?? $this->deviceApi->getUuid();
+            ?? $this->deviceApiClient()->getUuid();
     }
 
     public function getJoinablePeerIds(): array

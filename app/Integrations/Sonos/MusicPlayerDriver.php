@@ -31,17 +31,21 @@ class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterf
 {
     use MultiRoomControls;
 
-    public Controller $deviceApi;
+    private ?Controller $deviceApi = null;
 
-    public function __construct(public Device $device)
-    {
-        $collection = (new Collection)->addIp($device->ip_address);
-        $sonos = new Network($collection);
-        $this->deviceApi = $sonos->getControllerByIp($device->ip_address);
-    }
+    public function __construct(public Device $device) {}
 
+    /**
+     * Connecting asks the speaker over the network, so it happens on first use:
+     * building the driver (capability checks, device lists) must not wait for Sonos.
+     */
     public function deviceApiClient(): Controller
     {
+        if ($this->deviceApi === null) {
+            $collection = (new Collection)->addIp($this->device->ip_address);
+            $this->deviceApi = (new Network($collection))->getControllerByIp($this->device->ip_address);
+        }
+
         return $this->deviceApi;
     }
 
@@ -61,74 +65,74 @@ class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterf
     {
         $id = $station->getMeta('tunein');
         $uri = "x-sonosapi-stream:{$id}?sid=254&flags=8224&sn=0";
-        $this->deviceApi->useStream(new Stream($uri, $station->name));
+        $this->deviceApiClient()->useStream(new Stream($uri, $station->name));
     }
 
     public function play(): void
     {
-        $this->deviceApi->play();
+        $this->deviceApiClient()->play();
     }
 
     public function pause(): void
     {
-        $this->deviceApi->pause();
+        $this->deviceApiClient()->pause();
     }
 
     public function next(): void
     {
-        $this->deviceApi->next();
+        $this->deviceApiClient()->next();
     }
 
     public function previous(): void
     {
-        $this->deviceApi->previous();
+        $this->deviceApiClient()->previous();
     }
 
     public function stop(): void
     {
-        $this->deviceApi->pause();
+        $this->deviceApiClient()->pause();
     }
 
     public function setVolume(int $volume): int
     {
-        $this->deviceApi->setVolume($volume);
+        $this->deviceApiClient()->setVolume($volume);
 
         return $volume;
     }
 
     public function getVolume(): int
     {
-        return $this->deviceApi->getVolume();
+        return $this->deviceApiClient()->getVolume();
     }
 
     public function incrementVolume(): void
     {
-        $this->deviceApi->adjustVolume(1);
+        $this->deviceApiClient()->adjustVolume(1);
     }
 
     public function decrementVolume(): void
     {
-        $this->deviceApi->adjustVolume(-1);
+        $this->deviceApiClient()->adjustVolume(-1);
     }
 
     public function mute(): void
     {
-        $this->deviceApi->mute(true);
+        $this->deviceApiClient()->mute(true);
     }
 
     public function unmute(): void
     {
-        $this->deviceApi->unmute();
+        $this->deviceApiClient()->unmute();
     }
 
     public function isMuted(): bool
     {
-        return $this->deviceApi->isMuted();
+        return $this->deviceApiClient()->isMuted();
     }
 
     public function seek(int $seconds): void
     {
-        $this->deviceApi->seek(Time::inSeconds(max(0, $seconds)));
+        $this->deviceApiClient()->seek(Time::inSeconds(max(0, $seconds)));
     }
 
     public function setShuffle(bool $shuffle): void
@@ -146,28 +150,28 @@ class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterf
     /** @return array{0: ?bool, 1: ?RepeatMode} */
     public function getPlayMode(): array
     {
-        $settings = $this->deviceApi->soap('AVTransport', 'GetTransportSettings')->getArray();
+        $settings = $this->deviceApiClient()->soap('AVTransport', 'GetTransportSettings')->getArray();
 
         return PlayMode::parse((string) ($settings['PlayMode'] ?? ''));
     }
 
     private function setPlayMode(bool $shuffle, RepeatMode $repeat): void
     {
-        $this->deviceApi->soap('AVTransport', 'SetPlayMode', [
+        $this->deviceApiClient()->soap('AVTransport', 'SetPlayMode', [
             'NewPlayMode' => PlayMode::build($shuffle, $repeat),
         ]);
     }
 
     public function getUpNext(int $limit = 20): array
     {
-        $state = $this->deviceApi->getStateDetails();
+        $state = $this->deviceApiClient()->getStateDetails();
 
         // Radio and line-in play a single stream, not the queue.
         if ($state->isStreaming()) {
             return [];
         }
 
-        $tracks = $this->deviceApi->getQueue()->getTracks($state->getNumber() + 1, $limit);
+        $tracks = $this->deviceApiClient()->getQueue()->getTracks($state->getNumber() + 1, $limit);
 
         return array_map(fn ($track) => new QueueItem(
             name: $track->getTitle() ?: 'Unknown',
@@ -191,8 +195,8 @@ class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterf
             ->setArtist($track->artist?->name ?? '')
             ->setAlbum($track->album?->name ?? '');
 
-        $this->deviceApi->useQueue()->getQueue()->clear()->addTrack($sonosTrack);
-        $this->deviceApi->play();
+        $this->deviceApiClient()->useQueue()->getQueue()->clear()->addTrack($sonosTrack);
+        $this->deviceApiClient()->play();
     }
 
     public function playLibraryTracks(TrackCollection $tracks): void
@@ -203,7 +207,7 @@ class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterf
             throw new \RuntimeException('No tracks with a playable DLNA URL.');
         }
 
-        $queue = $this->deviceApi->useQueue()->getQueue()->clear();
+        $queue = $this->deviceApiClient()->useQueue()->getQueue()->clear();
 
         foreach ($playable as $track) {
             $queue->addTrack(
@@ -214,7 +218,7 @@ class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterf
             );
         }
 
-        $this->deviceApi->play();
+        $this->deviceApiClient()->play();
     }
 
     public function playLibraryPlaylist(Playlist $playlist): void
