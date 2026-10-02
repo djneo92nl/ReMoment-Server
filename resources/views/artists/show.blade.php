@@ -34,6 +34,9 @@
         $details = $artist->details();
         $bio = $details['bio'];
         $links = (array) $details['links'];
+        $artistImage = ((array) $details['images'])['thumb'] ?? null;
+        $extraTags = collect([$details['mood'], $details['style'], ...$details['tags']])->filter()
+            ->reject(fn ($tag) => collect($genres)->contains(fn ($g) => strcasecmp($g, $tag) === 0))->unique()->take(8);
         $lifeSpan = $details['begin_date'] ? ($details['end_date'] ? substr($details['begin_date'], 0, 4).' – '.substr($details['end_date'], 0, 4) : 'Since '.substr($details['begin_date'], 0, 4)) : null;
         $similarArtists = $artist->similarArtistModels();
     @endphp
@@ -42,7 +45,7 @@
          @if(count($heroColors) >= 2) style="background: linear-gradient(135deg, {{ $heroColors[0] }}22, {{ $heroColors[1] }}11)" @endif>
         <div class="flex flex-col md:flex-row items-center md:items-start gap-6 text-center md:text-left">
             <x-artwork-thumb
-                :src="$coverAlbum?->images[0]['url'] ?? null"
+                :src="$artistImage ?? $coverAlbum?->images[0]['url'] ?? null"
                 :colors="$heroColors"
                 :seed="$artist->name"
                 icon="fa-solid fa-microphone-lines"
@@ -67,8 +70,22 @@
                     @endif
                 </div>
 
+                @if($extraTags->isNotEmpty())
+                    <div class="flex flex-wrap items-center justify-center md:justify-start gap-1.5 mt-2">
+                        @foreach($extraTags as $tag)
+                            <span class="px-2 py-0.5 rounded-full text-[11px] font-medium border border-gray-200 dark:border-stone-700 text-gray-500 dark:text-gray-500">{{ $tag }}</span>
+                        @endforeach
+                    </div>
+                @endif
+
                 @if($bio)
                     <p class="mt-4 text-sm text-gray-500 dark:text-gray-400 leading-relaxed max-w-2xl">{{ $bio }}</p>
+                @endif
+
+                @if($details['listeners'])
+                    <p class="mt-3 text-xs text-gray-400 dark:text-gray-600">
+                        {{ number_format($details['listeners']) }} listeners · {{ number_format($details['playcount']) }} scrobbles on Last.fm
+                    </p>
                 @endif
 
                 @if($details['wikipedia_url'] || $links)

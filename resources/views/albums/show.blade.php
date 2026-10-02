@@ -59,6 +59,7 @@
                             $details = $album->details();
                             $subline = collect([
                                 $details['release_type'] ? ucfirst($details['release_type']) : null,
+                                $details['format'],
                                 $album->released_at?->year,
                                 $details['label'],
                                 $details['catalog_number'],
@@ -75,6 +76,25 @@
                                     <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 dark:bg-stone-800 text-gray-500 dark:text-gray-500">{{ $genre }}</span>
                                 @endforeach
                             </div>
+                        @endif
+                        @php
+                            $albumTags = collect([$details['mood'], $details['theme'], $details['style'], ...$details['tags']])->filter()
+                                ->reject(fn ($tag) => collect($genres)->contains(fn ($g) => strcasecmp($g, $tag) === 0))->unique()->take(8);
+                        @endphp
+                        @if($albumTags->isNotEmpty())
+                            <div class="flex flex-wrap gap-1.5 mt-1.5">
+                                @foreach($albumTags as $tag)
+                                    <span class="px-2 py-0.5 rounded-full text-[11px] font-medium border border-gray-200 dark:border-stone-700 text-gray-500 dark:text-gray-500">{{ $tag }}</span>
+                                @endforeach
+                            </div>
+                        @endif
+                        @if($details['rating'] || $details['listeners'])
+                            <p class="mt-2 text-xs text-gray-400 dark:text-gray-600">
+                                {{ collect([
+                                    $details['rating'] ? '★ '.$details['rating'].' / 10' : null,
+                                    $details['listeners'] ? number_format($details['listeners']).' listeners on Last.fm' : null,
+                                ])->filter()->implode(' · ') }}
+                            </p>
                         @endif
                         @if($details['summary'])
                             <p class="mt-3 text-sm text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-4">{{ $details['summary'] }}
@@ -135,8 +155,9 @@
                                 $trackGenres = $track->genres();
                                 $isrc = $track->metaValue('isrc');
                                 $popularity = $track->metaValue('spotify_popularity');
+                                $listeners = $track->metaInt('lastfm_listeners');
                                 $recordingMbid = $track->metaValue('mbid');
-                                $hasInfo = $quality || $credits || $trackGenres || $isrc || $popularity !== null;
+                                $hasInfo = $quality || $credits || $trackGenres || $isrc || $popularity !== null || $listeners;
                             @endphp
                             <div x-data="{ panel: null }">
                                 <div class="flex items-center gap-4 px-6 py-3 hover:bg-gray-50 dark:hover:bg-stone-800/30 transition-colors group">
@@ -208,6 +229,10 @@
                                                 <dt class="text-gray-400 dark:text-gray-600">Spotify popularity</dt>
                                                 <dd class="text-gray-700 dark:text-gray-300">{{ $popularity }} / 100</dd>
                                             @endif
+                                            @if($listeners)
+                                                <dt class="text-gray-400 dark:text-gray-600">Last.fm</dt>
+                                                <dd class="text-gray-700 dark:text-gray-300">{{ number_format($listeners) }} listeners · {{ number_format($track->metaInt('lastfm_playcount')) }} plays</dd>
+                                            @endif
                                             @if($isrc)
                                                 <dt class="text-gray-400 dark:text-gray-600">ISRC</dt>
                                                 <dd class="text-gray-700 dark:text-gray-300 font-mono">{{ $isrc }}</dd>
@@ -233,6 +258,24 @@
 
         <!-- Right: Stats + recent plays -->
         <div class="space-y-6">
+
+            @php $albumCredits = (array) $details['credits']; @endphp
+            @if($albumCredits)
+                <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8">
+                    <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">Credits</h2>
+                    <dl class="space-y-3 text-sm">
+                        @foreach($albumCredits as $role => $names)
+                            <div>
+                                <dt class="text-xs text-gray-400 dark:text-gray-600">{{ ucfirst($role) }}</dt>
+                                <dd class="text-gray-800 dark:text-gray-200">{{ implode(', ', $names) }}</dd>
+                            </div>
+                        @endforeach
+                    </dl>
+                    @if($details['discogs_url'])
+                        <a href="{{ $details['discogs_url'] }}" target="_blank" rel="noopener" class="inline-block mt-4 text-xs text-indigo-600 dark:text-indigo-400 hover:underline">Discogs release</a>
+                    @endif
+                </div>
+            @endif
 
             @if($totalPlays > 0)
                 <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8">

@@ -25,7 +25,7 @@ docs/
     device-drivers.md       Driver contracts, existing drivers, guide for adding a new brand
     device-discovery.md     Discovery commands, listener startup, device_meta keys
     discovery-for-clients.md mDNS advertisement (_remoment._tcp via host Avahi) so clients find the server
-    metadata-enrichment.md  Per-source enrichment jobs (MusicBrainz track/artist/album, Wikipedia, Cover Art Archive, lyrics, Spotify, Last.fm), DLNA tags, canonical genres: markers, retries, rate limits, library:enrich
+    metadata-enrichment.md  Per-source enrichment jobs (MusicBrainz track/artist/album, Wikipedia, Cover Art Archive, lyrics, Spotify, Last.fm, TheAudioDB, Discogs), DLNA tags, canonical genres: markers, retries, rate limits, library:enrich
     lastfm.md                Scrobbling, now-playing, auth flow, artist enrichment, backfill
     library-identity.md      One record per artist/album/track across sources: name keys, find-or-create, library:merge-duplicates
     live-updates.md          MQTT-over-WebSocket push to Livewire + /receiver, topics, fallback polling
@@ -327,8 +327,8 @@ Browse, favorites and playback for clients; full shapes in `docs/api/library.md`
 
 ```
 GET  /api/library/artists?cursor=          → { data: [ArtistItem], next_cursor }   alphabetical ("The " ignored), 50/page, only artists with albums
-GET  /api/library/artists/{id}             → { id, name, favorite, genres, details, albums: [AlbumItem] }   newest year first, then name
-GET  /api/library/albums/{id}?device_id=   → { id, name, artist: {id, name}, year, artwork, favorite, genres, details, playable, tracks: [{ id, name, duration, playable }] }
+GET  /api/library/artists/{id}             → { id, name, favorite, genres, details (bio, links, images, mood, Last.fm stats …), albums: [AlbumItem] }   newest year first, then name
+GET  /api/library/albums/{id}?device_id=   → { id, name, artist: {id, name}, year, artwork, favorite, genres, details (label, release type, mood, rating, credits …), playable, tracks: [{ id, name, duration, playable, details }] }
 GET  /api/library/genres                   → { data: [{ slug, name, artist_count, album_count }] }   canonical genres, most artists first
 GET  /api/library/genres/{slug}            → { slug, name, artists: [ArtistItem], albums: [AlbumItem] }   up to 100 of each
 GET  /api/library/playlists?cursor=        → { data: [PlaylistItem], next_cursor }   recently played (last_played_at) first, then by name, 50/page, only playlists with tracks

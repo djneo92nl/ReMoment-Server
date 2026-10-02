@@ -54,6 +54,9 @@ class EnrichAlbumMusicBrainz implements ShouldBeUnique, ShouldQueue
         }
 
         Enrichment::markDone($album, Enrichment::MUSICBRAINZ);
+
+        // The release group id found above is what TheAudioDB is looked up by.
+        Enrichment::queueAlbum($album->load('artist'));
     }
 
     private function storeRelease(Album $album, array $release, MusicBrainzClient $mb, WikipediaClient $wikipedia): void

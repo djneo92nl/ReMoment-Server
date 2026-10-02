@@ -62,10 +62,10 @@ class Artist extends Model
         return $this->metadata()->where('key', 'country')->value('value');
     }
 
-    /** The Wikipedia summary when there is one, else the Last.fm bio. */
+    /** The Wikipedia summary when there is one, else the Last.fm bio, else TheAudioDB's. */
     public function bio(): ?string
     {
-        return $this->metaValue('wikipedia_extract') ?? $this->metaValue('bio');
+        return $this->metaValue('wikipedia_extract') ?? $this->metaValue('bio') ?? $this->metaValue('audiodb_bio');
     }
 
     /** What the web page and the library API show besides name and genres. */
@@ -80,6 +80,12 @@ class Artist extends Model
             'bio' => $this->bio(),
             'wikipedia_url' => $this->metaValue('wikipedia_url'),
             'links' => (object) $this->metaJson('links'),
+            'images' => (object) $this->metaJson('images'),
+            'mood' => $this->metaValue('mood'),
+            'style' => $this->metaValue('style'),
+            'tags' => $this->metaJson('tags'),
+            'listeners' => $this->metaInt('lastfm_listeners'),
+            'playcount' => $this->metaInt('lastfm_playcount'),
         ];
     }
 

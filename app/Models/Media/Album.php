@@ -82,8 +82,18 @@ class Album extends Model
             'country' => $this->metaValue('country'),
             'track_count' => ($n = $this->metaValue('track_count')) !== null ? (int) $n : null,
             'disc_count' => ($n = $this->metaValue('disc_count')) !== null ? (int) $n : null,
-            'summary' => $this->metaValue('wikipedia_extract'),
+            'summary' => $this->metaValue('wikipedia_extract') ?? $this->metaValue('lastfm_summary') ?? $this->metaValue('audiodb_description'),
             'wikipedia_url' => $this->metaValue('wikipedia_url'),
+            'format' => $this->metaValue('format'),
+            'mood' => $this->metaValue('mood'),
+            'style' => $this->metaValue('style'),
+            'theme' => $this->metaValue('theme'),
+            'rating' => ($r = $this->metaValue('rating')) !== null ? (float) $r : null,
+            'tags' => $this->metaJson('tags'),
+            'credits' => (object) $this->credits(),
+            'discogs_url' => $this->metaValue('discogs_url'),
+            'listeners' => $this->metaInt('lastfm_listeners'),
+            'playcount' => $this->metaInt('lastfm_playcount'),
         ];
     }
 }

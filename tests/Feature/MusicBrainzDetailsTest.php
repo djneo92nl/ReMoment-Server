@@ -19,6 +19,13 @@ class MusicBrainzDetailsTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Http::preventStrayRequests();
+    }
+
     private function artist(): Artist
     {
         $artist = Artist::create(['name' => 'Band', 'source' => 'dlna']);
@@ -112,6 +119,7 @@ class MusicBrainzDetailsTest extends TestCase
         Sleep::fake();
         Queue::fake([ProcessArtwork::class]);
         Http::fake($this->fakeWikipedia() + [
+            'theaudiodb.com/*' => Http::response(['album' => null]),
             'coverartarchive.org/*' => Http::response('', 404),
             'musicbrainz.org/ws/2/release-group/*' => Http::response([
                 'genres' => [['name' => 'shoegaze', 'count' => 4]],
@@ -142,6 +150,7 @@ class MusicBrainzDetailsTest extends TestCase
         $this->assertSame('2011-03-01', $album->released_at->toDateString());
         $this->assertSame(['Shoegaze', 'Rock'], $album->genres());
         $this->assertTrue(Enrichment::isDone($album, Enrichment::MUSICBRAINZ));
+        $this->assertTrue(Enrichment::isDone($album, Enrichment::AUDIODB), 'queued once the release group id is known');
         Queue::assertNothingPushed();
     }
 
@@ -185,8 +194,9 @@ class MusicBrainzDetailsTest extends TestCase
         Enrichment::markDone($done, Enrichment::MUSICBRAINZ);
         Album::create(['artist_id' => $artist->id, 'name' => 'No mbid', 'source' => 'dlna']);
 
-        $this->assertSame(2, Enrichment::queueEntities(10));
+        $this->assertSame(3, Enrichment::queueEntities(10), 'artist details, artist AudioDB, album details');
         Queue::assertPushed(EnrichArtistMusicBrainz::class, fn ($job) => $job->artist->is($artist));
+        Queue::assertPushed(\App\Jobs\EnrichArtistAudioDb::class);
         Queue::assertPushed(EnrichAlbumMusicBrainz::class, 1);
         Queue::assertPushed(EnrichAlbumMusicBrainz::class, fn ($job) => $job->album->is($album));
     }

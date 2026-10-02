@@ -42,6 +42,9 @@ class AppServiceProvider extends ServiceProvider
     {
         // MusicBrainz asks for at most one request per second; shared by every enrichment worker.
         RateLimiter::for('musicbrainz', fn () => Limit::perSecond(1));
+        // TheAudioDB's free key allows about 30 requests a minute, Discogs 60 with a token.
+        RateLimiter::for('audiodb', fn () => Limit::perMinute(25));
+        RateLimiter::for('discogs', fn () => Limit::perMinute(50));
 
         Event::listen(NowPlayingUpdated::class, [UpdateDeviceCache::class, 'handle']);
         Event::listen(NowPlayingUpdated::class, [StorePlaybackHistory::class, 'handle']);

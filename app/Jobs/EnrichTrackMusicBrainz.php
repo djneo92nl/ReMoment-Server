@@ -13,8 +13,8 @@ use Illuminate\Queue\Middleware\RateLimited;
 
 /**
  * Finds the track's MusicBrainz recording and keeps its ids (recording, artist, release), ISRC and credits.
- * The artist's and album's own details are fetched once per record by EnrichArtistMusicBrainz and
- * EnrichAlbumMusicBrainz, queued from here.
+ * The artist's and album's own details are fetched once per record by their jobs, queued from here
+ * (Enrichment::queueArtist() / queueAlbum()).
  */
 class EnrichTrackMusicBrainz implements ShouldBeUnique, ShouldQueue
 {
@@ -85,18 +85,14 @@ class EnrichTrackMusicBrainz implements ShouldBeUnique, ShouldQueue
         if ($artistMbid = $best['artist-credit'][0]['artist']['id'] ?? null) {
             Enrichment::save($track->artist, 'mbid', $artistMbid, 'string', Enrichment::MUSICBRAINZ);
 
-            if (!Enrichment::isDone($track->artist, Enrichment::MUSICBRAINZ)) {
-                EnrichArtistMusicBrainz::dispatch($track->artist);
-            }
+            Enrichment::queueArtist($track->artist);
         }
 
         // The recording appears on many releases (singles, compilations); only the one that is this album is its mbid.
         if ($track->album && ($releaseMbid = $this->releaseOf($best, $track->album->name))) {
             Enrichment::save($track->album, 'mbid', $releaseMbid, 'string', Enrichment::MUSICBRAINZ);
 
-            if (!Enrichment::isDone($track->album, Enrichment::MUSICBRAINZ)) {
-                EnrichAlbumMusicBrainz::dispatch($track->album);
-            }
+            Enrichment::queueAlbum($track->album->setRelation('artist', $track->artist));
         }
     }
 

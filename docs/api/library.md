@@ -28,7 +28,7 @@ Duplicates from before that are merged by an admin running `php artisan library:
 
 `{ "id", "name", "favorite", "genres": [ "Rock", … ], "details": ArtistDetails, "albums": [ AlbumItem, … ] }` — albums newest year first (unknown year last), then by name.
 
-**ArtistDetails** — `{ "type": "group"|"person"|…|null, "country": "GB"|null, "area": "London"|null, "begin_date": "1994"|null, "end_date": null, "bio": "…"|null, "wikipedia_url": "…"|null, "links": { "official": "…", "discogs": "…", … } }`. `bio` is the Wikipedia summary, else the Last.fm bio. Dates are MusicBrainz partial dates (`1994`, `1994-05`, `1994-05-12`). `links` keys that may occur: `official`, `wikidata`, `wikipedia`, `discogs`, `allmusic`, `lastfm`, `bandcamp`, `songkick`, `youtube`, `twitter`, `instagram`, `facebook`, `spotify`, `apple_music`, `deezer`, `tidal`. Every field is filled in as enrichment reaches the artist (see `docs/architecture/metadata-enrichment.md`), so all may be `null`/empty.
+**ArtistDetails** — `{ "type": "group"|"person"|…|null, "country": "GB"|null, "area": "London"|null, "begin_date": "1994"|null, "end_date": null, "bio": "…"|null, "wikipedia_url": "…"|null, "links": { "official": "…", "discogs": "…", … } }`. `bio` is the Wikipedia summary, else the Last.fm bio. Dates are MusicBrainz partial dates (`1994`, `1994-05`, `1994-05-12`). `links` keys that may occur: `official`, `wikidata`, `wikipedia`, `discogs`, `allmusic`, `lastfm`, `bandcamp`, `songkick`, `youtube`, `twitter`, `instagram`, `facebook`, `spotify`, `apple_music`, `deezer`, `tidal`. Besides: `"images": { "thumb": "https://…", "fanart": "…", "logo": "…", "banner": "…" }` (TheAudioDB, any key may be absent; remote URLs, not processed by the server), `"mood"`, `"style"`, `"tags": ["Shoegaze", …]` (Last.fm), `"listeners"`, `"playcount"` (Last.fm, integers). Every field is filled in as enrichment reaches the artist (see `docs/architecture/metadata-enrichment.md`), so all may be `null`/empty.
 
 ### `GET /api/library/albums/{id}?device_id=`
 
@@ -44,12 +44,16 @@ Duplicates from before that are merged by an admin running `php artisan library:
   "details": {
     "label": "Mushroom", "catalog_number": "MUSH-1", "release_type": "album", "secondary_types": ["live"],
     "release_date": "2003-09-15", "country": "GB", "track_count": 14, "disc_count": 1,
-    "summary": "…", "wikipedia_url": "…"
+    "summary": "…", "wikipedia_url": "…", "format": "Vinyl, LP, Album", "mood": "Dreamy", "style": "Rock/Pop", "theme": null,
+    "rating": 8.7, "tags": ["Alternative Rock"], "credits": { "producer": ["Rich Costey"] }, "discogs_url": "…",
+    "listeners": 1200, "playcount": 99000
   },
   "playable": true,
-  "tracks": [ { "id": 34, "name": "Intro", "duration": 213, "playable": true } ]
+  "tracks": [ { "id": 34, "name": "Intro", "duration": 213, "playable": true, "details": TrackDetails } ]
 }
 ```
+
+**TrackDetails** — `{ "genres": [], "quality": "FLAC · 16-bit / 44.1 kHz · 1411 kbps · stereo"|null, "credits": { "composer": ["…"], "instrument": ["Name (guitar)"] }, "isrc": null, "explicit": true|false|null, "popularity": 67|null, "listeners": null, "playcount": null }`. `quality` is what a DLNA server reported; `credits` are MusicBrainz credits grouped by role (an empty object when none); `popularity` is Spotify's 0–100; `listeners`/`playcount` are Last.fm's.
 
 Tracks are in best-effort album order (by id — there is no track number column). `duration` is seconds or `null`. A track is `playable` when the server has a stream for it: a DLNA URL, or a Spotify URI. With the optional `device_id`, `playable` is for that device: DLNA tracks need a device with a DLNA library driver, Spotify tracks a device that can play Spotify (below). The album is `playable` when any track is.
 

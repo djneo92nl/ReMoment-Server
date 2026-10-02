@@ -5,9 +5,9 @@ namespace App\Jobs;
 use App\Domain\Library\Enrichment;
 use App\Jobs\Concerns\EnrichesFromSource;
 use App\Models\Media\Artist;
+use App\Services\Lastfm\LastfmInfoClient;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Support\Facades\Http;
 
 class EnrichArtistLastfm implements ShouldBeUnique, ShouldQueue
 {
@@ -20,58 +20,31 @@ class EnrichArtistLastfm implements ShouldBeUnique, ShouldQueue
         return (string) $this->artist->id;
     }
 
-    public function handle(): void
+    public function handle(LastfmInfoClient $lastfm): void
     {
-        $apiKey = config('lastfm.api_key');
-        $artistName = trim($this->artist->name);
+        $artist = $this->artist;
+        $name = trim($artist->name);
 
-        if (!$apiKey || $artistName === '' || $this->artist->metadata()->where('source', Enrichment::LASTFM)->exists()) {
+        if (!LastfmInfoClient::enabled() || $name === '' || Enrichment::isDone($artist, Enrichment::LASTFM)) {
             return;
         }
 
-        $response = Http::withHeaders(['User-Agent' => 'ReMoment/1.0 (remko@pionect.nl)'])
-            ->get('https://ws.audioscrobbler.com/2.0/', [
-                'method' => 'artist.getinfo',
-                'artist' => $artistName,
-                'api_key' => $apiKey,
-                'format' => 'json',
-                'autocorrect' => 1,
-            ]);
+        $info = $lastfm->get('artist.getinfo', ['artist' => $name])['artist'] ?? null;
 
-        // Rate limits and outages are retried; anything else (an unknown artist) is just "no data".
-        if ($response->status() === 429 || $response->serverError()) {
-            $response->throw();
-        }
-
-        if ($response->failed()) {
-            Enrichment::markDone($this->artist, Enrichment::LASTFM);
-
-            return;
-        }
-
-        $summary = $response->json('artist.bio.summary');
-        if ($summary) {
-            $bio = trim(preg_replace('/\s*<a href="[^"]*">Read more on Last\.fm<\/a>\.?\s*$/', '', $summary));
-            if ($bio !== '') {
-                $this->saveMeta('bio', $bio, 'string');
+        if ($info !== null) {
+            if ($bio = LastfmInfoClient::cleanSummary($info['bio']['summary'] ?? null)) {
+                Enrichment::save($artist, 'bio', $bio, 'string', Enrichment::LASTFM);
             }
+
+            $similar = array_values(array_filter(array_column($info['similar']['artist'] ?? [], 'name')));
+            if ($similar) {
+                Enrichment::save($artist, 'similar_artists', json_encode($similar), 'json', Enrichment::LASTFM);
+            }
+
+            Enrichment::saveStats($artist, $info['stats'] ?? []);
+            Enrichment::saveTags($artist, LastfmInfoClient::tagNames($info['tags']['tag'] ?? null), Enrichment::LASTFM);
         }
 
-        $similar = collect($response->json('artist.similar.artist', []))
-            ->pluck('name')
-            ->filter()
-            ->values()
-            ->all();
-
-        if (!empty($similar)) {
-            $this->saveMeta('similar_artists', json_encode($similar), 'json');
-        }
-
-        Enrichment::markDone($this->artist, Enrichment::LASTFM);
-    }
-
-    private function saveMeta(string $key, string $value, string $type): void
-    {
-        Enrichment::save($this->artist, $key, $value, $type, Enrichment::LASTFM);
+        Enrichment::markDone($artist, Enrichment::LASTFM);
     }
 }

@@ -94,11 +94,14 @@ class LibraryController extends Controller
 
         $album->load('artist');
         $tracks = LibraryPlayback::albumTracks($album);
+        // The playback keys plus what the track details read, so neither costs a query per track.
+        $tracks->load(['genreRelation', 'metadata' => fn ($q) => $q->whereIn('key', array_unique([...LibraryPlayback::PLAYBACK_METADATA, ...Track::DISPLAY_METADATA]))]);
         $items = $tracks->map(fn (Track $track) => [
             'id' => $track->id,
             'name' => $track->name,
             'duration' => $track->duration,
             'playable' => LibraryPlayback::trackPlayable($track, $device),
+            'details' => $track->details(),
         ])->values();
 
         return response()->json([

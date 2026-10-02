@@ -19,6 +19,7 @@ class Track extends Model
     public const DISPLAY_METADATA = [
         'dlna_url', 'lyrics_plain', 'credits', 'isrc', 'explicit', 'spotify_popularity', 'mbid',
         'mime_type', 'bit_depth', 'sample_rate', 'bitrate', 'channels', 'file_size', 'track_number', 'disc_number',
+        'lastfm_listeners', 'lastfm_playcount',
     ];
 
     protected $table = 'tracks';
@@ -101,8 +102,6 @@ class Track extends Model
         'audio/ogg' => 'Ogg', 'audio/x-aiff' => 'AIFF', 'audio/aiff' => 'AIFF',
     ];
 
-    private const CREDIT_ORDER = ['composer', 'lyricist', 'writer', 'arranger', 'producer', 'co-producer', 'executive producer', 'engineer', 'recording', 'mix', 'mastering', 'programming', 'conductor', 'vocal', 'instrument', 'performer', 'remixer', 'DJ-mix'];
-
     /** File format and quality a DLNA server reported, e.g. "FLAC · 16-bit / 44.1 kHz · 1411 kbps · stereo · 31.2 MB". */
     public function audioQuality(): ?string
     {
@@ -128,22 +127,18 @@ class Track extends Model
         return $parts ? implode(' · ', $parts) : null;
     }
 
-    /**
-     * People credited on the recording (MusicBrainz), grouped by role in a fixed order.
-     *
-     * @return array<string, list<string>> role => names, an instrument or other detail in brackets
-     */
-    public function credits(): array
+    /** What the album page and the library API show about a track beyond its name and duration. */
+    public function details(): array
     {
-        $grouped = [];
-
-        foreach ($this->metaJson('credits') as $credit) {
-            $grouped[$credit['role']][] = $credit['name'].(isset($credit['detail']) ? " ({$credit['detail']})" : '');
-        }
-
-        uksort($grouped, fn ($a, $b) => (array_search($a, self::CREDIT_ORDER) === false ? 99 : array_search($a, self::CREDIT_ORDER))
-            <=> (array_search($b, self::CREDIT_ORDER) === false ? 99 : array_search($b, self::CREDIT_ORDER)));
-
-        return $grouped;
+        return [
+            'genres' => $this->genres(),
+            'quality' => $this->audioQuality(),
+            'credits' => (object) $this->credits(),
+            'isrc' => $this->metaValue('isrc'),
+            'explicit' => ($e = $this->metaValue('explicit')) !== null ? $e === '1' : null,
+            'popularity' => $this->metaInt('spotify_popularity'),
+            'listeners' => $this->metaInt('lastfm_listeners'),
+            'playcount' => $this->metaInt('lastfm_playcount'),
+        ];
     }
 }

@@ -21,7 +21,7 @@ class BackfillArtistLastfm extends Command
         }
 
         $artists = Artist::query()
-            ->whereDoesntHave('metadata', fn ($q) => $q->where('source', 'lastfm'))
+            ->whereDoesntHave('metadata', fn ($q) => $q->where('key', 'enriched_at')->where('source', 'lastfm'))
             ->get();
 
         if ($artists->isEmpty()) {

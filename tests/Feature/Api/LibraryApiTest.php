@@ -230,12 +230,14 @@ class LibraryApiTest extends TestCase
                 'details' => [
                     'label' => null, 'catalog_number' => null, 'release_type' => null, 'secondary_types' => [],
                     'release_date' => null, 'country' => null, 'track_count' => null, 'disc_count' => null,
-                    'summary' => null, 'wikipedia_url' => null,
+                    'summary' => null, 'wikipedia_url' => null, 'format' => null, 'mood' => null, 'style' => null,
+                    'theme' => null, 'rating' => null, 'tags' => [], 'credits' => [], 'discogs_url' => null,
+                    'listeners' => null, 'playcount' => null,
                 ],
                 'playable' => true,
                 'tracks' => [
-                    ['id' => $one->id, 'name' => 'Intro', 'duration' => 200, 'playable' => true],
-                    ['id' => $two->id, 'name' => 'Apocalypse Please', 'duration' => 200, 'playable' => false],
+                    ['id' => $one->id, 'name' => 'Intro', 'duration' => 200, 'playable' => true, 'details' => ['genres' => [], 'quality' => null, 'credits' => [], 'isrc' => null, 'explicit' => null, 'popularity' => null, 'listeners' => null, 'playcount' => null]],
+                    ['id' => $two->id, 'name' => 'Apocalypse Please', 'duration' => 200, 'playable' => false, 'details' => ['genres' => [], 'quality' => null, 'credits' => [], 'isrc' => null, 'explicit' => null, 'popularity' => null, 'listeners' => null, 'playcount' => null]],
                 ],
             ]);
 

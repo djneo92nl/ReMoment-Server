@@ -37,13 +37,15 @@ class LibraryEnrichmentTest extends TestCase
         config(['lastfm.api_key' => 'key']);
         $track = $this->track();
 
-        $this->assertSame(3, Enrichment::queue($track));
+        $this->assertSame(4, Enrichment::queue($track));
         Queue::assertPushed(EnrichTrackMusicBrainz::class);
+        Queue::assertPushed(\App\Jobs\EnrichTrackLastfm::class);
         Queue::assertPushed(EnrichTrackLyrics::class);
         Queue::assertPushed(EnrichArtistLastfm::class);
 
         Enrichment::markDone($track, Enrichment::MUSICBRAINZ);
         Enrichment::markDone($track, Enrichment::LRCLIB);
+        Enrichment::markDone($track, Enrichment::LASTFM);
         Enrichment::markDone($track->artist, Enrichment::LASTFM);
 
         $this->assertSame(0, Enrichment::queue($track->fresh()));
