@@ -8,6 +8,7 @@ use App\Models\Media\Metadata;
 use App\Models\Media\Track;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 
 /**
@@ -38,7 +39,8 @@ final class LibraryIdentity
         $key = Normalizer::artist($name);
 
         return self::find(Artist::class, fn () => Artist::query()->where('name_key', $key)->orderBy('id')->first())
-            ?? Artist::create(['name' => $name, 'source' => $source]);
+            ?? self::create(Artist::class, ['name' => $name, 'source' => $source],
+                fn () => Artist::query()->where('name', $name)->where('source', $source)->orderBy('id')->first());
     }
 
     /** @param  array<string, mixed>  $attributes  only used when the album is created */
@@ -48,7 +50,8 @@ final class LibraryIdentity
 
         return self::find(Album::class, fn () => Album::query()
             ->where('artist_id', $artist->id)->where('name_key', $key)->orderBy('id')->first())
-            ?? Album::create(['artist_id' => $artist->id, 'name' => $name, 'source' => $source] + $attributes);
+            ?? self::create(Album::class, ['artist_id' => $artist->id, 'name' => $name, 'source' => $source] + $attributes,
+                fn () => Album::query()->where('artist_id', $artist->id)->where('name', $name)->where('source', $source)->orderBy('id')->first());
     }
 
     /**
@@ -93,6 +96,26 @@ final class LibraryIdentity
         $track->save();
 
         return $track;
+    }
+
+    /**
+     * Creates a record; when a unique index rejects it (a concurrent queue
+     * worker created it first, or an existing row has a stale `name_key`),
+     * returns the existing row found by $existing instead.
+     *
+     * @template T of Model
+     *
+     * @param  class-string<T>  $model
+     * @param  array<string, mixed>  $attributes
+     * @return T
+     */
+    private static function create(string $model, array $attributes, \Closure $existing): Model
+    {
+        try {
+            return $model::create($attributes);
+        } catch (UniqueConstraintViolationException $e) {
+            return $existing() ?? throw $e;
+        }
     }
 
     /** A track by an external id: its own (`tracks.external_id` + `source`), or one kept from a merged record. */
