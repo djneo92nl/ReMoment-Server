@@ -48,6 +48,40 @@ class SpotifyLibraryImporter
         return $count;
     }
 
+    /**
+     * Imports every track of a Spotify album (the album of a track that was just played), so the
+     * library holds the full album instead of the one song. Returns the number of tracks imported.
+     */
+    public function importAlbum(string $spotifyAlbumId): int
+    {
+        $api = $this->tokenService->makeApiClient();
+
+        $spotifyAlbum = $api->getAlbum($spotifyAlbumId);
+        $albumInfo = array_diff_key($spotifyAlbum, ['tracks' => true]);
+        $count = 0;
+        $album = null;
+
+        foreach ($this->paginate(fn ($offset, $limit) => $api->getAlbumTracks($spotifyAlbumId, ['limit' => $limit, 'offset' => $offset])) as $item) {
+            if (empty($item['id'])) {
+                continue;
+            }
+
+            // Album tracks come without their album.
+            $track = $this->importTrackItem($item + ['album' => $albumInfo]);
+            $album ??= $track->album;
+            $count++;
+        }
+
+        if ($album !== null && !empty($spotifyAlbum['uri'])) {
+            Metadata::updateOrCreate(
+                ['metadatable_type' => $album->getMorphClass(), 'metadatable_id' => $album->id, 'key' => 'spotify_album_uri'],
+                ['value' => $spotifyAlbum['uri'], 'type' => 'string', 'source' => 'spotify'],
+            );
+        }
+
+        return $count;
+    }
+
     private function importPlaylistItem(array $spotifyPlaylist, \SpotifyWebAPI\SpotifyWebAPI $api): void
     {
         $playlist = Playlist::updateOrCreate(

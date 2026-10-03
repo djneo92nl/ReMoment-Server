@@ -6,6 +6,7 @@ use App\Domain\Library\Enrichment;
 use App\Domain\Library\LibraryIdentity;
 use App\Events\Device\NowPlayingUpdated;
 use App\Integrations\Contracts\RadioControlInterface;
+use App\Jobs\ImportSpotifyAlbum;
 use App\Jobs\ScrobbleToLastfm;
 use App\Jobs\SendNowPlayingToLastfm;
 use App\Models\Device;
@@ -244,6 +245,15 @@ class StorePlaybackHistory implements ShouldQueue
         // --- Enrich Spotify tracks with API metadata (release date, etc.) ---
         if ($npTrack->source === 'spotify' && $albumId !== null) {
             $this->enrichSpotifyAlbum($album, $npTrack->meta ?? []);
+        }
+
+        // --- Add the rest of the album to the library ---
+        $spotifyTrackUri = $track->external_id && str_starts_with($track->external_id, 'spotify:track:')
+            ? $track->external_id
+            : $this->spotifyIdFromMeta($npTrack->meta ?? [], $npTrack->source);
+
+        if ($album !== null && $spotifyTrackUri !== null) {
+            ImportSpotifyAlbum::dispatch($album, substr($spotifyTrackUri, strlen('spotify:track:')));
         }
     }
 
