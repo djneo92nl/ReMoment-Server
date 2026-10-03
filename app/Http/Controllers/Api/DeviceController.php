@@ -10,6 +10,7 @@ use App\Domain\Device\RepeatMode;
 use App\Domain\Device\SpotifyRouting;
 use App\Domain\Device\State;
 use App\Domain\Library\LibraryPlayback;
+use App\Domain\Library\LibrarySources;
 use App\Domain\Library\NotPlayableException;
 use App\Domain\Library\PlaybackFailedException;
 use App\Events\Device\PlaybackModesUpdated;
@@ -29,6 +30,7 @@ use App\Integrations\Contracts\ShuffleInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\SourcesInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
+use App\Models\Client;
 use App\Models\Device;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
@@ -233,8 +235,11 @@ class DeviceController extends Controller
     }
 
     /** The stations playRadio() accepts for this device, in /radio's order (by name). */
-    public function radioStations(Device $device): JsonResponse
+    public function radioStations(Request $request, Device $device): JsonResponse
     {
+        $request->validate(['client' => ['nullable', 'string', 'max:100']]);
+        $client = $request->filled('client') ? Client::where('api_token', $request->query('client'))->firstOrFail() : null;
+
         if ($error = $this->assertReachable($device)) {
             return $error;
         }
@@ -243,6 +248,10 @@ class DeviceController extends Controller
 
         if (!($driver instanceof RadioControlInterface)) {
             return $this->unsupported('radio_control');
+        }
+
+        if (in_array('radio', LibrarySources::hiddenFor($client), true)) {
+            return response()->json(['stations' => []]);
         }
 
         $stations = RadioStation::query()

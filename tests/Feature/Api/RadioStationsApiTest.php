@@ -6,6 +6,7 @@ use App\Domain\Artwork\ArtworkCache;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
 use App\Jobs\ProcessArtwork;
+use App\Models\Client;
 use App\Models\Device;
 use App\Models\RadioStation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -59,6 +60,20 @@ class RadioStationsApiTest extends TestCase
             ->assertJsonPath('stations.0.name', 'Alpha Radio')
             ->assertJsonPath('stations.0.genre', null)
             ->assertJsonPath('stations.1.id', $zulu->id);
+    }
+
+    public function test_a_client_hiding_radio_gets_no_stations(): void
+    {
+        $device = $this->makeDevice();
+        $this->station('Alpha Radio');
+        $client = Client::create([
+            'type' => 'multi', 'status' => 'approved', 'hidden_sources' => ['radio'],
+            'registration_token' => Client::generateToken(), 'api_token' => Client::generateToken(),
+        ]);
+
+        $this->getJson("/api/devices/{$device->id}/radio?client={$client->api_token}")
+            ->assertOk()->assertExactJson(['stations' => []]);
+        $this->getJson("/api/devices/{$device->id}/radio")->assertJsonCount(1, 'stations');
     }
 
     public function test_a_station_without_an_image_gets_the_radio_logo(): void

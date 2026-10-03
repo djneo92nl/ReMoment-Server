@@ -6,7 +6,9 @@ use App\Domain\Artwork\LibraryArtwork;
 use App\Domain\Artwork\LibraryItemArtwork;
 use App\Domain\Artwork\PlaylistArtwork;
 use App\Domain\Library\LibraryPlayback;
+use App\Domain\Library\LibrarySources;
 use App\Http\Controllers\Controller;
+use App\Models\Client;
 use App\Models\Device;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
@@ -43,18 +45,19 @@ class LibraryController extends Controller
             'cursor' => ['nullable', 'string', 'max:200'],
             'letter' => ['nullable', 'string', 'regex:/^[A-Za-z#]$/'],
         ]);
+        $hidden = $this->hiddenSources($request);
         $offset = $this->decodeCursor($request->query('cursor'));
 
         // Jump to a letter (the clients' A-Z bar): start at the first artist sorting at or after
         // it; "#" is the start (digits and symbols sort before letters). Paging continues from there.
         $letter = $request->query('letter');
         if ($letter !== null && $letter !== '#' && $request->query('cursor') === null) {
-            $offset = Artist::query()->whereHas('albums')
+            $offset = LibrarySources::artists(Artist::query()->whereHas('albums'), $hidden)
                 ->whereRaw(self::ARTIST_SORT_NAME.' < ?', [strtolower($letter)])
                 ->count();
         }
 
-        $artists = $this->artistItems(Artist::query()->whereHas('albums'))
+        $artists = $this->artistItems(LibrarySources::artists(Artist::query()->whereHas('albums'), $hidden), $hidden)
             ->orderByRaw(self::ARTIST_SORT_NAME)
             ->orderBy('artists.id')
             ->offset($offset)
@@ -69,9 +72,10 @@ class LibraryController extends Controller
         ]);
     }
 
-    public function artist(Artist $artist): JsonResponse
+    public function artist(Request $request, Artist $artist): JsonResponse
     {
-        $albums = $artist->albums()->with('artist')->get()
+        $hidden = $this->hiddenSources($request);
+        $albums = LibrarySources::albums($artist->albums()->with('artist'), $hidden)->get()
             ->sortBy([
                 fn (Album $a, Album $b) => ($b->released_at?->year ?? PHP_INT_MIN) <=> ($a->released_at?->year ?? PHP_INT_MIN),
                 fn (Album $a, Album $b) => strcasecmp($a->name, $b->name),
@@ -91,9 +95,10 @@ class LibraryController extends Controller
     {
         $request->validate(['device_id' => ['nullable', 'integer', 'exists:devices,id']]);
         $device = $request->filled('device_id') ? Device::find($request->integer('device_id')) : null;
+        $hidden = $this->hiddenSources($request);
 
         $album->load('artist');
-        $tracks = LibraryPlayback::albumTracks($album);
+        $tracks = LibraryPlayback::albumTracks($album, $hidden);
         // The playback keys plus what the track details read, so neither costs a query per track.
         $tracks->load(['genreRelation', 'metadata' => fn ($q) => $q->whereIn('key', array_unique([...LibraryPlayback::PLAYBACK_METADATA, ...Track::DISPLAY_METADATA]))]);
         $items = $tracks->map(fn (Track $track) => [
@@ -119,9 +124,13 @@ class LibraryController extends Controller
     }
 
     /** Genres with artists or albums, most artists first. */
-    public function genres(): JsonResponse
+    public function genres(Request $request): JsonResponse
     {
-        $genres = Genre::query()->withCount(['artists', 'albums'])->get()
+        $hidden = $this->hiddenSources($request);
+        $genres = Genre::query()->withCount([
+            'artists' => fn ($q) => LibrarySources::artists($q, $hidden),
+            'albums' => fn ($q) => LibrarySources::albums($q, $hidden),
+        ])->get()
             ->filter(fn (Genre $genre) => $genre->artists_count > 0 || $genre->albums_count > 0)
             ->sortBy([['artists_count', 'desc'], ['albums_count', 'desc'], ['name', 'asc']])
             ->values();
@@ -135,15 +144,16 @@ class LibraryController extends Controller
     }
 
     /** A genre's artists (alphabetical, "The " ignored) and albums (newest first), up to GENRE_ITEMS of each. */
-    public function genre(Genre $genre): JsonResponse
+    public function genre(Request $request, Genre $genre): JsonResponse
     {
-        $artists = $this->artistItems($genre->artists()->getQuery())
+        $hidden = $this->hiddenSources($request);
+        $artists = $this->artistItems(LibrarySources::artists($genre->artists()->getQuery(), $hidden), $hidden)
             ->whereHas('albums')
             ->orderByRaw(self::ARTIST_SORT_NAME)
             ->limit(self::GENRE_ITEMS)
             ->get();
 
-        $albums = $genre->albums()->with('artist')
+        $albums = LibrarySources::albums($genre->albums()->with('artist'), $hidden)
             ->orderByRaw('albums.released_at IS NULL')->orderByDesc('albums.released_at')->orderBy('albums.name')
             ->limit(self::GENRE_ITEMS)
             ->get();
@@ -161,10 +171,11 @@ class LibraryController extends Controller
     {
         $request->validate(['cursor' => ['nullable', 'string', 'max:200']]);
         $offset = $this->decodeCursor($request->query('cursor'));
+        $hidden = $this->hiddenSources($request);
 
-        $playlists = Playlist::query()
+        $playlists = LibrarySources::playlists(Playlist::query(), $hidden)
             ->withTracksByRecency()
-            ->withCount('tracks')
+            ->withCount(['tracks' => fn ($q) => LibrarySources::tracks($q, $hidden)])
             ->with(['metadata' => fn ($q) => $q->where('key', 'spotify_owner')])
             ->offset($offset)
             ->limit(self::PLAYLISTS_PAGE_SIZE + 1)
@@ -193,8 +204,10 @@ class LibraryController extends Controller
         $request->validate(['device_id' => ['nullable', 'integer', 'exists:devices,id']]);
         $device = $request->filled('device_id') ? Device::find($request->integer('device_id')) : null;
 
+        $hidden = $this->hiddenSources($request);
+
         $playlist->load(['metadata' => fn ($q) => $q->where('key', 'spotify_owner')]);
-        $items = LibraryPlayback::playlistTracks($playlist, self::PLAYLIST_TRACKS)->map(fn (Track $track) => [
+        $items = LibraryPlayback::playlistTracks($playlist, self::PLAYLIST_TRACKS, $hidden)->map(fn (Track $track) => [
             'id' => $track->id,
             'name' => $track->name,
             'artist_name' => $track->artist?->name,
@@ -223,7 +236,7 @@ class LibraryController extends Controller
     {
         $request->validate(['limit' => ['nullable', 'integer', 'min:1', 'max:100']]);
 
-        $albums = Album::query()
+        $albums = LibrarySources::albums(Album::query(), $this->hiddenSources($request))
             ->joinSub(LibraryArtwork::lastPlayedPerAlbum(), 'recent', 'recent.album_id', '=', 'albums.id')
             ->with('artist')
             ->select('albums.*')
@@ -236,12 +249,14 @@ class LibraryController extends Controller
     }
 
     /** Favorite albums and artists, most recently favorited first. */
-    public function favorites(): JsonResponse
+    public function favorites(Request $request): JsonResponse
     {
-        $albums = Album::query()->whereNotNull('favorited_at')->with('artist')
+        $hidden = $this->hiddenSources($request);
+
+        $albums = LibrarySources::albums(Album::query()->whereNotNull('favorited_at')->with('artist'), $hidden)
             ->orderByDesc('favorited_at')->orderByDesc('id')->get();
 
-        $artists = $this->artistItems(Artist::query()->whereNotNull('favorited_at'))
+        $artists = $this->artistItems(LibrarySources::artists(Artist::query()->whereNotNull('favorited_at'), $hidden), $hidden)
             ->orderByDesc('favorited_at')->orderByDesc('artists.id')->get();
 
         return response()->json([
@@ -272,11 +287,25 @@ class LibraryController extends Controller
     }
 
     /** Eager loads what artistItem() reads: album count, and albums for the cover. */
-    private function artistItems(Builder $query): Builder
+    private function artistItems(Builder $query, array $hidden = []): Builder
     {
         return $query
-            ->withCount('albums')
-            ->with(['albums' => fn ($q) => $q->withCount('plays')->orderByDesc('plays_count')->orderByDesc('created_at')]);
+            ->withCount(['albums' => fn ($q) => LibrarySources::albums($q, $hidden)])
+            ->with(['albums' => fn ($q) => LibrarySources::albums($q, $hidden)->withCount('plays')->orderByDesc('plays_count')->orderByDesc('created_at')]);
+    }
+
+    /**
+     * The sources the requesting client hides (`?client={api_token}`, see
+     * docs/api/library.md); none without the parameter. Radio is not part
+     * of the library, so it has no effect here.
+     */
+    private function hiddenSources(Request $request): array
+    {
+        $request->validate(['client' => ['nullable', 'string', 'max:100']]);
+
+        return $request->filled('client')
+            ? LibrarySources::hiddenFor(Client::where('api_token', $request->query('client'))->firstOrFail())
+            : [];
     }
 
     private function artistItem(Artist $artist): array

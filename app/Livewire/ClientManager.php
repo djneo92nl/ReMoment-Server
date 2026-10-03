@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Domain\Library\LibrarySources;
 use App\Models\Client;
 use App\Models\Device;
 use Livewire\Component;
@@ -22,6 +23,9 @@ class ClientManager extends Component
 
     /** @var array<int> */
     public array $editDeviceIds = [];
+
+    /** @var array<string> Sources this client doesn't see in the library (LibrarySources::ALL keys). */
+    public array $editHiddenSources = [];
 
     public function startApprove(int $clientId): void
     {
@@ -62,6 +66,7 @@ class ClientManager extends Component
         $this->editName = $client->name ?? '';
         $this->editType = $client->type;
         $this->editDeviceIds = $client->devices->pluck('id')->map(fn ($id) => (int) $id)->toArray();
+        $this->editHiddenSources = LibrarySources::hiddenFor($client);
     }
 
     public function saveEdit(): void
@@ -70,6 +75,8 @@ class ClientManager extends Component
             'editType' => ['required', 'in:single,multi'],
             'editDeviceIds' => ['array'],
             'editDeviceIds.*' => ['integer', 'exists:devices,id'],
+            'editHiddenSources' => ['array'],
+            'editHiddenSources.*' => ['string', 'in:'.implode(',', array_keys(LibrarySources::ALL))],
         ]);
 
         $client = Client::findOrFail($this->editing);
@@ -82,6 +89,7 @@ class ClientManager extends Component
         $client->update([
             'name' => trim($this->editName) ?: null,
             'type' => $this->editType,
+            'hidden_sources' => LibrarySources::normalize($this->editHiddenSources) ?: null,
         ]);
         $client->devices()->sync($deviceIds);
 
@@ -116,6 +124,7 @@ class ClientManager extends Component
                 ->orderBy('created_at', 'desc')
                 ->get(),
             'allDevices' => Device::orderBy('device_name')->get(),
+            'librarySources' => LibrarySources::ALL,
         ]);
     }
 }

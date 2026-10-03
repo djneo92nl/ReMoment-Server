@@ -94,6 +94,18 @@ The mosaic is used **even when the playlist has its own image**, so all playlist
 
 `{ "data": [ AlbumItem, … ] }` — the most recently played distinct albums, newest first (`LibraryArtwork::lastPlayedPerAlbum()`, the same recency as the pre-cache list). `limit` 1–100, default 30.
 
+## Hiding sources per client
+
+An admin can hide sources from a client at `/settings/clients` (edit → *Hide from library*): `spotify`, `dlna` and `radio` (`App\Domain\Library\LibrarySources::ALL`; a future source is added there). The setting is `clients.hidden_sources` (JSON array).
+
+A client applies it by adding its API token as `?client={api_token}` to the browse endpoints (`/api/library/artists`, `artists/{id}`, `albums/{id}`, `genres`, `genres/{slug}`, `playlists`, `playlists/{id}`, `recent`, `favorites`) and to `GET /api/devices/{id}/radio`. Without the parameter nothing is hidden; an unknown token is `404`. `GET /api/clients/{api_token}/artwork` applies it from its path.
+
+- A track is available from its own `source` and from the sources of its `dlna_url` (`dlna:{server}`) and `external_id` metadata, so a track merged from DLNA and Spotify. It is hidden only when **all** of those are hidden.
+- Albums, artists and playlists with no visible track are left out; counts (`album_count`, `track_count`, genre counts) and album/playlist `tracks` only count visible tracks.
+- `radio` empties the `/radio` station list (`{ "stations": [] }`).
+- Playing is not blocked: the filter is for browsing, so playing a hidden id still works.
+- The playlist cover list in the artwork pre-cache is not filtered.
+
 ## Favorites
 
 Household-wide (there are no user accounts): `albums.favorited_at` / `artists.favorited_at`, `null` when not a favorite.

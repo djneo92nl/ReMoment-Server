@@ -245,6 +245,24 @@
                                     @endif
                                 </div>
 
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-500 mb-2">
+                                        Hide from library
+                                        <span class="font-normal text-gray-400 dark:text-gray-600">(sources this client doesn't see; requests carry <code>?client=</code> with its API token)</span>
+                                    </label>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                        @foreach($librarySources as $key => $label)
+                                            <label class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border cursor-pointer transition-colors
+                                                {{ in_array($key, $editHiddenSources) ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50/50 dark:bg-indigo-900/10' : 'border-gray-200 dark:border-stone-700 hover:border-gray-300 dark:hover:border-stone-600' }}">
+                                                <input type="checkbox" wire:model.live="editHiddenSources"
+                                                       value="{{ $key }}"
+                                                       class="rounded border-gray-300 dark:border-stone-600 text-indigo-600 focus:ring-indigo-500" />
+                                                <span class="text-sm text-gray-700 dark:text-gray-300">{{ $label }}</span>
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                </div>
+
                                 <div class="flex items-center gap-3 pt-1">
                                     <button wire:click="saveEdit"
                                             class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-xl transition-colors">

@@ -101,9 +101,9 @@ class LibraryPlayback
     }
 
     /** Tracks in best-effort album order (no track number column exists). */
-    public static function albumTracks(Album $album): Collection
+    public static function albumTracks(Album $album, array $hiddenSources = []): Collection
     {
-        return $album->tracks()
+        return LibrarySources::tracks($album->tracks(), $hiddenSources)
             ->orderBy('id')
             ->with(['metadata' => fn ($q) => $q->whereIn('key', self::PLAYBACK_METADATA)])
             ->get();
@@ -146,9 +146,9 @@ class LibraryPlayback
     }
 
     /** Tracks in playlist order, with what playback reads; $limit for a listing. */
-    public static function playlistTracks(Playlist $playlist, ?int $limit = null): Collection
+    public static function playlistTracks(Playlist $playlist, ?int $limit = null, array $hiddenSources = []): Collection
     {
-        return $playlist->tracks()
+        return LibrarySources::tracks($playlist->tracks(), $hiddenSources)
             ->orderBy('playlist_track.id')
             ->with(['artist', 'metadata' => fn ($q) => $q->whereIn('key', self::PLAYBACK_METADATA)])
             ->when($limit !== null, fn ($q) => $q->limit($limit))

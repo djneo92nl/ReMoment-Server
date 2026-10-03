@@ -8,6 +8,7 @@ use App\Domain\Artwork\NowPlayingArtwork;
 use App\Domain\Artwork\PlaylistArtwork;
 use App\Domain\Artwork\SourceLogo;
 use App\Domain\Device\SpotifyRouting;
+use App\Domain\Library\LibrarySources;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\DeviceListResource;
 use App\Models\Client;
@@ -119,14 +120,14 @@ class ClientController extends Controller
      */
     public function artwork(Request $request, string $apiToken): JsonResponse
     {
-        Client::where('api_token', $apiToken)->firstOrFail();
+        $client = Client::where('api_token', $apiToken)->firstOrFail();
 
         $validated = $request->validate([
             'cursor' => ['nullable', 'integer', 'min:0'],
         ]);
         $offset = (int) ($validated['cursor'] ?? 0);
 
-        $albums = LibraryArtwork::albumsByRecency()
+        $albums = LibrarySources::albums(LibraryArtwork::albumsByRecency(), LibrarySources::hiddenFor($client))
             ->offset($offset)
             ->limit(self::ARTWORK_PAGE_SIZE)
             ->get();

@@ -9,7 +9,7 @@ use Illuminate\Support\Str;
 class Client extends Model
 {
     protected $fillable = [
-        'name', 'type', 'status', 'hardware_id',
+        'name', 'type', 'hidden_sources', 'status', 'hardware_id',
         'registration_token', 'pairing_code', 'api_token',
         'ip_address', 'firmware_version', 'build_number',
         'battery_percent', 'battery_charging',
@@ -18,6 +18,7 @@ class Client extends Model
 
     protected $casts = [
         'metadata' => 'array',
+        'hidden_sources' => 'array',
         'battery_percent' => 'integer',
         'battery_charging' => 'boolean',
         'last_seen_at' => 'datetime',
