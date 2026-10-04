@@ -5,11 +5,14 @@ namespace App\Http\Controllers;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\NotPlayableException;
 use App\Domain\Library\PlaybackFailedException;
+use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
 use App\Models\Device;
 use App\Models\Media\Album;
 use App\Models\Media\Track;
 use App\Models\Play;
+use App\Services\SpotifyTokenService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class AlbumController extends Controller
 {
@@ -54,6 +57,7 @@ class AlbumController extends Controller
             ->get();
 
         $playableDevices = Device::libraryCapable();
+        $spotifyConnected = app(SpotifyTokenService::class)->isConnected();
 
         return view('albums.show', compact(
             'album',
@@ -61,6 +65,7 @@ class AlbumController extends Controller
             'totalSeconds',
             'recentPlays',
             'playableDevices',
+            'spotifyConnected',
         ));
     }
 
@@ -79,6 +84,32 @@ class AlbumController extends Controller
             : "Playing \"{$album->name}\" on {$device->device_name}.";
 
         return back()->with('success', $message);
+    }
+
+    /** Adds the album's missing tracks from Spotify, whatever source the album came from. */
+    public function fill(Album $album, SpotifyTokenService $spotify, SpotifyLibraryImporter $importer)
+    {
+        if (!$spotify->isConnected()) {
+            return back()->with('error', 'Connect Spotify first.');
+        }
+
+        try {
+            $spotifyAlbumId = $importer->findAlbumId($album);
+
+            if ($spotifyAlbumId === null) {
+                return back()->with('error', "Could not find \"{$album->name}\" on Spotify.");
+            }
+
+            $before = $album->tracks()->count();
+            $importer->importAlbum($spotifyAlbumId, $album);
+            $added = $album->tracks()->count() - $before;
+        } catch (\Throwable $e) {
+            return back()->with('error', "Could not fill \"{$album->name}\" from Spotify: {$e->getMessage()}");
+        }
+
+        return back()->with('success', $added > 0
+            ? "Added {$added} ".Str::plural('track', $added)." to \"{$album->name}\" from Spotify."
+            : "\"{$album->name}\" is already complete.");
     }
 
     public function favorite(Request $request, Album $album)

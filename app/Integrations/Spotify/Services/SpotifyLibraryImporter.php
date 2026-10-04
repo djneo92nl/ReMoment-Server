@@ -5,7 +5,10 @@ namespace App\Integrations\Spotify\Services;
 use App\Domain\Artwork\ArtworkCache;
 use App\Domain\Library\Enrichment;
 use App\Domain\Library\LibraryIdentity;
+use App\Domain\Library\Normalizer;
 use App\Jobs\ProcessArtwork;
+use App\Models\Media\Album;
+use App\Models\Media\Artist;
 use App\Models\Media\Metadata;
 use App\Models\Media\Playlist;
 use App\Models\Media\Track;
@@ -52,7 +55,7 @@ class SpotifyLibraryImporter
      * Imports every track of a Spotify album (the album of a track that was just played), so the
      * library holds the full album instead of the one song. Returns the number of tracks imported.
      */
-    public function importAlbum(string $spotifyAlbumId): int
+    public function importAlbum(string $spotifyAlbumId, ?Album $into = null): int
     {
         $api = $this->tokenService->makeApiClient();
 
@@ -67,7 +70,7 @@ class SpotifyLibraryImporter
             }
 
             // Album tracks come without their album.
-            $track = $this->importTrackItem($item + ['album' => $albumInfo]);
+            $track = $this->importTrackItem($item + ['album' => $albumInfo], $into);
             $album ??= $track->album;
             $count++;
         }
@@ -80,6 +83,75 @@ class SpotifyLibraryImporter
         }
 
         return $count;
+    }
+
+    /** The Spotify id of a library album: stored URI, a Spotify track of it, else a search by name. */
+    public function findAlbumId(Album $album): ?string
+    {
+        $stored = $album->metadata()->where('key', 'spotify_album_uri')->value('value');
+        if (is_string($stored) && str_starts_with($stored, 'spotify:album:')) {
+            return substr($stored, strlen('spotify:album:'));
+        }
+
+        $api = $this->tokenService->makeApiClient();
+
+        $uri = $album->tracks()->where('source', 'spotify')->where('external_id', 'like', 'spotify:track:%')->value('external_id');
+        if ($uri) {
+            $id = $api->getTrack(substr($uri, strlen('spotify:track:')))['album']['id'] ?? null;
+            if ($id) {
+                return $id;
+            }
+        }
+
+        $artist = $album->artist;
+        $results = $api->search('album:'.$album->name.' artist:'.$artist->name, 'album', ['limit' => 10]);
+
+        foreach ($results['albums']['items'] ?? [] as $candidate) {
+            $sameAlbum = Normalizer::album($candidate['name'] ?? null) === Normalizer::album($album->name);
+            $sameArtist = collect($candidate['artists'] ?? [])->contains(fn ($a) => Normalizer::artist($a['name'] ?? null) === Normalizer::artist($artist->name));
+
+            if ($sameAlbum && $sameArtist) {
+                return $candidate['id'];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Spotify ids of an artist's albums and singles (not compilations or appearances), newest first.
+     *
+     * @return list<string>
+     */
+    public function artistAlbumIds(Artist $artist): array
+    {
+        $api = $this->tokenService->makeApiClient();
+
+        $spotifyId = $artist->metadata()->where('key', 'spotify_id')->value('value');
+
+        if (!$spotifyId) {
+            $results = $api->search('artist:'.$artist->name, 'artist', ['limit' => 10]);
+
+            foreach ($results['artists']['items'] ?? [] as $candidate) {
+                if (Normalizer::artist($candidate['name'] ?? null) === Normalizer::artist($artist->name)) {
+                    $spotifyId = $candidate['id'];
+                    break;
+                }
+            }
+        }
+
+        if (!$spotifyId) {
+            return [];
+        }
+
+        $ids = [];
+        foreach ($this->paginate(fn ($offset, $limit) => $api->getArtistAlbums($spotifyId, ['include_groups' => 'album,single', 'limit' => $limit, 'offset' => $offset])) as $item) {
+            if (!empty($item['id'])) {
+                $ids[] = $item['id'];
+            }
+        }
+
+        return array_values(array_unique($ids));
     }
 
     private function importPlaylistItem(array $spotifyPlaylist, \SpotifyWebAPI\SpotifyWebAPI $api): void
@@ -121,16 +193,17 @@ class SpotifyLibraryImporter
         $playlist->tracks()->sync($trackIds);
     }
 
-    private function importTrackItem(array $spotifyTrack): Track
+    /** @param  Album|null  $into  put the track on this album (and artist) instead of looking them up by name */
+    private function importTrackItem(array $spotifyTrack, ?Album $into = null): Track
     {
         $artistName = $spotifyTrack['artists'][0]['name'] ?? 'Unknown Artist';
         $albumName = $spotifyTrack['album']['name'] ?? 'Unknown Album';
         $images = $spotifyTrack['album']['images'] ?? [];
 
         // One record per artist/album/track whatever the source (LibraryIdentity).
-        $artist = LibraryIdentity::artist($artistName, 'spotify');
+        $artist = $into?->artist ?? LibraryIdentity::artist($artistName, 'spotify');
 
-        $album = LibraryIdentity::album($artist, $albumName, 'spotify', [
+        $album = $into ?? LibraryIdentity::album($artist, $albumName, 'spotify', [
             'images' => $images,
             'released_at' => $spotifyTrack['album']['release_date'] ?? null,
         ]);

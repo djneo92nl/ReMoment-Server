@@ -5,10 +5,14 @@ namespace App\Http\Controllers;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\NotPlayableException;
 use App\Domain\Library\PlaybackFailedException;
+use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
+use App\Jobs\ImportSpotifyAlbumById;
 use App\Models\Device;
 use App\Models\Media\Artist;
 use App\Models\Play;
+use App\Services\SpotifyTokenService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class ArtistController extends Controller
 {
@@ -26,9 +30,10 @@ class ArtistController extends Controller
 
     public function show(Artist $artist)
     {
-        $artist->load(['albums.tracks', 'tracks.album']);
+        $artist->load(['albums.tracks.metadata' => fn ($q) => $q->where('key', 'dlna_url'), 'tracks.album']);
 
         $playableDevices = Device::libraryCapable();
+        $spotifyConnected = app(SpotifyTokenService::class)->isConnected();
 
         $totalPlays = $artist->plays()->count();
 
@@ -57,6 +62,7 @@ class ArtistController extends Controller
             'topTracks',
             'recentPlays',
             'playableDevices',
+            'spotifyConnected',
         ));
     }
 
@@ -75,6 +81,30 @@ class ArtistController extends Controller
             : "Playing \"{$artist->name}\" on {$device->device_name}.";
 
         return back()->with('success', $message);
+    }
+
+    /** Queues an import of all the artist's Spotify albums and singles, whatever source the artist came from. */
+    public function fill(Artist $artist, SpotifyTokenService $spotify, SpotifyLibraryImporter $importer)
+    {
+        if (!$spotify->isConnected()) {
+            return back()->with('error', 'Connect Spotify first.');
+        }
+
+        try {
+            $ids = $importer->artistAlbumIds($artist);
+        } catch (\Throwable $e) {
+            return back()->with('error', "Could not look up \"{$artist->name}\" on Spotify: {$e->getMessage()}");
+        }
+
+        if ($ids === []) {
+            return back()->with('error', "Could not find \"{$artist->name}\" on Spotify.");
+        }
+
+        foreach ($ids as $id) {
+            ImportSpotifyAlbumById::dispatch($id);
+        }
+
+        return back()->with('success', 'Importing '.count($ids).' '.Str::plural('album', count($ids))." by \"{$artist->name}\" from Spotify; they appear here as the queue works through them.");
     }
 
     public function favorite(Artist $artist)

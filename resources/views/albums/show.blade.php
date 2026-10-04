@@ -110,6 +110,16 @@
                                 @endforeach
                             </div>
                         @endif
+                        @if($spotifyConnected)
+                            <form method="POST" action="{{ route('albums.fill', $album) }}" class="mt-4" x-data="{ busy: false }" @submit="busy = true">
+                                @csrf
+                                <button type="submit" :disabled="busy"
+                                        class="flex items-center gap-2 px-4 py-2 rounded-2xl bg-gray-100 dark:bg-stone-800 hover:bg-gray-200 dark:hover:bg-stone-700 text-gray-700 dark:text-gray-300 text-sm font-medium transition-colors disabled:opacity-60">
+                                    <i class="fa-brands fa-spotify text-emerald-500" :class="busy && 'animate-pulse'"></i>
+                                    <span x-text="busy ? 'Adding tracks…' : 'Fill out album from Spotify'"></span>
+                                </button>
+                            </form>
+                        @endif
                         @if($playableDevices->isNotEmpty() && $album->tracks->isNotEmpty())
                             <div class="flex items-center gap-2 mt-4">
                                 <button type="button"
@@ -145,6 +155,21 @@
 
                 {{-- Tracklist --}}
                 @if($album->tracks->isNotEmpty())
+                    @php
+                        $localCount = $album->tracks->filter(fn ($t) => $t->getDlnaUrl())->count();
+                        $addedCount = $album->tracks->count() - $localCount;
+                    @endphp
+                    <div x-data="{ localOnly: false }">
+                    @if($localCount > 0 && $addedCount > 0)
+                        <div class="flex items-center justify-between gap-3 px-6 py-2.5 border-t border-gray-100 dark:border-stone-800 text-xs text-gray-500 dark:text-gray-500">
+                            <span>{{ $addedCount }} {{ Str::plural('track', $addedCount) }} added from Spotify</span>
+                            <button type="button" @click="localOnly = !localOnly"
+                                    class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-100 dark:bg-stone-800 hover:bg-gray-200 dark:hover:bg-stone-700 text-gray-600 dark:text-gray-400 transition-colors">
+                                <i class="fa-solid" :class="localOnly ? 'fa-eye' : 'fa-eye-slash'"></i>
+                                <span x-text="localOnly ? 'Show all tracks' : 'Only my library'"></span>
+                            </button>
+                        </div>
+                    @endif
                     <div class="border-t border-gray-100 dark:border-stone-800 divide-y divide-gray-50 dark:divide-stone-800/50">
                         @foreach($album->tracks as $i => $track)
                             @php
@@ -159,7 +184,7 @@
                                 $recordingMbid = $track->metaValue('mbid');
                                 $hasInfo = $quality || $credits || $trackGenres || $isrc || $popularity !== null || $listeners;
                             @endphp
-                            <div x-data="{ panel: null }">
+                            <div x-data="{ panel: null }" @if($localCount > 0 && !$dlnaUrl) x-show="!localOnly" @endif>
                                 <div class="flex items-center gap-4 px-6 py-3 hover:bg-gray-50 dark:hover:bg-stone-800/30 transition-colors group">
                                     <span class="w-5 text-center text-xs text-gray-300 dark:text-stone-600 flex-shrink-0">{{ $track->metaValue('track_number') ?? $i + 1 }}</span>
                                     <div class="flex-1 min-w-0">
@@ -251,6 +276,7 @@
                                 @endif
                             </div>
                         @endforeach
+                    </div>
                     </div>
                 @endif
             </div>
