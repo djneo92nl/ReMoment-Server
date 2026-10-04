@@ -262,6 +262,16 @@ class DeviceController extends Controller
         return response()->json($response);
     }
 
+    public function favoriteRadio(Request $request, RadioStation $station): JsonResponse
+    {
+        $request->validate(['favorite' => ['required', 'boolean']]);
+        $favorite = $request->boolean('favorite');
+
+        $station->update(['favorited_at' => $favorite ? ($station->favorited_at ?? now()) : null]);
+
+        return response()->json(['favorite' => $favorite]);
+    }
+
     /** The stations playRadio() accepts for this device, in /radio's order (by name). */
     public function radioStations(Request $request, Device $device): JsonResponse
     {
@@ -292,6 +302,7 @@ class DeviceController extends Controller
                 'name' => $station->name,
                 // RadioStation has no genre yet; kept in the shape for clients.
                 'genre' => null,
+                'favorite' => $station->favorited_at !== null,
                 'artwork' => RadioStationArtwork::resolve($station),
             ])
             ->values();

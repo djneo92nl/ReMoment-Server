@@ -10,6 +10,11 @@ class RadioStation extends Model
     protected $fillable = [
         'name',
         'image_url',
+        'favorited_at',
+    ];
+
+    protected $casts = [
+        'favorited_at' => 'datetime',
     ];
 
     public function plays(): HasMany

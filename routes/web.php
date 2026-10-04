@@ -31,6 +31,7 @@ Route::get('/multiroom', fn () => view('multiroom.index'))->name('multiroom.inde
 Route::get('/receiver', fn () => view('receiver'))->name('receiver');
 Route::get('/artists', [ArtistController::class, 'index'])->name('artists.index');
 Route::resource('radio', RadioStationController::class);
+Route::post('/radio/{radio}/favorite', [RadioStationController::class, 'favorite'])->name('radio.favorite');
 Route::post('/radio/{radio}/play/{device}', [RadioStationController::class, 'play'])->name('radio.play');
 Route::get('/artists/{artist}', [ArtistController::class, 'show'])->name('artists.show');
 Route::post('/artists/{artist}/play/{device}', [ArtistController::class, 'play'])->name('artists.play');

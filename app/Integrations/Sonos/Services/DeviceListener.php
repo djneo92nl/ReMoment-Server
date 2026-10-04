@@ -9,6 +9,7 @@ use App\Domain\Media\AlbumData;
 use App\Domain\Media\ArtistData;
 use App\Domain\Media\NowPlaying;
 use App\Domain\Media\Radio;
+use App\Domain\Media\Source;
 use App\Domain\Media\TrackData;
 use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
@@ -16,10 +17,12 @@ use App\Events\Device\PlaybackModesUpdated;
 use App\Events\Device\ProgressUpdated;
 use App\Events\Device\VolumeUpdated;
 use App\Integrations\Sonos\PlayMode;
+use App\Integrations\Sonos\SonosInputs;
 use duncan3dc\Sonos\Controller;
-use duncan3dc\Sonos\Interfaces\Devices\DeviceInterface;
+use duncan3dc\Sonos\Devices\Collection;
 use duncan3dc\Sonos\Interfaces\NetworkInterface;
 use duncan3dc\Sonos\Interfaces\PlayState;
+use duncan3dc\Sonos\Network;
 use duncan3dc\Sonos\State as SonosState;
 
 class DeviceListener
@@ -30,9 +33,13 @@ class DeviceListener
 
     protected int $pollIntervalSeconds = 1;
 
-    public function __construct(protected DeviceInterface $device, ?NetworkInterface $network = null)
+    /**
+     * Talks to the one speaker at $ip (unicast): no multicast discovery, so it also works
+     * where multicast does not reach, e.g. inside a Docker bridge network.
+     */
+    public function __construct(protected string $ip, ?NetworkInterface $network = null)
     {
-        $this->network = $network ?? new \duncan3dc\Sonos\Network;
+        $this->network = $network ?? new Network((new Collection)->addIp($ip));
     }
 
     public function listen(string $deviceId)
@@ -78,6 +85,9 @@ class DeviceListener
                         $lastNowPlayingKey = null;
                         $lastPositionSeconds = null;
                     }
+
+                    // Reachable but idle: leave the initial "unreachable" state (no-op when unchanged).
+                    DeviceCache::updateState($deviceId, State::Standby);
                 } else {
                     $nowPlaying = $this->buildNowPlaying($details);
                     if ($nowPlaying !== null) {
@@ -102,6 +112,10 @@ class DeviceListener
                         event(new ProgressUpdated(deviceId: $deviceId, progress: $positionSeconds));
                         $lastPositionSeconds = $positionSeconds;
                     }
+
+                    if ($state === PlayState::Paused) {
+                        DeviceCache::updateState($deviceId, State::Paused);
+                    }
                 }
 
                 $retryDelaySeconds = 1;
@@ -121,7 +135,7 @@ class DeviceListener
     protected function getController(): Controller
     {
         if ($this->controller === null) {
-            $this->controller = $this->network->getControllerByIp($this->device->ip);
+            $this->controller = $this->network->getControllerByIp($this->ip);
         }
 
         return $this->controller;
@@ -153,7 +167,7 @@ class DeviceListener
         $images = $albumArt !== '' ? [$albumArt] : [];
 
         if ($title === '' && $streamName === '') {
-            return null;
+            return $this->buildInputNowPlaying($details);
         }
 
         $durationSeconds = $details->getDuration()->asInt() ?: null;
@@ -193,6 +207,24 @@ class DeviceListener
         }
 
         return $nowPlaying;
+    }
+
+    /** A soundbar on its TV input or a speaker on line-in plays no track: report the input as the source. */
+    protected function buildInputNowPlaying(SonosState $details): ?NowPlaying
+    {
+        $input = SonosInputs::idForUri($details->getUri());
+        if ($input === null) {
+            return null;
+        }
+
+        $source = SonosInputs::source($input, true);
+
+        return new NowPlaying(
+            state: 'playing',
+            type: 'music',
+            platform: 'media',
+            source: new Source(name: $source->friendlyName, category: $source->category, sourceType: $source->sourceType),
+        );
     }
 
     protected function nowPlayingKey(NowPlaying $nowPlaying): string

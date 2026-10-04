@@ -23,10 +23,14 @@ Uses `MozartDiscoveryService` (mDNS) to find newer B&O devices on the Mozart pla
 ### Sonos
 
 ```bash
-php artisan device:sonos-discovery
+php artisan device:sonos-discovery [--host=192.168.1.9 ...]
 ```
 
-Uses `DeviceDiscoveryService` (backed by the `duncan3dc/sonos` library) to find Sonos devices on the network and persist them.
+`SonosDiscovery` does not depend on multicast alone. Seeds are the `--host` / "Known device IPs" input, the IPs of Sonos devices already stored, and an SSDP search (`ZonePlayer:1`). The first seed that answers on port 1400 lists the whole household through `ZoneGroupTopology` (`SonosTopology`), so one reachable speaker finds the rest. Stereo-pair secondaries, satellites and Boost bridges are skipped. Devices match on `sonos_uuid`, then on IP; an IP change is written back. Notes on what failed (e.g. "no multicast replies") come back from `diagnostics()` and are shown on the CLI and in the Scan page.
+
+## Docker and multicast
+
+SSDP and mDNS multicast do not cross a Docker bridge. `docker-compose.prod.yml` therefore runs `app` with `network_mode: host` (Linux: LXC, Raspberry Pi); Redis, Meilisearch and Mosquitto publish on loopback and the app reaches them on `127.0.0.1` (`REDIS_HOST`, `MQTT_HOST` in `ansible/templates/env.j2`). `APP_PORT` sets the `artisan serve` port. Local Sail on macOS cannot do this; use the "Known device IPs" field there. `App\Services\Discovery\SsdpClient` sends the M-SEARCH three times from every local IPv4 interface and is shared by the ASE and DLNA discoverers. Mozart mDNS still uses its own socket code.
 
 ## Starting Device Listeners
 
@@ -36,7 +40,9 @@ After devices are registered, start the listener processes that stream real-time
 php artisan device:listen
 ```
 
-Spawns one background process per device (mapped by driver class — currently ASE via `device-ase:listen-single {id}`), plus a Spotify listener (`device-spotify:listen`) if a Spotify account is connected. It monitors and automatically restarts any listener process that exits. This is the command used by `composer dev` / production process management; it runs until interrupted (Ctrl+C).
+Spawns one background process per device (mapped by driver class: ASE via `device-ase:listen-single {id}`, Mozart via `device-mozart:listen-single {id}`, Sonos via `device-sonos:listen-single {id}`), plus a Spotify listener (`device-spotify:listen`) if a Spotify account is connected. It monitors and automatically restarts any listener process that exits. This is the command used by `composer dev` / production process management; it runs until interrupted (Ctrl+C).
+
+The Sonos listener polls the speaker once a second by its stored IP (unicast, no discovery), reporting now-playing, progress, volume and shuffle/repeat; stopped maps to `standby`, paused to `paused`.
 
 To run a single ASE device's listener directly:
 

@@ -32,6 +32,7 @@ Route::get('/devices/{device}/sources', [DeviceController::class, 'sources']);
 Route::post('/devices/{device}/sources/activate', [DeviceController::class, 'activateSource']);
 
 Route::get('/devices/{device}/radio', [DeviceController::class, 'radioStations']);
+Route::put('/radio/{station}/favorite', [DeviceController::class, 'favoriteRadio']);
 Route::post('/devices/{device}/radio/{station}', [DeviceController::class, 'playRadio']);
 
 Route::get('/devices/{device}/multiroom', [DeviceController::class, 'multiroom']);

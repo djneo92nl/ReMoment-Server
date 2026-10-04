@@ -14,7 +14,7 @@ app_uid: 1000
 app_gid: 1000
 
 # MQTT settings
-mqtt_host: mosquitto
+mqtt_host: 127.0.0.1
 mqtt_port: 1883
 mqtt_client_id: remoment-server
 # Broker address client devices should use (see GET /api/info).

@@ -3,59 +3,19 @@
 namespace App\Services\Dlna;
 
 use App\Models\DlnaServer;
+use App\Services\Discovery\SsdpClient;
+use Illuminate\Support\Facades\Http;
 
 class DlnaServerDiscovery
 {
-    private string $multicastAddr = '239.255.255.250';
-
-    private int $multicastPort = 1900;
-
-    private int $timeout = 4;
+    public function __construct(private SsdpClient $ssdp) {}
 
     /** @return DlnaServer[] */
     public function discover(): array
     {
-        $socket = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
-        socket_set_option($socket, SOL_SOCKET, SO_REUSEADDR, 1);
-        socket_bind($socket, '0.0.0.0', 0);
-
-        $request = "M-SEARCH * HTTP/1.1\r\n".
-            "HOST: {$this->multicastAddr}:{$this->multicastPort}\r\n".
-            'MAN: "ssdp:discover"'."\r\n".
-            "MX: 3\r\n".
-            "ST: urn:schemas-upnp-org:device:MediaServer:1\r\n".
-            "USER-AGENT: PHP/SSDP-Discovery\r\n".
-            "\r\n";
-
-        socket_sendto($socket, $request, strlen($request), 0, $this->multicastAddr, $this->multicastPort);
-
-        $locations = [];
-        $start = time();
-        while (($remaining = $this->timeout - (time() - $start)) > 0) {
-            $read = [$socket];
-            $write = $except = [];
-            $changed = socket_select($read, $write, $except, $remaining);
-            if ($changed === false || $changed === 0) {
-                break;
-            }
-            $buf = '';
-            $from = '';
-            $port = 0;
-            socket_recvfrom($socket, $buf, 2048, 0, $from, $port);
-
-            foreach (explode("\r\n", $buf) as $line) {
-                if (stripos($line, 'location:') === 0) {
-                    $locations[] = trim(substr($line, 9));
-                    break;
-                }
-            }
-        }
-
-        socket_close($socket);
-
         $servers = [];
-        foreach (array_unique($locations) as $location) {
-            $server = $this->resolveServer($location);
+        foreach ($this->ssdp->search('urn:schemas-upnp-org:device:MediaServer:1') as $found) {
+            $server = $this->resolveServer($found['location']);
             if ($server !== null) {
                 $servers[] = $server;
             }
@@ -66,7 +26,11 @@ class DlnaServerDiscovery
 
     private function resolveServer(string $location): ?DlnaServer
     {
-        $xml = @file_get_contents($location);
+        try {
+            $xml = Http::timeout(3)->get($location)->body();
+        } catch (\Throwable) {
+            return null;
+        }
         if (!$xml) {
             return null;
         }

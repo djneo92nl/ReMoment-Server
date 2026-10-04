@@ -14,13 +14,14 @@ class DeviceDiscoveryService
     /**
      * Discover and persist Sonos devices.
      *
+     * @param  string[]  $hosts  IPs to probe directly (no multicast needed)
      * @return array<int, Device>
      */
-    public function discoverAndStore(): array
+    public function discoverAndStore(array $hosts = []): array
     {
         $devices = [];
 
-        foreach ($this->discovery->discover() as $found) {
+        foreach ($this->discovery->withHosts($hosts)->discover() as $found) {
             $uuid = $found->meta['sonos_uuid'] ?? null;
 
             $device = null;
@@ -58,5 +59,11 @@ class DeviceDiscoveryService
         }
 
         return $devices;
+    }
+
+    /** @return string[] */
+    public function diagnostics(): array
+    {
+        return $this->discovery->diagnostics();
     }
 }

@@ -62,6 +62,14 @@
                             </p>
                         </div>
                         <div class="flex items-center gap-1 flex-shrink-0">
+                            <form method="POST" action="{{ route('radio.favorite', $station) }}">
+                                @csrf
+                                <button type="submit"
+                                        title="{{ $station->favorited_at ? 'Remove from favorites' : 'Add to favorites' }}"
+                                        class="flex items-center justify-center w-8 h-8 rounded-lg transition-colors {{ $station->favorited_at ? 'text-rose-500 hover:text-rose-600' : 'text-gray-300 hover:text-rose-400 dark:text-stone-600' }}">
+                                    <i class="{{ $station->favorited_at ? 'fa-solid' : 'fa-regular' }} fa-heart text-sm"></i>
+                                </button>
+                            </form>
                             <a href="{{ route('radio.edit', $station) }}"
                                class="flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-stone-800 hover:text-gray-600 dark:hover:text-gray-400 transition-colors">
                                 <i class="fa-solid fa-pen text-xs"></i>

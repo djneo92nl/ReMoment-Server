@@ -12,7 +12,7 @@ class SonosDeviceDiscovery extends Command
      *
      * @var string
      */
-    protected $signature = 'device:sonos-discovery';
+    protected $signature = 'device:sonos-discovery {--host=* : Sonos IP to probe directly (repeatable), for networks where multicast does not reach this machine}';
 
     /**
      * The console command description.
@@ -28,12 +28,16 @@ class SonosDeviceDiscovery extends Command
 
     public function handle(): int
     {
-        $devices = $this->discovery->discoverAndStore();
+        $devices = $this->discovery->discoverAndStore($this->option('host'));
 
         $this->info('Found Sonos devices: '.count($devices));
 
         foreach ($devices as $device) {
             $this->line(" - {$device->device_name} ({$device->ip_address})");
+        }
+
+        foreach ($this->discovery->diagnostics() as $note) {
+            $this->warn($note);
         }
 
         return self::SUCCESS;

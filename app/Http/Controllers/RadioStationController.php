@@ -14,6 +14,8 @@ class RadioStationController extends Controller
         $stations = RadioStation::query()
             ->with('meta')
             ->withCount('plays')
+            ->orderByRaw('favorited_at IS NULL')
+            ->orderByDesc('favorited_at')
             ->orderBy('name')
             ->get();
 
@@ -73,6 +75,13 @@ class RadioStationController extends Controller
         }
 
         return redirect()->route('radio.index')->with('success', 'Radio station updated.');
+    }
+
+    public function favorite(RadioStation $radio)
+    {
+        $radio->update(['favorited_at' => $radio->favorited_at ? null : now()]);
+
+        return back();
     }
 
     public function destroy(RadioStation $radio)

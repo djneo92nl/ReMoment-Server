@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Integrations\BangOlufsen\Ase\MusicPlayerDriver as AseMusicPlayerDriver;
+use App\Integrations\Sonos\MusicPlayerDriver as SonosMusicPlayerDriver;
 use App\Integrations\Spotify\MusicPlayerDriver as SpotifyMusicPlayerDriver;
 use App\Models\Device;
 use App\Services\SpotifyTokenService;
@@ -19,6 +20,7 @@ class ListenAllDevices extends Command
     private array $driverCommandMap = [
         AseMusicPlayerDriver::class => 'device-ase:listen-single',
         MozartMusicPlayerDriver::class => 'device-mozart:listen-single',
+        SonosMusicPlayerDriver::class => 'device-sonos:listen-single',
     ];
 
     public function handle(): void

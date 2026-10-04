@@ -23,10 +23,26 @@
         @endif
     </div>
 
+    <div class="mb-6 -mt-2">
+        <label class="block text-sm text-gray-500 dark:text-gray-400 mb-1.5" for="discover-hosts">
+            Known device IPs <span class="text-gray-400 dark:text-stone-500">(optional, e.g. a Sonos; helps when network scanning is blocked)</span>
+        </label>
+        <input id="discover-hosts" type="text" wire:model="hosts" placeholder="192.168.1.29"
+               class="w-full max-w-md rounded-xl border-gray-200 dark:border-stone-700 dark:bg-stone-900 text-sm text-gray-900 dark:text-gray-100 focus:ring-0 focus:border-gray-400 dark:focus:border-stone-500">
+    </div>
+
     {{-- Scanning hint --}}
     <div wire:loading wire:target="scan" class="text-sm text-gray-500 dark:text-gray-400 mb-6 -mt-4">
         Listening for devices on the network — this takes a few seconds&hellip;
     </div>
+
+    @if($done && count($diagnostics) > 0)
+        <ul class="mb-6 space-y-1 text-sm text-amber-700 dark:text-amber-400">
+            @foreach($diagnostics as $note)
+                <li><i class="fa-solid fa-circle-info mr-1.5"></i>{{ $note }}</li>
+            @endforeach
+        </ul>
+    @endif
 
     {{-- Results --}}
     @if($done)

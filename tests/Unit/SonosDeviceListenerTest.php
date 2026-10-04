@@ -4,7 +4,6 @@ namespace Tests\Unit;
 
 use App\Domain\Media\NowPlaying;
 use App\Integrations\Sonos\Services\DeviceListener;
-use duncan3dc\Sonos\Interfaces\Devices\DeviceInterface;
 use duncan3dc\Sonos\Interfaces\NetworkInterface;
 use duncan3dc\Sonos\State as SonosState;
 use duncan3dc\Sonos\Tracks\Stream;
@@ -85,12 +84,23 @@ class SonosDeviceListenerTest extends TestCase
         $this->assertNull($nowPlaying);
     }
 
+    public function test_a_soundbar_on_its_tv_input_reports_the_input_as_the_source(): void
+    {
+        $listener = $this->makeListener();
+
+        $nowPlaying = $this->callProtected($listener, 'buildNowPlaying', [new SonosState('x-sonos-htastream:RINCON_ABC:spdif')]);
+
+        $this->assertInstanceOf(NowPlaying::class, $nowPlaying);
+        $this->assertNull($nowPlaying->track);
+        $this->assertSame('TV', $nowPlaying->source?->name);
+        $this->assertSame('TV', $nowPlaying->source?->sourceType);
+    }
+
     private function makeListener(): DeviceListener
     {
-        $device = $this->createMock(DeviceInterface::class);
         $network = $this->createMock(NetworkInterface::class);
 
-        return new DeviceListener($device, $network);
+        return new DeviceListener('192.168.1.9', $network);
     }
 
     private function callProtected(object $object, string $method, array $args = [])

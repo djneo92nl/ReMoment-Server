@@ -14,6 +14,12 @@ class DiscoverDevices extends Component
 
     public bool $done = false;
 
+    /** Optional IPs (space/comma/newline separated) probed directly, for when multicast does not reach the server. */
+    public string $hosts = '';
+
+    /** @var string[] */
+    public array $diagnostics = [];
+
     /** @var array<int, array{ip: string, name: string, brand: string, product: string, driver: string, driver_name: string, meta: array, selected: bool}> */
     public array $results = [];
 
@@ -24,7 +30,12 @@ class DiscoverDevices extends Component
         $this->results = [];
 
         $service = app(NetworkDiscoveryService::class);
-        $discovered = $service->discover();
+        $hosts = array_values(array_filter(
+            preg_split('/[\s,;]+/', $this->hosts, -1, PREG_SPLIT_NO_EMPTY),
+            fn ($h) => filter_var($h, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)
+        ));
+        $discovered = $service->discover(hosts: $hosts);
+        $this->diagnostics = $service->diagnostics;
 
         $this->results = array_map(fn ($d) => [
             'ip' => $d->ip_address,
