@@ -2,7 +2,9 @@
 
 namespace App\Livewire;
 
+use App\Domain\Device\SourceSync;
 use App\Integrations\Contracts\SourceActivationInterface;
+use App\Integrations\Contracts\SourcesInterface;
 use App\Models\Device;
 use App\Models\DeviceSource;
 use Livewire\Component;
@@ -25,6 +27,7 @@ class DeviceSourceManager extends Component
         } catch (\Throwable) {
             $this->supportsActivation = false;
         }
+        $this->syncWhenEmpty();
         $this->loadSources();
     }
 
@@ -62,6 +65,26 @@ class DeviceSourceManager extends Component
                 $driver->activateSource($source->source_id);
             }
         } catch (\Throwable) {
+        }
+    }
+
+    /**
+     * Sources are stored by the weekly `devices:sync-sources`, so a device added since
+     * (or one whose driver gained sources) has none yet: fetch them on first view.
+     */
+    private function syncWhenEmpty(): void
+    {
+        if ($this->device->deviceSources()->exists()) {
+            return;
+        }
+
+        try {
+            $driver = $this->device->driver;
+            if ($driver instanceof SourcesInterface) {
+                SourceSync::sync($this->device, $driver);
+            }
+        } catch (\Throwable) {
+            // Unreachable device: the card shows its empty state until the next visit.
         }
     }
 

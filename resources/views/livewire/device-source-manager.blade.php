@@ -18,6 +18,7 @@
 @endphp
 
 <div>
+@if($allSources->isNotEmpty())
 {{-- ── Inline card ── --}}
 <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8">
 
@@ -176,4 +177,5 @@
         @endif
     </div>
 </x-modal>
+@endif
 </div>
