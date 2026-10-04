@@ -74,7 +74,7 @@ class DeviceApiTest extends TestCase
         $this->getJson("/api/devices/{$full->id}")
             ->assertJsonPath('data.capabilities', [
                 'media_controls', 'volume_control', 'source_control', 'source_activation',
-                'multi_room', 'seek', 'queue',
+                'multi_room', 'seek', 'queue', 'queue_jump',
             ]);
 
         $this->getJson("/api/devices/{$bare->id}")->assertJsonPath('data.capabilities', []);
@@ -274,6 +274,28 @@ class DeviceApiTest extends TestCase
         $device = $this->makeDevice(FakeBareDriver::class);
 
         $this->getJson("/api/devices/{$device->id}/queue")->assertStatus(422)->assertJsonPath('error', 'unsupported');
+    }
+
+    public function test_queue_jump(): void
+    {
+        $device = $this->makeDevice(state: State::Playing);
+
+        $this->postJson("/api/devices/{$device->id}/queue/jump", ['position' => 2])
+            ->assertOk()
+            ->assertExactJson(['status' => 'ok', 'position' => 2]);
+
+        $this->assertSame([['skipToQueuePosition', 2]], FakePlayerDriver::$calls);
+    }
+
+    public function test_queue_jump_validation_and_capability(): void
+    {
+        $device = $this->makeDevice();
+        $bare = $this->makeDevice(FakeBareDriver::class, name: 'Bare');
+
+        $this->postJson("/api/devices/{$device->id}/queue/jump", ['position' => 0])->assertStatus(422)->assertJsonValidationErrors('position');
+        $this->postJson("/api/devices/{$bare->id}/queue/jump", ['position' => 1])
+            ->assertStatus(422)
+            ->assertJsonPath('error', 'unsupported');
     }
 
     // --- Sources ---

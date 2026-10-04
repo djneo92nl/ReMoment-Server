@@ -106,6 +106,16 @@ A client applies it by adding its API token as `?client={api_token}` to the brow
 - Playing is not blocked: the filter is for browsing, so playing a hidden id still works.
 - The playlist cover list in the artwork pre-cache is not filtered.
 
+## Search
+
+```
+GET /api/library/search?q=hyster[&client={api_token}]
+  → { "artists": [ ArtistItem ], "albums": [ AlbumItem ], "tracks": [ SearchTrack ] }
+SearchTrack = { id, name, artist_name, album_id, album_name, duration, artwork }
+```
+
+Case-insensitive substring match on the artist, album and track name; `q` is 2–100 characters (`422` otherwise). At most 10 artists, 15 albums and 20 tracks, each sorted by name. Tracks without an album are left out: play one with `play-album` (`album_id`, `start_track_id` = the track's `id`). `?client=` hides sources as in the other browse endpoints. Playlists are not searched.
+
 ## Favorites
 
 Household-wide (there are no user accounts): `albums.favorited_at` / `artists.favorited_at`, `null` when not a favorite.

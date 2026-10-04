@@ -9,6 +9,7 @@ use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
 use App\Integrations\Contracts\QueueInterface;
+use App\Integrations\Contracts\QueueJumpInterface;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\RepeatInterface;
 use App\Integrations\Contracts\SeekInterface;
@@ -27,7 +28,7 @@ use duncan3dc\Sonos\Tracks\Track as SonosTrack;
 use duncan3dc\Sonos\Utils\Time;
 use Illuminate\Support\Collection as TrackCollection;
 
-class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, QueueInterface, RadioControlInterface, RepeatInterface, SeekInterface, ShuffleInterface, VolumeControlInterface
+class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, QueueInterface, QueueJumpInterface, RadioControlInterface, RepeatInterface, SeekInterface, ShuffleInterface, VolumeControlInterface
 {
     use MultiRoomControls;
 
@@ -180,6 +181,15 @@ class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterf
             image: $track->getAlbumArt() ?: null,
             uri: $track->getUri() ?: null,
         ), $tracks);
+    }
+
+    public function skipToQueuePosition(int $position): void
+    {
+        $api = $this->deviceApiClient();
+
+        // getStateDetails() numbers the playing track from zero, as selectTrack() does
+        $api->selectTrack($api->getStateDetails()->getNumber() + max(1, $position));
+        $api->play();
     }
 
     public function playLibraryTrack(Track $track): void

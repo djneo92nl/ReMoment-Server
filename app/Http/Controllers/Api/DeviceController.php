@@ -23,6 +23,7 @@ use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
 use App\Integrations\Contracts\PowerInterface;
 use App\Integrations\Contracts\QueueInterface;
+use App\Integrations\Contracts\QueueJumpInterface;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\RepeatInterface;
 use App\Integrations\Contracts\SeekInterface;
@@ -134,6 +135,33 @@ class DeviceController extends Controller
         }
 
         return response()->json(['up_next' => array_map(fn ($item) => $item->toArray() + ['artwork' => LibraryItemArtwork::forUrl($item->image)], $items)]);
+    }
+
+    /** Plays the queue entry `position` places ahead (1 = the first of `up_next`). */
+    public function queueJump(Request $request, Device $device): JsonResponse
+    {
+        $request->validate(['position' => ['required', 'integer', 'min:1', 'max:100']]);
+
+        if ($error = $this->assertReachable($device)) {
+            return $error;
+        }
+
+        $driver = SpotifyRouting::driverFor($device, QueueJumpInterface::class);
+
+        if (!($driver instanceof QueueJumpInterface)) {
+            return $this->unsupported('queue_jump');
+        }
+
+        try {
+            $driver->skipToQueuePosition($request->integer('position'));
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'driver_error',
+                'message' => 'The device did not respond: '.$e->getMessage(),
+            ], 502);
+        }
+
+        return response()->json(['status' => 'ok', 'position' => $request->integer('position')]);
     }
 
     public function setShuffle(Request $request, Device $device): JsonResponse

@@ -9,6 +9,7 @@ use App\Integrations\Contracts\LikeInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
 use App\Integrations\Contracts\QueueInterface;
+use App\Integrations\Contracts\QueueJumpInterface;
 use App\Integrations\Contracts\RepeatInterface;
 use App\Integrations\Contracts\SeekInterface;
 use App\Integrations\Contracts\ShuffleInterface;
@@ -16,7 +17,7 @@ use App\Models\Device;
 use App\Services\SpotifyTokenService;
 use Illuminate\Support\Facades\Cache;
 
-class MusicPlayerDriver implements LikeInterface, MediaControlsInterface, MusicPlayerDriverInterface, QueueInterface, RepeatInterface, SeekInterface, ShuffleInterface
+class MusicPlayerDriver implements LikeInterface, MediaControlsInterface, MusicPlayerDriverInterface, QueueInterface, QueueJumpInterface, RepeatInterface, SeekInterface, ShuffleInterface
 {
     public function __construct(public Device $device) {}
 
@@ -70,6 +71,14 @@ class MusicPlayerDriver implements LikeInterface, MediaControlsInterface, MusicP
             duration: ($ms = data_get($item, 'duration_ms')) ? intdiv((int) $ms, 1000) : null,
             uri: data_get($item, 'uri'),
         ), $items);
+    }
+
+    /** Spotify can't pick a queue entry: skipping forward plays the ones before it for an instant. */
+    public function skipToQueuePosition(int $position): void
+    {
+        for ($i = 0; $i < max(1, $position); $i++) {
+            $this->api()->next();
+        }
     }
 
     public function setShuffle(bool $shuffle): void

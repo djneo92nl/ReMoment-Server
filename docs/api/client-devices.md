@@ -313,9 +313,14 @@ POST /api/devices/{id}/play
 POST /api/devices/{id}/pause
 POST /api/devices/{id}/next
 POST /api/devices/{id}/previous
+PUT  /api/devices/{id}/seek              body: { "position": 90 }   → { "status": "ok", "position": 90 }   (seconds; capability `seek`)
+GET  /api/devices/{id}/queue?limit=20    → { "up_next": [ { name, artist, album, image, duration, uri, artwork } ] }   (capability `queue`)
+POST /api/devices/{id}/queue/jump        body: { "position": 2 }    → { "status": "ok", "position": 2 }    (capability `queue_jump`)
 ```
 
-Always check the `capabilities` array from `GET /devices` before showing transport controls — a device without `media_controls` will return `422`. Capabilities can change while running: a speaker Spotify is routed to gains `media_controls`, `seek`, `queue`, `shuffle`, `repeat` and `like` for as long as it plays (or is paused on) Spotify, so refresh the device list now and then, and treat non-null `/modes` values as supported.
+`queue/jump` plays the entry `position` places ahead: 1 is the first item of `up_next`, 2 the second, and so on. Sonos selects that queue entry directly; Spotify can only skip forward, so it skips `position` times (the entries before the target start for an instant). `artwork` of a queue item is the same small object as in the library API (`proxy_120`, `proxy_320`), or `null`.
+
+Always check the `capabilities` array from `GET /devices` before showing transport controls — a device without `media_controls` will return `422`. Capabilities can change while running: a speaker Spotify is routed to gains `media_controls`, `seek`, `queue`, `queue_jump`, `shuffle`, `repeat` and `like` for as long as it plays (or is paused on) Spotify, so refresh the device list now and then, and treat non-null `/modes` values as supported.
 
 ### MQTT (optional)
 

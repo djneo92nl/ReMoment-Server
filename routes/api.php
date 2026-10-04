@@ -21,6 +21,7 @@ Route::put('/devices/{device}/mute', [DeviceController::class, 'setMute']);
 
 Route::put('/devices/{device}/seek', [DeviceController::class, 'seek']);
 Route::get('/devices/{device}/queue', [DeviceController::class, 'queue']);
+Route::post('/devices/{device}/queue/jump', [DeviceController::class, 'queueJump']);
 
 Route::put('/devices/{device}/shuffle', [DeviceController::class, 'setShuffle']);
 Route::put('/devices/{device}/repeat', [DeviceController::class, 'setRepeat']);
@@ -53,6 +54,7 @@ Route::get('/library/playlists', [LibraryController::class, 'playlists']);
 Route::get('/library/playlists/{playlist}', [LibraryController::class, 'playlist']);
 Route::get('/library/recent', [LibraryController::class, 'recent']);
 Route::get('/library/favorites', [LibraryController::class, 'favorites']);
+Route::get('/library/search', [LibraryController::class, 'search']);
 
 Route::post('/clients/register', [ClientController::class, 'register']);
 Route::get('/clients/status/{registrationToken}', [ClientController::class, 'status']);

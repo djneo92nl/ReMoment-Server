@@ -33,6 +33,13 @@ class LibraryController extends Controller
     /** Artists and albums listed in a genre's detail. */
     public const GENRE_ITEMS = 100;
 
+    /** Hits per kind in a search. */
+    public const SEARCH_ARTISTS = 10;
+
+    public const SEARCH_ALBUMS = 15;
+
+    public const SEARCH_TRACKS = 20;
+
     /** Tracks listed in a playlist's detail. */
     public const PLAYLIST_TRACKS = 200;
 
@@ -246,6 +253,51 @@ class LibraryController extends Controller
             ->get();
 
         return response()->json(['data' => $albums->map(fn (Album $album) => $this->albumItem($album))->values()]);
+    }
+
+    /**
+     * Free-text search over artist, album and track names (substring, case
+     * insensitive). Tracks without an album are left out: a client plays a
+     * track through its album (play-album + start_track_id).
+     */
+    public function search(Request $request): JsonResponse
+    {
+        $request->validate(['q' => ['required', 'string', 'min:2', 'max:100']]);
+        $hidden = $this->hiddenSources($request);
+        $like = '%'.addcslashes(trim($request->query('q')), '\\%_').'%';
+
+        $artists = $this->artistItems(LibrarySources::artists(Artist::query()->whereHas('albums'), $hidden), $hidden)
+            ->where('artists.name', 'like', $like)
+            ->orderByRaw(self::ARTIST_SORT_NAME)
+            ->limit(self::SEARCH_ARTISTS)
+            ->get();
+
+        $albums = LibrarySources::albums(Album::query()->with('artist'), $hidden)
+            ->where('albums.name', 'like', $like)
+            ->orderBy('albums.name')
+            ->limit(self::SEARCH_ALBUMS)
+            ->get();
+
+        $tracks = LibrarySources::tracks(Track::query()->with(['artist', 'album']), $hidden)
+            ->whereNotNull('tracks.album_id')
+            ->where('tracks.name', 'like', $like)
+            ->orderBy('tracks.name')
+            ->limit(self::SEARCH_TRACKS)
+            ->get();
+
+        return response()->json([
+            'artists' => $artists->map(fn (Artist $artist) => $this->artistItem($artist))->values(),
+            'albums' => $albums->map(fn (Album $album) => $this->albumItem($album))->values(),
+            'tracks' => $tracks->map(fn (Track $track) => [
+                'id' => $track->id,
+                'name' => $track->name,
+                'artist_name' => $track->artist?->name,
+                'album_id' => $track->album_id,
+                'album_name' => $track->album?->name,
+                'duration' => $track->duration,
+                'artwork' => LibraryItemArtwork::forImages($track->album?->images),
+            ])->values(),
+        ]);
     }
 
     /** Favorite albums and artists, most recently favorited first. */

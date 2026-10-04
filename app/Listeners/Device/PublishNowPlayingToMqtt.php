@@ -3,8 +3,11 @@
 namespace App\Listeners\Device;
 
 use App\Domain\Artwork\NowPlayingArtwork;
+use App\Domain\Library\Normalizer;
 use App\Domain\Media\NowPlaying;
 use App\Events\Device\NowPlayingUpdated;
+use App\Models\Media\Album;
+use App\Models\Media\Artist;
 use App\Services\MqttService;
 use Illuminate\Support\Facades\Cache;
 
@@ -34,6 +37,13 @@ class PublishNowPlayingToMqtt
             'duration' => $nowPlaying->track?->duration,
         ];
 
+        // Lets a client open the playing album in its library. Left out when the play
+        // history (queued) hasn't created the album yet, or for radio and sources.
+        $albumId = $this->libraryAlbumId($nowPlaying);
+        if ($albumId !== null) {
+            $data['album_id'] = $albumId;
+        }
+
         $artwork = NowPlayingArtwork::resolve($nowPlaying);
         if ($artwork !== null) {
             $data['artwork'] = $artwork;
@@ -57,6 +67,28 @@ class PublishNowPlayingToMqtt
         Cache::forget(self::publishedKey($deviceId));
 
         $this->mqttService->publish("remoment/player/{$deviceId}/data", '', retain: true);
+    }
+
+    /** Read-only lookup, same keys as LibraryIdentity (artist name_key, then artist + album name_key). */
+    private function libraryAlbumId(NowPlaying $nowPlaying): ?int
+    {
+        $artistName = trim((string) $nowPlaying->track?->artist?->name);
+        $albumName = trim((string) $nowPlaying->album?->name);
+
+        if ($artistName === '' || $albumName === '') {
+            return null;
+        }
+
+        $artistId = Artist::query()->where('name_key', Normalizer::artist($artistName))->orderBy('id')->value('id');
+        if ($artistId === null) {
+            return null;
+        }
+
+        return Album::query()
+            ->where('artist_id', $artistId)
+            ->where('name_key', Normalizer::album($albumName))
+            ->orderBy('id')
+            ->value('id');
     }
 
     private static function publishedKey(int $deviceId): string

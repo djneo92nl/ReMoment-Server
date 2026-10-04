@@ -8,6 +8,7 @@ use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
 use App\Integrations\Contracts\PowerInterface;
 use App\Integrations\Contracts\QueueInterface;
+use App\Integrations\Contracts\QueueJumpInterface;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\RepeatInterface;
 use App\Integrations\Contracts\SeekInterface;
@@ -33,6 +34,7 @@ final class Capabilities
         'library_playback' => LibraryPlaybackInterface::class,
         'seek' => SeekInterface::class,
         'queue' => QueueInterface::class,
+        'queue_jump' => QueueJumpInterface::class,
         'shuffle' => ShuffleInterface::class,
         'repeat' => RepeatInterface::class,
         'like' => LikeInterface::class,

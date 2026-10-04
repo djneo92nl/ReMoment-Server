@@ -9,6 +9,7 @@ use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
 use App\Integrations\Contracts\QueueInterface;
+use App\Integrations\Contracts\QueueJumpInterface;
 use App\Integrations\Contracts\SeekInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\SourcesInterface;
@@ -20,7 +21,7 @@ use App\Models\Device;
  * contract the REST API exposes, records calls, and can be told to throw
  * to simulate a device that doesn't respond.
  */
-class FakePlayerDriver implements MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, QueueInterface, SeekInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
+class FakePlayerDriver implements MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, QueueInterface, QueueJumpInterface, SeekInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
 {
     /** @var array<int, array{0: string, 1: mixed}> */
     public static array $calls = [];
@@ -88,6 +89,11 @@ class FakePlayerDriver implements MediaControlsInterface, MultiRoomInterface, Mu
     public function seek(int $seconds): void
     {
         $this->record('seek', $seconds);
+    }
+
+    public function skipToQueuePosition(int $position): void
+    {
+        $this->record('skipToQueuePosition', $position);
     }
 
     public function setVolume(int $volume): int

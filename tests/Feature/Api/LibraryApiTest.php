@@ -264,6 +264,44 @@ class LibraryApiTest extends TestCase
         $this->getJson('/api/library/recent?limit=101')->assertStatus(422);
     }
 
+    // --- Search ---
+
+    public function test_search_finds_artists_albums_and_tracks_by_name(): void
+    {
+        $muse = $this->artist('Muse');
+        $absolution = $this->album($muse, 'Absolution');
+        $this->track($absolution, 'Hysteria');
+        $this->track($absolution, 'Apocalypse Please');
+        $other = $this->album($this->artist('Abba'), 'Gold');
+        $this->track($other, 'Waterloo');
+
+        $this->getJson('/api/library/search?q=muse')
+            ->assertOk()
+            ->assertJsonPath('artists.*.name', ['Muse'])
+            ->assertJsonPath('albums', [])
+            ->assertJsonPath('tracks', []);
+
+        $this->getJson('/api/library/search?q=ABSOL')
+            ->assertOk()
+            ->assertJsonPath('albums.*.name', ['Absolution'])
+            ->assertJsonPath('albums.0.artist_name', 'Muse');
+
+        $this->getJson('/api/library/search?q=hyster')
+            ->assertOk()
+            ->assertJsonPath('tracks.*.name', ['Hysteria'])
+            ->assertJsonPath('tracks.0.album_id', $absolution->id)
+            ->assertJsonPath('tracks.0.artist_name', 'Muse');
+    }
+
+    public function test_search_needs_two_characters_and_escapes_wildcards(): void
+    {
+        $this->album($this->artist('Muse'), 'Absolution');
+
+        $this->getJson('/api/library/search?q=a')->assertStatus(422);
+        $this->getJson('/api/library/search')->assertStatus(422);
+        $this->getJson('/api/library/search?q=%25%25')->assertOk()->assertJsonPath('albums', []);
+    }
+
     // --- Favorites ---
 
     public function test_favorites_can_be_set_and_listed_newest_first(): void

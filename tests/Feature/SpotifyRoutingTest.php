@@ -266,7 +266,7 @@ class SpotifyRoutingTest extends TestCase
 
         $this->route($speaker);
 
-        $merged = ['media_controls', 'seek', 'queue', 'shuffle', 'repeat', 'like', 'power'];
+        $merged = ['media_controls', 'seek', 'queue', 'queue_jump', 'shuffle', 'repeat', 'like', 'power'];
         $this->getJson("/api/devices/{$speaker->id}")->assertJsonPath('data.capabilities', $merged);
         $this->getJson('/api/devices')->assertJsonFragment(['id' => $speaker->id, 'capabilities' => $merged]);
         $this->postJson("/api/devices/{$speaker->id}/play")->assertOk();
@@ -303,7 +303,7 @@ class SpotifyRoutingTest extends TestCase
         $this->getJson("/api/clients/{$client->api_token}/devices")
             ->assertJsonCount(1, 'devices')
             ->assertJsonPath('devices.0.id', $this->speaker->id)
-            ->assertJsonPath('devices.0.capabilities', ['media_controls', 'volume_control', 'source_control', 'source_activation', 'multi_room', 'seek', 'queue', 'shuffle', 'repeat', 'like']);
+            ->assertJsonPath('devices.0.capabilities', ['media_controls', 'volume_control', 'source_control', 'source_activation', 'multi_room', 'seek', 'queue', 'queue_jump', 'shuffle', 'repeat', 'like']);
 
         $this->getJson("/api/clients/status/{$client->registration_token}")
             ->assertJsonCount(1, 'devices');
