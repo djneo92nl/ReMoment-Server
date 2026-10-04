@@ -8,12 +8,12 @@ use App\Domain\Device\Cache\Modes;
 use App\Domain\Device\PlaybackModes;
 use App\Domain\Device\RepeatMode;
 use App\Domain\Device\SpotifyRouting;
-use App\Domain\Device\State;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\LibrarySources;
 use App\Domain\Library\NotPlayableException;
 use App\Domain\Library\PlaybackFailedException;
 use App\Events\Device\PlaybackModesUpdated;
+use App\Http\Controllers\Api\Concerns\GuardsDeviceAccess;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\DeviceDetailResource;
 use App\Http\Resources\Api\DeviceListResource;
@@ -45,6 +45,8 @@ use Illuminate\Validation\Rule;
 
 class DeviceController extends Controller
 {
+    use GuardsDeviceAccess;
+
     public function index(): AnonymousResourceCollection
     {
         return DeviceListResource::collection(SpotifyRouting::visible(Device::all()));
@@ -661,25 +663,5 @@ class DeviceController extends Controller
         return Device::whereHas('meta', function ($q) use ($ids, $metaKey) {
             $q->where('key', $metaKey)->whereIn('value', $ids);
         })->where('id', '!=', $exclude->id)->get();
-    }
-
-    private function assertReachable(Device $device): ?JsonResponse
-    {
-        if ($device->state === State::Unreachable) {
-            return response()->json([
-                'error' => 'unreachable',
-                'message' => 'Device is not reachable.',
-            ], 503);
-        }
-
-        return null;
-    }
-
-    private function unsupported(string $capability): JsonResponse
-    {
-        return response()->json([
-            'error' => 'unsupported',
-            'message' => "This device does not support {$capability}.",
-        ], 422);
     }
 }

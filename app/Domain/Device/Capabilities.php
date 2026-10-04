@@ -2,10 +2,13 @@
 
 namespace App\Domain\Device;
 
+use App\Integrations\Contracts\BluetoothInterface;
+use App\Integrations\Contracts\DeviceInfoInterface;
 use App\Integrations\Contracts\LibraryPlaybackInterface;
 use App\Integrations\Contracts\LikeInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
+use App\Integrations\Contracts\NetworkSettingsInterface;
 use App\Integrations\Contracts\PowerInterface;
 use App\Integrations\Contracts\QueueInterface;
 use App\Integrations\Contracts\QueueJumpInterface;
@@ -13,9 +16,11 @@ use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\RepeatInterface;
 use App\Integrations\Contracts\SeekInterface;
 use App\Integrations\Contracts\ShuffleInterface;
+use App\Integrations\Contracts\SoundAdjustmentInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\SourcesInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
+use App\Integrations\Contracts\WirelessSpeakersInterface;
 
 /**
  * Maps driver contracts to the capability strings exposed by the REST API.
@@ -39,6 +44,11 @@ final class Capabilities
         'repeat' => RepeatInterface::class,
         'like' => LikeInterface::class,
         'power' => PowerInterface::class,
+        'sound_adjustment' => SoundAdjustmentInterface::class,
+        'bluetooth' => BluetoothInterface::class,
+        'device_info' => DeviceInfoInterface::class,
+        'network_settings' => NetworkSettingsInterface::class,
+        'wireless_speakers' => WirelessSpeakersInterface::class,
     ];
 
     /**

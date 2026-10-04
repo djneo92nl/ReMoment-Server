@@ -4,6 +4,7 @@ namespace App\Listeners\Device;
 
 use App\Domain\Library\Enrichment;
 use App\Domain\Library\LibraryIdentity;
+use App\Domain\Library\Normalizer;
 use App\Events\Device\NowPlayingUpdated;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Jobs\ImportSpotifyAlbum;
@@ -138,16 +139,14 @@ class StorePlaybackHistory implements ShouldQueue
             return;
         }
 
-        // Build a stable signature so repeated "now playing" updates don't create duplicates
+        // Build a stable signature so repeated "now playing" updates don't create duplicates.
+        // Only the normalized artist + track: a speaker playing Spotify is reported by both
+        // its own listener and the Spotify listener, with different ids, sources, durations
+        // and album spellings, and those alternating reports must count as one play.
         $signatureParts = [
             'type' => 'track',
-            'sourceType' => $event->sourceType,
-            'trackId' => $npTrack->id,
-            'trackName' => $npTrack->name,
-            'trackSource' => $npTrack->source,
-            'artistName' => $artistName,
-            'albumName' => $nowPlaying->album?->name,
-            'duration' => $npTrack->duration,
+            'artist' => Normalizer::artist($artistName),
+            'track' => Normalizer::track($npTrack->name),
         ];
 
         $signature = hash('sha256', json_encode($signatureParts, JSON_THROW_ON_ERROR));

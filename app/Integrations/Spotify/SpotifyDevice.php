@@ -11,11 +11,11 @@ class SpotifyDevice
         return Device::firstOrCreate(
             ['device_driver' => MusicPlayerDriver::class],
             [
-                'device_name'         => 'Spotify Connect',
-                'device_brand_name'   => 'Spotify',
-                'device_driver_name'  => 'Spotify',
+                'device_name' => 'Spotify Connect',
+                'device_brand_name' => 'Spotify',
+                'device_driver_name' => 'Spotify',
                 'device_product_type' => 'Spotify Connect',
-                'ip_address'          => null,
+                'ip_address' => null,
             ]
         );
     }

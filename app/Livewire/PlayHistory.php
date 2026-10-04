@@ -12,9 +12,13 @@ class PlayHistory extends Component
     use WithPagination;
 
     public ?int $deviceId = null;
+
     public ?string $sourceFilter = null;
+
     public string $search = '';
+
     public string $dateFrom = '';
+
     public string $dateTo = '';
 
     public function updatedDeviceId(): void
@@ -80,7 +84,7 @@ class PlayHistory extends Component
                         ->orWhereHas('artist', fn ($aq) => $aq->where('name', 'like', "%{$search}%"))
                         ->orWhereHas('album', fn ($aq) => $aq->where('name', 'like', "%{$search}%"));
                 })->orWhere('radio_name', 'like', "%{$search}%")
-                  ->orWhere('source_name', 'like', "%{$search}%");
+                    ->orWhere('source_name', 'like', "%{$search}%");
             });
         }
 
@@ -103,8 +107,8 @@ class PlayHistory extends Component
             ->pluck('source_type');
 
         return view('livewire.play-history', [
-            'plays'       => $plays,
-            'devices'     => $devices,
+            'plays' => $plays,
+            'devices' => $devices,
             'sourceTypes' => $sourceTypes,
         ]);
     }

@@ -13,6 +13,13 @@ return [
             'driver' => \App\Integrations\BangOlufsen\Ase\MusicPlayerDriver::class,
             'speaker' => 'external',
         ],
+        // The only ASE model with WiSA hardware (wireless speakers): see HardwareFeatures.
+        'BeoSound Moment' => [
+            'driver_name' => 'ASE',
+            'driver' => \App\Integrations\BangOlufsen\Ase\MusicPlayerDriver::class,
+            'speaker' => 'external',
+            'wisa' => true,
+        ],
         'Beoplay M5' => [
             'driver_name' => 'ASE',
             'driver' => \App\Integrations\BangOlufsen\Ase\MusicPlayerDriver::class,
@@ -66,14 +73,6 @@ return [
         'Beosound Theatre' => [
             'driver_name' => 'Mozart',
             'driver' => \Remoment\MozartDriver\MusicPlayerDriver::class,
-        ],
-    ],
-    'Bang &amp; Olufsen' => [
-        'BeoSound Moment' => [
-            'driver_name' => 'ASE',
-            'driver' => \App\Integrations\BangOlufsen\Ase\MusicPlayerDriver::class,
-            'speaker' => 'external',
-            'wisa' => true,
         ],
     ],
     'Spotify' => [

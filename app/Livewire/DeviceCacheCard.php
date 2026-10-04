@@ -19,9 +19,9 @@ class DeviceCacheCard extends Component
     {
         return view('livewire.device-cache-card', [
             'listenerRunning' => DeviceCache::isListenerRunning($this->device->id),
-            'state'           => DeviceCache::getState($this->device->id)?->value,
-            'nowPlaying'      => DeviceCache::getNowPlaying($this->device->id),
-            'lastSeen'        => DeviceCache::getLastSeen($this->device->id),
+            'state' => DeviceCache::getState($this->device->id)?->value,
+            'nowPlaying' => DeviceCache::getNowPlaying($this->device->id),
+            'lastSeen' => DeviceCache::getLastSeen($this->device->id),
         ]);
     }
 }

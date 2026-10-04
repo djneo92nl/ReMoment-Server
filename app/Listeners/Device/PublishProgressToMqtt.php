@@ -32,7 +32,7 @@ class PublishProgressToMqtt
 
             // Math from issue description:
             // $nowPlaying->position = (int) (((int)$event->progress / (int)$trackDuration) * 100);
-            $progressPercentage = (int) (((int)$event->progress / (int)$trackDuration) * 100);
+            $progressPercentage = (int) (((int) $event->progress / (int) $trackDuration) * 100);
 
             // Ensure it's between 0 and 100
             $progressPercentage = max(0, min(100, $progressPercentage));

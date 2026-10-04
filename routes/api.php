@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\ClientController;
 use App\Http\Controllers\Api\DeviceController;
+use App\Http\Controllers\Api\DeviceSettingsController;
 use App\Http\Controllers\Api\InfoController;
 use App\Http\Controllers\Api\LibraryController;
 use Illuminate\Support\Facades\Route;
@@ -27,6 +28,20 @@ Route::put('/devices/{device}/shuffle', [DeviceController::class, 'setShuffle'])
 Route::put('/devices/{device}/repeat', [DeviceController::class, 'setRepeat']);
 Route::put('/devices/{device}/like', [DeviceController::class, 'setLike']);
 Route::put('/devices/{device}/power', [DeviceController::class, 'setPower']);
+
+Route::get('/devices/{device}/sound-adjustment', [DeviceSettingsController::class, 'getSoundAdjustment']);
+Route::put('/devices/{device}/sound-adjustment', [DeviceSettingsController::class, 'setSoundAdjustment']);
+Route::get('/devices/{device}/bluetooth', [DeviceSettingsController::class, 'getBluetooth']);
+Route::put('/devices/{device}/bluetooth', [DeviceSettingsController::class, 'setBluetooth']);
+Route::delete('/devices/{device}/bluetooth/devices/{deviceId}', [DeviceSettingsController::class, 'removeBluetoothDevice'])->where('deviceId', '.+');
+Route::get('/devices/{device}/network', [DeviceSettingsController::class, 'getNetwork']);
+Route::put('/devices/{device}/network/interface', [DeviceSettingsController::class, 'setNetworkInterface']);
+Route::put('/devices/{device}/network/wired', [DeviceSettingsController::class, 'setWiredNetwork']);
+Route::put('/devices/{device}/network/wifi', [DeviceSettingsController::class, 'joinWifi']);
+Route::get('/devices/{device}/wireless-speakers', [DeviceSettingsController::class, 'getWirelessSpeakers']);
+Route::post('/devices/{device}/wireless-speakers/scan', [DeviceSettingsController::class, 'scanWirelessSpeakers']);
+Route::get('/devices/{device}/info', [DeviceSettingsController::class, 'getInfo']);
+Route::put('/devices/{device}/info', [DeviceSettingsController::class, 'setInfo']);
 
 Route::get('/devices/{device}/sources', [DeviceController::class, 'sources']);
 Route::post('/devices/{device}/sources/activate', [DeviceController::class, 'activateSource']);

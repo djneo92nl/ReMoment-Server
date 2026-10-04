@@ -14,6 +14,8 @@ use App\Domain\Device\DeviceCache;
 use App\Domain\Device\RepeatMode;
 use App\Domain\Device\State;
 use App\Integrations\Common\UnsupportedOperationException;
+use App\Integrations\Contracts\BluetoothInterface;
+use App\Integrations\Contracts\DeviceInfoInterface;
 use App\Integrations\Contracts\LibraryPlaybackInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
@@ -23,6 +25,7 @@ use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\RepeatInterface;
 use App\Integrations\Contracts\SeekInterface;
 use App\Integrations\Contracts\ShuffleInterface;
+use App\Integrations\Contracts\SoundAdjustmentInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\SourcesInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
@@ -35,8 +38,10 @@ use Djneo92nl\BeoMozart\MozartClient;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
-class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, PowerInterface, RadioControlInterface, RepeatInterface, SeekInterface, ShuffleInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
+class MusicPlayerDriver implements BluetoothInterface, DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, PowerInterface, RadioControlInterface, RepeatInterface, SeekInterface, ShuffleInterface, SoundAdjustmentInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
 {
+    use SettingsControls;
+
     public MozartClient $client;
 
     public function __construct(public Device $device)

@@ -1,0 +1,95 @@
+---
+# Create the ReMoment LXC container on an existing Proxmox VE host. Safe to re-run.
+# Usage: ansible-playbook -i ansible/inventory.yml ansible/proxmox.yml
+#
+# Then: setup.yml and deploy.yml against the new container.
+# Skip this playbook if you already have an Ubuntu VM/host: point remoment_server at it.
+
+- name: Create ReMoment container on Proxmox
+  hosts: proxmox
+  become: false
+  vars:
+      ct_public_key: "{{ lookup('ansible.builtin.file', proxmox_ssh_public_key | expanduser) }}"
+
+  tasks:
+      - name: Check whether the container exists
+        ansible.builtin.command: pct status {{ proxmox_ct_id }}
+        register: ct_status
+        failed_when: false
+        changed_when: false
+
+      - name: Find the latest Ubuntu 24.04 template
+        ansible.builtin.shell:
+            cmd: set -o pipefail; pveam available --section system | awk '/ubuntu-24.04-standard/ {print $2}' | sort -V | tail -n1
+            executable: /bin/bash
+        register: ct_template
+        changed_when: false
+        when: ct_status.rc != 0
+
+      - name: Download the template
+        ansible.builtin.command: pveam download {{ proxmox_template_storage }} {{ ct_template.stdout }}
+        args:
+            creates: "/var/lib/vz/template/cache/{{ ct_template.stdout }}"
+        when: ct_status.rc != 0
+
+      - name: Create the container
+        ansible.builtin.command: >-
+            pct create {{ proxmox_ct_id }} {{ proxmox_template_storage }}:vztmpl/{{ ct_template.stdout }}
+            --hostname {{ proxmox_ct_hostname }}
+            --cores {{ proxmox_ct_cores }}
+            --memory {{ proxmox_ct_memory }}
+            --swap {{ proxmox_ct_swap }}
+            --rootfs {{ proxmox_ct_disk_storage }}:{{ proxmox_ct_disk_size }}
+            --net0 name=eth0,bridge={{ proxmox_ct_bridge }},ip={{ proxmox_ct_ip }}/{{ proxmox_ct_cidr }},gw={{ proxmox_ct_gateway }}
+            --nameserver {{ proxmox_ct_dns }}
+            --unprivileged 1
+            --features nesting=1,keyctl=1
+            --onboot 1
+            --ostype ubuntu
+            --mp0 {{ (proxmox_media_host_path ~ ',mp=' ~ dlna_media_dir ~ ',ro=1') if proxmox_media_host_path
+                     else (proxmox_ct_disk_storage ~ ':' ~ proxmox_media_size ~ ',mp=' ~ dlna_media_dir) }}
+        when: ct_status.rc != 0
+
+      - name: Start the container
+        ansible.builtin.shell: pct status {{ proxmox_ct_id }} | grep -q running || pct start {{ proxmox_ct_id }}
+        changed_when: false
+
+      - name: Wait for the container network
+        ansible.builtin.command: pct exec {{ proxmox_ct_id }} -- getent hosts archive.ubuntu.com
+        register: ct_net
+        retries: 15
+        delay: 2
+        until: ct_net.rc == 0
+        changed_when: false
+
+      # Bootstrap SSH access so the other playbooks can reach the container.
+      - name: Install SSH server, sudo and Python in the container
+        ansible.builtin.command: >-
+            pct exec {{ proxmox_ct_id }} -- bash -c
+            'DEBIAN_FRONTEND=noninteractive apt-get update -qq &&
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq openssh-server sudo python3'
+        changed_when: false
+
+      - name: Create the deploy user with the SSH key and passwordless sudo
+        ansible.builtin.command:
+            argv:
+                - pct
+                - exec
+                - "{{ proxmox_ct_id | string }}"
+                - --
+                - bash
+                - -c
+                - |
+                  id {{ hostvars['remoment_server'].ansible_user }} >/dev/null 2>&1 || useradd -m -s /bin/bash -u {{ app_uid }} {{ hostvars['remoment_server'].ansible_user }} || useradd -m -s /bin/bash {{ hostvars['remoment_server'].ansible_user }}
+                  d=/home/{{ hostvars['remoment_server'].ansible_user }}/.ssh
+                  install -d -m 700 -o {{ hostvars['remoment_server'].ansible_user }} $d
+                  echo '{{ ct_public_key | trim }}' > $d/authorized_keys
+                  chown {{ hostvars['remoment_server'].ansible_user }}: $d/authorized_keys; chmod 600 $d/authorized_keys
+                  echo '{{ hostvars['remoment_server'].ansible_user }} ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/90-deploy
+                  chmod 440 /etc/sudoers.d/90-deploy
+                  systemctl enable --now ssh
+        changed_when: false
+
+      - name: Report
+        ansible.builtin.debug:
+            msg: "Container {{ proxmox_ct_id }} is up at {{ proxmox_ct_ip }}. Next: setup.yml, then deploy.yml."

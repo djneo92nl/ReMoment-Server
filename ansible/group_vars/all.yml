@@ -21,3 +21,34 @@ mqtt_client_id: remoment-server
 # Leave empty to use whatever host the client reached the server on.
 mqtt_public_host: ''
 mqtt_public_port: 1883
+
+# --- Proxmox (proxmox.yml) -------------------------------------------------
+# An unprivileged LXC container with nesting enabled (required for Docker).
+proxmox_ct_id: 200
+proxmox_ct_hostname: remoment
+proxmox_ct_ip: 192.168.1.100          # must match ansible_host of remoment_server
+proxmox_ct_cidr: 24
+proxmox_ct_gateway: 192.168.1.1
+proxmox_ct_dns: 192.168.1.1
+proxmox_ct_bridge: vmbr0
+proxmox_ct_cores: 4
+proxmox_ct_memory: 4096               # MB
+proxmox_ct_swap: 512                  # MB
+proxmox_ct_disk_storage: local-lvm    # storage for the root disk
+proxmox_ct_disk_size: 32              # GB
+proxmox_template_storage: local       # storage holding container templates
+proxmox_ssh_public_key: ~/.ssh/id_rsa.pub   # key (on the control machine) installed for ansible_user
+
+# --- DLNA server (MiniDLNA, setup.yml) ---------------------------------------
+# Serves the music library inside the container; ReMoment discovers it via SSDP
+# and scans it from /settings/dlna.
+dlna_enabled: true
+dlna_friendly_name: ReMoment Music
+dlna_media_dir: /srv/media
+dlna_port: 8200
+# Where the music comes from (proxmox.yml). Set a PVE host path (e.g. an existing
+# music share) to bind-mount it read-only at dlna_media_dir; leave empty to get a
+# dedicated volume of proxmox_media_size GB instead.
+# Unprivileged containers see host uid 0 as 100000+, so the path must be world-readable.
+proxmox_media_host_path: ''
+proxmox_media_size: 200

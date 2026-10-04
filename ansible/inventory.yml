@@ -1,7 +1,16 @@
 all:
-    hosts:
-        remoment_server:
-            ansible_host: 192.168.1.100      # Change to your server's IP or hostname
-            ansible_user: ubuntu              # Change to your SSH user
-            # ansible_ssh_private_key_file: ~/.ssh/id_rsa
-            # ansible_become_password: "secret"  # or use ansible-vault
+    children:
+        proxmox:
+            hosts:
+                pve:
+                    ansible_host: 192.168.1.10       # Change to your Proxmox host
+                    ansible_user: root                # pct needs root on the PVE host
+        remoment_servers:
+            hosts:
+                remoment_server:
+                    # IP of the container proxmox.yml creates (must match proxmox_ct_ip in group_vars/all.yml),
+                    # or of any existing Ubuntu host/VM if you skip proxmox.yml.
+                    ansible_host: 192.168.1.100
+                    ansible_user: ubuntu              # created in the container by proxmox.yml
+                    # ansible_ssh_private_key_file: ~/.ssh/id_rsa
+                    # ansible_become_password: "secret"  # or use ansible-vault

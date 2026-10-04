@@ -3,7 +3,7 @@
 # Usage: ansible-playbook -i ansible/inventory.yml ansible/setup.yml --ask-become-pass
 
 - name: Setup ReMoment server
-  hosts: remoment_server
+  hosts: remoment_servers
   become: true
 
   tasks:
@@ -97,7 +97,42 @@
           enabled: true
           state: started
 
+    # DLNA media server (MiniDLNA). ReMoment finds it via SSDP and scans it
+    # from /settings/dlna. Runs on the host so SSDP multicast works.
+    - name: Install MiniDLNA
+      ansible.builtin.apt:
+          name: minidlna
+          state: present
+      when: dlna_enabled | bool
+
+    - name: Create DLNA media directory
+      ansible.builtin.file:
+          path: "{{ dlna_media_dir }}"
+          state: directory
+          mode: '0755'
+      when: dlna_enabled | bool
+
+    - name: Configure MiniDLNA
+      ansible.builtin.template:
+          src: templates/minidlna.conf.j2
+          dest: /etc/minidlna.conf
+          mode: '0644'
+      when: dlna_enabled | bool
+      notify: Restart MiniDLNA
+
+    - name: Enable and start MiniDLNA
+      ansible.builtin.systemd:
+          name: minidlna
+          enabled: true
+          state: started
+      when: dlna_enabled | bool
+
   handlers:
+    - name: Restart MiniDLNA
+      ansible.builtin.systemd:
+          name: minidlna
+          state: restarted
+
     - name: Restart Avahi
       ansible.builtin.systemd:
           name: avahi-daemon

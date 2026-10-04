@@ -17,12 +17,19 @@ All contracts live in `app/Integrations/Contracts/`.
 | `RepeatInterface` | `setRepeat(RepeatMode $mode)` — `Off`, `All`, `One` | If device can set repeat explicitly (Sonos, Spotify, Mozart) |
 | `LikeInterface` | `setLiked(bool $liked)` — like/save the playing track | If the service has a per-user library (Spotify) |
 | `PowerInterface` | `powerOn()`, `standby()` | If device can be put in standby remotely (ASE, Mozart). `powerOn()` may throw `App\Integrations\Common\UnsupportedOperationException` when only standby works (Mozart) — the API answers 422 |
+| `SoundAdjustmentInterface` | `getSoundAdjustment(): SoundAdjustment`, `setSoundAdjustment(?int $bass, ?int $treble, ?bool $loudness)` — throws `InvalidArgumentException` outside the device's range, `UnsupportedOperationException` for a missing part | If device has bass/treble/loudness (ASE, Mozart, Sonos) |
+| `BluetoothInterface` | `getBluetooth(): BluetoothState`, `setBluetooth(?bool $discoverable, ?string $reconnectMode)`, `removeBluetoothDevice(string $id)` | If device has Bluetooth pairing (ASE). `BluetoothState::$writable` is false for a platform that can only list paired devices (Mozart's `setup/bluetooth/devices`) |
+| `DeviceInfoInterface` | `getDeviceInfo(): DeviceInfo`, `setDeviceName(string)` | If device reports/changes its name, model, firmware (ASE, Mozart, Sonos). `DeviceInfo::$renamable` is false where the platform can't rename (Sonos) |
+| `NetworkSettingsInterface` | `getNetwork(): NetworkState`, `setActiveInterface(string)`, `setWiredAddress(bool $dhcp, array $ipv4)`, `joinWifi(string $ssid, ?string $passphrase, ?string $security)` — `InvalidArgumentException` for an interface/setup the device can't use | If device has network settings (ASE). The writes aren't read back: the device may move to a new address |
+| `WirelessSpeakersInterface` | `getWirelessSpeakers(): WirelessSpeakersState`, `startWirelessScan()`, `stopWirelessScan()` | WiSA speaker setup (ASE driver, but only listed for models with the hardware: `HardwareFeatures` reads `wisa => true` from `config/devices.php`; only the BeoSound Moment) |
 | `SourcesInterface` | `getSources(): AvailableSource[]` | If device exposes a source list (ASE only) |
 | `SourceActivationInterface` | `activateSource(string $sourceId)` | If device supports switching sources (ASE only) |
 | `MultiRoomInterface` | `multiRoomMetaKey()`, `getMultiRoomId()`, `getJoinablePeerIds()`, `getCurrentPeerIds()`, `joinSession(Device $host)`, `leaveSession()` | If device supports multiroom grouping (ASE, Sonos) |
 | `LibraryPlaybackInterface` | `playLibraryTrack(Track $track)`, `playLibraryPlaylist(Playlist $playlist)` | If device can stream a local DLNA track/playlist |
 | `RadioControlInterface` | `radioPlatform(): string`, `canPlayRadioStation(RadioStation $station): bool`, `playRadioStation(RadioStation $station)` | If device can tune radio stations |
 | `DiscoveryInterface` | `discover(): DiscoveredDevice[]` | Implemented by a discovery service, not the driver itself |
+
+A driver covers a whole platform, but some features need hardware only some models have (WiSA on the Moment). `App\Domain\Device\HardwareFeatures` reads such per-model flags from `config/devices.php`, matched on the device's product type; `DeviceCapabilities::for()` drops a capability the model lacks and the settings API answers `422` for it.
 
 The API and UI check these interfaces to determine a device's capabilities at runtime — no separate capability configuration is needed. `App\Domain\Device\Capabilities::forDriver()` maps each contract to its REST capability string (`seek`, `queue`, …) from the driver *class name*, so listing devices never instantiates a driver or touches the network. The current shuffle/repeat/liked values are not read through the driver: the device's listener fires `PlaybackModesUpdated` with a `PlaybackModes` (`shuffle` ?bool, `repeat` ?`RepeatMode`, `liked` ?bool; null = unknown) whenever what it observes changes, which feeds `now_playing.modes` (cache `device:{id}:modes`) and the MQTT `/modes` topic. `MultiRoomInterface::getMultiRoomId()` also writes the platform ID (JID, UUID) to `device_meta` under the key returned by `multiRoomMetaKey()`, so devices can be looked up by peer ID later.
 
@@ -56,7 +63,7 @@ Console commands: `device-mozart:listen-single {id}` (per-device listener, regis
 
 **Path:** `app/Integrations/Sonos/`
 
-Implements media controls, volume, radio, multiroom, library playback, seek, queue (`getUpNext()` reads the Sonos queue after the current track; empty while streaming radio or line-in), shuffle and repeat. Shuffle and repeat share one AVTransport `PlayMode` string (`NORMAL`, `REPEAT_ALL`, `REPEAT_ONE`, `SHUFFLE_NOREPEAT`, `SHUFFLE`, `SHUFFLE_REPEAT_ONE`), mapped by `Sonos\PlayMode` since duncan3dc/sonos has no repeat-one; the listener reads it on every poll. Uses the `duncan3dc/sonos` library (v3) for UPnP/SOAP communication.
+Implements media controls, volume, radio, multiroom, library playback, seek, queue (`getUpNext()` reads the Sonos queue after the current track; empty while streaming radio or line-in), shuffle and repeat. Shuffle and repeat share one AVTransport `PlayMode` string (`NORMAL`, `REPEAT_ALL`, `REPEAT_ONE`, `SHUFFLE_NOREPEAT`, `SHUFFLE`, `SHUFFLE_REPEAT_ONE`), mapped by `Sonos\PlayMode` since duncan3dc/sonos has no repeat-one; the listener reads it on every poll. Uses the `duncan3dc/sonos` library (v3) for UPnP/SOAP communication. **Inputs:** `SourcesInterface` / `SourceActivationInterface` (`Connectors/SourceControls`) for soundbars and line-in speakers. `Sonos\SonosInputs` maps the model (`device_product_type`) to its inputs: `tv` for Ray/Beam/Arc/Playbar/Playbase/Amp (optical or HDMI eARC, always one "TV" input), `line_in` for Five/Play:5/Port/Connect/Amp; other models list none. Activating sets the transport URI to the speaker's own stream (`x-sonos-htastream:{uuid}:spdif`, `x-rincon-stream:{uuid}`) and plays; a grouped follower leaves its group first. The listener reports a track-less transport on one of these URIs as a `NowPlaying` with a `Source` (TV / Line-in), so clients get a source logo. Sonos soundbars also switch to TV by themselves when "TV autoplay" is on in the Sonos app.
 
 ### Spotify
 
@@ -149,3 +156,7 @@ $client->delete('path/to/resource');
 ```
 
 It sets `Content-Type: application/json`, decodes JSON responses, and has a 10s timeout. `get()` swallows exceptions and returns `[]` on failure; `post`/`put`/`delete` throw `RuntimeException` on a cURL error.
+
+### Default input on wake
+
+`device_meta` `default_source` (set on `/devices/{id}/settings`, "Input") names a source id. `Listeners\Device\SwitchToDefaultSource` (queued, on `DeviceStateChanged`) activates it when a device wakes (standby/unreachable to playing/paused) while no track or radio station is playing, and skips Sonos when it already plays that input. Playback someone started is never overridden.

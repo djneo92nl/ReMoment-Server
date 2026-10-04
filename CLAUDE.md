@@ -20,10 +20,13 @@ docs/
     client-devices.md       Client device registration flow, all endpoints, firmware guide
     library.md              Library browse (artists, albums, playlists), favorites, play album/artist/playlist on a device (DLNA or Spotify), playlist artwork
     server-info.md          GET /api/info bootstrap endpoint (API/MQTT/artwork addresses for clients)
+    device-settings.md      Sound adjustment (bass/treble/loudness), Bluetooth pairing, device name: endpoints, shapes, per-platform support
   architecture/
     client-devices.md       DB schema, model, controller, admin UI internals
     device-drivers.md       Driver contracts, existing drivers, guide for adding a new brand
     device-discovery.md     Discovery commands, listener startup, device_meta keys
+    ase-api-map.md          What the B&O ASE REST API offers beyond the driver (Bluetooth, network, WiSA, sound), per model; the ase:map command
+    proxmox-deployment.md   Ansible: LXC container on an existing Proxmox host, MiniDLNA server
     discovery-for-clients.md mDNS advertisement (_remoment._tcp via host Avahi) so clients find the server
     metadata-enrichment.md  Per-source enrichment jobs (MusicBrainz track/artist/album, Wikipedia, Cover Art Archive, lyrics, Spotify, Last.fm, TheAudioDB, Discogs), DLNA tags, canonical genres: markers, retries, rate limits, library:enrich
     lastfm.md                Scrobbling, now-playing, auth flow, artist enrichment, backfill
@@ -62,6 +65,9 @@ php artisan device:discovery
 
 # Sync B&O source/JID data for all ASE devices
 php artisan devices:sync-sources
+
+# Map a B&O ASE device's (or NetworkLink/MasterLink converter's) REST API — GET-only crawl; --compare diffs two devices
+php artisan ase:map {device id|ip} [--seed=BeoZone/Zone/Video] [--compare=storage/app/ase-maps/other.json]
 
 # Scan DLNA servers' libraries (triggered via UI or manually)
 php artisan library:scan [--server=192.168.1.20]
@@ -119,7 +125,7 @@ Response: `{ "data": DeviceDetailResource }`
 
 `state` values: `playing` | `standby` | `paused` | `unreachable`
 
-`capabilities` values: `media_controls` | `volume_control` | `radio_control` | `source_control` | `source_activation` | `multi_room` | `library_playback` | `seek` | `queue` | `shuffle` | `repeat` | `like` | `power`
+`capabilities` values: `media_controls` | `volume_control` | `radio_control` | `source_control` | `source_activation` | `multi_room` | `library_playback` | `seek` | `queue` | `queue_jump` | `shuffle` | `repeat` | `like` | `power` | `sound_adjustment` | `bluetooth` | `device_info` | `network_settings` | `wireless_speakers`
 
 Always check `capabilities` before calling a feature endpoint — calling an unsupported feature returns `422`. `capabilities` can change at runtime: a speaker Spotify is routed to also lists Spotify's playback capabilities (see below).
 
@@ -247,6 +253,25 @@ PUT  /api/devices/{id}/power           body: { "on": false }                → 
 ```
 
 `on: true` wakes the device, `on: false` puts it in standby. Mozart can only be put in standby: `on: true` returns `422` `{ "error": "unsupported", "message": "This device cannot be switched on remotely." }`. The resulting state arrives through the listener (`state` / MQTT `/state`).
+
+### Device settings
+
+Per-device settings behind their own capabilities; full shapes in `docs/api/device-settings.md`. Same errors as the controls (`503` unreachable, `422` unsupported / `invalid` value, `502` the device failed or didn't apply the change).
+
+```
+GET|PUT  /api/devices/{id}/sound-adjustment   → { bass: {value,min,max,step}, treble: {…}, loudness }   PUT { bass?, treble?, loudness? }   (capability `sound_adjustment`; ASE, Mozart, Sonos)
+GET|PUT  /api/devices/{id}/bluetooth          → { enabled, discoverable, reconnect_mode, reconnect_modes, writable, devices: [{id,name,address,connected}] }   PUT { discoverable?, reconnect_mode? }   (capability `bluetooth`; ASE; Mozart lists only, `writable: false`)
+DELETE   /api/devices/{id}/bluetooth/devices/{deviceId}   forget a paired device
+GET|PUT  /api/devices/{id}/info               → { name, product_type, firmware, mac_address, renamable }   PUT { name }   (capability `device_info`; ASE, Mozart, Sonos — Sonos can't rename)
+```
+
+The web page `/devices/{id}/settings` (admin login, `App\Livewire\DeviceSettings`) shows one card per capability the device has.
+
+```
+GET      /api/devices/{id}/network   → active interface, wired/wireless status and addresses, known Wi-Fi networks (never a passphrase)   (capability `network_settings`; ASE)
+PUT      /api/devices/{id}/network/interface | /network/wired | /network/wifi   → { status: "ok" } — not read back, the device may change address
+GET      /api/devices/{id}/wireless-speakers   POST …/wireless-speakers/scan { action: start|stop }   (capability `wireless_speakers`; WiSA: **only the BeoSound Moment**, via `wisa => true` in config/devices.php / `HardwareFeatures`)
+```
 
 ### Up Next (queue)
 
@@ -424,6 +449,8 @@ All drivers implement interfaces from `app/Integrations/Contracts/`:
 - `QueueInterface` – list up-next tracks (Sonos, Spotify)
 - `ShuffleInterface` / `RepeatInterface` – set shuffle and repeat (Sonos, Spotify, Mozart)
 - `LikeInterface` – like/save the playing track (Spotify)
+- `NetworkSettingsInterface` / `WirelessSpeakersInterface` – network status, interface, wired address, Wi-Fi join / WiSA scan (ASE; `HardwareFeatures` limits WiSA to models with `wisa => true`)
+- `SoundAdjustmentInterface` / `BluetoothInterface` / `DeviceInfoInterface` – bass/treble/loudness, Bluetooth pairing mode and paired devices, device name and firmware (ASE; Mozart and Sonos for sound adjustment and device info, Mozart lists Bluetooth; value objects in `app/Domain/Device/Settings/`; reads and writes use `HttpConnector::getStrict/putStrict` so an unreachable or rejecting device is never read as "empty")
 - `PowerInterface` – wake / standby (ASE, Mozart; Mozart can't be woken and throws `UnsupportedOperationException`, answered with 422)
 
 `App\Domain\Device\Capabilities::forDriver()` maps these contracts to the API capability strings from the driver class name, without instantiating the driver. What a device reports is `App\Domain\Device\DeviceCapabilities::for()`: that, plus Spotify's playback capabilities while Spotify is routed to it, plus `library_playback` when Spotify can play the library on it.
@@ -439,7 +466,7 @@ All drivers implement interfaces from `app/Integrations/Contracts/`:
 **Sonos** (`app/Integrations/Sonos/`)
 - Communicates via UPnP SOAP to device IP
 - Library: `duncan3dc/sonos` v3
-- Capabilities: media controls, volume, radio, multiroom, library playback, seek, queue, shuffle, repeat
+- Capabilities: media controls, volume, radio, multiroom, library playback, seek, queue, shuffle, repeat, sources (TV / line-in on soundbars and line-in speakers, by model)
 
 **Spotify** (`app/Integrations/Spotify/`)
 - Virtual device — polls Spotify Web API every 3 seconds

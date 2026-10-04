@@ -23,15 +23,15 @@ class PublishProgressToMqttTest extends TestCase
         $track = new TrackData(duration: $duration);
         $nowPlaying = new NowPlaying(track: $track);
 
-        (new DeviceCache())->updateNowPlaying($deviceId, $nowPlaying);
+        (new DeviceCache)->updateNowPlaying($deviceId, $nowPlaying);
 
         $this->mock(MqttService::class, function (MockInterface $mock) use ($deviceId) {
             $mock->shouldReceive('publish')
                 ->once()
-                ->with("remoment/player/{$deviceId}/progress", "50");
+                ->with("remoment/player/{$deviceId}/progress", '50');
         });
 
-        $event = new ProgressUpdated((string)$deviceId, $progress);
+        $event = new ProgressUpdated((string) $deviceId, $progress);
         $listener = app(PublishProgressToMqtt::class);
         $listener->handle($event);
     }
@@ -48,7 +48,7 @@ class PublishProgressToMqttTest extends TestCase
             $mock->shouldReceive('publish')->never();
         });
 
-        $event = new ProgressUpdated((string)$deviceId, $progress);
+        $event = new ProgressUpdated((string) $deviceId, $progress);
         $listener = app(PublishProgressToMqtt::class);
         $listener->handle($event);
     }

@@ -17,7 +17,7 @@ class ScanDlnaLibrary extends Command
     {
         if ($ip = $this->option('server')) {
             $server = DlnaServer::where('ip', $ip)->first();
-            if (! $server) {
+            if (!$server) {
                 $this->error("No known DLNA server with IP {$ip}. Run without --server to discover first.");
 
                 return self::FAILURE;

@@ -4,6 +4,7 @@ namespace App\Integrations\Sonos;
 
 use App\Domain\Device\QueueItem;
 use App\Domain\Device\RepeatMode;
+use App\Integrations\Contracts\DeviceInfoInterface;
 use App\Integrations\Contracts\LibraryPlaybackInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
@@ -14,8 +15,13 @@ use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\RepeatInterface;
 use App\Integrations\Contracts\SeekInterface;
 use App\Integrations\Contracts\ShuffleInterface;
+use App\Integrations\Contracts\SoundAdjustmentInterface;
+use App\Integrations\Contracts\SourceActivationInterface;
+use App\Integrations\Contracts\SourcesInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Integrations\Sonos\Connectors\MultiRoomControls;
+use App\Integrations\Sonos\Connectors\SettingsControls;
+use App\Integrations\Sonos\Connectors\SourceControls;
 use App\Models\Device;
 use App\Models\Media\Playlist;
 use App\Models\Media\Track;
@@ -28,9 +34,11 @@ use duncan3dc\Sonos\Tracks\Track as SonosTrack;
 use duncan3dc\Sonos\Utils\Time;
 use Illuminate\Support\Collection as TrackCollection;
 
-class MusicPlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, QueueInterface, QueueJumpInterface, RadioControlInterface, RepeatInterface, SeekInterface, ShuffleInterface, VolumeControlInterface
+class MusicPlayerDriver implements DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, QueueInterface, QueueJumpInterface, RadioControlInterface, RepeatInterface, SeekInterface, ShuffleInterface, SoundAdjustmentInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
 {
     use MultiRoomControls;
+    use SettingsControls;
+    use SourceControls;
 
     private ?Controller $deviceApi = null;
 

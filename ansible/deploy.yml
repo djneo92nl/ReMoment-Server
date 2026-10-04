@@ -6,7 +6,7 @@
 # Secrets: ansible-vault encrypt ansible/group_vars/vault.yml
 
 - name: Deploy ReMoment application
-  hosts: remoment_server
+  hosts: remoment_servers
   become: false
   vars_files:
       - group_vars/vault.yml

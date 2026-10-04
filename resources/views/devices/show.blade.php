@@ -31,6 +31,15 @@
                         <span class="hidden sm:inline">{{ $device->hidden ? 'Unhide' : 'Hide' }}</span>
                     </button>
                 </form>
+                @auth
+                    @if(array_intersect(\App\Livewire\DeviceSettings::SECTIONS, $capabilities))
+                        <a href="{{ route('devices.settings', $device) }}"
+                           class="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-stone-800 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-medium hover:bg-gray-200 dark:hover:bg-stone-700 transition-colors">
+                            <i class="fa-solid fa-gear"></i>
+                            <span class="hidden sm:inline">Settings</span>
+                        </a>
+                    @endif
+                @endauth
                 <a href="{{ route('devices.edit', $device) }}"
                    class="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-stone-800 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-medium hover:bg-gray-200 dark:hover:bg-stone-700 transition-colors">
                     <i class="fa-solid fa-pen-to-square"></i>
@@ -129,6 +138,9 @@
                         'library_playback' => ['fa-compact-disc', 'Library Playback'],
                         'seek'           => ['fa-forward',     'Seek'],
                         'queue'          => ['fa-list-ol',     'Up Next'],
+                        'sound_adjustment' => ['fa-sliders',   'Sound Adjustment'],
+                        'bluetooth'      => ['fa-link',       'Bluetooth'],
+                        'device_info'    => ['fa-circle-info', 'Device Info'],
                     ];
                 @endphp
                 <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8">

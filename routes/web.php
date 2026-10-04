@@ -61,6 +61,8 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/setup', fn () => view('setup.index'))->name('setup.index');
 
+    Route::get('/devices/{device}/settings', fn (\App\Models\Device $device) => view('devices.settings', ['device' => $device]))->name('devices.settings');
+
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
     Route::get('/settings/users', [SettingsController::class, 'users'])->name('settings.users');
     Route::get('/settings/listeners', [SettingsController::class, 'listeners'])->name('settings.listeners');

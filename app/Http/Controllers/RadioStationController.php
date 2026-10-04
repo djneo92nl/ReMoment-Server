@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Artwork\RadioStationArtwork;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Models\Device;
 use App\Models\RadioStation;
@@ -19,9 +20,13 @@ class RadioStationController extends Controller
             ->orderBy('name')
             ->get();
 
+        $artwork = $stations->mapWithKeys(fn (RadioStation $station) => [
+            $station->id => RadioStationArtwork::resolve($station)['proxy_120'] ?? null,
+        ]);
+
         $devices = $this->radioCapableDevices();
 
-        return view('radio.index', compact('stations', 'devices'));
+        return view('radio.index', compact('stations', 'devices', 'artwork'));
     }
 
     public function create()
