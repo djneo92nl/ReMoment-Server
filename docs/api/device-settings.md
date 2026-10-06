@@ -13,6 +13,7 @@ Errors, as for the controls: `503 unreachable`, `422 unsupported` (device lacks 
 | `device_info` | name, model, firmware, MAC; rename | model, firmware (`softwareupdate`); rename. The API can't read the name back, so ReMoment's own is shown | room name, model, firmware, MAC; **no rename** (`renamable: false`) | – |
 | `network_settings` | wired/Wi-Fi status, switch interface, wired DHCP/static, join Wi-Fi | – | – | – |
 | `wireless_speakers` | WiSA scan — **BeoSound Moment only** (see below) | – | – | – |
+| `wired_speakers` | speaker type per wired output — **Essence and Moment** (models with external speakers) | – | – | – |
 
 Mozart and Sonos are built from the Mozart OpenAPI spec and the Sonos library, **not yet tried on real hardware** (none was reachable). Treat their first run as unverified: report anything that looks off.
 
@@ -92,6 +93,22 @@ POST /api/devices/{id}/wireless-speakers/scan     body: { "action": "start" | "s
 **Only the BeoSound Moment has the WiSA hardware.** Every ASE speaker answers these endpoints (the Essence even lists `SPEAKER_WIRELESS_SETUP`), so the driver can't tell: the model flag `wisa => true` in `config/devices.php` decides, matched on the device's *Product* (`device_product_type`). Any other model — Essence, V1, M3, M5 — does not list the capability and answers `422 unsupported`. A Moment whose Product is empty is not recognised: set it to "BeoSound Moment" on the device's edit page.
 
 Unverified on hardware (the Moment was unreachable): the body of a scan (taken from the BeoNetRemote Postman collection), the scan states (anything but `notInitiated`/`stopped`/`done`/… counts as scanning) and the shape of a speaker entry (read from `id`/`address`/`name`/`friendlyName`/`state`/`status`).
+
+## Wired speakers — `wired_speakers`
+
+```
+GET /api/devices/{id}/wired-speakers
+→ { "speakers": [ { "id": "pl_1", "position": "left", "connected": true, "type": "Beolab 4", "types": ["None", "Beolab 1", … "Beolab Penta", "Beovox 1", "Beovox 2", "Other", "Line"], "sound": "none", "sounds": ["none", "localizationNoise"] }, { "id": "pl_2", "position": "right", … } ] }
+
+PUT /api/devices/{id}/wired-speakers/{id}      body: { "type": "Beolab 4" }   and/or   { "sound": "none" }
+→ the new state, as above
+```
+
+- `connected` is whether the device senses a speaker on the output. `types` is what the device lists; a value outside it is `422 invalid`. A write is read back, so a change the device ignores is a `502`.
+- `sound: "localizationNoise"` plays a test noise on the output so you can tell which speaker it is. The web page never starts it; it only offers a Stop button when one was left on.
+- **Which models:** the ones with external speakers, `speaker => 'external'` in `config/devices.php`: **BeoSound Essence and BeoSound Moment**. The Beoplay M3 and M5 have built-in speakers and no such outputs, but their firmware answers the same endpoint, so the model decides, not the API (`422 unsupported` for them). The device's *Product* must be set to the model name.
+- The Essence reports an empty list of types (its own web UI still offers a choice), so the driver falls back to the 34 names a Moment lists. **Unverified on an Essence:** whether it accepts those names.
+- **Verified on a Moment:** the body `PUT …/SpeakerWiredSetup/{id}` with `{"speaker": {"type": …}}` (a bad type: `Invalid speaker type`, a bad sound: `Invalid SpeakerSound`), and a real change of the left output to `Beolab 4`.
 
 ## ASE notes
 - `BeoDevice/bluetoothSettings/deviceSettings` rejects partial bodies (`A string was expected. Key: deviceName`) and demands `bluetoothOn` although it is read-only, so the driver reads, merges and writes the whole object.

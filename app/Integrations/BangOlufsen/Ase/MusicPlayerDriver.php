@@ -8,16 +8,19 @@ use App\Integrations\BangOlufsen\Ase\Connectors\BluetoothControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\ContentControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\DeviceControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\DeviceInfoControls;
+use App\Integrations\BangOlufsen\Ase\Connectors\LibraryPlayback;
 use App\Integrations\BangOlufsen\Ase\Connectors\MediaControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\MultiRoomControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\NetworkControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\SoundAdjustmentControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\SourceControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\VolumeControls;
+use App\Integrations\BangOlufsen\Ase\Connectors\WiredSpeakerControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\WirelessSpeakerControls;
 use App\Integrations\Common\HttpConnector;
 use App\Integrations\Contracts\BluetoothInterface;
 use App\Integrations\Contracts\DeviceInfoInterface;
+use App\Integrations\Contracts\LibraryPlaybackInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
@@ -28,22 +31,25 @@ use App\Integrations\Contracts\SoundAdjustmentInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\SourcesInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
+use App\Integrations\Contracts\WiredSpeakersInterface;
 use App\Integrations\Contracts\WirelessSpeakersInterface;
 use App\Models\Device;
 use App\Models\RadioStation;
 
-class MusicPlayerDriver implements BluetoothInterface, DeviceInfoInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, NetworkSettingsInterface, PowerInterface, RadioControlInterface, SoundAdjustmentInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface, WirelessSpeakersInterface
+class MusicPlayerDriver implements BluetoothInterface, DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, NetworkSettingsInterface, PowerInterface, RadioControlInterface, SoundAdjustmentInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface, WiredSpeakersInterface, WirelessSpeakersInterface
 {
     use BluetoothControls;
     use ContentControls;
     use DeviceControls;
     use DeviceInfoControls;
+    use LibraryPlayback;
     use MediaControls;
     use MultiRoomControls;
     use NetworkControls;
     use SoundAdjustmentControls;
     use SourceControls;
     use VolumeControls;
+    use WiredSpeakerControls;
     use WirelessSpeakerControls;
 
     public HttpConnector $deviceApi;

@@ -75,6 +75,39 @@
         </section>
     @endif
 
+    {{-- Wired speakers: only models with external speakers (Essence, Moment) --}}
+    @if(in_array('wired_speakers', $capabilities))
+        <section class="{{ $card }}">
+            <h2 class="{{ $heading }}">Speakers</h2>
+            @include('livewire.partials.settings-messages', ['section' => 'wired_speakers', 'problems' => $problems, 'notices' => $notices])
+            @if(!$ready)
+                {!! $skeleton !!}
+            @elseif($wiredSpeakers)
+                <div class="divide-y divide-gray-100 dark:divide-stone-800">
+                    @foreach($wiredSpeakers['speakers'] as $speaker)
+                        <div class="{{ $row }}" wire:key="wired-{{ $speaker['id'] }}">
+                            <div>
+                                <div class="text-sm text-gray-700 dark:text-gray-300">{{ ucfirst($speaker['position']) }} output</div>
+                                <div class="text-xs text-gray-400 dark:text-gray-600">{{ $speaker['connected'] ? 'Speaker detected' : 'No speaker detected' }}</div>
+                            </div>
+                            <x-select aria-label="{{ ucfirst($speaker['position']) }} speaker" wire:change="setWiredSpeakerType(@js($speaker['id']), $event.target.value)">
+                                @foreach($speaker['types'] as $type)
+                                    <option value="{{ $type }}" @selected($type === $speaker['type'])>{{ $type }}</option>
+                                @endforeach
+                            </x-select>
+                        </div>
+                        @if($speaker['sound'] !== 'none')
+                            <div class="{{ $row }}">
+                                <span class="text-sm text-amber-700 dark:text-amber-400">A test noise is playing on the {{ $speaker['position'] }} output.</span>
+                                <button type="button" wire:click="stopWiredSpeakerNoise(@js($speaker['id']))" class="px-4 py-2 bg-gray-100 dark:bg-stone-800 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-medium">Stop</button>
+                            </div>
+                        @endif
+                    @endforeach
+                </div>
+            @endif
+        </section>
+    @endif
+
     {{-- Bluetooth --}}
     @if(in_array('bluetooth', $capabilities))
         <section class="{{ $card }}">

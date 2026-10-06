@@ -129,7 +129,7 @@ Response: `{ "data": DeviceDetailResource }`
 
 `state` values: `playing` | `standby` | `paused` | `unreachable`
 
-`capabilities` values: `media_controls` | `volume_control` | `radio_control` | `source_control` | `source_activation` | `multi_room` | `library_playback` | `seek` | `queue` | `queue_jump` | `shuffle` | `repeat` | `like` | `power` | `sound_adjustment` | `bluetooth` | `device_info` | `battery` | `network_settings` | `wireless_speakers` | `source_controls`
+`capabilities` values: `media_controls` | `volume_control` | `radio_control` | `source_control` | `source_activation` | `multi_room` | `library_playback` | `seek` | `queue` | `queue_jump` | `shuffle` | `repeat` | `like` | `power` | `sound_adjustment` | `bluetooth` | `device_info` | `battery` | `network_settings` | `wireless_speakers` | `wired_speakers` | `source_controls`
 
 `battery` is `{ "level": 0-100, "charging": bool }` or `null` on every device (list and detail), and the `battery` capability is listed only once the device's listener has reported a battery (Mozart, portable Sonos; never ASE or Spotify) — a driver also covers mains-powered models.
 
@@ -278,6 +278,7 @@ The web page `/devices/{id}/settings` (admin login, `App\Livewire\DeviceSettings
 GET      /api/devices/{id}/network   → active interface, wired/wireless status and addresses, known Wi-Fi networks (never a passphrase)   (capability `network_settings`; ASE)
 PUT      /api/devices/{id}/network/interface | /network/wired | /network/wifi   → { status: "ok" } — not read back, the device may change address
 GET      /api/devices/{id}/wireless-speakers   POST …/wireless-speakers/scan { action: start|stop }   (capability `wireless_speakers`; WiSA: **only the BeoSound Moment**, via `wisa => true` in config/devices.php / `HardwareFeatures`)
+GET      /api/devices/{id}/wired-speakers   PUT …/wired-speakers/{pl_1|pl_2} { type?, sound? }   (capability `wired_speakers`; which speaker type is on each wired output: **only models with external speakers**, Essence and Moment, via `speaker => 'external'` in config/devices.php / `HardwareFeatures`)
 ```
 
 ### Source controls
@@ -470,6 +471,7 @@ All drivers implement interfaces from `app/Integrations/Contracts/`:
 - `ShuffleInterface` / `RepeatInterface` – set shuffle and repeat (Sonos, Spotify, Mozart)
 - `LikeInterface` – like/save the playing track (Spotify)
 - `NetworkSettingsInterface` / `WirelessSpeakersInterface` – network status, interface, wired address, Wi-Fi join / WiSA scan (ASE; `HardwareFeatures` limits WiSA to models with `wisa => true`)
+- `WiredSpeakersInterface` – speaker type per wired output (ASE; `HardwareFeatures` limits it to models with `speaker => 'external'`)
 - `BatteryInterface` – `getBattery(): ?BatteryStatus`, null when the model has no battery (Mozart, Sonos). The listeners, not the driver, feed the cache the UI and API read.
 - `SoundAdjustmentInterface` / `BluetoothInterface` / `DeviceInfoInterface` – bass/treble/loudness, Bluetooth pairing mode and paired devices, device name and firmware (ASE; Mozart and Sonos for sound adjustment and device info, Mozart lists Bluetooth; value objects in `app/Domain/Device/Settings/`; reads and writes use `HttpConnector::getStrict/putStrict` so an unreachable or rejecting device is never read as "empty")
 - `PowerInterface` – wake / standby (ASE, Mozart; Mozart can't be woken and throws `UnsupportedOperationException`, answered with 422)

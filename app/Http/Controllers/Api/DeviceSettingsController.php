@@ -10,6 +10,7 @@ use App\Integrations\Contracts\BluetoothInterface;
 use App\Integrations\Contracts\DeviceInfoInterface;
 use App\Integrations\Contracts\NetworkSettingsInterface;
 use App\Integrations\Contracts\SoundAdjustmentInterface;
+use App\Integrations\Contracts\WiredSpeakersInterface;
 use App\Integrations\Contracts\WirelessSpeakersInterface;
 use App\Models\Device;
 use Illuminate\Http\JsonResponse;
@@ -160,6 +161,26 @@ class DeviceSettingsController extends Controller
             $data['action'] === 'start' ? $driver->startWirelessScan() : $driver->stopWirelessScan();
 
             return $driver->getWirelessSpeakers()->toArray();
+        });
+    }
+
+    public function getWiredSpeakers(Device $device): JsonResponse
+    {
+        return $this->withDriver($device, WiredSpeakersInterface::class, 'wired_speakers',
+            fn (WiredSpeakersInterface $driver) => $driver->getWiredSpeakers()->toArray());
+    }
+
+    public function setWiredSpeaker(Request $request, Device $device, string $speakerId): JsonResponse
+    {
+        $data = $request->validate([
+            'type' => ['required_without:sound', 'nullable', 'string', 'max:64'],
+            'sound' => ['required_without:type', 'nullable', 'string', 'max:32'],
+        ]);
+
+        return $this->withDriver($device, WiredSpeakersInterface::class, 'wired_speakers', function (WiredSpeakersInterface $driver) use ($data, $speakerId) {
+            $driver->setWiredSpeaker($speakerId, $data['type'] ?? null, $data['sound'] ?? null);
+
+            return $driver->getWiredSpeakers()->toArray();
         });
     }
 

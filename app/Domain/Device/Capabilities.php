@@ -21,6 +21,7 @@ use App\Integrations\Contracts\SoundAdjustmentInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\SourcesInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
+use App\Integrations\Contracts\WiredSpeakersInterface;
 use App\Integrations\Contracts\WirelessSpeakersInterface;
 
 /**
@@ -51,6 +52,7 @@ final class Capabilities
         'battery' => BatteryInterface::class,
         'network_settings' => NetworkSettingsInterface::class,
         'wireless_speakers' => WirelessSpeakersInterface::class,
+        'wired_speakers' => WiredSpeakersInterface::class,
     ];
 
     /** Not a driver contract: reported while the active source has controls (see SourceControls). */

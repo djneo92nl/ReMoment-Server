@@ -162,6 +162,15 @@ class AseApiMapperTest extends TestCase
         (new ApiMapper('10.0.0.5'))->map();
     }
 
+    public function test_short_numeric_ids_of_catalogue_items_collapse_too(): void
+    {
+        $this->assertSame('BeoContent/music/deezerProfile/album/{id}/track', ApiMapper::template('BeoContent/music/deezerProfile/album/40888/track'));
+        $this->assertSame('BeoContent/music/deezerProfile/genre/{id}/albumTop', ApiMapper::template('BeoContent/music/deezerProfile/genre/106/albumTop'));
+        $this->assertSame('BeoZone/Zone/Sound/Mode/{id}', ApiMapper::template('BeoZone/Zone/Sound/Mode/1'));
+        $this->assertSame('BeoContent/music/moodWheelProfile/moodWheelItem/{id}/track', ApiMapper::template('BeoContent/music/moodWheelProfile/moodWheelItem/0-65338/track'));
+        $this->assertSame('BeoZone/Zone/Sound/Adjustment', ApiMapper::template('BeoZone/Zone/Sound/Adjustment'));
+    }
+
     public function test_compare_ignores_ids_of_list_members(): void
     {
         $a = ['endpoints' => ['BeoDevice' => [], 'BeoContent/fav/1111111' => [], 'BeoZone/Zone/Tv' => []]];

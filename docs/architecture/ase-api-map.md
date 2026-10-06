@@ -67,7 +67,19 @@ Destructive, not planned for the UI: `factoryReset`, `softwareUpdate` triggers.
 | Essence Mk2 (`BEOSOUND_ESSENCE_MK2`, fw 6.7) | Base map, above (84 endpoints) |
 | M3 (`CA17`), M5 (`CA16`) | + `wifiPowerSave`, + wireless network entry; M5 has `tunein_account` credentials instead of deezer |
 | BeoPlay V1 (`BEOPLAY_V1`, fw 1.0.11) | Much older and thinner API (29 endpoints), see below |
-| Moment, NetworkLink/MasterLink converter | Not mapped yet (not reachable). The converter is visible through the V1, see below. |
+| BeoSound Moment (`BEOSOUND_MOMENT_SOUNDHEART`, fw 2.2) | 213 endpoints, see below |
+| NetworkLink/MasterLink converter | Not mapped yet (not reachable). It is visible through the V1, see below. |
+
+### BeoSound Moment (`BEOSOUND_MOMENT_SOUNDHEART`)
+Mapped over wired Ethernet. The product type the device reports is `BEOSOUND_MOMENT_SOUNDHEART`; ReMoment's model name for it is "BeoSound Moment" (the `device_product_type` / `config/devices.php` key that `HardwareFeatures` matches on).
+
+- **WiSA looks the same as on the Essence.** `SpeakerWirelessSetup` answers `scan: notInitiated`, `standbyMode: disconnect`, `speaker: []`, `scan` editable with `start`/`stop`. Nothing on the API tells the Moment apart: the Essence lists `SPEAKER_WIRELESS_SETUP` too. The speaker entries are still unseen (none paired or scanned), so the shape of a found speaker stays unverified.
+- Its `Sound` features have no `SPEAKER_GROUP`, `SPEAKER_DPL_SETUP` or `SPEAKER_TEST_MODE` (the Essence has them), so no `Sound/SpeakerGroup` or `SpeakerTestMode`.
+- **`SpeakerWiredSetup`** has two power-link outputs `pl_1` (left) / `pl_2` (right), `sense: true`, and an editable `type` (the connected speaker: `None`, `Beolab 1` … `Beolab 20`, `Beolab Penta`, `Beovox 1/2`, `Other`, `Line`) and `sound` (`none` | `localizationNoise`). A candidate for a settings capability.
+- **DLNA on the device:** `BeoDevice/dlnaSettings` lists the DLNA servers the Moment sees (`id` = url-encoded UDN, `friendlyName`, `status: available`, `selected` — editable) plus `expertMode` and `browseForArtistImages`. `BeoContent/music/dlnaProfile/{album,artist,genre,playList,track}` is the device's own copy of the selected server's library, as paged lists (`offset`, `count`, `total`, `revision`). **All of them are empty (`total: 0`) while no server is `selected`**: selecting one makes the device harvest that server's library (`harvestSettings` has the per-service `action`: `none` | `harvest`, `reset` for TuneIn). Selecting is a write that triggers a full library import on the device and the server, so it has not been done; the item shapes are therefore unseen.
+- **Mood wheel:** `BeoContent/music/moodWheelProfile/moodWheelItem` is a paged list (`total: 100`, 50 per page) of `{ "id": "0-65338", "ring": "core", "mood": { "name": "Hopeful / Breezy", "graceNote": { "id": 65338 } } }` — Gracenote mood ids, with a `/relation/track` link per mood (`…/{id}/track`, a `trackList`). Every mood's `trackList` is empty (`total: 0`) while no DLNA server is selected, so the moods are presumably matched against the harvested library's tracks. `ring` was only `core` on the first page; the other 50 items were not read. `…/moodWheelItem/track` without an id is `400 Invalid Mood Id`.
+- **Deezer** appears as `BeoContent/music/deezerProfile/…` (charts, genres, albums) whether or not an account is set up: it is a built-in content profile, not a sign of a login. A crawl of it is huge (3000+ list members), so the mapper collapses any all-digit path segment to `{id}`.
+- Missing compared to the Essence: `remoteControlPairing`, the per-service `credentials/credential/*` entries, `List/Repeat`, `List/Shuffle`, `BeoHome`-less radio favourites paths (`netRadioProfile/favoriteList/…`).
 
 ### BeoPlay V1 (mapped in standby)
 Mapped while in standby, so `Sound`, `Stream` and `List` answered 500: their feature lists and children are **not yet seen** (that is probably where the extra TV commands live). Re-map with the V1 awake.

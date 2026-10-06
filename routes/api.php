@@ -39,6 +39,8 @@ Route::get('/devices/{device}/network', [DeviceSettingsController::class, 'getNe
 Route::put('/devices/{device}/network/interface', [DeviceSettingsController::class, 'setNetworkInterface']);
 Route::put('/devices/{device}/network/wired', [DeviceSettingsController::class, 'setWiredNetwork']);
 Route::put('/devices/{device}/network/wifi', [DeviceSettingsController::class, 'joinWifi']);
+Route::get('/devices/{device}/wired-speakers', [DeviceSettingsController::class, 'getWiredSpeakers']);
+Route::put('/devices/{device}/wired-speakers/{speakerId}', [DeviceSettingsController::class, 'setWiredSpeaker'])->where('speakerId', '[A-Za-z0-9_]+');
 Route::get('/devices/{device}/wireless-speakers', [DeviceSettingsController::class, 'getWirelessSpeakers']);
 Route::post('/devices/{device}/wireless-speakers/scan', [DeviceSettingsController::class, 'scanWirelessSpeakers']);
 Route::get('/devices/{device}/info', [DeviceSettingsController::class, 'getInfo']);

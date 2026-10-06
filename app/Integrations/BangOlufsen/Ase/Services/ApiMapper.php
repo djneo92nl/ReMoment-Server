@@ -141,7 +141,7 @@ class ApiMapper
     public static function template(string $path): string
     {
         $segments = array_map(function (string $segment) {
-            $isId = preg_match('/^\d{6,}$/', $segment)
+            $isId = preg_match('/^\d+(-\d+)*$/', $segment)
                 || preg_match('/%3a|%2f/i', $segment)
                 || (preg_match('/^[0-9a-f_:]{12,}$/i', $segment) && preg_match('/\d/', $segment));
 

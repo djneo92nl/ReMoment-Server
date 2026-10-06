@@ -23,6 +23,27 @@ class HardwareFeaturesTest extends TestCase
         }
     }
 
+    public function test_the_essence_and_the_moment_have_external_speakers_the_portables_do_not(): void
+    {
+        foreach (['BeoSound Essence', 'BeoSound Moment', 'beosound essence'] as $product) {
+            $this->assertTrue(HardwareFeatures::externalSpeakers($this->device($product)), $product);
+            $this->assertTrue(HardwareFeatures::allows($this->device($product), 'wired_speakers'), $product);
+        }
+
+        foreach (['Beoplay M3', 'Beoplay M5', 'Beosound Balance', 'Sonos Speaker', '', null] as $product) {
+            $this->assertFalse(HardwareFeatures::externalSpeakers($this->device($product)), (string) $product);
+            $this->assertFalse(HardwareFeatures::allows($this->device($product), 'wired_speakers'), (string) $product);
+        }
+    }
+
+    public function test_external_speakers_do_not_imply_wisa(): void
+    {
+        $essence = $this->device('BeoSound Essence');
+
+        $this->assertTrue(HardwareFeatures::allows($essence, 'wired_speakers'));
+        $this->assertFalse(HardwareFeatures::allows($essence, 'wireless_speakers'));
+    }
+
     public function test_the_gate_only_applies_to_hardware_bound_capabilities(): void
     {
         $essence = $this->device('BeoSound Essence');

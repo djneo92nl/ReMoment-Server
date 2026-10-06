@@ -13,6 +13,7 @@ use Tests\Support\FakeBareDriver;
 use Tests\Support\FakeNetworkDriver;
 use Tests\Support\FakeSettingsDriver;
 use Tests\Support\FakeSourceDriver;
+use Tests\Support\FakeWiredSpeakersDriver;
 use Tests\TestCase;
 
 class DeviceSettingsPageTest extends TestCase
@@ -324,5 +325,86 @@ class DeviceSettingsPageTest extends TestCase
         Livewire::test(DeviceSettings::class, ['device' => $device])->call('load')->call('reload', 'network_settings')->assertStatus(403);
 
         $this->assertSame([], FakeNetworkDriver::$calls);
+    }
+
+    private function wiredDevice(string $product): Device
+    {
+        FakeWiredSpeakersDriver::reset();
+
+        $device = Device::create([
+            'ip_address' => '10.0.0.12',
+            'device_name' => 'Speaker',
+            'device_brand_name' => 'Bang & Olufsen',
+            'device_product_type' => $product,
+            'device_driver' => FakeWiredSpeakersDriver::class,
+            'device_driver_name' => 'Fake',
+        ]);
+        DeviceCache::updateState($device->id, State::Standby);
+
+        return $device;
+    }
+
+    public function test_the_speakers_card_shows_for_external_speaker_models_only(): void
+    {
+        $this->admin();
+
+        Livewire::test(DeviceSettings::class, ['device' => $this->wiredDevice('Beoplay M3')])->call('load')->assertDontSee('Left output');
+
+        Livewire::test(DeviceSettings::class, ['device' => $this->wiredDevice('BeoSound Essence')])
+            ->call('load')
+            ->assertSee('Left output')
+            ->assertSee('Right output')
+            ->assertSee('Speaker detected')
+            ->assertSee('Beolab 3');
+    }
+
+    public function test_changes_a_speaker_type_and_shows_what_the_device_reports(): void
+    {
+        $device = $this->wiredDevice('BeoSound Moment');
+
+        $this->admin();
+        Livewire::test(DeviceSettings::class, ['device' => $device])
+            ->call('load')
+            ->call('setWiredSpeakerType', 'pl_1', 'Beolab 3')
+            ->assertSet('wiredSpeakers.speakers.0.type', 'Beolab 3')
+            ->assertSet('notices.wired_speakers', 'Saved.');
+
+        $this->assertSame([['pl_1', 'Beolab 3', null]], FakeWiredSpeakersDriver::$calls);
+    }
+
+    public function test_a_refused_speaker_type_shows_the_reason(): void
+    {
+        $device = $this->wiredDevice('BeoSound Moment');
+
+        $this->admin();
+        Livewire::test(DeviceSettings::class, ['device' => $device])
+            ->call('load')
+            ->call('setWiredSpeakerType', 'pl_1', 'Beolab 99')
+            ->assertSet('problems.wired_speakers', "Unknown speaker type 'Beolab 99'.");
+    }
+
+    public function test_a_test_noise_left_on_can_be_stopped_but_not_started_here(): void
+    {
+        $device = $this->wiredDevice('BeoSound Moment');
+        FakeWiredSpeakersDriver::$outputs['pl_2']['sound'] = 'localizationNoise';
+
+        $this->admin();
+        Livewire::test(DeviceSettings::class, ['device' => $device])
+            ->call('load')
+            ->assertSee('A test noise is playing on the right output')
+            ->call('stopWiredSpeakerNoise', 'pl_2')
+            ->assertDontSee('A test noise is playing')
+            ->assertSet('wiredSpeakers.speakers.1.sound', 'none');
+
+        $this->assertStringNotContainsString('localizationNoise', file_get_contents(resource_path('views/livewire/device-settings.blade.php')), 'the page never offers to start the noise');
+    }
+
+    public function test_guests_cannot_change_a_speaker(): void
+    {
+        $device = $this->wiredDevice('BeoSound Moment');
+
+        Livewire::test(DeviceSettings::class, ['device' => $device])->call('load')->call('setWiredSpeakerType', 'pl_1', 'Line')->assertStatus(403);
+
+        $this->assertSame([], FakeWiredSpeakersDriver::$calls);
     }
 }

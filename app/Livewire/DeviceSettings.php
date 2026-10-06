@@ -9,6 +9,7 @@ use App\Integrations\Contracts\DeviceInfoInterface;
 use App\Integrations\Contracts\NetworkSettingsInterface;
 use App\Integrations\Contracts\SoundAdjustmentInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
+use App\Integrations\Contracts\WiredSpeakersInterface;
 use App\Integrations\Contracts\WirelessSpeakersInterface;
 use App\Listeners\Device\SwitchToDefaultSource;
 use App\Models\Device;
@@ -24,7 +25,7 @@ class DeviceSettings extends Component
 {
     private const NETWORK_APPLIED = 'Applied. The device may take a moment and may come back on a new address; use Refresh once it is up.';
 
-    public const SECTIONS = ['sound_adjustment', 'bluetooth', 'device_info', 'network_settings', 'wireless_speakers', 'source_activation'];
+    public const SECTIONS = ['sound_adjustment', 'wired_speakers', 'bluetooth', 'device_info', 'network_settings', 'wireless_speakers', 'source_activation'];
 
     public Device $device;
 
@@ -49,6 +50,8 @@ class DeviceSettings extends Component
     public ?array $network = null;
 
     public ?array $wirelessSpeakers = null;
+
+    public ?array $wiredSpeakers = null;
 
     public bool $wiredDhcp = true;
 
@@ -135,6 +138,17 @@ class DeviceSettings extends Component
             $driver->joinWifi(trim($this->wifiSsid), $this->wifiPassphrase ?: null, trim($this->wifiSecurity) ?: null);
             $this->wifiPassphrase = '';
         }, self::NETWORK_APPLIED, reread: false);
+    }
+
+    public function setWiredSpeakerType(string $id, string $type): void
+    {
+        $this->run('wired_speakers', fn (WiredSpeakersInterface $driver) => $driver->setWiredSpeaker($id, type: $type), 'Saved.');
+    }
+
+    /** A test noise left on (by the device's own UI) can be stopped here; starting one is not offered. */
+    public function stopWiredSpeakerNoise(string $id): void
+    {
+        $this->run('wired_speakers', fn (WiredSpeakersInterface $driver) => $driver->setWiredSpeaker($id, sound: 'none'), 'Test noise stopped.');
     }
 
     public function startScan(): void
@@ -228,6 +242,7 @@ class DeviceSettings extends Component
                 'source_activation' => $this->fillInputs($driver->getSources()),
                 'network_settings' => $this->fillNetwork($driver->getNetwork()->toArray()),
                 'wireless_speakers' => $this->wirelessSpeakers = $driver->getWirelessSpeakers()->toArray(),
+                'wired_speakers' => $this->wiredSpeakers = $driver->getWiredSpeakers()->toArray(),
             };
         } catch (\Throwable $e) {
             $this->problems[$section] ??= 'Could not read this from the device: '.$e->getMessage();
@@ -275,6 +290,7 @@ class DeviceSettings extends Component
             'device_info' => DeviceInfoInterface::class,
             'network_settings' => NetworkSettingsInterface::class,
             'wireless_speakers' => WirelessSpeakersInterface::class,
+            'wired_speakers' => WiredSpeakersInterface::class,
             'source_activation' => SourceActivationInterface::class,
         ][$section];
 
