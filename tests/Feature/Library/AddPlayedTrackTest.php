@@ -127,4 +127,71 @@ class AddPlayedTrackTest extends TestCase
 
         $this->assertSame(Track::where('external_id', 'spotify:track:sp1')->value('id'), $play->fresh()->track_id);
     }
+
+    private function radioStub(Device $device): array
+    {
+        $artist = Artist::create(['name' => 'Nobody', 'source' => 'radio']);
+        $stub = Track::create(['artist_id' => $artist->id, 'name' => 'Stranger', 'source' => 'radio', 'images' => [['url' => 'http://static.airable.io/logo.png']]]);
+        $play = Play::create(['device_id' => $device->id, 'track_id' => $stub->id, 'radio_name' => 'KINK', 'source_type' => 'radio', 'played_at' => now()]);
+
+        return [$stub, $play];
+    }
+
+    public function test_a_radio_stub_is_offered_for_adding_and_replaced_by_the_spotify_track(): void
+    {
+        Queue::fake();
+        $device = $this->device();
+        [$stub, $play] = $this->radioStub($device);
+        (new DeviceCache)->updateNowPlaying($device->id, new NowPlayingData(
+            track: new TrackData(id: null, name: 'Stranger', artist: new ArtistData(name: 'Nobody')),
+            state: 'playing', position: 5, type: 'music',
+        ));
+
+        $api = Mockery::mock(SpotifyWebAPI::class);
+        $api->shouldReceive('search')->andReturn(['tracks' => ['items' => [
+            ['id' => 'sp1', 'name' => 'Stranger', 'artists' => [['name' => 'Nobody']]],
+        ]]]);
+        $api->shouldReceive('getTrack')->with('sp1')->andReturn([
+            'id' => 'sp1', 'name' => 'Stranger', 'artists' => [['name' => 'Nobody']], 'duration_ms' => 200000,
+            'album' => ['name' => 'Elsewhere', 'images' => [['url' => 'https://img.test/real.jpg']], 'release_date' => '2020-01-01'],
+        ]);
+        $this->mock(SpotifyTokenService::class, function ($m) use ($api) {
+            $m->shouldReceive('isConnected')->andReturn(true);
+            $m->shouldReceive('makeApiClient')->andReturn($api);
+        });
+
+        Livewire::test(Nowplaying::class, ['device' => $device])
+            ->assertSee('Add to library')
+            ->call('addToLibrary')
+            ->assertSee('Added to the library');
+
+        // The stub became the real track (same record, so its plays stay linked), with the real cover.
+        $real = Track::where('external_id', 'spotify:track:sp1')->sole();
+        $this->assertSame($stub->id, $real->id);
+        $this->assertSame('spotify', $real->source);
+        $this->assertSame('https://img.test/real.jpg', $real->images[0]['url']);
+        $this->assertSame($real->id, $play->fresh()->track_id);
+        $this->assertSame('KINK', $play->fresh()->radio_name);
+        $this->assertSame('Elsewhere', $real->album->name);
+    }
+
+    public function test_history_matches_a_radio_stub_to_a_library_track(): void
+    {
+        Queue::fake();
+        $device = $this->device();
+        [$stub, $play] = $this->radioStub($device);
+        $artist = Artist::where('name', 'Nobody')->first();
+        $real = Track::create(['artist_id' => $artist->id, 'name' => 'Stranger', 'external_id' => '1:1', 'source' => 'dlna', 'duration' => 200]);
+        $this->mock(SpotifyTokenService::class, fn ($m) => $m->shouldReceive('isConnected')->andReturn(false));
+
+        Livewire::test(PlayHistory::class)
+            ->assertSee('Match')
+            ->call('openMatch', $play->id)
+            ->assertSet('matchName', 'Stranger')
+            ->assertSet('matchArtist', 'Nobody')
+            ->call('chooseLocal', $real->id);
+
+        $this->assertNull(Track::find($stub->id));
+        $this->assertSame($real->id, $play->fresh()->track_id);
+    }
 }

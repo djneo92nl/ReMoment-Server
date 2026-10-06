@@ -70,13 +70,15 @@ class PlayHistory extends Component
     {
         $play = Play::find($playId);
 
-        if ($play === null || $play->track_id !== null || $play->track_name === null) {
+        $stub = $play?->track?->isRadioStub() ? $play->track : null;
+
+        if ($play === null || ($play->track_id !== null && $stub === null) || ($stub === null && $play->track_name === null)) {
             return;
         }
 
         $this->matchPlayId = $play->id;
-        $this->matchName = $play->track_name;
-        $this->matchArtist = $play->artist_name ?? '';
+        $this->matchName = $stub?->name ?? $play->track_name;
+        $this->matchArtist = $stub?->artist?->name ?? $play->artist_name ?? '';
         $this->searchMatch();
     }
 
@@ -109,6 +111,7 @@ class PlayHistory extends Component
 
         $this->matchLocal = Track::query()
             ->where('name', 'like', "%{$name}%")
+            ->where(fn ($q) => $q->whereNull('source')->orWhere('source', '!=', 'radio'))
             ->when($artist !== '', fn ($q) => $q->whereHas('artist', fn ($a) => $a->where('name', 'like', "%{$artist}%")))
             ->with(['artist', 'album'])
             ->orderBy('name')
@@ -167,7 +170,10 @@ class PlayHistory extends Component
     {
         $play = Play::find($this->matchPlayId);
 
-        if ($play !== null) {
+        if ($play?->track?->isRadioStub()) {
+            // The stub is replaced by the chosen track: all its plays move over.
+            PlayedTrackAdder::replaceStub($play->track, $track);
+        } elseif ($play !== null) {
             $play->update(['track_id' => $track->id]);
             PlayedTrackAdder::linkPlays($track, (string) $play->track_name, (string) $play->artist_name);
         }

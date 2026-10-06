@@ -69,6 +69,15 @@ class Track extends Model
         return $this->morphMany(Metadata::class, 'metadatable');
     }
 
+    /**
+     * A track that only exists because a radio stream announced it (source `radio`): no album, no
+     * id, and the station's logo as its image. Matching it to a real track replaces it.
+     */
+    public function isRadioStub(): bool
+    {
+        return $this->source === 'radio';
+    }
+
     public function getDlnaUrl(): ?string
     {
         if ($this->relationLoaded('metadata')) {

@@ -3,9 +3,11 @@
 namespace App\Domain\Library;
 
 use App\Domain\Media\NowPlaying;
+use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
 use App\Jobs\ImportSpotifyAlbum;
 use App\Models\Media\Track;
 use App\Models\Play;
+use App\Services\SpotifyTokenService;
 
 /**
  * Puts a track that is playing, or was played and only logged as text, into the library
@@ -24,7 +26,10 @@ class PlayedTrackAdder
             return true; // nothing to add
         }
 
-        return LibraryIdentity::lookupTrack($artist, $nowPlaying->album?->name, $name, self::externalId($nowPlaying), $track->source, $track->duration) !== null;
+        $found = LibraryIdentity::lookupTrack($artist, $nowPlaying->album?->name, $name, self::externalId($nowPlaying), $track->source, $track->duration);
+
+        // A radio stub (the stream's own announcement) isn't a library track yet.
+        return $found !== null && !$found->isRadioStub();
     }
 
     public static function add(NowPlaying $nowPlaying): ?Track
@@ -38,6 +43,21 @@ class PlayedTrackAdder
         }
 
         $source = $npTrack->source;
+        $externalId = self::externalId($nowPlaying);
+        $stub = LibraryIdentity::lookupTrack($artistName, $nowPlaying->album?->name, $name, $externalId, $source, $npTrack->duration);
+        $stub = $stub?->isRadioStub() ? $stub : null;
+
+        $stub?->update(['images' => null]); // the station's logo, so the real cover can take its place
+
+        // Without an id of its own (radio), look the track up on Spotify and put that in the library.
+        if ($externalId === null && ($spotifyId = self::findOnSpotify($artistName, $name)) !== null) {
+            $track = app(SpotifyLibraryImporter::class)->importTrackById($spotifyId);
+            self::replaceStub($stub, $track);
+            self::linkPlays($track, $name, $artistName);
+
+            return $track;
+        }
+
         $artist = LibraryIdentity::artist($artistName, $npTrack->artist?->source ?? $source);
 
         $album = null;
@@ -49,7 +69,6 @@ class PlayedTrackAdder
             ]);
         }
 
-        $externalId = self::externalId($nowPlaying);
         $track = LibraryIdentity::track($artist, $album, $name, $externalId, $source, [
             'duration' => $npTrack->duration,
             'images' => self::images($npTrack->images ?? []) ?: null,
@@ -66,6 +85,44 @@ class PlayedTrackAdder
         self::linkPlays($track, $name, $artistName);
 
         return $track;
+    }
+
+    /** Moves everything on a radio stub (its plays, metadata) to the real track and deletes the stub. */
+    public static function replaceStub(?Track $stub, Track $track): void
+    {
+        if ($stub === null || $stub->id === $track->id) {
+            return;
+        }
+
+        $stub->update(['images' => null]);
+        app(LibraryMerger::class)->mergeTracks($track->id, [$stub->id]);
+    }
+
+    /** Spotify's id for a track whose artist and name match exactly, null without a connection or a match. */
+    private static function findOnSpotify(string $artistName, string $name): ?string
+    {
+        $spotify = app(SpotifyTokenService::class);
+
+        if (!$spotify->isConnected()) {
+            return null;
+        }
+
+        try {
+            $results = $spotify->makeApiClient()->search(trim($name.' '.$artistName), 'track', ['limit' => 10]);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        foreach ($results['tracks']['items'] ?? [] as $candidate) {
+            $sameName = Normalizer::track($candidate['name'] ?? null) === Normalizer::track($name);
+            $sameArtist = collect($candidate['artists'] ?? [])->contains(fn ($a) => Normalizer::artist($a['name'] ?? null) === Normalizer::artist($artistName));
+
+            if ($sameName && $sameArtist && !empty($candidate['id'])) {
+                return $candidate['id'];
+            }
+        }
+
+        return null;
     }
 
     /** Points the plays that were logged as text for this track at the library track. */

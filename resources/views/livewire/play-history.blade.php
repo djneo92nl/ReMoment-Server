@@ -271,7 +271,7 @@
                                                 </div>
                                             @endif
 
-                                            @if($play->track_id === null && $play->track_name !== null)
+                                            @if(($play->track_id === null && $play->track_name !== null) || $play->track?->isRadioStub())
                                                 <button wire:click="openMatch({{ $play->id }})" type="button" title="Match to a library track"
                                                         class="flex-shrink-0 text-[11px] px-2 py-1 rounded-lg bg-gray-100 dark:bg-stone-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-stone-700 transition-colors">
                                                     <i class="fa-solid fa-link mr-1"></i>Match
