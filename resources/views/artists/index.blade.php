@@ -76,31 +76,11 @@
                     @if($heading !== '')
                         <h2 class="mb-2 text-sm font-semibold text-gray-400 dark:text-gray-600 tracking-wider">{{ $heading }}</h2>
                     @endif
-                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:.5rem">
+                    <x-album-grid>
                         @foreach($group as $artist)
-                            @php
-                                $cover = $artist->coverAlbum();
-                                $rawCover = $cover ? \App\Domain\Artwork\LibraryArtwork::coverUrl($cover->images) : null;
-                                $thumb = \App\Domain\Artwork\LibraryItemArtwork::webUrl(\App\Domain\Artwork\LibraryItemArtwork::forUrl($rawCover)['proxy_120'] ?? null) ?? $rawCover;
-                                $meta = $artist->albums_count.' '.Str::plural('album', $artist->albums_count)
-                                    .($artist->plays_count > 0 ? ' · '.number_format($artist->plays_count).' '.Str::plural('play', $artist->plays_count) : '');
-                            @endphp
-                            <a href="{{ route('artists.show', $artist) }}"
-                               class="flex items-center gap-3 p-2 rounded-xl bg-white dark:bg-stone-900 border border-gray-200/70 dark:border-stone-800/80 hover:border-gray-300 dark:hover:border-stone-600 transition-colors min-w-0">
-                                <div style="width:44px;height:44px;flex:none">
-                                    <x-artwork-thumb :src="$thumb" :colors="$cover?->colors" :seed="$artist->name"
-                                                     icon="fa-solid fa-microphone-lines" size="w-full h-full" rounded="rounded-lg" />
-                                </div>
-                                <div class="min-w-0 flex-1">
-                                    <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate leading-tight">{{ $artist->name }}</p>
-                                    <p class="text-xs text-gray-400 dark:text-gray-600 truncate mt-0.5">{{ $meta }}</p>
-                                </div>
-                                @if($artist->favorited_at)
-                                    <i class="fa-solid fa-star text-amber-400 text-[11px] flex-shrink-0"></i>
-                                @endif
-                            </a>
+                            <x-artist-card :artist="$artist" />
                         @endforeach
-                    </div>
+                    </x-album-grid>
                 </section>
             @endforeach
         </div>

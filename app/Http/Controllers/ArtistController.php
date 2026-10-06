@@ -55,7 +55,10 @@ class ArtistController extends Controller
             ->when($letter === '#', fn ($q) => $q->whereRaw('SUBSTR('.Artist::SORT_NAME_SQL.', 1, 1) NOT BETWEEN ? AND ?', ['a', 'z']))
             ->when($letter !== null && $letter !== '#', fn ($q) => $q->whereRaw('SUBSTR('.Artist::SORT_NAME_SQL.', 1, 1) = ?', [strtolower($letter)]))
             ->withCount(['plays', 'albums' => fn ($q) => LibrarySources::albums($q, $hidden)])
-            ->with(['albums' => fn ($q) => LibrarySources::albums($q, $hidden)->withCount('plays')->orderByDesc('plays_count')->orderByDesc('created_at')])
+            ->with([
+                'albums' => fn ($q) => LibrarySources::albums($q, $hidden)->withCount('plays')->orderByDesc('plays_count')->orderByDesc('created_at'),
+                'metadata' => fn ($q) => $q->where('key', 'images'),
+            ])
             ->when($sort === 'name', fn ($q) => $q->orderByRaw(Artist::SORT_NAME_SQL)->orderBy('artists.id'))
             ->when($sort === 'plays', fn ($q) => $q->orderByDesc('plays_count')->orderByRaw(Artist::SORT_NAME_SQL))
             ->when($sort === 'albums', fn ($q) => $q->orderByDesc('albums_count')->orderByRaw(Artist::SORT_NAME_SQL))
