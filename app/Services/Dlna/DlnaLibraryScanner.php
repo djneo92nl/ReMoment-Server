@@ -19,14 +19,21 @@ class DlnaLibraryScanner
     /** @var array<string, true> */
     private array $dispatchedArtwork = [];
 
-    public function scanServer(DlnaServer $server, ?callable $progress = null): int
+    /**
+     * @param  string|null  $root  a folder to start in instead of the top: its title or object id, or a path of
+     *                             titles ("Muziek/Albums"). A server that also holds films and series is
+     *                             otherwise crawled folder by folder before it reaches the music.
+     *
+     * @throws \InvalidArgumentException when the folder does not exist
+     */
+    public function scanServer(DlnaServer $server, ?callable $progress = null, ?string $root = null): int
     {
         $this->tracksImported = 0;
         $this->visitedContainers = [];
         $this->dispatchedArtwork = [];
 
         $client = new DlnaContentDirectoryClient($server->control_url);
-        $this->browseContainer($client, '0', $server, $progress);
+        $this->browseContainer($client, $this->resolveRoot($client, $root), $server, $progress);
 
         $server->update(['last_scanned_at' => now()]);
 
@@ -34,6 +41,26 @@ class DlnaLibraryScanner
         Enrichment::queueBacklog(Enrichment::SCAN_BATCH);
 
         return $this->tracksImported;
+    }
+
+    private function resolveRoot(DlnaContentDirectoryClient $client, ?string $root): string
+    {
+        $id = '0';
+
+        foreach (array_filter(explode('/', (string) $root), fn ($segment) => $segment !== '') as $segment) {
+            $containers = $client->browseChildren($id)['containers'];
+
+            $match = collect($containers)->first(fn (array $c) => $c['id'] === $segment || mb_strtolower($c['title']) === mb_strtolower($segment));
+            if ($match === null) {
+                $available = collect($containers)->pluck('title')->implode(', ') ?: 'none';
+
+                throw new \InvalidArgumentException("No folder '{$segment}' here. Available: {$available}.");
+            }
+
+            $id = $match['id'];
+        }
+
+        return $id;
     }
 
     private function browseContainer(

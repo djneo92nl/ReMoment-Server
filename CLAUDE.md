@@ -71,7 +71,7 @@ php artisan devices:sync-sources
 php artisan ase:map {device id|ip} [--seed=BeoZone/Zone/Video] [--compare=storage/app/ase-maps/other.json]
 
 # Scan DLNA servers' libraries (triggered via UI or manually)
-php artisan library:scan [--server=192.168.1.20]
+php artisan library:scan [--server=192.168.1.20] [--root=Muziek]   # --root: start in a folder (title, object id or Muziek/Albums) so a server with films and series isn't crawled first
 
 # Queue MusicBrainz/lyrics/Spotify/Last.fm enrichment for tracks still missing a source (scheduled daily)
 php artisan library:enrich [--limit=200] [--dry-run]

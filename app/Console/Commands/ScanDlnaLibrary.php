@@ -9,7 +9,9 @@ use Illuminate\Console\Command;
 
 class ScanDlnaLibrary extends Command
 {
-    protected $signature = 'library:scan {--server= : IP address of a specific server to scan}';
+    protected $signature = 'library:scan
+        {--server= : IP address of a specific server to scan}
+        {--root= : Folder to start in (title, object id or a path like Muziek/Albums), instead of crawling the whole server}';
 
     protected $description = 'Discover DLNA media servers and index their music library';
 
@@ -42,10 +44,17 @@ class ScanDlnaLibrary extends Command
             $bar->setFormat(' %current% tracks — %message%');
             $bar->start();
 
-            $count = $scanner->scanServer($server, function (int $total, string $title) use ($bar) {
-                $bar->setMessage(mb_strimwidth($title, 0, 50, '…'));
-                $bar->setProgress($total);
-            });
+            try {
+                $count = $scanner->scanServer($server, function (int $total, string $title) use ($bar) {
+                    $bar->setMessage(mb_strimwidth($title, 0, 50, '…'));
+                    $bar->setProgress($total);
+                }, $this->option('root') ?: null);
+            } catch (\InvalidArgumentException $e) {
+                $this->newLine();
+                $this->error($e->getMessage());
+
+                return self::FAILURE;
+            }
 
             $bar->finish();
             $this->newLine();

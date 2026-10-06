@@ -72,23 +72,28 @@ class DlnaContentDirectoryClient
     /** @return array{items: array, containers: array, total: int} */
     private function parseDidlLite(string $soapResponse): array
     {
+        // `=== false`, not `!$xml`: a SimpleXMLElement is falsy when it has no attributes or children in the
+        // default namespace, which is every reply whose envelope is fully qualified (Jellyfin's SOAP-ENV:).
         $xml = simplexml_load_string($soapResponse, 'SimpleXMLElement', LIBXML_NOCDATA);
-        if (!$xml) {
+        if ($xml === false) {
             return ['items' => [], 'containers' => [], 'total' => 0];
         }
 
         $body = $xml->children('http://schemas.xmlsoap.org/soap/envelope/')->Body;
         $browseResponse = $body->children('urn:schemas-upnp-org:service:ContentDirectory:1')->BrowseResponse;
 
-        $total = (int) ($browseResponse->TotalMatches ?? 0);
-        $resultXml = (string) ($browseResponse->Result ?? '');
+        // The out-arguments of a UPnP action are unqualified (<Result>, as Jellyfin sends them); some
+        // servers qualify them with the service namespace (<u:Result>). Read either.
+        $plain = $browseResponse->children('');
+        $total = (int) (string) $plain->TotalMatches ?: (int) (string) $browseResponse->TotalMatches;
+        $resultXml = (string) $plain->Result ?: (string) $browseResponse->Result;
 
         if (empty($resultXml)) {
             return ['items' => [], 'containers' => [], 'total' => $total];
         }
 
         $didl = simplexml_load_string($resultXml, 'SimpleXMLElement', LIBXML_NOCDATA);
-        if (!$didl) {
+        if ($didl === false) {
             return ['items' => [], 'containers' => [], 'total' => $total];
         }
 
