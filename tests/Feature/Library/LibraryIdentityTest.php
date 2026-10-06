@@ -271,6 +271,8 @@ class LibraryIdentityTest extends TestCase
     public function test_an_album_less_track_gets_its_album_on_a_later_play(): void
     {
         $this->play('Yellow', 'Coldplay', null);
+        // Consecutive reports of the same track count as one play; forget it, as a later play would.
+        \Illuminate\Support\Facades\Cache::flush();
         $this->play('Yellow', 'Coldplay', 'Parachutes');
 
         $this->assertSame(1, Track::count());

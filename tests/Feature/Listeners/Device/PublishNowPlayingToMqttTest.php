@@ -10,12 +10,15 @@ use App\Domain\Media\TrackData;
 use App\Events\Device\NowPlayingUpdated;
 use App\Listeners\Device\PublishNowPlayingToMqtt;
 use App\Services\MqttService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use Mockery\MockInterface;
 use Tests\TestCase;
 
 class PublishNowPlayingToMqttTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_it_publishes_now_playing_data_to_mqtt()
     {
         $deviceId = '1';
