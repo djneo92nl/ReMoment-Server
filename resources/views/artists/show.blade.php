@@ -185,7 +185,7 @@
                 $localAlbums = $artist->albums->filter($isLocal)->count();
                 $addedAlbums = $artist->albums->count() - $localAlbums;
             @endphp
-            @if($artist->albums->isNotEmpty() || $spotifyConnected)
+            @if($artist->albums->isNotEmpty())
                 <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8" x-data="{ localOnly: false }">
                     <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
                         <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600">Albums</h2>
@@ -196,16 +196,6 @@
                                     <i class="fa-solid" :class="localOnly ? 'fa-eye' : 'fa-eye-slash'"></i>
                                     <span x-text="localOnly ? 'Show all albums' : 'Only my library'"></span>
                                 </button>
-                            @endif
-                            @if($spotifyConnected)
-                                <form method="POST" action="{{ route('artists.fill', $artist) }}" x-data="{ busy: false }" @submit="busy = true">
-                                    @csrf
-                                    <button type="submit" :disabled="busy"
-                                            class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-100 dark:bg-stone-800 hover:bg-gray-200 dark:hover:bg-stone-700 text-xs text-gray-600 dark:text-gray-400 transition-colors disabled:opacity-60">
-                                        <i class="fa-brands fa-spotify text-emerald-500" :class="busy && 'animate-pulse'"></i>
-                                        <span x-text="busy ? 'Looking up…' : 'Show all albums from Spotify'"></span>
-                                    </button>
-                                </form>
                             @endif
                         </div>
                     </div>
