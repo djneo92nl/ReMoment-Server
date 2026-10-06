@@ -33,6 +33,7 @@ class LibraryPlaylistsApiTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        \App\Models\Setting::set(\App\Domain\Library\LeadingSource::SETTING, 'all');
 
         FakeLibraryPlaybackDriver::reset();
         $this->artist = Artist::create(['name' => 'Muse', 'source' => 'dlna']);

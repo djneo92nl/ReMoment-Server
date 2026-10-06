@@ -17,6 +17,12 @@ class GenresTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        \App\Models\Setting::set(\App\Domain\Library\LeadingSource::SETTING, 'all');
+    }
+
     public function test_spellings_collapse_and_non_genres_are_dropped(): void
     {
         $names = array_column(GenreNormalizer::normalize([

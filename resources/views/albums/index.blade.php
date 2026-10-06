@@ -6,6 +6,8 @@
                 <p class="mt-1.5 text-gray-500 dark:text-gray-500">{{ number_format($albums->total()) }} albums in your library</p>
             </div>
 
+            <div class="flex items-center gap-3 flex-wrap">
+            <x-library-scope :scope="$scope" />
             <form method="GET" action="{{ route('albums.index') }}">
                 <select name="sort" onchange="this.form.submit()"
                         class="rounded-xl border-gray-200 dark:border-stone-700 dark:bg-stone-900 text-sm text-gray-600 dark:text-gray-400 focus:ring-indigo-500 focus:border-indigo-500">
@@ -15,6 +17,7 @@
                     <option value="artist" @selected($sort === 'artist')>Artist</option>
                 </select>
             </form>
+            </div>
         </div>
     </x-slot>
 

@@ -1,7 +1,12 @@
 <x-app-layout>
     <x-slot name="header">
-        <h1 class="text-3xl md:text-4xl font-medium tracking-tight dark:text-gray-100 text-gray-900">Artists</h1>
-        <p class="mt-1.5 text-gray-500 dark:text-gray-500">{{ number_format($artists->total()) }} artists in your library</p>
+        <div class="flex items-end justify-between gap-4 flex-wrap">
+            <div>
+                <h1 class="text-3xl md:text-4xl font-medium tracking-tight dark:text-gray-100 text-gray-900">Artists</h1>
+                <p class="mt-1.5 text-gray-500 dark:text-gray-500">{{ number_format($artists->total()) }} artists in your library</p>
+            </div>
+            <x-library-scope :scope="$scope" />
+        </div>
     </x-slot>
 
     @if($artists->isEmpty())

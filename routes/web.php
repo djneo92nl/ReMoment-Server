@@ -76,6 +76,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/settings/dlna/discover', [SettingsController::class, 'dlnaDiscover'])->name('settings.dlna.discover');
     Route::post('/settings/dlna/{server}/scan', [SettingsController::class, 'dlnaScan'])->name('settings.dlna.scan');
 
+    Route::get('/settings/library', [SettingsController::class, 'library'])->name('settings.library');
+    Route::post('/settings/library', [SettingsController::class, 'librarySave'])->name('settings.library.save');
+
     Route::get('/settings/mqtt', [SettingsController::class, 'mqtt'])->name('settings.mqtt');
 
     Route::get('/settings/spotify', [SettingsController::class, 'spotify'])->name('settings.spotify');

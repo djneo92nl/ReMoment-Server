@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibraryPlayback;
+use App\Domain\Library\LibrarySources;
 use App\Domain\Library\NotPlayableException;
 use App\Domain\Library\PlaybackFailedException;
 use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
@@ -22,8 +24,10 @@ class AlbumController extends Controller
             ? $request->query('sort')
             : 'plays';
 
-        $albums = Album::query()
-            ->where(fn ($q) => $q->whereHas('plays')->orWhere('albums.source', 'dlna'))
+        $scope = LeadingSource::forRequest($request);
+
+        $albums = LibrarySources::albums(Album::query(), LeadingSource::hidden($scope))
+            ->whereHas('tracks')
             ->with('artist')
             ->withCount('plays')
             ->when($sort === 'plays', fn ($q) => $q->orderByDesc('plays_count')->orderByDesc('created_at'))
@@ -36,7 +40,7 @@ class AlbumController extends Controller
             ->paginate(50)
             ->withQueryString();
 
-        return view('albums.index', compact('albums', 'sort'));
+        return view('albums.index', compact('albums', 'sort', 'scope'));
     }
 
     public function show(Album $album)

@@ -557,6 +557,10 @@ DLNA servers are discovered on the network and their tracks imported into the sh
 
 **Scanner:** `DlnaLibraryScanner` recursively browses the DLNA content tree via `DlnaContentDirectoryClient` (SOAP/UPnP), finding or creating `Artist`, `Album` and `Track` records through `LibraryIdentity` (a track already imported from Spotify or recorded from a play is reused and gets the `dlna_url`) and `Metadata` records. Triggered via the Settings UI or `php artisan library:scan [--server=ip]`.
 
+### Leading source
+
+`App\Domain\Library\LeadingSource`: DLNA leads the library when it has imported tracks (else Spotify; setting at `/settings/library`). Web pages and `/api/library/*` default to that source's scope; `?scope=local|streaming|all` overrides it, nothing is deleted. See `docs/architecture/library-identity.md`.
+
 ### Library Identity
 
 One record per artist, album and track across all sources (DLNA scan, Spotify import, plays); see `docs/architecture/library-identity.md`.

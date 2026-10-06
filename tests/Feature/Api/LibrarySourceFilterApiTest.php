@@ -16,6 +16,12 @@ class LibrarySourceFilterApiTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        \App\Models\Setting::set(\App\Domain\Library\LeadingSource::SETTING, 'all');
+    }
+
     private function client(array $hidden): Client
     {
         return Client::create([

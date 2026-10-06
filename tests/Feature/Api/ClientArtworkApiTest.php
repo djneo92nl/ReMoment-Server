@@ -27,6 +27,7 @@ class ClientArtworkApiTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        \App\Models\Setting::set(\App\Domain\Library\LeadingSource::SETTING, 'all');
 
         $this->artist = Artist::create(['name' => 'A', 'source' => 'spotify']);
 

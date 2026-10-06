@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Domain\Artwork\LibraryArtwork;
 use App\Domain\Artwork\LibraryItemArtwork;
 use App\Domain\Artwork\PlaylistArtwork;
+use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\LibrarySources;
 use App\Http\Controllers\Controller;
@@ -347,17 +348,26 @@ class LibraryController extends Controller
     }
 
     /**
-     * The sources the requesting client hides (`?client={api_token}`, see
-     * docs/api/library.md); none without the parameter. Radio is not part
+     * The sources hidden for this request: the scope (`?scope=local|streaming|all`,
+     * default the leading source, see docs/api/library.md) plus what the
+     * requesting client hides (`?client={api_token}`). Radio is not part
      * of the library, so it has no effect here.
      */
     private function hiddenSources(Request $request): array
     {
-        $request->validate(['client' => ['nullable', 'string', 'max:100']]);
+        $request->validate([
+            'client' => ['nullable', 'string', 'max:100'],
+            'scope' => ['nullable', 'in:'.implode(',', LeadingSource::SCOPES)],
+        ]);
 
-        return $request->filled('client')
+        $client = $request->filled('client')
             ? LibrarySources::hiddenFor(Client::where('api_token', $request->query('client'))->firstOrFail())
             : [];
+
+        return array_values(array_unique([
+            ...$client,
+            ...LeadingSource::hidden(LeadingSource::scope($request->query('scope'))),
+        ]));
     }
 
     private function artistItem(Artist $artist): array

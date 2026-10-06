@@ -62,6 +62,11 @@
                     Not Connected
                 @endif
             </x-settings-row>
+            <x-settings-row href="{{ route('settings.library') }}"
+                             icon="fa-solid fa-compact-disc" icon-bg="bg-indigo-50 dark:bg-indigo-900/20" icon-color="text-indigo-500"
+                             label="Library">
+                Leading source: {{ ['dlna' => 'DLNA', 'spotify' => 'Spotify', 'all' => 'everything'][\App\Domain\Library\LeadingSource::leading()] }}
+            </x-settings-row>
             <x-settings-row href="{{ route('settings.mqtt') }}"
                              icon="fa-solid fa-tower-broadcast" icon-bg="bg-amber-50 dark:bg-amber-900/20" icon-color="text-amber-500"
                              label="MQTT">

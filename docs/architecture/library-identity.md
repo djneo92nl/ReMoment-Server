@@ -88,3 +88,7 @@ Everything referencing library rows: `tracks.album_id`, `tracks.artist_id`, `alb
 - Albums are per artist: a compilation imported per track artist (Spotify import uses the track's first artist) is still split by artist.
 - Two different songs with the same title and nearly the same length on one album would be merged.
 - Two imports running at the same moment can still create a duplicate; the next `library:merge-duplicates` run folds it in.
+
+## Leading source
+
+`App\Domain\Library\LeadingSource` decides which source the library pages and API show by default (setting `library_leading_source`: `auto` = DLNA if it has tracks else Spotify, `dlna`, `spotify`, `all`). A scope (`local`, `streaming`, `all`) maps to `LibrarySources` hidden sources (`local` hides `spotify`, `streaming` hides `dlna`), so it's a query filter only. The web pages take `?scope=` and remember it in the session (`<x-library-scope>` toggle); the API takes `?scope=`.

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Domain\Artwork\SdCardExport;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\DeviceListeners;
+use App\Domain\Library\LeadingSource;
 use App\Integrations\Spotify\MusicPlayerDriver as SpotifyDriver;
 use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
 use App\Integrations\Spotify\SpotifyDevice;
@@ -52,6 +53,25 @@ class SettingsController extends Controller
             'connected' => $lastfm->isConnected(),
             'username' => $lastfm->username(),
         ]);
+    }
+
+    public function library()
+    {
+        return view('settings.library', [
+            'mode' => LeadingSource::mode(),
+            'leading' => LeadingSource::leading(),
+        ]);
+    }
+
+    public function librarySave(Request $request)
+    {
+        $validated = $request->validate([
+            'leading_source' => ['required', 'in:'.implode(',', LeadingSource::MODES)],
+        ]);
+
+        Setting::set(LeadingSource::SETTING, $validated['leading_source']);
+
+        return redirect()->route('settings.library')->with('success', 'Library settings saved.');
     }
 
     public function mqtt()

@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibraryPlayback;
+use App\Domain\Library\LibrarySources;
 use App\Domain\Library\NotPlayableException;
 use App\Domain\Library\PlaybackFailedException;
 use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
@@ -16,16 +18,20 @@ use Illuminate\Support\Str;
 
 class ArtistController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $artists = Artist::query()
-            ->where(fn ($q) => $q->whereHas('plays')->orWhere('source', 'dlna'))
-            ->withCount('plays')
-            ->with(['albums' => fn ($q) => $q->withCount('plays')->orderByDesc('plays_count')->orderByDesc('created_at')])
-            ->orderByDesc('plays_count')
-            ->paginate(50);
+        $scope = LeadingSource::forRequest($request);
+        $hidden = LeadingSource::hidden($scope);
 
-        return view('artists.index', compact('artists'));
+        $artists = LibrarySources::artists(Artist::query(), $hidden)
+            ->whereHas('albums')
+            ->withCount('plays')
+            ->with(['albums' => fn ($q) => LibrarySources::albums($q, $hidden)->withCount('plays')->orderByDesc('plays_count')->orderByDesc('created_at')])
+            ->orderByDesc('plays_count')
+            ->paginate(50)
+            ->withQueryString();
+
+        return view('artists.index', compact('artists', 'scope'));
     }
 
     public function show(Artist $artist)

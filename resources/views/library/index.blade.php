@@ -1,7 +1,12 @@
 <x-app-layout>
     <x-slot name="header">
-        <h1 class="text-3xl md:text-4xl font-medium tracking-tight dark:text-gray-100 text-gray-900">Library</h1>
-        <p class="mt-1.5 text-gray-500 dark:text-gray-500">What's new and what's playing</p>
+        <div class="flex items-end justify-between gap-4 flex-wrap">
+            <div>
+                <h1 class="text-3xl md:text-4xl font-medium tracking-tight dark:text-gray-100 text-gray-900">Library</h1>
+                <p class="mt-1.5 text-gray-500 dark:text-gray-500">What's new and what's playing</p>
+            </div>
+            <x-library-scope :scope="$scope" />
+        </div>
     </x-slot>
 
     <div class="space-y-8">

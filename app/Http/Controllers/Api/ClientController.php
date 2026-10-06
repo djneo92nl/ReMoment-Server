@@ -8,6 +8,7 @@ use App\Domain\Artwork\NowPlayingArtwork;
 use App\Domain\Artwork\PlaylistArtwork;
 use App\Domain\Artwork\SourceLogo;
 use App\Domain\Device\SpotifyRouting;
+use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibrarySources;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\DeviceListResource;
@@ -127,7 +128,7 @@ class ClientController extends Controller
         ]);
         $offset = (int) ($validated['cursor'] ?? 0);
 
-        $albums = LibrarySources::albums(LibraryArtwork::albumsByRecency(), LibrarySources::hiddenFor($client))
+        $albums = LibrarySources::albums(LibraryArtwork::albumsByRecency(), array_values(array_unique([...LibrarySources::hiddenFor($client), ...LeadingSource::hidden(LeadingSource::scope(null))])))
             ->offset($offset)
             ->limit(self::ARTWORK_PAGE_SIZE)
             ->get();
