@@ -19,6 +19,8 @@ class InfoController extends Controller
     public function __invoke(Request $request): JsonResponse
     {
         $baseUrl = $request->getSchemeAndHttpHost();
+        $mqttHost = config('mqtt.public_host') ?: $request->getHost();
+        $wsPort = (int) config('mqtt.public_ws_port');
 
         return response()->json([
             'name' => config('app.name'),
@@ -28,9 +30,12 @@ class InfoController extends Controller
             'api_base_url' => "{$baseUrl}/api",
             'artwork_base_url' => $baseUrl,
             'mqtt' => [
-                'host' => config('mqtt.public_host') ?: $request->getHost(),
+                'host' => $mqttHost,
                 'port' => (int) config('mqtt.public_port'),
                 'topic_prefix' => 'remoment/player',
+                // MQTT over WebSocket, for browsers and apps that can't open a raw TCP socket.
+                'ws_port' => $wsPort,
+                'ws_url' => config('mqtt.ws_url') ?: ($request->isSecure() ? 'wss' : 'ws')."://{$mqttHost}:{$wsPort}",
             ],
             // Shown by clients whenever there is no artwork; rendered on the spot if missing.
             'placeholder' => NowPlayingArtwork::placeholder(),

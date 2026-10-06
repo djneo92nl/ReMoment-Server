@@ -4,6 +4,7 @@ namespace App\Domain\Library;
 
 use App\Domain\Artwork\LibraryArtwork;
 use App\Models\Media\Album;
+use App\Models\Media\Artist;
 use App\Models\Media\Track;
 use App\Models\Play;
 use Illuminate\Database\Eloquent\Model;
@@ -54,11 +55,11 @@ class LibraryRemover
     /** Removes every track of an album that has none on DLNA; returns how many, null when the album has DLNA tracks. */
     public static function album(Album $album): ?int
     {
-        $tracks = $album->tracks()->with('metadata')->get();
-
-        if ($tracks->contains(fn (Track $t) => !$t->isRemovable())) {
+        if (LibrarySources::availableFrom($album->tracks(), 'dlna')->exists()) {
             return null;
         }
+
+        $tracks = $album->tracks()->with('metadata')->get();
 
         foreach ($tracks as $track) {
             self::track($track);
@@ -68,6 +69,37 @@ class LibraryRemover
         $album = Album::find($album->id);
         if ($album !== null && !$album->tracks()->exists()) {
             self::delete($album);
+        }
+
+        return $tracks->count();
+    }
+
+    /**
+     * Removes an artist with all its albums and tracks, when none of them is on DLNA (an artist with
+     * nothing left is simply deleted). Returns the number of tracks removed, null when DLNA tracks keep it.
+     */
+    public static function artist(Artist $artist): ?int
+    {
+        if (LibrarySources::availableFrom($artist->tracks(), 'dlna')->exists()) {
+            return null;
+        }
+
+        $tracks = $artist->tracks()->with('metadata')->get();
+
+        foreach ($tracks as $track) {
+            self::track($track);
+        }
+
+        // Albums that never had tracks, then the artist itself if removing the tracks didn't already.
+        foreach (Album::query()->where('artist_id', $artist->id)->get() as $album) {
+            if (!$album->tracks()->exists()) {
+                self::delete($album);
+            }
+        }
+
+        $artist = Artist::find($artist->id);
+        if ($artist !== null) {
+            self::delete($artist);
         }
 
         return $tracks->count();

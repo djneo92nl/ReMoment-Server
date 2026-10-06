@@ -66,6 +66,7 @@ Route::post('/devices/{device}/library/play-artist', [DeviceController::class, '
 Route::get('/library/artists', [LibraryController::class, 'artists']);
 Route::get('/library/artists/{artist}', [LibraryController::class, 'artist']);
 Route::put('/library/artists/{artist}/favorite', [LibraryController::class, 'favoriteArtist']);
+Route::get('/library/albums', [LibraryController::class, 'albums']);
 Route::get('/library/albums/{album}', [LibraryController::class, 'album']);
 Route::put('/library/albums/{album}/favorite', [LibraryController::class, 'favoriteAlbum']);
 Route::get('/library/genres', [LibraryController::class, 'genres']);

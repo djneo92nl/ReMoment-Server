@@ -167,6 +167,44 @@ class LibraryApiTest extends TestCase
         $this->getJson('/api/library/artists?cursor=nonsense')->assertStatus(422)->assertJsonValidationErrors('cursor');
     }
 
+    public function test_albums_are_listed_by_name_and_sortable_and_only_with_tracks(): void
+    {
+        $zed = $this->artist('The Zed');
+        $abba = $this->artist('Abba');
+        $this->track($this->album($zed, 'Bravo', '2001-01-01'), 'One');
+        $this->track($this->album($abba, 'Charlie', '2020-01-01'), 'One');
+        $this->track($this->album($abba, 'Alpha'), 'One');
+        $this->album($abba, 'Empty');
+
+        $this->getJson('/api/library/albums')
+            ->assertOk()
+            ->assertJsonPath('data.*.name', ['Alpha', 'Bravo', 'Charlie'])
+            ->assertJsonPath('data.0.artist_name', 'Abba')
+            ->assertJsonPath('next_cursor', null);
+
+        $this->getJson('/api/library/albums?sort=year')->assertJsonPath('data.*.name', ['Charlie', 'Bravo', 'Alpha']);
+        $this->getJson('/api/library/albums?sort=artist')->assertJsonPath('data.*.name', ['Alpha', 'Charlie', 'Bravo']);
+        $this->getJson('/api/library/albums?sort=added')->assertJsonPath('data.*.name', ['Alpha', 'Charlie', 'Bravo']);
+        $this->getJson('/api/library/albums?sort=bogus')->assertUnprocessable()->assertJsonValidationErrors('sort');
+    }
+
+    public function test_albums_are_paged_by_an_opaque_cursor(): void
+    {
+        $artist = $this->artist('Many');
+        foreach (range(1, 62) as $i) {
+            $this->track($this->album($artist, sprintf('Album %02d', $i)), 'One');
+        }
+
+        $cursor = $this->getJson('/api/library/albums')->assertJsonCount(60, 'data')->json('next_cursor');
+        $this->assertIsString($cursor);
+
+        $this->getJson('/api/library/albums?cursor='.$cursor)
+            ->assertJsonPath('data.*.name', ['Album 61', 'Album 62'])
+            ->assertJsonPath('next_cursor', null);
+
+        $this->getJson('/api/library/albums?cursor=nonsense')->assertStatus(422)->assertJsonValidationErrors('cursor');
+    }
+
     public function test_artwork_is_the_small_object_or_null_and_queued_once(): void
     {
         Queue::fake();

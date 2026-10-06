@@ -14,6 +14,17 @@
                         </button>
                     </form>
                 </div>
+                @auth
+                    @if(! \App\Domain\Library\LibrarySources::availableFrom($artist->tracks(), 'dlna')->exists())
+                        <form method="POST" action="{{ route('artists.destroy', $artist) }}" class="mt-2" onsubmit="return confirm('Remove this artist and all their albums and tracks from the library? Your play history is kept.')">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="text-xs text-gray-400 hover:text-red-500 transition-colors">
+                                <i class="fa-solid fa-trash-can mr-1"></i>Remove from library
+                            </button>
+                        </form>
+                    @endif
+                @endauth
                 <p class="mt-1.5 text-gray-500 dark:text-gray-500">
                     {{ number_format($totalPlays) }} {{ Str::plural('play', $totalPlays) }}
                     @if($totalSeconds > 0)

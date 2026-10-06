@@ -29,8 +29,8 @@ class RemoveExternalTest extends TestCase
     {
         $artist = Artist::firstOrCreate(['name' => $artistName], ['source' => 'spotify']);
         $album = Album::create(['artist_id' => $artist->id, 'name' => $albumName, 'source' => 'spotify', 'images' => [['url' => 'https://img.test/c.jpg']]]);
-        Track::create(['artist_id' => $artist->id, 'album_id' => $album->id, 'name' => 'Hysteria', 'external_id' => 'spotify:track:1', 'source' => 'spotify', 'duration' => 200]);
-        Track::create(['artist_id' => $artist->id, 'album_id' => $album->id, 'name' => 'Stockholm', 'external_id' => 'spotify:track:2', 'source' => 'spotify', 'duration' => 180]);
+        Track::create(['artist_id' => $artist->id, 'album_id' => $album->id, 'name' => 'Hysteria', 'external_id' => 'spotify:track:'.md5($albumName.'1'), 'source' => 'spotify', 'duration' => 200]);
+        Track::create(['artist_id' => $artist->id, 'album_id' => $album->id, 'name' => 'Stockholm', 'external_id' => 'spotify:track:'.md5($albumName.'2'), 'source' => 'spotify', 'duration' => 180]);
 
         return $album;
     }
@@ -110,5 +110,34 @@ class RemoveExternalTest extends TestCase
         $this->dlnaTrackOn($this->spotifyAlbum());
 
         $this->get('/albums')->assertSee('In the DLNA library')->assertSee('From Spotify');
+    }
+
+    public function test_an_empty_artist_can_be_removed(): void
+    {
+        $artist = Artist::create(['name' => 'Nothing', 'source' => 'spotify']);
+        $this->actingAs(User::factory()->create());
+
+        $this->get(route('artists.show', $artist))->assertSee('Remove from library');
+        $this->delete(route('artists.destroy', $artist))->assertRedirect(route('artists.index'))->assertSessionHas('success');
+
+        $this->assertNull(Artist::find($artist->id));
+    }
+
+    public function test_removing_an_artist_removes_their_external_albums_but_not_when_dlna_has_tracks(): void
+    {
+        $album = $this->spotifyAlbum('Muse', 'Absolution');
+        $other = $this->spotifyAlbum('Muse', 'Origin of Symmetry');
+        $play = $this->play($album->tracks()->first());
+
+        $this->assertSame(4, LibraryRemover::artist($album->artist));
+        $this->assertSame(0, Track::count() + Album::count() + Artist::count());
+        $this->assertSame('Hysteria', $play->fresh()->track_name);
+
+        $keep = $this->spotifyAlbum('Keeper', 'Local mix');
+        $this->dlnaTrackOn($keep);
+        $this->assertNull(LibraryRemover::artist($keep->artist));
+        $this->assertNotNull(Artist::find($keep->artist_id));
+
+        $this->delete(route('artists.destroy', $keep->artist))->assertRedirect('/login');
     }
 }

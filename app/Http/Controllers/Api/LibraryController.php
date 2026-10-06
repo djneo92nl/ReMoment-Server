@@ -29,6 +29,8 @@ class LibraryController extends Controller
 {
     public const ARTISTS_PAGE_SIZE = 50;
 
+    public const ALBUMS_PAGE_SIZE = 60;
+
     public const PLAYLISTS_PAGE_SIZE = 50;
 
     /** Artists and albums listed in a genre's detail. */
@@ -77,6 +79,40 @@ class LibraryController extends Controller
         return response()->json([
             'data' => $artists->take(self::ARTISTS_PAGE_SIZE)->map(fn (Artist $artist) => $this->artistItem($artist))->values(),
             'next_cursor' => $hasMore ? $this->encodeCursor($offset + self::ARTISTS_PAGE_SIZE) : null,
+        ]);
+    }
+
+    /** All albums with tracks, paged: `sort` is name (default), artist ("The " ignored), year (newest first), added (newest first) or plays. */
+    public function albums(Request $request): JsonResponse
+    {
+        $request->validate([
+            'cursor' => ['nullable', 'string', 'max:200'],
+            'sort' => ['nullable', 'in:name,artist,year,added,plays'],
+        ]);
+        $hidden = $this->hiddenSources($request);
+        $offset = $this->decodeCursor($request->query('cursor'));
+
+        $query = LibrarySources::albums(Album::query(), $hidden)->whereHas('tracks')->with('artist');
+
+        match ($request->query('sort', 'name')) {
+            'artist' => $query->join('artists', 'artists.id', '=', 'albums.artist_id')
+                ->orderByRaw(self::ARTIST_SORT_NAME)->orderBy('albums.name')->select('albums.*'),
+            'year' => $query->orderByRaw('albums.released_at IS NULL')->orderByDesc('albums.released_at')->orderBy('albums.name'),
+            'added' => $query->orderByDesc('albums.created_at')->orderByDesc('albums.id'),
+            'plays' => $query->withCount('plays')->orderByDesc('plays_count')->orderByDesc('albums.created_at'),
+            default => $query->orderBy('albums.name'),
+        };
+
+        $albums = $query->orderBy('albums.id')
+            ->offset($offset)
+            ->limit(self::ALBUMS_PAGE_SIZE + 1)
+            ->get();
+
+        $hasMore = $albums->count() > self::ALBUMS_PAGE_SIZE;
+
+        return response()->json([
+            'data' => $albums->take(self::ALBUMS_PAGE_SIZE)->map(fn (Album $album) => $this->albumItem($album))->values(),
+            'next_cursor' => $hasMore ? $this->encodeCursor($offset + self::ALBUMS_PAGE_SIZE) : null,
         ]);
     }
 

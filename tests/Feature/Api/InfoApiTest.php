@@ -16,7 +16,7 @@ class InfoApiTest extends TestCase
 
     public function test_info_returns_the_bootstrap_shape(): void
     {
-        config(['app.name' => 'ReMoment', 'app.version' => '1.4.0', 'mqtt.public_host' => null, 'mqtt.public_port' => 1883]);
+        config(['app.name' => 'ReMoment', 'app.version' => '1.4.0', 'mqtt.public_host' => null, 'mqtt.public_port' => 1883, 'mqtt.public_ws_port' => 9001, 'mqtt.ws_url' => null]);
 
         $response = $this->getJson('http://192.168.1.50/api/info')->assertOk();
 
@@ -31,8 +31,23 @@ class InfoApiTest extends TestCase
                 'host' => '192.168.1.50',
                 'port' => 1883,
                 'topic_prefix' => 'remoment/player',
+                'ws_port' => 9001,
+                'ws_url' => 'ws://192.168.1.50:9001',
             ],
         ], Arr::except($response->json(), 'placeholder'));
+    }
+
+    public function test_websocket_address_follows_config_and_the_request_scheme(): void
+    {
+        config(['mqtt.public_host' => 'broker.lan', 'mqtt.public_ws_port' => 19001, 'mqtt.ws_url' => null]);
+
+        $this->getJson('https://remoment.local/api/info')
+            ->assertJsonPath('mqtt.ws_port', 19001)
+            ->assertJsonPath('mqtt.ws_url', 'wss://broker.lan:19001');
+
+        config(['mqtt.ws_url' => 'wss://proxy.lan/mqtt']);
+
+        $this->getJson('/api/info')->assertJsonPath('mqtt.ws_url', 'wss://proxy.lan/mqtt');
     }
 
     public function test_placeholder_is_the_music_logo_as_a_full_artwork_object(): void

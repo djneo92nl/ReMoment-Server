@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibraryPlayback;
+use App\Domain\Library\LibraryRemover;
 use App\Domain\Library\LibrarySources;
 use App\Domain\Library\NotPlayableException;
 use App\Domain\Library\PlaybackFailedException;
@@ -120,6 +121,18 @@ class ArtistController extends Controller
             : "Playing \"{$artist->name}\" on {$device->device_name}.";
 
         return back()->with('success', $message);
+    }
+
+    /** Removes an artist and everything of theirs that isn't on DLNA (admin); an empty artist just goes. */
+    public function destroy(Artist $artist)
+    {
+        $name = $artist->name;
+
+        if (LibraryRemover::artist($artist) === null) {
+            return back()->with('error', "\"{$name}\" has tracks from the DLNA library and can't be removed here.");
+        }
+
+        return redirect()->route('artists.index')->with('success', "Removed \"{$name}\" from the library.");
     }
 
     public function favorite(Artist $artist)
