@@ -16,6 +16,7 @@ Schedule::command('library:backfill-artwork')->daily();
 Schedule::command('artwork:prerender')->daily();
 Schedule::command('library:backfill-lastfm')->daily();
 Schedule::command('library:enrich')->daily();
+Schedule::command('library:artist-images')->daily();
 
 // Health heartbeats — see App\Domain\Health\Heartbeat and /settings/health.
 Schedule::call(function () {

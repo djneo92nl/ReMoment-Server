@@ -76,6 +76,9 @@ php artisan library:scan [--server=192.168.1.20]
 # Queue MusicBrainz/lyrics/Spotify/Last.fm enrichment for tracks still missing a source (scheduled daily)
 php artisan library:enrich [--limit=200] [--dry-run]
 
+# Queue Spotify photos for artists without one (scheduled daily; artists with a Spotify id are fetched 50 per request, others looked up by exact name)
+php artisan library:artist-images [--limit=1000] [--dry-run]
+
 # Rebuild canonical genres from stored genre metadata (after changing GenreNormalizer)
 php artisan library:sync-genres
 
@@ -87,7 +90,7 @@ php artisan library:merge-duplicates [--force]
 php artisan artwork:prerender [--limit=500] [--max-jobs=100]
 
 # Build the SD card artwork zip for the touch client (also on /settings/clients)
-php artisan artwork:export-sd [--size=1024x600|320x480] [--limit=500] [--queue]
+php artisan artwork:export-sd [--size=1024x600|320x480|480x480] [--limit=500] [--queue]
 ```
 
 ## REST API Reference
@@ -176,6 +179,7 @@ While a speaker mapped to a Spotify Connect name (`/settings/spotify-connect`) p
       "proxy_120": "http://remoment.local/storage/artwork/abc123/120.jpg",
       "proxy_bg": "http://remoment.local/storage/artwork/abc123/bg_1024x600.jpg",
       "proxy_bg_320x480": "http://remoment.local/storage/artwork/abc123/bg_320x480.jpg",
+      "proxy_bg_480x480": "http://remoment.local/storage/artwork/abc123/bg_480x480.jpg",
       "colors": ["#1a2b3c", "#4d5e6f", "#7a8b9c", "#0d1e2f", "#3c4d5e"],
       "safe_colors": ["#5d7fa3", "#4d5e6f", "#7a8b9c", "#4f86c4", "#3c4d5e"]
     },
@@ -184,7 +188,7 @@ While a speaker mapped to a Spotify Connect name (`/settings/spotify-connect`) p
 }
 ```
 
-`now_playing` is `null` when the device is in standby or unreachable. `artwork.kind` says what the image is: `album` (track/album cover), `radio` (the station's image from the stream or from its `image_url` in `/radio`, else a generated radio logo) or `source` (a generated logo for the source — Spotify, line-in, Bluetooth, TV, AirPlay/Cast, CD, or a music note — when nothing playing has an image). Logos have the same keys and go through the same pipeline as covers, so clients need no special case. A real image's `artwork` is absent on the first play of a new URL (processed asynchronously), present on all subsequent plays; logos are always present. Artwork URLs are prefixed with `APP_URL` (root-relative `/storage/…` when it is empty); clients should take the path from `/storage/` on and prefix `artwork_base_url` from `GET /api/info`. `proxy_512`/`proxy_320`/`proxy_120` are square covers; `proxy_bg` is a blurred, darkened 1024×600 background for the 7" landscape client and `proxy_bg_320x480` the same for the 3.5" portrait client (extra background sizes are always `proxy_bg_{w}x{h}`; a client picks `proxy_bg_{width}x{height}` for its own screen (e.g. `proxy_bg_320x480` on the 3.5" portrait client) and falls back to `proxy_bg` (1024×600) when that key is absent); all are **baseline** JPEGs (ESP32 TJpgDec can't decode progressive). `safe_colors` are `colors` lightened to ≥65% lightness for text/accents on dark backgrounds. An entry cached before a key existed may lack it until regenerated. `radio` and `source` keys are absent when not applicable — use whichever is present to identify playback type. `modes` is always present: `shuffle` (bool), `repeat` (`off` | `all` | `one`) and `liked` (bool), each `null` when unknown or unsupported; the same object is pushed on MQTT `/modes`.
+`now_playing` is `null` when the device is in standby or unreachable. `artwork.kind` says what the image is: `album` (track/album cover), `radio` (the station's image from the stream or from its `image_url` in `/radio`, else a generated radio logo) or `source` (a generated logo for the source — Spotify, line-in, Bluetooth, TV, AirPlay/Cast, CD, or a music note — when nothing playing has an image). Logos have the same keys and go through the same pipeline as covers, so clients need no special case. A real image's `artwork` is absent on the first play of a new URL (processed asynchronously), present on all subsequent plays; logos are always present. Artwork URLs are prefixed with `APP_URL` (root-relative `/storage/…` when it is empty); clients should take the path from `/storage/` on and prefix `artwork_base_url` from `GET /api/info`. `proxy_512`/`proxy_320`/`proxy_120` are square covers; `proxy_bg` is a blurred, darkened 1024×600 background for the 7" landscape client and `proxy_bg_320x480` the same for the 3.5" portrait client and `proxy_bg_480x480` for a square 480×480 screen (extra background sizes are always `proxy_bg_{w}x{h}`; a client picks `proxy_bg_{width}x{height}` for its own screen (e.g. `proxy_bg_320x480` on the 3.5" portrait client) and falls back to `proxy_bg` (1024×600) when that key is absent); all are **baseline** JPEGs (ESP32 TJpgDec can't decode progressive). `safe_colors` are `colors` lightened to ≥65% lightness for text/accents on dark backgrounds. An entry cached before a key existed may lack it until regenerated. `radio` and `source` keys are absent when not applicable — use whichever is present to identify playback type. `modes` is always present: `shuffle` (bool), `repeat` (`off` | `all` | `one`) and `liked` (bool), each `null` when unknown or unsupported; the same object is pushed on MQTT `/modes`.
 
 ### Media Controls
 
@@ -403,7 +407,7 @@ PUT   /api/clients/{api_token}/heartbeat              → updates IP, firmware, 
 GET   /api/clients/{api_token}/artwork?cursor=        → processed library covers to pre-cache, by hash
 ```
 
-The artwork list is `{ data: [{ kind, hash, proxy_320, proxy_120, proxy_bg, proxy_bg_320x480 }], next_cursor }`: the eight source logos (`kind: "source"`, first page only), processed playlist covers that aren't just an album's cover (`kind: "playlist"`: composites and playlists' own images, recently played first, first page only), then library albums whose cover is fully processed (`kind: "album"`), most recently played first, then the never-played rest by id. 200 albums are scanned per page (an offset cursor), so pages can be short; follow `next_cursor` until `null`. Unprocessed covers are skipped, not queued.
+The artwork list is `{ data: [{ kind, hash, proxy_320, proxy_120, proxy_bg, proxy_bg_320x480, proxy_bg_480x480 }], next_cursor }`: the eight source logos (`kind: "source"`, first page only), processed playlist covers that aren't just an album's cover (`kind: "playlist"`: composites and playlists' own images, recently played first, first page only), then library albums whose cover is fully processed (`kind: "album"`), most recently played first, then the never-played rest by id. 200 albums are scanned per page (an offset cursor), so pages can be short; follow `next_cursor` until `null`. Unprocessed covers are skipped, not queued.
 
 See `docs/api/client-devices.md` for full request/response shapes, the registration flow, firmware implementation notes, and an Arduino sketch outline.
 
@@ -417,7 +421,7 @@ The Mosquitto broker runs in Docker on port 1883. Each device's MQTT base topic 
 
 | Topic | Trigger | Payload |
 |-------|---------|---------|
-| `remoment/player/{id}/data` | New track starts (retained); cleared on standby/unreachable | `{ "track": "Name", "artist": "Name", "album": "Name"|null, "duration": 213|null, "artwork": { "kind": "album", "proxy_512": "…", "proxy_320": "…", "proxy_120": "…", "proxy_bg": "…", "proxy_bg_320x480": "…", "colors": ["#…"], "safe_colors": ["#…"] } }` (same `artwork` object as the REST API; ~800 bytes, so MQTT clients need a buffer above PubSubClient's 256-byte default). An **empty (zero-length) payload** means nothing is playing |
+| `remoment/player/{id}/data` | New track starts (retained); cleared on standby/unreachable | `{ "track": "Name", "artist": "Name", "album": "Name"|null, "duration": 213|null, "artwork": { "kind": "album", "proxy_512": "…", "proxy_320": "…", "proxy_120": "…", "proxy_bg": "…", "proxy_bg_320x480": "…", "proxy_bg_480x480": "…", "colors": ["#…"], "safe_colors": ["#…"] } }` (same `artwork` object as the REST API; ~800 bytes, so MQTT clients need a buffer above PubSubClient's 256-byte default). An **empty (zero-length) payload** means nothing is playing |
 | `remoment/player/{id}/progress` | Every second while playing | Progress as a percentage of the track, 0–100 (integer string) |
 | `remoment/player/{id}/state` | State transition (retained) | `{ "state": "playing" }` — `playing` / `paused` / `standby` / `unreachable` |
 | `remoment/player/{id}/volume` | Volume or mute changes (retained) | `{ "volume": 45, "muted": false }` |
@@ -523,7 +527,7 @@ Domain objects represent live state; Eloquent models represent stored history.
 
 When a new track starts playing, `DispatchArtworkProcessing` dispatches the `ProcessArtwork` queued job. The job:
 1. Downloads the original image URL from the music service
-2. Resizes to square JPEG proxies (`SQUARE_SIZES`: 512, 320, 120 → `{size}.jpg`) and renders full-screen client backgrounds (`ArtworkBackgrounds::SIZES`: `1024x600` → `proxy_bg` / `bg_1024x600.jpg`, `320x480` → `proxy_bg_320x480` / `bg_320x480.jpg`; the cover scaled to fill (cropped to the screen's aspect), shrunk to 1/32 and scaled back up with blur passes, then overlaid with 60% black), stored under `storage/app/public/artwork/{md5(url)}/`. Add a background size by adding it to `ArtworkBackgrounds::SIZES` and its key `proxy_bg_{w}x{h}` to `ArtworkCache::REQUIRED_KEYS` and `LibraryArtwork::CLIENT_FILES`; `proxy_bg` stays the 1024×600 one for existing clients
+2. Resizes to square JPEG proxies (`SQUARE_SIZES`: 512, 320, 120 → `{size}.jpg`) and renders full-screen client backgrounds (`ArtworkBackgrounds::SIZES`: `1024x600` → `proxy_bg` / `bg_1024x600.jpg`, `320x480` → `proxy_bg_320x480` / `bg_320x480.jpg`, `480x480` → `proxy_bg_480x480` / `bg_480x480.jpg`; the cover scaled to fill (cropped to the screen's aspect), shrunk to 1/32 and scaled back up with blur passes, then overlaid with 60% black), stored under `storage/app/public/artwork/{md5(url)}/`. Add a background size by adding it to `ArtworkBackgrounds::SIZES` and its key `proxy_bg_{w}x{h}` to `ArtworkCache::REQUIRED_KEYS` and `LibraryArtwork::CLIENT_FILES`; `proxy_bg` stays the 1024×600 one for existing clients
 3. Extracts 5 dominant colors via ColorThief
 4. Stores proxy URLs + hex colors in Redis (`artwork:{md5}`, 30-day TTL) via `ArtworkCache`
 5. Updates any matching `albums.colors` column in the database
@@ -534,7 +538,7 @@ All JPEGs are encoded baseline (`JpegEncoder(progressive: false)`; Intervention'
 
 **Recently played albums** (`app/Domain/Artwork/LibraryArtwork.php`): `albumsByRecency()` orders library albums by their last play in `plays` (newest first), then never-played albums by id; `recentCoverUrls()` gives the covers of the last `config('artwork.recent_albums')` (`ARTWORK_RECENT_ALBUMS`, default 500) distinct albums played. `php artisan artwork:prerender` (scheduled daily) queues `ProcessArtwork` for those whose entry isn't complete (`ArtworkCache::has()`), at most `artwork.prerender_max_jobs` (`ARTWORK_PRERENDER_MAX_JOBS`, default 100) per run, newest first, and doesn't re-queue a cover it queued in the last 12 hours — so a big backlog is worked off over several days without flooding the queue.
 
-**SD card export:** `php artisan artwork:export-sd [--size=1024x600|320x480]` or `/settings/clients` (size selector) builds `storage/app/private/exports/remoment-sd-artwork-{size}.zip` (queued `BuildSdCardExport`, one zip per size): `remoment/covers/{hash}.jpg` (320.jpg) and `remoment/backgrounds/{hash}.jpg` (`bg_{size}.jpg`, the client's single backgrounds folder) byte copies for the recent albums and the source logos, plus a README.txt; extract at the SD card root. See `docs/architecture/sd-card-export.md`.
+**SD card export:** `php artisan artwork:export-sd [--size=1024x600|320x480|480x480]` or `/settings/clients` (size selector) builds `storage/app/private/exports/remoment-sd-artwork-{size}.zip` (queued `BuildSdCardExport`, one zip per size): `remoment/covers/{hash}.jpg` (320.jpg) and `remoment/backgrounds/{hash}.jpg` (`bg_{size}.jpg`, the client's single backgrounds folder) byte copies for the recent albums and the source logos, plus a README.txt; extract at the SD card root. See `docs/architecture/sd-card-export.md`.
 
 **Logos for playback without an image** (`app/Domain/Artwork/`): `NowPlayingArtwork` picks the image for a `NowPlaying` (cover → radio station `image_url` from `/radio` → generated logo) and adds `kind`; it is used by both `PublishNowPlayingToMqtt` and `DeviceDetailResource`. `SourceLogo` maps the source's `sourceType`/`name`/`connector`/`category` to a logo key (`spotify`, `radio`, `line_in`, `bluetooth`, `tv`, `cast`, `cd`, default `music`) and addresses it by a pseudo URL `remoment:logo/v{VERSION}/{key}`, so its hash is the same on every server. `LogoRenderer` draws the glyph (off-white line icon on a #181818 square, GD, 4× supersampled, deterministic); `ProcessArtwork` renders it instead of downloading. Missing logo entries are rendered synchronously (~0.2s, a handful of logos). Bump `SourceLogo::VERSION` when a glyph changes so clients' hash-keyed caches pick it up.
 

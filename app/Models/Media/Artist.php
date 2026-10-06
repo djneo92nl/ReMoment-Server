@@ -114,6 +114,12 @@ class Artist extends Model
         return static::query()->whereIn('name', $names)->get()->keyBy('name');
     }
 
+    /** The artist's own photo: TheAudioDB's, else Spotify's; null when neither is known. */
+    public function photoUrl(): ?string
+    {
+        return ((array) $this->metaJson('images'))['thumb'] ?? $this->metaValue('spotify_image');
+    }
+
     public function coverAlbum(): ?Album
     {
         if (!$this->relationLoaded('albums')) {

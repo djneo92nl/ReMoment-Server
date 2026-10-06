@@ -34,7 +34,7 @@
         $details = $artist->details();
         $bio = $details['bio'];
         $links = (array) $details['links'];
-        $artistImage = ((array) $details['images'])['thumb'] ?? null;
+        $artistImage = $artist->photoUrl();
         $extraTags = collect([$details['mood'], $details['style'], ...$details['tags']])->filter()
             ->reject(fn ($tag) => collect($genres)->contains(fn ($g) => strcasecmp($g, $tag) === 0))->unique()->take(8);
         $lifeSpan = $details['begin_date'] ? ($details['end_date'] ? substr($details['begin_date'], 0, 4).' – '.substr($details['end_date'], 0, 4) : 'Since '.substr($details['begin_date'], 0, 4)) : null;
