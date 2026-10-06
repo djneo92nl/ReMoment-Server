@@ -19,6 +19,7 @@ docs/
   api/
     client-devices.md       Client device registration flow, all endpoints, firmware guide
     library.md              Library browse (artists, albums, playlists), favorites, play album/artist/playlist on a device (DLNA or Spotify), playlist artwork
+    source-controls.md      Per-source controls (change disc, FM presets) from control profiles: GET/POST /api/devices/{id}/controls, resolution, transports
     server-info.md          GET /api/info bootstrap endpoint (API/MQTT/artwork addresses for clients)
     device-settings.md      Sound adjustment (bass/treble/loudness), Bluetooth pairing, device name: endpoints, shapes, per-platform support
   architecture/
@@ -125,7 +126,9 @@ Response: `{ "data": DeviceDetailResource }`
 
 `state` values: `playing` | `standby` | `paused` | `unreachable`
 
-`capabilities` values: `media_controls` | `volume_control` | `radio_control` | `source_control` | `source_activation` | `multi_room` | `library_playback` | `seek` | `queue` | `queue_jump` | `shuffle` | `repeat` | `like` | `power` | `sound_adjustment` | `bluetooth` | `device_info` | `network_settings` | `wireless_speakers`
+`capabilities` values: `media_controls` | `volume_control` | `radio_control` | `source_control` | `source_activation` | `multi_room` | `library_playback` | `seek` | `queue` | `queue_jump` | `shuffle` | `repeat` | `like` | `power` | `sound_adjustment` | `bluetooth` | `device_info` | `battery` | `network_settings` | `wireless_speakers` | `source_controls`
+
+`battery` is `{ "level": 0-100, "charging": bool }` or `null` on every device (list and detail), and the `battery` capability is listed only once the device's listener has reported a battery (Mozart, portable Sonos; never ASE or Spotify) — a driver also covers mains-powered models.
 
 Always check `capabilities` before calling a feature endpoint — calling an unsupported feature returns `422`. `capabilities` can change at runtime: a speaker Spotify is routed to also lists Spotify's playback capabilities (see below).
 
@@ -273,6 +276,17 @@ PUT      /api/devices/{id}/network/interface | /network/wired | /network/wifi   
 GET      /api/devices/{id}/wireless-speakers   POST …/wireless-speakers/scan { action: start|stop }   (capability `wireless_speakers`; WiSA: **only the BeoSound Moment**, via `wisa => true` in config/devices.php / `HardwareFeatures`)
 ```
 
+### Source controls
+
+`source_controls` is reported while the playing source has controls a transport can deliver (CD changer, tape, FM presets); full description in `docs/api/source-controls.md`.
+
+```
+GET  /api/devices/{id}/controls            → { "profile": "cd", "label": "CD", "controls": [ { id, label, icon, type, group }, … ] }
+POST /api/devices/{id}/controls/{control}  → { "status": "ok", "control": "next_disc" }
+```
+
+Profiles are in `config/control-profiles.php`; `App\Domain\Control\SourceControls` resolves the profile from the active source and sends commands through a `ControlTransport`. `422` for an unknown control or none for the source, `503` unreachable, `502` the transport failed.
+
 ### Up Next (queue)
 
 Requires `queue` (Sonos, Spotify).
@@ -407,9 +421,10 @@ The Mosquitto broker runs in Docker on port 1883. Each device's MQTT base topic 
 | `remoment/player/{id}/progress` | Every second while playing | Progress as a percentage of the track, 0–100 (integer string) |
 | `remoment/player/{id}/state` | State transition (retained) | `{ "state": "playing" }` — `playing` / `paused` / `standby` / `unreachable` |
 | `remoment/player/{id}/volume` | Volume or mute changes (retained) | `{ "volume": 45, "muted": false }` |
+| `remoment/player/{id}/battery` | Battery level or charging changes (retained) | `{ "level": 87, "charging": false }` — only for devices that have a battery; same object as the REST `battery` |
 | `remoment/player/{id}/modes` | Shuffle/repeat/liked changes (retained) | `{ "shuffle": true, "repeat": "off", "liked": null }` — as `now_playing.modes`; `null` = unknown/unsupported. While Spotify is routed to a speaker, Spotify's modes are published on the speaker's id; afterwards its own (or all `null`) |
 
-`/data` is retained so a client subscribing later (e.g. after switching device) gets the current track at once; when the device goes to standby or becomes unreachable the server publishes an empty retained payload, which also removes the retained track from the broker, so clients must treat an empty `/data` as "nothing playing". It is republished from the cache when a device comes back, and identical payloads aren't repeated. `artwork` is absent in the MQTT payload if a real image is not yet processed; `kind` is `album` | `radio` | `source` as in the REST API. Published by the `PublishNowPlayingToMqtt`, `PublishProgressToMqtt`, `PublishStateToMqtt`, `PublishVolumeToMqtt` and `PublishModesToMqtt` listeners. The server only publishes and never subscribes. Browsers subscribe over the WebSocket listener on port 9001 to drive live UI refreshes; see `docs/architecture/live-updates.md`.
+`/data` is retained so a client subscribing later (e.g. after switching device) gets the current track at once; when the device goes to standby or becomes unreachable the server publishes an empty retained payload, which also removes the retained track from the broker, so clients must treat an empty `/data` as "nothing playing". It is republished from the cache when a device comes back, and identical payloads aren't repeated. `artwork` is absent in the MQTT payload if a real image is not yet processed; `kind` is `album` | `radio` | `source` as in the REST API. Published by the `PublishNowPlayingToMqtt`, `PublishProgressToMqtt`, `PublishStateToMqtt`, `PublishVolumeToMqtt`, `PublishBatteryToMqtt` and `PublishModesToMqtt` listeners. The server only publishes and never subscribes. Browsers subscribe over the WebSocket listener on port 9001 to drive live UI refreshes; see `docs/architecture/live-updates.md`.
 
 ---
 
@@ -423,12 +438,13 @@ Defined in `app/Providers/AppServiceProvider.php`:
 - `ProgressUpdated` → `UpdateDeviceCache`, `PublishProgressToMqtt`
 - `NowPlayingEnded` → `UpdateDeviceCache`, `ClosePlaybackHistory`
 - `VolumeUpdated` (volume + optional `muted`) → `UpdateDeviceCache`, `PublishVolumeToMqtt`
+- `BatteryUpdated` (`BatteryStatus`: level, charging) → `UpdateDeviceCache` (`Battery`), `PublishBatteryToMqtt`. Mozart's listener reads `GET /api/v1/battery` on connect and takes the WebSocket battery notifications; Sonos's polls `:1400/status/batterystatus` (`SonosBattery`) every 60 s — a speaker without a battery simply never reports one. The device card shows an icon and percentage (`<x-battery>`).
 - `PlaybackModesUpdated` → `HoldOwnModesWhileSpotifyRouted`, `UpdateDeviceCache`, `PublishModesToMqtt`. Fired by listeners with the shuffle/repeat/liked they observe, and by the API after a change. The first listener remembers a device's own reports (`Modes::own()`) and stops them (returns `false`) while Spotify is routed to that device; Spotify's reports for it carry `routed: true`.
 - `DeviceStateChanged` → `PublishStateToMqtt`, `SyncNowPlayingDataWithState` (clears the retained `/data` on standby/unreachable, republishes the cached track when a device comes back). Fired by `DeviceCache::updateState()` only when the cached state actually changes.
 
 Listeners are registered only here: event auto-discovery is disabled in `bootstrap/app.php`, because it registered every listener twice.
 
-Device listeners (`app/Integrations/*/Services/DeviceListener.php`) poll devices and fire these events. The queue must be running for `StorePlaybackHistory` and `ProcessArtwork` to process.
+Device listeners (`app/Integrations/*/Services/DeviceListener.php`, each a `DeviceListenerInterface` registered per driver under `listeners` in `config/devices.php`) poll devices and fire these events. `php artisan device:listen` boots once and forks one child per device (restart with backoff, rescan for added/removed devices); `device:listen-single {id}` runs one. See `docs/architecture/device-discovery.md`. The queue must be running for `StorePlaybackHistory` and `ProcessArtwork` to process.
 
 ### Integration Driver Pattern
 
@@ -450,6 +466,7 @@ All drivers implement interfaces from `app/Integrations/Contracts/`:
 - `ShuffleInterface` / `RepeatInterface` – set shuffle and repeat (Sonos, Spotify, Mozart)
 - `LikeInterface` – like/save the playing track (Spotify)
 - `NetworkSettingsInterface` / `WirelessSpeakersInterface` – network status, interface, wired address, Wi-Fi join / WiSA scan (ASE; `HardwareFeatures` limits WiSA to models with `wisa => true`)
+- `BatteryInterface` – `getBattery(): ?BatteryStatus`, null when the model has no battery (Mozart, Sonos). The listeners, not the driver, feed the cache the UI and API read.
 - `SoundAdjustmentInterface` / `BluetoothInterface` / `DeviceInfoInterface` – bass/treble/loudness, Bluetooth pairing mode and paired devices, device name and firmware (ASE; Mozart and Sonos for sound adjustment and device info, Mozart lists Bluetooth; value objects in `app/Domain/Device/Settings/`; reads and writes use `HttpConnector::getStrict/putStrict` so an unreachable or rejecting device is never read as "empty")
 - `PowerInterface` – wake / standby (ASE, Mozart; Mozart can't be woken and throws `UnsupportedOperationException`, answered with 422)
 
@@ -495,6 +512,8 @@ Domain objects represent live state; Eloquent models represent stored history.
 | `device:{id}:own_modes` | what the device's own listener last reported, restored after Spotify routing | 3600s |
 | `mqtt_published_volume_{id}` | last `/volume` payload published to MQTT (dedupe) | 3600s |
 | `mqtt_published_data_{id}` | md5 of the last `/data` payload published (dedupe; forgotten when cleared) | 3600s |
+| `device:{id}:battery` | last reported `BatteryStatus` array | 3600s |
+| `mqtt_published_battery_{id}` | last `/battery` payload published to MQTT (dedupe) | 3600s |
 | `mqtt_published_modes_{id}` | last `/modes` payload published to MQTT (dedupe) | 3600s |
 | `health:scheduler` / `health:queue` | ISO timestamp heartbeats for `/settings/health` | 86400s |
 

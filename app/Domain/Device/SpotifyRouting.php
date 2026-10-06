@@ -11,6 +11,7 @@ use App\Integrations\Contracts\QueueJumpInterface;
 use App\Integrations\Contracts\RepeatInterface;
 use App\Integrations\Contracts\SeekInterface;
 use App\Integrations\Contracts\ShuffleInterface;
+use App\Integrations\Sonos\MusicPlayerDriver as SonosDriver;
 use App\Integrations\Spotify\MusicPlayerDriver as SpotifyDriver;
 use App\Models\Device;
 use Illuminate\Support\Collection;
@@ -61,6 +62,17 @@ final class SpotifyRouting
         return $routedId !== null && $routedId === $device->id && !self::isSpotify($device);
     }
 
+    /**
+     * Sonos plays Spotify through its own integration, which Spotify reports as
+     * a restricted device: the Web API refuses playback commands for it. Its
+     * own driver (UPnP) controls that playback, so only contracts it lacks
+     * (like) are delegated to Spotify.
+     */
+    public static function controlsSpotifyItself(Device $device): bool
+    {
+        return is_a((string) $device->device_driver, SonosDriver::class, true);
+    }
+
     public static function spotifyDevice(): ?Device
     {
         return Device::where('device_driver', SpotifyDriver::class)->orderBy('id')->first();
@@ -74,6 +86,10 @@ final class SpotifyRouting
     public static function deviceFor(Device $device, string $contract): Device
     {
         if (in_array($contract, self::DELEGATED_CONTRACTS, true) && self::isRoutedTarget($device)) {
+            if (self::controlsSpotifyItself($device) && $device->driver instanceof $contract) {
+                return $device;
+            }
+
             return self::spotifyDevice() ?? $device;
         }
 

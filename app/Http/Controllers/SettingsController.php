@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Artwork\SdCardExport;
 use App\Domain\Device\DeviceCache;
+use App\Domain\Device\DeviceListeners;
 use App\Integrations\Spotify\MusicPlayerDriver as SpotifyDriver;
 use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
 use App\Integrations\Spotify\SpotifyDevice;
@@ -94,21 +95,15 @@ class SettingsController extends Controller
 
     public function startListener(Device $device)
     {
-        if (!in_array($device->device_driver_name, ['ASE', 'Spotify'])) {
-            return back()->with('error', 'Listeners can only be started for ASE or Spotify devices.');
+        if (!DeviceListeners::supports($device)) {
+            return back()->with('error', "There is no listener for {$device->device_name}'s driver.");
         }
 
         if (DeviceCache::isListenerRunning($device->id)) {
             return back()->with('error', "Listener for {$device->device_name} is already running.");
         }
 
-        if ($device->device_driver_name === 'Spotify') {
-            $cmd = 'php '.base_path('artisan').' device-spotify:listen > /dev/null 2>&1 &';
-        } else {
-            $cmd = 'php '.base_path('artisan')." device-ase:listen-single '{$device->id}' > /dev/null 2>&1 &";
-        }
-
-        shell_exec($cmd);
+        $this->spawnListener($device);
 
         return back()->with('success', "Listener started for {$device->device_name}.");
     }
@@ -119,7 +114,15 @@ class SettingsController extends Controller
 
         if ($spotify->isConnected()) {
             try {
-                $spotifyDevices = $spotify->makeApiClient()->getMyDevices()['devices'] ?? [];
+                $api = $spotify->makeApiClient();
+                $spotifyDevices = $api->getMyDevices()['devices'] ?? [];
+
+                // Sonos plays Spotify through its own cloud integration: it is the active
+                // device in /me/player (restricted, no id) but never in the device list.
+                $current = $api->getMyCurrentPlaybackInfo()['device'] ?? null;
+                if ($current && !in_array($current['name'], array_column($spotifyDevices, 'name'), true)) {
+                    $spotifyDevices[] = $current;
+                }
             } catch (\Throwable) {
                 // Spotify unreachable — show empty list
             }
@@ -217,17 +220,11 @@ class SettingsController extends Controller
 
     public function startAllListeners()
     {
-        $devices = Device::whereIn('device_driver_name', ['ASE', 'Spotify'])->get();
         $started = 0;
 
-        foreach ($devices as $device) {
+        foreach (Device::all()->filter(fn (Device $device) => DeviceListeners::supports($device)) as $device) {
             if (!DeviceCache::isListenerRunning($device->id)) {
-                if ($device->device_driver_name === 'Spotify') {
-                    $cmd = 'php '.base_path('artisan').' device-spotify:listen > /dev/null 2>&1 &';
-                } else {
-                    $cmd = 'php '.base_path('artisan')." device-ase:listen-single '{$device->id}' > /dev/null 2>&1 &";
-                }
-                shell_exec($cmd);
+                $this->spawnListener($device);
                 $started++;
             }
         }
@@ -237,5 +234,10 @@ class SettingsController extends Controller
             : 'All listeners are already running.';
 
         return back()->with('success', $message);
+    }
+
+    private function spawnListener(Device $device): void
+    {
+        shell_exec('php '.base_path('artisan')." device:listen-single '{$device->id}' > /dev/null 2>&1 &");
     }
 }

@@ -9,11 +9,13 @@ namespace Remoment\MozartDriver;
 // for the (not-yet-extracted) ASE driver either, so building one here would
 // be speculative. See that doc for the target end-state.
 use App\Domain\Device\AvailableSource;
+use App\Domain\Device\BatteryStatus;
 use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\RepeatMode;
 use App\Domain\Device\State;
 use App\Integrations\Common\UnsupportedOperationException;
+use App\Integrations\Contracts\BatteryInterface;
 use App\Integrations\Contracts\BluetoothInterface;
 use App\Integrations\Contracts\DeviceInfoInterface;
 use App\Integrations\Contracts\LibraryPlaybackInterface;
@@ -38,7 +40,7 @@ use Djneo92nl\BeoMozart\MozartClient;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
-class MusicPlayerDriver implements BluetoothInterface, DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, PowerInterface, RadioControlInterface, RepeatInterface, SeekInterface, ShuffleInterface, SoundAdjustmentInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
+class MusicPlayerDriver implements BatteryInterface, BluetoothInterface, DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, PowerInterface, RadioControlInterface, RepeatInterface, SeekInterface, ShuffleInterface, SoundAdjustmentInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
 {
     use SettingsControls;
 
@@ -50,6 +52,29 @@ class MusicPlayerDriver implements BluetoothInterface, DeviceInfoInterface, Libr
             $device->ip_address,
             config('mozart.rest_port', 8080),
             config('mozart.ws_port', 9000),
+        );
+    }
+
+    // --- BatteryInterface ---
+
+    public function getBattery(): ?BatteryStatus
+    {
+        return self::batteryFromMozart($this->client->power()->getBattery());
+    }
+
+    /**
+     * BatteryState { batteryLevel, isCharging, state, … } as a status; null for
+     * no answer or no battery (a mains-powered product reports `BatteryNotPresent`).
+     */
+    public static function batteryFromMozart(?array $state): ?BatteryStatus
+    {
+        if ($state === null || !isset($state['batteryLevel']) || ($state['state'] ?? null) === 'BatteryNotPresent') {
+            return null;
+        }
+
+        return new BatteryStatus(
+            max(0, min(100, (int) $state['batteryLevel'])),
+            (bool) ($state['isCharging'] ?? false) || ($state['state'] ?? null) === 'Charging',
         );
     }
 

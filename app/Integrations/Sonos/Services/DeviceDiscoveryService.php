@@ -29,7 +29,8 @@ class DeviceDiscoveryService
                 $device = Device::whereHas('meta', fn ($q) => $q->where('key', 'sonos_uuid')->where('value', $uuid))->first();
             }
             if (!$device) {
-                $device = Device::where('ip_address', $found->ip_address)->first();
+                // IPs get reused by DHCP: never take over a device of another brand.
+                $device = Device::where('ip_address', $found->ip_address)->where('device_brand_name', 'Sonos')->first();
             }
 
             $data = [

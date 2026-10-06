@@ -14,7 +14,9 @@ use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
 use App\Events\Device\PlaybackModesUpdated;
 use App\Events\Device\ProgressUpdated;
+use App\Integrations\Contracts\DeviceListenerInterface;
 use App\Integrations\Spotify\MusicPlayerDriver;
+use App\Models\Device;
 use App\Models\DeviceMeta;
 use App\Services\SpotifyTokenService;
 use Illuminate\Support\Facades\Cache;
@@ -22,7 +24,7 @@ use Illuminate\Support\Facades\Log;
 use SpotifyWebAPI\SpotifyWebAPI;
 use SpotifyWebAPI\SpotifyWebAPIException;
 
-class DeviceListener
+class DeviceListener implements DeviceListenerInterface
 {
     protected int $pollIntervalSeconds = 3;
 
@@ -40,6 +42,14 @@ class DeviceListener
     protected ?int $lastEffectiveDeviceId = null;
 
     public function __construct(protected SpotifyTokenService $tokenService) {}
+
+    /** Only while an account is connected: without one there is nothing to poll. */
+    public static function forDevice(Device $device): ?static
+    {
+        $tokens = app(SpotifyTokenService::class);
+
+        return $tokens->isConnected() ? new static($tokens) : null;
+    }
 
     public function onError(\Closure $callback): void
     {

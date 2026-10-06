@@ -40,7 +40,7 @@ class GetCurrentPlayingMedia extends Command
             $this->info("Spawning listener for {$id}...");
 
             // fire-and-forget child process
-            $cmd = 'php '.base_path('artisan')." device-ase:listen-single '{$id}' > /dev/null 2>&1 &";
+            $cmd = 'php '.base_path('artisan')." device:listen-single '{$id}' > /dev/null 2>&1 &";
             shell_exec($cmd);
         }
     }

@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\DeviceSettingsController;
 use App\Http\Controllers\Api\InfoController;
 use App\Http\Controllers\Api\LibraryController;
+use App\Http\Controllers\Api\SourceControlsController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/info', InfoController::class);
@@ -45,6 +46,9 @@ Route::put('/devices/{device}/info', [DeviceSettingsController::class, 'setInfo'
 
 Route::get('/devices/{device}/sources', [DeviceController::class, 'sources']);
 Route::post('/devices/{device}/sources/activate', [DeviceController::class, 'activateSource']);
+
+Route::get('/devices/{device}/controls', [SourceControlsController::class, 'index']);
+Route::post('/devices/{device}/controls/{control}', [SourceControlsController::class, 'run']);
 
 Route::get('/devices/{device}/radio', [DeviceController::class, 'radioStations']);
 Route::put('/radio/{station}/favorite', [DeviceController::class, 'favoriteRadio']);

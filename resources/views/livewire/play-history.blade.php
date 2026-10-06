@@ -144,9 +144,9 @@
                                     // Art URL (tracks only)
                                     $artUrl = null;
                                     if ($play->track) {
-                                        $artUrl = $play->track->images[0]['url']
-                                            ?? $play->track->album?->images[0]['url']
-                                            ?? null;
+                                        $rawArt = \App\Domain\Artwork\LibraryArtwork::coverUrl($play->track->images)
+                                            ?? \App\Domain\Artwork\LibraryArtwork::coverUrl($play->track->album?->images);
+                                        $artUrl = \App\Domain\Artwork\LibraryItemArtwork::forUrl($rawArt)['proxy_120'] ?? $rawArt;
                                     }
                                 @endphp
 

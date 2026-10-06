@@ -81,6 +81,18 @@ final class SourceLogo
     /** @param array<int, string|null> $labels */
     public static function match(array $labels): string
     {
+        return self::firstMatch($labels, self::RULES) ?? self::DEFAULT;
+    }
+
+    /**
+     * The first key of $rules whose words appear in the first label that
+     * matches any of them, or null. Shared with the source control profiles.
+     *
+     * @param  array<int, string|null>  $labels
+     * @param  array<string, string[]>  $rules  key => words
+     */
+    public static function firstMatch(array $labels, array $rules): ?string
+    {
         foreach ($labels as $label) {
             $words = preg_split('/[^a-z0-9]+/', strtolower((string) $label), -1, PREG_SPLIT_NO_EMPTY);
             if ($words === []) {
@@ -88,7 +100,7 @@ final class SourceLogo
             }
             $compact = implode('', $words);
 
-            foreach (self::RULES as $key => $needles) {
+            foreach ($rules as $key => $needles) {
                 foreach ($needles as $needle) {
                     if (in_array($needle, $words, true) || (strlen($needle) >= 5 && str_contains($compact, $needle))) {
                         return $key;
@@ -97,6 +109,6 @@ final class SourceLogo
             }
         }
 
-        return self::DEFAULT;
+        return null;
     }
 }

@@ -180,7 +180,7 @@ class StorePlaybackHistory implements ShouldQueue
 
         if ($albumName !== '') {
             $albumSource = $nowPlaying->album?->source ?? $npTrack->source ?? null;
-            $albumImages = $nowPlaying->album?->images ?? [];
+            $albumImages = $this->normalizeImages($nowPlaying->album?->images ?? []);
 
             $album = LibraryIdentity::album($artist, $albumName, $albumSource, [
                 'images' => $albumImages ?: null,
@@ -206,7 +206,7 @@ class StorePlaybackHistory implements ShouldQueue
             $trackSource,
             [
                 'duration' => $npTrack->duration,
-                'images' => ($npTrack->images ?? []) ?: null,
+                'images' => $this->normalizeImages($npTrack->images ?? []) ?: null,
             ],
         );
 
@@ -254,6 +254,28 @@ class StorePlaybackHistory implements ShouldQueue
         if ($album !== null && $spotifyTrackUri !== null) {
             ImportSpotifyAlbum::dispatch($album, substr($spotifyTrackUri, strlen('spotify:track:')));
         }
+    }
+
+    /**
+     * Listeners report images as plain URL strings, the library stores (and the views read)
+     * them as `{url}` entries like the Spotify importer does.
+     *
+     * @param  array<int, mixed>  $images
+     * @return array<int, array<string, mixed>>
+     */
+    private function normalizeImages(array $images): array
+    {
+        $normalized = [];
+
+        foreach ($images as $image) {
+            if (is_string($image) && trim($image) !== '') {
+                $normalized[] = ['url' => trim($image)];
+            } elseif (is_array($image) && !empty($image['url'])) {
+                $normalized[] = $image;
+            }
+        }
+
+        return $normalized;
     }
 
     /** A speaker playing Spotify (B&O ASE) reports the URI only in its meta. */

@@ -2,6 +2,7 @@
 
 namespace Remoment\MozartDriver\Services;
 
+use App\Domain\Device\BatteryStatus;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\PlaybackModes;
 use App\Domain\Device\State;
@@ -10,18 +11,22 @@ use App\Domain\Media\ArtistData;
 use App\Domain\Media\NowPlaying;
 use App\Domain\Media\Radio;
 use App\Domain\Media\TrackData;
+use App\Events\Device\BatteryUpdated;
 use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
 use App\Events\Device\PlaybackModesUpdated;
 use App\Events\Device\ProgressUpdated;
 use App\Events\Device\VolumeUpdated;
+use App\Integrations\Contracts\DeviceListenerInterface;
+use App\Models\Device;
 use Djneo92nl\BeoMozart\Enums\RenderingStateValue;
+use Djneo92nl\BeoMozart\MozartClient;
 use Djneo92nl\BeoMozart\WebSocket\EventClassifier;
 use Djneo92nl\BeoMozart\WebSocket\NotificationClient;
 use Illuminate\Support\Facades\Log;
 use Remoment\MozartDriver\MusicPlayerDriver;
 
-class DeviceListener
+class DeviceListener implements DeviceListenerInterface
 {
     protected NotificationClient $client;
 
@@ -29,9 +34,17 @@ class DeviceListener
 
     protected ?string $lastSourceType = null;
 
+    protected MozartClient $rest;
+
     public function __construct(string $host, int $wsPort = 9000)
     {
         $this->client = new NotificationClient($host, $wsPort);
+        $this->rest = new MozartClient($host, config('mozart.rest_port', 8080), $wsPort);
+    }
+
+    public static function forDevice(Device $device): ?static
+    {
+        return new static($device->ip_address, config('mozart.ws_port', 9000));
     }
 
     public function onError(\Closure $callback): void
@@ -54,6 +67,9 @@ class DeviceListener
 
             try {
                 DeviceCache::updateState($deviceId, State::Standby);
+
+                // Battery changes arrive as notifications, but the level is only known after the first one.
+                $this->readBattery($deviceId);
 
                 $this->client->connectAndListen(function (string $eventType, mixed $eventData, array $raw) use ($deviceId, $cacheKey) {
                     cache()->put($cacheKey, true, now()->addSeconds(10));
@@ -80,6 +96,12 @@ class DeviceListener
 
     protected function applyEvent(string $eventType, mixed $eventData, string $deviceId): void
     {
+        if ($this->isBatteryState($eventData)) {
+            $this->publishBattery(MusicPlayerDriver::batteryFromMozart($eventData), $deviceId);
+
+            return;
+        }
+
         if ($this->isQueueSettings($eventData)) {
             event(new PlaybackModesUpdated(deviceId: $deviceId, modes: new PlaybackModes(
                 shuffle: isset($eventData['shuffle']) ? (bool) $eventData['shuffle'] : null,
@@ -141,6 +163,29 @@ class DeviceListener
 
             default:
                 Log::info("Mozart listener [{$deviceId}]: unrecognized WS event type [{$eventType}]");
+        }
+    }
+
+    /** BatteryState { batteryLevel, isCharging, state, … } — no other notification payload has `batteryLevel`. */
+    protected function isBatteryState(mixed $eventData): bool
+    {
+        return is_array($eventData) && array_key_exists('batteryLevel', $eventData);
+    }
+
+    protected function readBattery(string $deviceId): void
+    {
+        try {
+            $this->publishBattery(MusicPlayerDriver::batteryFromMozart($this->rest->power()->getBattery()), $deviceId);
+        } catch (\Throwable $e) {
+            // A battery that can't be read is not worth dropping the listener for.
+            Log::info("Mozart listener [{$deviceId}]: battery not read: {$e->getMessage()}");
+        }
+    }
+
+    protected function publishBattery(?BatteryStatus $battery, string $deviceId): void
+    {
+        if ($battery !== null) {
+            event(new BatteryUpdated(deviceId: $deviceId, battery: $battery));
         }
     }
 

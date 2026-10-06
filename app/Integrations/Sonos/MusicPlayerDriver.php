@@ -2,8 +2,10 @@
 
 namespace App\Integrations\Sonos;
 
+use App\Domain\Device\BatteryStatus;
 use App\Domain\Device\QueueItem;
 use App\Domain\Device\RepeatMode;
+use App\Integrations\Contracts\BatteryInterface;
 use App\Integrations\Contracts\DeviceInfoInterface;
 use App\Integrations\Contracts\LibraryPlaybackInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
@@ -34,7 +36,7 @@ use duncan3dc\Sonos\Tracks\Track as SonosTrack;
 use duncan3dc\Sonos\Utils\Time;
 use Illuminate\Support\Collection as TrackCollection;
 
-class MusicPlayerDriver implements DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, QueueInterface, QueueJumpInterface, RadioControlInterface, RepeatInterface, SeekInterface, ShuffleInterface, SoundAdjustmentInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
+class MusicPlayerDriver implements BatteryInterface, DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, QueueInterface, QueueJumpInterface, RadioControlInterface, RepeatInterface, SeekInterface, ShuffleInterface, SoundAdjustmentInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
 {
     use MultiRoomControls;
     use SettingsControls;
@@ -56,6 +58,11 @@ class MusicPlayerDriver implements DeviceInfoInterface, LibraryPlaybackInterface
         }
 
         return $this->deviceApi;
+    }
+
+    public function getBattery(): ?BatteryStatus
+    {
+        return SonosBattery::fetch($this->device->ip_address);
     }
 
     public function getCurrentPlayingAttribute(): array {}

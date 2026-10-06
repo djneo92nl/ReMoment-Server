@@ -40,14 +40,26 @@ After devices are registered, start the listener processes that stream real-time
 php artisan device:listen
 ```
 
-Spawns one background process per device (mapped by driver class: ASE via `device-ase:listen-single {id}`, Mozart via `device-mozart:listen-single {id}`, Sonos via `device-sonos:listen-single {id}`), plus a Spotify listener (`device-spotify:listen`) if a Spotify account is connected. It monitors and automatically restarts any listener process that exits. This is the command used by `composer dev` / production process management; it runs until interrupted (Ctrl+C).
+One supervisor process boots the application once and **forks one child per device**, so each listener shares the booted framework copy-on-write instead of paying for its own `php artisan` (~50 MB each), which is what keeps a dozen listeners within a Raspberry Pi's memory. It needs the `pcntl` extension (part of php-cli on Linux and macOS). Which listener a device gets comes from the driver map `listeners` in `config/devices.php`; a listener may decline (Spotify, until an account is connected).
+
+The supervisor:
+
+- restarts a child that exits, with a delay that doubles from 1 s to 30 s while it keeps failing;
+- every `--rescan` seconds (default 15) starts listeners for devices added since, stops those of deleted devices, and restarts one whose IP changed, so adding a device or connecting Spotify needs no restart;
+- on SIGINT/SIGTERM signals all children at once and gives them 5 s before SIGKILL (a child blocked in a network call only sees the signal when the call returns).
+
+Run it under process management in production; it runs until interrupted (Ctrl+C).
+
+### Adding a listener for a new integration
+
+Implement `App\Integrations\Contracts\DeviceListenerInterface` (`forDevice(Device): ?static`, `listen(string $deviceId)`), fire the events from `AppServiceProvider` from it, and add `DriverClass::class => ListenerClass::class` under `listeners` in `config/devices.php`. Nothing else changes.
 
 The Sonos listener polls the speaker once a second by its stored IP (unicast, no discovery), reporting now-playing, progress, volume and shuffle/repeat; stopped maps to `standby`, paused to `paused`.
 
-To run a single ASE device's listener directly:
+To run one device's listener directly (any brand), e.g. to watch its output while debugging:
 
 ```bash
-php artisan device-ase:listen-single {deviceId}
+php artisan device:listen-single {deviceId}
 ```
 
 ## Device Metadata

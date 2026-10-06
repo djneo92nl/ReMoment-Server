@@ -2,6 +2,7 @@
 
 namespace App\Domain\Device;
 
+use App\Integrations\Contracts\BatteryInterface;
 use App\Integrations\Contracts\BluetoothInterface;
 use App\Integrations\Contracts\DeviceInfoInterface;
 use App\Integrations\Contracts\LibraryPlaybackInterface;
@@ -47,9 +48,13 @@ final class Capabilities
         'sound_adjustment' => SoundAdjustmentInterface::class,
         'bluetooth' => BluetoothInterface::class,
         'device_info' => DeviceInfoInterface::class,
+        'battery' => BatteryInterface::class,
         'network_settings' => NetworkSettingsInterface::class,
         'wireless_speakers' => WirelessSpeakersInterface::class,
     ];
+
+    /** Not a driver contract: reported while the active source has controls (see SourceControls). */
+    private const DYNAMIC = ['source_controls'];
 
     /**
      * @param  string[]  $contracts
@@ -68,7 +73,7 @@ final class Capabilities
      */
     public static function sort(array $capabilities): array
     {
-        return array_values(array_intersect(array_keys(self::MAP), $capabilities));
+        return array_values(array_intersect([...array_keys(self::MAP), ...self::DYNAMIC], $capabilities));
     }
 
     /** @return string[] */

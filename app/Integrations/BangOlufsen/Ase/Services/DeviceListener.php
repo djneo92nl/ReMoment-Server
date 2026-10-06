@@ -14,12 +14,19 @@ use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
 use App\Events\Device\ProgressUpdated;
 use App\Events\Device\VolumeUpdated;
+use App\Integrations\Contracts\DeviceListenerInterface;
+use App\Models\Device;
 use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Log;
 
-class DeviceListener
+class DeviceListener implements DeviceListenerInterface
 {
     protected string $url;
+
+    public static function forDevice(Device $device): ?static
+    {
+        return new static('http://'.$device->ip_address.':8080/BeoNotify/Notifications');
+    }
 
     protected Client $http;
 

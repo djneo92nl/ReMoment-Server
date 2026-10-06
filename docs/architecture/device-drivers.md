@@ -19,6 +19,7 @@ All contracts live in `app/Integrations/Contracts/`.
 | `PowerInterface` | `powerOn()`, `standby()` | If device can be put in standby remotely (ASE, Mozart). `powerOn()` may throw `App\Integrations\Common\UnsupportedOperationException` when only standby works (Mozart) — the API answers 422 |
 | `SoundAdjustmentInterface` | `getSoundAdjustment(): SoundAdjustment`, `setSoundAdjustment(?int $bass, ?int $treble, ?bool $loudness)` — throws `InvalidArgumentException` outside the device's range, `UnsupportedOperationException` for a missing part | If device has bass/treble/loudness (ASE, Mozart, Sonos) |
 | `BluetoothInterface` | `getBluetooth(): BluetoothState`, `setBluetooth(?bool $discoverable, ?string $reconnectMode)`, `removeBluetoothDevice(string $id)` | If device has Bluetooth pairing (ASE). `BluetoothState::$writable` is false for a platform that can only list paired devices (Mozart's `setup/bluetooth/devices`) |
+| `BatteryInterface` | `getBattery(): ?BatteryStatus` | Portable models report charge level and charging state (Mozart `GET /api/v1/battery`, Sonos `:1400/status/batterystatus`); null when this model has no battery. The live value comes from the listener's `BatteryUpdated` event, see CLAUDE.md |
 | `DeviceInfoInterface` | `getDeviceInfo(): DeviceInfo`, `setDeviceName(string)` | If device reports/changes its name, model, firmware (ASE, Mozart, Sonos). `DeviceInfo::$renamable` is false where the platform can't rename (Sonos) |
 | `NetworkSettingsInterface` | `getNetwork(): NetworkState`, `setActiveInterface(string)`, `setWiredAddress(bool $dhcp, array $ipv4)`, `joinWifi(string $ssid, ?string $passphrase, ?string $security)` — `InvalidArgumentException` for an interface/setup the device can't use | If device has network settings (ASE). The writes aren't read back: the device may move to a new address |
 | `WirelessSpeakersInterface` | `getWirelessSpeakers(): WirelessSpeakersState`, `startWirelessScan()`, `stopWirelessScan()` | WiSA speaker setup (ASE driver, but only listed for models with the hardware: `HardwareFeatures` reads `wisa => true` from `config/devices.php`; only the BeoSound Moment) |
@@ -57,7 +58,7 @@ Two assumptions are unverifiable without physical hardware and are `config('moza
 - **WebSocket port 9000** — the Mozart OpenAPI spec documents no connection info for real-time notifications at all; port 9000 is a community convention (B&O's official client libraries).
 - **SSDP/UPnP discovery** — no Mozart-specific discovery mechanism is documented; `MozartDiscovery` assumes Mozart devices are UPnP MediaRenderers like ASE devices.
 
-Console commands: `device-mozart:listen-single {id}` (per-device listener, registered in `ListenAllDevices`'s driver map) and `device:mozart-discovery`.
+Console commands: `device:mozart-discovery`. Its listener (`Services/DeviceListener`, a `DeviceListenerInterface`) is registered under `listeners` in `config/devices.php` and run by `device:listen` / `device:listen-single {id}`.
 
 ### Sonos
 

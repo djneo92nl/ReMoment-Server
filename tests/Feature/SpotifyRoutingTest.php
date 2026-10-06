@@ -6,8 +6,14 @@ use App\Domain\Device\Cache\Modes;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\PlaybackModes;
 use App\Domain\Device\RepeatMode;
+use App\Domain\Device\SpotifyRouting;
 use App\Domain\Device\State;
 use App\Events\Device\PlaybackModesUpdated;
+use App\Integrations\Contracts\LikeInterface;
+use App\Integrations\Contracts\MediaControlsInterface;
+use App\Integrations\Contracts\SeekInterface;
+use App\Integrations\Contracts\ShuffleInterface;
+use App\Integrations\Sonos\MusicPlayerDriver as SonosDriver;
 use App\Integrations\Spotify\MusicPlayerDriver as SpotifyDriver;
 use App\Integrations\Spotify\Services\DeviceListener;
 use App\Models\Client;
@@ -323,5 +329,17 @@ class SpotifyRoutingTest extends TestCase
         $this->getJson("/api/clients/{$client->api_token}/devices")
             ->assertJsonCount(1, 'devices')
             ->assertJsonPath('devices.0.id', $this->spotify->id);
+    }
+
+    public function test_a_routed_sonos_is_controlled_by_its_own_driver_except_like(): void
+    {
+        // Spotify reports Sonos as a restricted device: Web API commands are refused.
+        $sonos = $this->makeDevice('Roam', SonosDriver::class, 'Sonos');
+        $this->route($sonos);
+
+        $this->assertSame($sonos->id, SpotifyRouting::deviceFor($sonos, MediaControlsInterface::class)->id);
+        $this->assertSame($sonos->id, SpotifyRouting::deviceFor($sonos, SeekInterface::class)->id);
+        $this->assertSame($sonos->id, SpotifyRouting::deviceFor($sonos, ShuffleInterface::class)->id);
+        $this->assertSame($this->spotify->id, SpotifyRouting::deviceFor($sonos, LikeInterface::class)->id);
     }
 }

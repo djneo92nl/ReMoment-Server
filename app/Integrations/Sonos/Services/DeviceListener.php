@@ -11,27 +11,35 @@ use App\Domain\Media\NowPlaying;
 use App\Domain\Media\Radio;
 use App\Domain\Media\Source;
 use App\Domain\Media\TrackData;
+use App\Events\Device\BatteryUpdated;
 use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
 use App\Events\Device\PlaybackModesUpdated;
 use App\Events\Device\ProgressUpdated;
 use App\Events\Device\VolumeUpdated;
+use App\Integrations\Contracts\DeviceListenerInterface;
 use App\Integrations\Sonos\PlayMode;
+use App\Integrations\Sonos\SonosBattery;
 use App\Integrations\Sonos\SonosInputs;
+use App\Models\Device;
 use duncan3dc\Sonos\Controller;
 use duncan3dc\Sonos\Devices\Collection;
 use duncan3dc\Sonos\Interfaces\NetworkInterface;
 use duncan3dc\Sonos\Interfaces\PlayState;
 use duncan3dc\Sonos\Network;
 use duncan3dc\Sonos\State as SonosState;
+use Illuminate\Support\Facades\Log;
 
-class DeviceListener
+class DeviceListener implements DeviceListenerInterface
 {
     protected NetworkInterface $network;
 
     protected ?Controller $controller = null;
 
     protected int $pollIntervalSeconds = 1;
+
+    /** A battery changes slowly, and a speaker without one has nothing to ask twice. */
+    protected int $batteryIntervalSeconds = 60;
 
     /**
      * Talks to the one speaker at $ip (unicast): no multicast discovery, so it also works
@@ -40,6 +48,11 @@ class DeviceListener
     public function __construct(protected string $ip, ?NetworkInterface $network = null)
     {
         $this->network = $network ?? new Network((new Collection)->addIp($ip));
+    }
+
+    public static function forDevice(Device $device): ?static
+    {
+        return new static($device->ip_address);
     }
 
     public function listen(string $deviceId)
@@ -53,6 +66,8 @@ class DeviceListener
         $lastVolume = null;
         $lastMuted = null;
         $lastModes = null;
+        $lastError = null;
+        $nextBatteryCheck = 0;
 
         DeviceCache::updateState($deviceId, State::Unreachable);
 
@@ -71,6 +86,13 @@ class DeviceListener
                     event(new VolumeUpdated(deviceId: $deviceId, volume: $volume, muted: $muted));
                     $lastVolume = $volume;
                     $lastMuted = $muted;
+                }
+
+                if (time() >= $nextBatteryCheck) {
+                    $nextBatteryCheck = time() + $this->batteryIntervalSeconds;
+                    if ($battery = SonosBattery::fetch($this->ip)) {
+                        event(new BatteryUpdated(deviceId: $deviceId, battery: $battery));
+                    }
                 }
 
                 $modes = $this->readModes($controller);
@@ -119,8 +141,14 @@ class DeviceListener
                 }
 
                 $retryDelaySeconds = 1;
+                $lastError = null;
                 sleep($this->pollIntervalSeconds);
             } catch (\Throwable $e) {
+                // Logged once per distinct message, so an unreachable speaker does not flood the log.
+                if ($e->getMessage() !== $lastError) {
+                    Log::warning("Sonos listener {$deviceId} ({$this->ip}): ".get_class($e).': '.$e->getMessage());
+                    $lastError = $e->getMessage();
+                }
                 cache()->forget($cacheKey);
                 DeviceCache::updateState($deviceId, State::Unreachable);
                 $this->controller = null;

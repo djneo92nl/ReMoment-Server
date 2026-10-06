@@ -7,6 +7,14 @@ return [
         \Remoment\MozartDriver\MozartDiscovery::class,
     ],
 
+    // Driver class => its DeviceListenerInterface implementation, run by `php artisan device:listen`.
+    'listeners' => [
+        \App\Integrations\BangOlufsen\Ase\MusicPlayerDriver::class => \App\Integrations\BangOlufsen\Ase\Services\DeviceListener::class,
+        \App\Integrations\Sonos\MusicPlayerDriver::class => \App\Integrations\Sonos\Services\DeviceListener::class,
+        \App\Integrations\Spotify\MusicPlayerDriver::class => \App\Integrations\Spotify\Services\DeviceListener::class,
+        \Remoment\MozartDriver\MusicPlayerDriver::class => \Remoment\MozartDriver\Services\DeviceListener::class,
+    ],
+
     'Bang & Olufsen' => [
         'BeoSound Essence' => [
             'driver_name' => 'ASE',
