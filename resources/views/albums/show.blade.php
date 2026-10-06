@@ -203,8 +203,29 @@
                                 $hasInfo = $quality || $credits || $trackGenres || $isrc || $popularity !== null || $listeners;
                             @endphp
                             <div id="track-{{ $track->id }}" class="scroll-mt-24" x-data="{ panel: null }" @if($localCount > 0 && !$dlnaUrl) x-show="!localOnly" @endif>
-                                <div class="flex items-center gap-4 px-6 py-3 hover:bg-gray-50 dark:hover:bg-stone-800/30 transition-colors group">
-                                    <span class="w-5 text-center text-xs text-gray-300 dark:text-stone-600 flex-shrink-0">{{ $track->metaValue('track_number') ?? $i + 1 }}</span>
+                                @php
+                                    $trackDevices = $playableDevices->filter(fn ($d) => \App\Domain\Library\LibraryPlayback::trackPlayable($track, $d))->values();
+                                    $slot = 'width:28px;height:28px;flex:none';
+                                    $btn = 'w-full h-full rounded-full flex items-center justify-center hover:bg-gray-100 dark:hover:bg-stone-700 transition-colors';
+                                @endphp
+                                <div class="flex items-center gap-3 px-6 py-3 hover:bg-gray-50 dark:hover:bg-stone-800/30 transition-colors group">
+                                    {{-- Play, then the track number: always in the same place --}}
+                                    <div style="{{ $slot }}">
+                                        @if($trackDevices->isNotEmpty())
+                                            <button type="button" @click="$dispatch('open-modal', 'play-track-{{ $track->id }}')"
+                                                    class="{{ $btn }} text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100" title="Play on device">
+                                                <i class="fa-solid fa-play text-xs"></i>
+                                            </button>
+                                            <x-device-picker
+                                                name="play-track-{{ $track->id }}"
+                                                title="Play track"
+                                                :description="$track->name"
+                                                :devices="$trackDevices"
+                                                :action-template="url('tracks/'.$track->id.'/play').'/{id}'"
+                                            />
+                                        @endif
+                                    </div>
+                                    <span class="w-5 text-center text-xs text-gray-400 dark:text-stone-500 flex-shrink-0">{{ $track->metaValue('track_number') ?? $i + 1 }}</span>
                                     <div class="flex-1 min-w-0">
                                         <p class="text-sm text-gray-900 dark:text-gray-100 truncate flex items-center gap-1.5">
                                             {{ $track->name }}
@@ -219,56 +240,41 @@
                                             <p class="text-xs text-gray-400 dark:text-gray-600 mt-0.5">{{ gmdate('g:i', $track->duration) }}</p>
                                         @endif
                                     </div>
-                                    @if(isset($track->plays_count) && $track->plays_count > 0)
-                                        <span class="text-xs text-gray-300 dark:text-stone-600 flex-shrink-0">
-                                            {{ number_format($track->plays_count) }}×
-                                        </span>
-                                    @endif
-                                    @if($hasInfo)
-                                        <button @click="panel = panel === 'info' ? null : 'info'"
-                                                :class="panel === 'info' ? 'opacity-100 text-blue-500 dark:text-blue-400' : 'opacity-0 group-hover:opacity-100 text-gray-400'"
-                                                class="transition-opacity w-7 h-7 rounded-full flex items-center justify-center hover:bg-gray-100 dark:hover:bg-stone-700 flex-shrink-0"
-                                                title="Track details">
-                                            <i class="fa-solid fa-circle-info text-xs"></i>
-                                        </button>
-                                    @endif
-                                    @if($lyrics)
-                                        <button @click="panel = panel === 'lyrics' ? null : 'lyrics'"
-                                                :class="panel === 'lyrics' ? 'opacity-100 text-blue-500 dark:text-blue-400' : 'opacity-0 group-hover:opacity-100 text-gray-400'"
-                                                class="transition-opacity w-7 h-7 rounded-full flex items-center justify-center hover:bg-gray-100 dark:hover:bg-stone-700 flex-shrink-0"
-                                                title="Lyrics">
-                                            <i class="fa-solid fa-align-left text-xs"></i>
-                                        </button>
-                                    @endif
-                                    @auth
-                                        @if($track->isRemovable())
-                                            <form method="POST" action="{{ route('tracks.destroy', $track) }}" class="flex-shrink-0" onsubmit="return confirm('Remove this track from the library? Your play history is kept.')">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" title="Remove from library"
-                                                        class="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity w-7 h-7 rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-stone-700">
-                                                    <i class="fa-solid fa-trash-can text-xs"></i>
-                                                </button>
-                                            </form>
+                                    {{-- Fixed slots, so the columns line up whatever a track has --}}
+                                    <span class="text-xs text-gray-400 dark:text-stone-500 text-right flex-shrink-0" style="width:2.5rem">
+                                        @if(isset($track->plays_count) && $track->plays_count > 0){{ number_format($track->plays_count) }}×@endif
+                                    </span>
+                                    <div style="{{ $slot }}">
+                                        @if($hasInfo)
+                                            <button type="button" @click="panel = panel === 'info' ? null : 'info'"
+                                                    :class="panel === 'info' ? 'text-blue-500 dark:text-blue-400' : 'text-gray-400'"
+                                                    class="{{ $btn }}" title="Track details">
+                                                <i class="fa-solid fa-circle-info text-xs"></i>
+                                            </button>
                                         @endif
+                                    </div>
+                                    <div style="{{ $slot }}">
+                                        @if($lyrics)
+                                            <button type="button" @click="panel = panel === 'lyrics' ? null : 'lyrics'"
+                                                    :class="panel === 'lyrics' ? 'text-blue-500 dark:text-blue-400' : 'text-gray-400'"
+                                                    class="{{ $btn }}" title="Lyrics">
+                                                <i class="fa-solid fa-align-left text-xs"></i>
+                                            </button>
+                                        @endif
+                                    </div>
+                                    @auth
+                                        <div style="{{ $slot }}">
+                                            @if($track->isRemovable())
+                                                <form method="POST" action="{{ route('tracks.destroy', $track) }}" class="w-full h-full" onsubmit="return confirm('Remove this track from the library? Your play history is kept.')">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" title="Remove from library" class="{{ $btn }} text-gray-400 hover:text-red-500">
+                                                        <i class="fa-solid fa-trash-can text-xs"></i>
+                                                    </button>
+                                                </form>
+                                            @endif
+                                        </div>
                                     @endauth
-                                    @php
-                                        $trackDevices = $playableDevices->filter(fn ($d) => \App\Domain\Library\LibraryPlayback::trackPlayable($track, $d))->values();
-                                    @endphp
-                                    @if($trackDevices->isNotEmpty())
-                                        <button @click="$dispatch('open-modal', 'play-track-{{ $track->id }}')"
-                                                class="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity w-7 h-7 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-stone-700 flex-shrink-0"
-                                                title="Play on device">
-                                            <i class="fa-solid fa-play text-xs"></i>
-                                        </button>
-                                        <x-device-picker
-                                            name="play-track-{{ $track->id }}"
-                                            title="Play track"
-                                            :description="$track->name"
-                                            :devices="$trackDevices"
-                                            :action-template="url('tracks/'.$track->id.'/play').'/{id}'"
-                                        />
-                                    @endif
                                 </div>
                                 @if($hasInfo)
                                     <div x-show="panel === 'info'" x-cloak class="px-14 py-4 border-t border-gray-50 dark:border-stone-800/50 bg-gray-50/50 dark:bg-stone-800/20">
