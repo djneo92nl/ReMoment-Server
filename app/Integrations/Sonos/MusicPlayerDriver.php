@@ -207,6 +207,16 @@ class MusicPlayerDriver implements BatteryInterface, DeviceInfoInterface, Librar
         $api->play();
     }
 
+    /**
+     * Sonos rejects a queue item (UPnP 804) whose stream URL ends in a container extension it
+     * doesn't know, such as Jellyfin's `stream.mov` for an ALAC/AAC file in an MP4 container.
+     * The server ignores the extension, so ask for the same stream as `.m4a`.
+     */
+    private function sonosStreamUrl(string $url): string
+    {
+        return preg_replace('#/stream\.(mov|mp4)(?=[?\#]|$)#i', '/stream.m4a', $url);
+    }
+
     public function playLibraryTrack(Track $track): void
     {
         $url = $track->getDlnaUrl();
@@ -215,7 +225,7 @@ class MusicPlayerDriver implements BatteryInterface, DeviceInfoInterface, Librar
             throw new \RuntimeException("Track {$track->id} has no DLNA URL.");
         }
 
-        $sonosTrack = (new SonosTrack($url))
+        $sonosTrack = (new SonosTrack($this->sonosStreamUrl($url)))
             ->setTitle($track->name)
             ->setArtist($track->artist?->name ?? '')
             ->setAlbum($track->album?->name ?? '');
@@ -236,7 +246,7 @@ class MusicPlayerDriver implements BatteryInterface, DeviceInfoInterface, Librar
 
         foreach ($playable as $track) {
             $queue->addTrack(
-                (new SonosTrack($track->getDlnaUrl()))
+                (new SonosTrack($this->sonosStreamUrl($track->getDlnaUrl())))
                     ->setTitle($track->name)
                     ->setArtist($track->artist?->name ?? '')
                     ->setAlbum($track->album?->name ?? '')
