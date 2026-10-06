@@ -19,7 +19,9 @@ Unauthenticated, like the rest of the API. Controller: `app/Http/Controllers/Api
   "mqtt": {
     "host": "192.168.1.100",
     "port": 1883,
-    "topic_prefix": "remoment/player"
+    "topic_prefix": "remoment/player",
+    "ws_port": 9001,
+    "ws_url": "ws://192.168.1.100:9001"
   },
   "placeholder": {
     "kind": "source",
@@ -45,6 +47,8 @@ Unauthenticated, like the rest of the API. Controller: `app/Http/Controllers/Api
 | `artwork_base_url` | same as `base_url` | Prefix for artwork paths, see below |
 | `mqtt.host` | `MQTT_PUBLIC_HOST`, else the request host | Broker host as the client should reach it |
 | `mqtt.port` | `MQTT_PUBLIC_PORT`, else `MQTT_PORT`, else `1883` | Plain MQTT (TCP), not WebSockets |
+| `mqtt.ws_port` | `MQTT_PUBLIC_WS_PORT`, default `9001` | The broker's WebSocket listener, for clients that speak MQTT over WebSocket (browsers, iOS apps) |
+| `mqtt.ws_url` | `MQTT_WS_URL`, else `ws://{mqtt.host}:{ws_port}` (`wss://` when the request was HTTPS) | Ready-to-use WebSocket URL. Set `MQTT_WS_URL` when the broker sits behind a reverse proxy |
 | `mqtt.topic_prefix` | constant | Device topics are `{topic_prefix}/{device_id}/{data,progress,state,volume,modes}` |
 | `placeholder` | `NowPlayingArtwork::placeholder()` | Artwork object (same shape as `now_playing.artwork`, `kind: "source"`) of the generic music-note logo. Show it whenever there is no artwork, including the first play of a cover that is still being processed. Rendered on the spot if not cached, so it is always present (`null` only if rendering itself fails). Its hash is the same on every server; cache `proxy_320` (and your screen's background, see below) like any cover |
 

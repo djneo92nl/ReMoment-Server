@@ -24,6 +24,10 @@ Duplicates from before that are merged by an admin running `php artisan library:
 
 `{ "data": [ ArtistItem, … ], "next_cursor": "…"|null }` — artists with at least one album, alphabetical (case-insensitive, a leading "The " ignored), 50 per page. Pass `next_cursor` back as `cursor` until it is `null`. The cursor is opaque; an invalid one returns Laravel's `422` validation error.
 
+### `GET /api/library/albums?cursor=&sort=`
+
+`{ "data": [ AlbumItem, … ], "next_cursor": "…"|null }` — every album with at least one visible track, 60 per page, paged like artists (opaque `cursor`). `sort` is `name` (default, case-insensitive), `artist` (artist name with "The " ignored, then album name), `year` (newest first, unknown year last), `added` (newest in the library first) or `plays` (most played first); any other value is a `422`. Ties fall back to the album id, so paging is stable. For the most recently *played* albums use `recent`.
+
 ### `GET /api/library/artists/{id}`
 
 `{ "id", "name", "favorite", "genres": [ "Rock", … ], "details": ArtistDetails, "albums": [ AlbumItem, … ] }` — albums newest year first (unknown year last), then by name.

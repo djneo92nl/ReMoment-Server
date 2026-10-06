@@ -15,4 +15,7 @@ return [
     // used for the HTTP request, since the broker port is published on the same machine.
     'public_host' => env('MQTT_PUBLIC_HOST') ?: null,
     'public_port' => (int) env('MQTT_PUBLIC_PORT', env('MQTT_PORT', 1883)),
+
+    // WebSocket listener port as clients should reach it (GET /api/info `mqtt.ws_port`).
+    'public_ws_port' => (int) env('MQTT_PUBLIC_WS_PORT', 9001),
 ];
