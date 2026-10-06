@@ -13,7 +13,7 @@ class ExportSdCardArtwork extends Command
 {
     protected $signature = 'artwork:export-sd
         {--limit= : Number of most recently played albums (default config artwork.recent_albums)}
-        {--size=1024x600 : Background size of the client screen (1024x600 or 320x480)}
+        {--size=1024x600 : Background size of the client screen (1024x600, 320x480 or 480x480)}
         {--queue : Queue the build instead of running it now}';
 
     protected $description = 'Build the SD card artwork zip (covers + backgrounds of recently played albums and source logos) for the touch client';

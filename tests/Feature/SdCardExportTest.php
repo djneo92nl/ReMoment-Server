@@ -49,7 +49,7 @@ class SdCardExportTest extends TestCase
     private function processed(string $url): string
     {
         $hash = md5($url);
-        foreach (['320.jpg', '120.jpg', '512.jpg', 'bg_1024x600.jpg', 'bg_320x480.jpg'] as $file) {
+        foreach (['320.jpg', '120.jpg', '512.jpg', 'bg_1024x600.jpg', 'bg_320x480.jpg', 'bg_480x480.jpg'] as $file) {
             Storage::disk('public')->put("artwork/{$hash}/{$file}", "{$file} of {$url}");
         }
         ArtworkCache::put($url, array_merge(array_fill_keys(ArtworkCache::REQUIRED_KEYS, '/storage/x.jpg'), ['colors' => ['#111111'], 'safe_colors' => ['#999999']]));

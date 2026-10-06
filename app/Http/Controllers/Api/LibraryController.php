@@ -45,7 +45,7 @@ class LibraryController extends Controller
     public const PLAYLIST_TRACKS = 200;
 
     /** Artist name for sorting: lower case, without a leading "The ". */
-    private const ARTIST_SORT_NAME = "LOWER(CASE WHEN LOWER(artists.name) LIKE 'the %' THEN SUBSTR(artists.name, 5) ELSE artists.name END)";
+    private const ARTIST_SORT_NAME = Artist::SORT_NAME_SQL;
 
     public function artists(Request $request): JsonResponse
     {

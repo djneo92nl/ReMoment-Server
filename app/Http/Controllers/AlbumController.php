@@ -20,27 +20,33 @@ class AlbumController extends Controller
 {
     public function index(Request $request)
     {
-        $sort = in_array($request->query('sort'), ['plays', 'recent', 'name', 'artist'], true)
+        $sort = in_array($request->query('sort'), ['plays', 'recent', 'name', 'artist', 'year'], true)
             ? $request->query('sort')
-            : 'plays';
-
+            : 'recent';
+        $search = trim((string) $request->query('q'));
+        $favorites = $request->boolean('fav');
         $scope = LeadingSource::forRequest($request);
 
         $albums = LibrarySources::albums(Album::query(), LeadingSource::hidden($scope))
             ->whereHas('tracks')
             ->with('artist')
             ->withCount('plays')
-            ->when($sort === 'plays', fn ($q) => $q->orderByDesc('plays_count')->orderByDesc('created_at'))
-            ->when($sort === 'recent', fn ($q) => $q->orderByDesc('created_at'))
-            ->when($sort === 'name', fn ($q) => $q->orderBy('name'))
+            ->when($search !== '', fn ($q) => $q->where(fn ($q) => $q
+                ->where('albums.name', 'like', "%{$search}%")
+                ->orWhereHas('artist', fn ($a) => $a->where('name', 'like', "%{$search}%"))))
+            ->when($favorites, fn ($q) => $q->whereNotNull('albums.favorited_at'))
+            ->when($sort === 'plays', fn ($q) => $q->orderByDesc('plays_count')->orderByDesc('albums.created_at'))
+            ->when($sort === 'recent', fn ($q) => $q->orderByDesc('albums.created_at')->orderByDesc('albums.id'))
+            ->when($sort === 'year', fn ($q) => $q->orderByDesc('albums.released_at')->orderBy('albums.name'))
+            ->when($sort === 'name', fn ($q) => $q->orderBy('albums.name'))
             ->when($sort === 'artist', fn ($q) => $q
                 ->join('artists', 'artists.id', '=', 'albums.artist_id')
-                ->orderBy('artists.name')->orderBy('albums.name')
+                ->orderByRaw(\App\Models\Media\Artist::SORT_NAME_SQL)->orderBy('albums.name')
                 ->select('albums.*'))
-            ->paginate(50)
+            ->paginate(96)
             ->withQueryString();
 
-        return view('albums.index', compact('albums', 'sort', 'scope'));
+        return view('albums.index', compact('albums', 'sort', 'scope', 'search', 'favorites'));
     }
 
     public function show(Album $album)

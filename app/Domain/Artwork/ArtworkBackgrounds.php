@@ -18,6 +18,7 @@ final class ArtworkBackgrounds
     public const SIZES = [
         '1024x600' => '7" landscape',
         '320x480' => '3.5" portrait',
+        '480x480' => 'square',
     ];
 
     /** The original size, published as `proxy_bg`. */

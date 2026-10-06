@@ -52,4 +52,15 @@ final class LibraryItemArtwork
     {
         return self::forUrl(LibraryArtwork::coverUrl($images));
     }
+
+    /**
+     * A proxy URL as the web UI should load it: root-relative from `/storage/` on, so
+     * it works on whatever host the page was opened with (cached URLs carry APP_URL).
+     */
+    public static function webUrl(?string $url): ?string
+    {
+        $pos = $url === null ? false : strpos($url, '/storage/');
+
+        return $pos === false ? $url : substr($url, $pos);
+    }
 }

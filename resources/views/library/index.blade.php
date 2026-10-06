@@ -25,23 +25,11 @@
                     <p class="text-gray-400 dark:text-gray-600 text-sm">No albums yet — start listening to build your library</p>
                 </div>
             @else
-                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-5">
+                <x-album-grid>
                     @foreach($recentAlbums as $album)
-                        <a href="{{ route('albums.show', $album) }}" class="group">
-                            <x-artwork-thumb
-                                :src="$album->images[0]['url'] ?? null"
-                                :colors="$album->colors"
-                                :seed="$album->name.$album->id"
-                                icon="fa-solid fa-compact-disc"
-                                size="w-full aspect-square"
-                                rounded="rounded-2xl"
-                                class="shadow-sm ring-1 ring-gray-100 dark:ring-stone-800 group-hover:shadow-md transition-shadow"
-                            />
-                            <p class="mt-3 text-sm font-medium text-gray-900 dark:text-gray-100 truncate group-hover:underline">{{ $album->name }}</p>
-                            <p class="text-xs text-gray-500 dark:text-gray-500 truncate">{{ $album->artist->name }}</p>
-                        </a>
+                        <x-album-card :album="$album" />
                     @endforeach
-                </div>
+                </x-album-grid>
             @endif
         </div>
 

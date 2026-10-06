@@ -93,6 +93,7 @@ class ArtworkProcessingTest extends TestCase
             'proxy_120' => ["{$dir}/120.jpg", 120, 120],
             'proxy_bg' => ["{$dir}/bg_1024x600.jpg", 1024, 600],
             'proxy_bg_320x480' => ["{$dir}/bg_320x480.jpg", 320, 480],
+            'proxy_bg_480x480' => ["{$dir}/bg_480x480.jpg", 480, 480],
         ];
 
         $cached = ArtworkCache::get(self::URL);
@@ -218,7 +219,7 @@ class ArtworkProcessingTest extends TestCase
         $data = collect($this->mqtt->published)->firstWhere('topic', 'remoment/player/4/data');
         $artwork = json_decode($data['message'], true)['artwork'];
 
-        foreach (['proxy_512', 'proxy_320', 'proxy_120', 'proxy_bg', 'proxy_bg_320x480', 'colors'] as $key) {
+        foreach (['proxy_512', 'proxy_320', 'proxy_120', 'proxy_bg', 'proxy_bg_320x480', 'proxy_bg_480x480', 'colors'] as $key) {
             $this->assertArrayHasKey($key, $artwork);
         }
         $this->assertStringEndsWith('/bg_1024x600.jpg', $artwork['proxy_bg']);
@@ -229,6 +230,7 @@ class ArtworkProcessingTest extends TestCase
     {
         $this->assertSame('proxy_bg', ArtworkBackgrounds::key('1024x600'));
         $this->assertSame('proxy_bg_320x480', ArtworkBackgrounds::key('320x480'));
+        $this->assertSame('proxy_bg_480x480', ArtworkBackgrounds::key('480x480'));
 
         foreach (array_keys(ArtworkBackgrounds::SIZES) as $size) {
             $key = ArtworkBackgrounds::key($size);

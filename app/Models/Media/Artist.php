@@ -28,6 +28,9 @@ class Artist extends Model
     ];
 
     /** Keeps `name_key` (the identity used to find this artist again across sources) in step with `name`. */
+    /** SQL sort key: lowercase name without a leading "The ". */
+    public const SORT_NAME_SQL = "LOWER(CASE WHEN LOWER(artists.name) LIKE 'the %' THEN SUBSTR(artists.name, 5) ELSE artists.name END)";
+
     protected static function booted(): void
     {
         static::saving(function (self $artist) {

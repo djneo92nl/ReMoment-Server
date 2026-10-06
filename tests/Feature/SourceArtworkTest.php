@@ -153,7 +153,7 @@ class SourceArtworkTest extends TestCase
         $this->assertSame(Storage::disk('public')->url("{$dir}/bg_1024x600.jpg"), $artwork['proxy_bg']);
         $this->assertSame(Storage::disk('public')->url("{$dir}/bg_320x480.jpg"), $artwork['proxy_bg_320x480']);
 
-        foreach (['320.jpg', '120.jpg', 'bg_1024x600.jpg', 'bg_320x480.jpg'] as $file) {
+        foreach (['320.jpg', '120.jpg', 'bg_1024x600.jpg', 'bg_320x480.jpg', 'bg_480x480.jpg'] as $file) {
             $bytes = Storage::disk('public')->get("{$dir}/{$file}");
             $this->assertStringContainsString("\xFF\xC0", $bytes, "{$file} is not baseline");
             $this->assertStringNotContainsString("\xFF\xC2", $bytes, "{$file} is progressive");

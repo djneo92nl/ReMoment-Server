@@ -20,7 +20,7 @@ class LibraryController extends Controller
             ->whereHas('tracks')
             ->with('artist')
             ->latest()
-            ->limit(12)
+            ->limit(18)
             ->get();
 
         $recentPlays = Play::whereNotNull('track_id')

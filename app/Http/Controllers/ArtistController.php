@@ -11,6 +11,7 @@ use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
 use App\Jobs\ImportSpotifyAlbumById;
 use App\Models\Device;
 use App\Models\Media\Artist;
+use App\Models\Media\Genre;
 use App\Models\Play;
 use App\Services\SpotifyTokenService;
 use Illuminate\Http\Request;
@@ -20,18 +21,50 @@ class ArtistController extends Controller
 {
     public function index(Request $request)
     {
+        $sort = in_array($request->query('sort'), ['name', 'plays', 'albums'], true) ? $request->query('sort') : 'name';
+        $search = trim((string) $request->query('q'));
+        $favorites = $request->boolean('fav');
+        $genreSlug = (string) $request->query('genre');
+        $letter = strtoupper((string) $request->query('letter'));
+        $letter = preg_match('/^[A-Z#]$/', $letter) ? $letter : null;
+
         $scope = LeadingSource::forRequest($request);
         $hidden = LeadingSource::hidden($scope);
+        $genre = $genreSlug !== '' ? Genre::where('slug', $genreSlug)->first() : null;
 
-        $artists = LibrarySources::artists(Artist::query(), $hidden)
-            ->whereHas('albums')
-            ->withCount('plays')
+        // Everything but the letter: the A-Z bar counts what each letter would show.
+        $base = LibrarySources::artists(Artist::query(), $hidden)
+            ->whereHas('albums', fn ($q) => LibrarySources::albums($q, $hidden))
+            ->when($search !== '', fn ($q) => $q->where('artists.name', 'like', "%{$search}%"))
+            ->when($favorites, fn ($q) => $q->whereNotNull('artists.favorited_at'))
+            ->when($genre, fn ($q) => $q->whereIn('artists.id', $genre->artists()->select('artists.id')));
+
+        $letters = (clone $base)
+            ->selectRaw('UPPER(SUBSTR('.Artist::SORT_NAME_SQL.', 1, 1)) as letter, COUNT(*) as total')
+            ->groupBy('letter')
+            ->pluck('total', 'letter')
+            ->reduce(function ($carry, $total, $l) {
+                $key = preg_match('/^[A-Z]$/', (string) $l) ? $l : '#';
+                $carry[$key] = ($carry[$key] ?? 0) + $total;
+
+                return $carry;
+            }, []);
+        ksort($letters);
+
+        $artists = (clone $base)
+            ->when($letter === '#', fn ($q) => $q->whereRaw('SUBSTR('.Artist::SORT_NAME_SQL.', 1, 1) NOT BETWEEN ? AND ?', ['a', 'z']))
+            ->when($letter !== null && $letter !== '#', fn ($q) => $q->whereRaw('SUBSTR('.Artist::SORT_NAME_SQL.', 1, 1) = ?', [strtolower($letter)]))
+            ->withCount(['plays', 'albums' => fn ($q) => LibrarySources::albums($q, $hidden)])
             ->with(['albums' => fn ($q) => LibrarySources::albums($q, $hidden)->withCount('plays')->orderByDesc('plays_count')->orderByDesc('created_at')])
-            ->orderByDesc('plays_count')
-            ->paginate(50)
+            ->when($sort === 'name', fn ($q) => $q->orderByRaw(Artist::SORT_NAME_SQL)->orderBy('artists.id'))
+            ->when($sort === 'plays', fn ($q) => $q->orderByDesc('plays_count')->orderByRaw(Artist::SORT_NAME_SQL))
+            ->when($sort === 'albums', fn ($q) => $q->orderByDesc('albums_count')->orderByRaw(Artist::SORT_NAME_SQL))
+            ->paginate(120)
             ->withQueryString();
 
-        return view('artists.index', compact('artists', 'scope'));
+        $genres = Genre::query()->whereHas('artists')->orderBy('name')->get(['slug', 'name']);
+
+        return view('artists.index', compact('artists', 'scope', 'sort', 'search', 'favorites', 'genre', 'genres', 'letter', 'letters'));
     }
 
     public function show(Artist $artist)

@@ -3,60 +3,44 @@
         <div class="flex items-end justify-between gap-4 flex-wrap">
             <div>
                 <h1 class="text-3xl md:text-4xl font-medium tracking-tight dark:text-gray-100 text-gray-900">Albums</h1>
-                <p class="mt-1.5 text-gray-500 dark:text-gray-500">{{ number_format($albums->total()) }} albums in your library</p>
+                <p class="mt-1.5 text-gray-500 dark:text-gray-500">{{ number_format($albums->total()) }} {{ Str::plural('album', $albums->total()) }}{{ $search !== '' ? ' matching “'.$search.'”' : '' }}</p>
             </div>
-
-            <div class="flex items-center gap-3 flex-wrap">
             <x-library-scope :scope="$scope" />
-            <form method="GET" action="{{ route('albums.index') }}">
-                <select name="sort" onchange="this.form.submit()"
-                        class="rounded-xl border-gray-200 dark:border-stone-700 dark:bg-stone-900 text-sm text-gray-600 dark:text-gray-400 focus:ring-indigo-500 focus:border-indigo-500">
-                    <option value="plays" @selected($sort === 'plays')>Most played</option>
-                    <option value="recent" @selected($sort === 'recent')>Recently added</option>
-                    <option value="name" @selected($sort === 'name')>Name</option>
-                    <option value="artist" @selected($sort === 'artist')>Artist</option>
-                </select>
-            </form>
-            </div>
         </div>
     </x-slot>
 
+    <form method="GET" action="{{ route('albums.index') }}" class="mb-6 flex flex-wrap items-center gap-2">
+        <div class="relative flex-1 min-w-[12rem] max-w-sm">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400"></i>
+            <input type="search" name="q" value="{{ $search }}" placeholder="Search albums or artists"
+                   class="w-full pl-8 rounded-xl border-gray-200 dark:border-stone-700 dark:bg-stone-900 text-sm focus:ring-indigo-500 focus:border-indigo-500">
+        </div>
+        <select name="sort" onchange="this.form.submit()"
+                class="rounded-xl border-gray-200 dark:border-stone-700 dark:bg-stone-900 text-sm text-gray-600 dark:text-gray-400 focus:ring-indigo-500 focus:border-indigo-500">
+            <option value="recent" @selected($sort === 'recent')>Recently added</option>
+            <option value="plays" @selected($sort === 'plays')>Most played</option>
+            <option value="year" @selected($sort === 'year')>Release year</option>
+            <option value="name" @selected($sort === 'name')>Album A–Z</option>
+            <option value="artist" @selected($sort === 'artist')>Artist A–Z</option>
+        </select>
+        <label class="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 px-2">
+            <input type="checkbox" name="fav" value="1" @checked($favorites) onchange="this.form.submit()" class="rounded text-indigo-600 focus:ring-indigo-500">
+            Favorites
+        </label>
+        <button type="submit" class="sr-only">Apply</button>
+    </form>
+
     @if($albums->isEmpty())
-        <div class="bg-white dark:bg-stone-900 rounded-3xl border border-gray-200/70 dark:border-stone-800/80 shadow-sm p-16 text-center">
-            <i class="fa-solid fa-compact-disc text-4xl text-gray-200 dark:text-stone-700 mb-4"></i>
-            <p class="text-gray-400 dark:text-gray-600 text-sm">No albums yet — start listening to build your library</p>
+        <div class="bg-white dark:bg-stone-900 rounded-2xl border border-gray-200/70 dark:border-stone-800/80 p-12 text-center">
+            <i class="fa-solid fa-compact-disc text-3xl text-gray-200 dark:text-stone-700 mb-3"></i>
+            <p class="text-gray-400 dark:text-gray-600 text-sm">No albums here{{ ($search !== '' || $favorites) ? ' for these filters' : ' yet' }}.</p>
         </div>
     @else
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-5">
+        <x-album-grid>
             @foreach($albums as $album)
-                <div class="group">
-                    <a href="{{ route('albums.show', $album) }}">
-                        <x-artwork-thumb
-                            :src="$album->images[0]['url'] ?? null"
-                            :colors="$album->colors"
-                            :seed="$album->name.$album->id"
-                            icon="fa-solid fa-compact-disc"
-                            size="w-full aspect-square"
-                            rounded="rounded-2xl"
-                            class="shadow-sm ring-1 ring-gray-100 dark:ring-stone-800 group-hover:shadow-md transition-shadow"
-                        />
-                        <p class="mt-3 text-sm font-medium text-gray-900 dark:text-gray-100 truncate group-hover:underline">{{ $album->name }}</p>
-                    </a>
-                    <a href="{{ route('artists.show', $album->artist) }}" class="text-xs text-gray-500 dark:text-gray-500 truncate hover:underline block">
-                        {{ $album->artist->name }}
-                    </a>
-                    <p class="text-xs text-gray-400 dark:text-gray-600 mt-0.5">
-                        @if($album->plays_count > 0)
-                            {{ number_format($album->plays_count) }} {{ Str::plural('play', $album->plays_count) }}
-                        @endif
-                        @if($album->released_at)
-                            @if($album->plays_count > 0) &middot; @endif
-                            {{ $album->released_at->format('Y') }}
-                        @endif
-                    </p>
-                </div>
+                <x-album-card :album="$album" :show-plays="$sort === 'plays'" />
             @endforeach
-        </div>
+        </x-album-grid>
 
         @if($albums->hasPages())
             <div class="mt-8 flex justify-center">

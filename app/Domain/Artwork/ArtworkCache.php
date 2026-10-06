@@ -15,7 +15,7 @@ final class ArtworkCache
      * (DispatchArtworkProcessing) or by `library:backfill-artwork`.
      * The background keys are ArtworkBackgrounds::key() of each size.
      */
-    public const REQUIRED_KEYS = ['proxy_512', 'proxy_320', 'proxy_120', 'proxy_bg', 'proxy_bg_320x480', 'colors', 'safe_colors'];
+    public const REQUIRED_KEYS = ['proxy_512', 'proxy_320', 'proxy_120', 'proxy_bg', 'proxy_bg_320x480', 'proxy_bg_480x480', 'colors', 'safe_colors'];
 
     public static function put(string $originalUrl, array $data): void
     {

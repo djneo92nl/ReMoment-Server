@@ -68,6 +68,7 @@ final class LibraryArtwork
         'proxy_120' => '120.jpg',
         'proxy_bg' => 'bg_1024x600.jpg',
         'proxy_bg_320x480' => 'bg_320x480.jpg',
+        'proxy_bg_480x480' => 'bg_480x480.jpg',
     ];
 
     /** Path of one processed file on the public disk. */

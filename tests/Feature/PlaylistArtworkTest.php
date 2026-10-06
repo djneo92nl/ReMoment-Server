@@ -143,7 +143,7 @@ class PlaylistArtworkTest extends TestCase
         $this->assertCount(5, $entry['safe_colors']);
 
         $dir = 'artwork/'.md5($url);
-        foreach (['512.jpg', '320.jpg', '120.jpg', 'bg_1024x600.jpg', 'bg_320x480.jpg'] as $file) {
+        foreach (['512.jpg', '320.jpg', '120.jpg', 'bg_1024x600.jpg', 'bg_320x480.jpg', 'bg_480x480.jpg'] as $file) {
             $bytes = Storage::disk('public')->get("{$dir}/{$file}");
             $this->assertStringContainsString("\xFF\xC0", $bytes, "{$file} is not baseline");
             $this->assertStringNotContainsString("\xFF\xC2", $bytes, "{$file} is progressive");
