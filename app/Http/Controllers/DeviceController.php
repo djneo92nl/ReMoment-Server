@@ -181,6 +181,20 @@ class DeviceController extends Controller
         return back()->with('success', "Playing \"{$track->name}\" on {$device->device_name}.");
     }
 
+    /** Plays a Spotify track that isn't in the library (a "More on Spotify" row). */
+    public function playSpotifyTrack(string $spotifyTrackId, Device $device, LibraryPlayback $library)
+    {
+        try {
+            $library->playSpotifyUri($device, 'spotify:track:'.$spotifyTrackId);
+        } catch (NotPlayableException) {
+            return back()->with('error', "{$device->device_name} can't play that track.");
+        } catch (\Throwable $e) {
+            return back()->with('error', "Could not play on {$device->device_name}: {$e->getMessage()}");
+        }
+
+        return back()->with('success', "Playing on {$device->device_name}.");
+    }
+
     public function standby(Device $device)
     {
         try {

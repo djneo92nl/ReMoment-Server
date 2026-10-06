@@ -145,6 +145,18 @@ class LibraryPlayback
         throw new NotPlayableException("\"{$track->name}\" can't be played on {$device->device_name}.");
     }
 
+    /** Plays a Spotify track by URI, without it being in the library (a "More on Spotify" row). */
+    public function playSpotifyUri(Device $device, string $uri): PlaybackResult
+    {
+        if (!self::isSpotifyTrackUri($uri) || !self::canPlaySpotify($device)) {
+            throw new NotPlayableException("That track can't be played on {$device->device_name}.");
+        }
+
+        $this->playOnSpotify($device, collect([$uri]));
+
+        return new PlaybackResult(PlaybackResult::VIA_SPOTIFY, 1, 1);
+    }
+
     /** Tracks in playlist order, with what playback reads; $limit for a listing. */
     public static function playlistTracks(Playlist $playlist, ?int $limit = null, array $hiddenSources = []): Collection
     {

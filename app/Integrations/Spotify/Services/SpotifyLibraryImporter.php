@@ -196,6 +196,13 @@ class SpotifyLibraryImporter
             Enrichment::queue($track);
         }
 
+        // Where the track sits on its album, for ordering the album page.
+        foreach (['track_number', 'disc_number'] as $key) {
+            if (!empty($spotifyTrack[$key])) {
+                Enrichment::save($track, $key, (string) (int) $spotifyTrack[$key], 'int', Enrichment::SPOTIFY);
+            }
+        }
+
         return $track;
     }
 

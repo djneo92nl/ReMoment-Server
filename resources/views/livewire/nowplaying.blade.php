@@ -103,7 +103,7 @@
                                                 class="flex items-center gap-2 px-4 py-2 rounded-2xl bg-gray-100 dark:bg-stone-800 hover:bg-gray-200 dark:hover:bg-stone-700 text-gray-700 dark:text-gray-300 text-sm font-medium transition-colors disabled:opacity-60">
                                             <i class="fa-solid fa-plus text-xs"></i>
                                             <span wire:loading.remove wire:target="addToLibrary">Add to library</span>
-                                            <span wire:loading wire:target="addToLibrary">Adding…</span>
+                                            <span style="display:none" wire:loading wire:target="addToLibrary">Adding…</span>
                                         </button>
                                     @elseif($addedUrl)
                                         <a href="{{ $addedUrl }}" class="inline-flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400 hover:underline">

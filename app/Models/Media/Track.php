@@ -73,6 +73,34 @@ class Track extends Model
      * A track that only exists because a radio stream announced it (source `radio`): no album, no
      * id, and the station's logo as its image. Matching it to a real track replaces it.
      */
+    /**
+     * The library sources this track is available from, `dlna` and/or `spotify`: its own source, or
+     * a DLNA url / Spotify id kept from a merge.
+     *
+     * @return list<string>
+     */
+    public function sources(): array
+    {
+        $meta = $this->relationLoaded('metadata')
+            ? $this->metadata->whereIn('key', ['dlna_url', 'external_id'])
+            : $this->metadata()->whereIn('key', ['dlna_url', 'external_id'])->get();
+
+        $sources = [];
+        foreach (['dlna', 'spotify'] as $source) {
+            if ($this->source === $source || $meta->contains(fn ($m) => $m->source === $source || str_starts_with((string) $m->source, $source.':'))) {
+                $sources[] = $source;
+            }
+        }
+
+        return $sources;
+    }
+
+    /** Whether the track may be removed from the library: it isn't available from the DLNA library. */
+    public function isRemovable(): bool
+    {
+        return !in_array('dlna', $this->sources(), true);
+    }
+
     public function isRadioStub(): bool
     {
         return $this->source === 'radio';

@@ -2,6 +2,7 @@
 
 namespace App\Models\Media;
 
+use App\Domain\Library\LibrarySources;
 use App\Domain\Library\Normalizer;
 use App\Models\Media\Concerns\HasGenres;
 use App\Models\Media\Concerns\ReadsMetadata;
@@ -43,6 +44,15 @@ class Album extends Model
                 $album->name_key = Normalizer::album($album->name);
             }
         });
+    }
+
+    /** Adds `on_dlna` / `on_spotify`: whether any of the album's tracks is available from that source. */
+    public function scopeWithSourceFlags($query)
+    {
+        return $query->withExists([
+            'tracks as on_dlna' => fn ($q) => LibrarySources::availableFrom($q, 'dlna'),
+            'tracks as on_spotify' => fn ($q) => LibrarySources::availableFrom($q, 'spotify'),
+        ]);
     }
 
     public function artist(): BelongsTo

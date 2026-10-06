@@ -67,6 +67,21 @@ class LibrarySources
         });
     }
 
+    /** Tracks available from $source (its own `source`, or a DLNA url / external id kept from a merge). */
+    public static function availableFrom(Builder|Relation $query, string $source): Builder|Relation
+    {
+        return $query->where(function (Builder $q) use ($source) {
+            $q->where('tracks.source', $source)
+                ->orWhereExists(function ($m) use ($source) {
+                    $m->selectRaw('1')->from('metadata')
+                        ->whereColumn('metadata.metadatable_id', 'tracks.id')
+                        ->where('metadata.metadatable_type', (new Track)->getMorphClass())
+                        ->whereIn('metadata.key', self::SOURCE_METADATA)
+                        ->where(fn ($s) => $s->where('metadata.source', $source)->orWhere('metadata.source', 'like', $source.':%'));
+                });
+        });
+    }
+
     /** Albums with at least one visible track. */
     public static function albums(Builder|Relation $query, array $hidden): Builder|Relation
     {

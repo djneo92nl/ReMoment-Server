@@ -20,8 +20,11 @@
             rounded="rounded-none"
             class="text-3xl"
         />
+        <div style="position:absolute;left:6px;bottom:6px">
+            <x-source-badges :dlna="(bool) ($album->on_dlna ?? false)" :spotify="(bool) ($album->on_spotify ?? false)" />
+        </div>
         @if($album->favorited_at)
-            <span class="absolute top-1.5 right-1.5 w-5 h-5 rounded-md bg-black/55 text-amber-300 text-[10px] flex items-center justify-center">
+            <span class="flex items-center justify-center text-[10px]" style="position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:6px;background:rgba(0,0,0,.6);color:#fcd34d">
                 <i class="fa-solid fa-star"></i>
             </span>
         @endif

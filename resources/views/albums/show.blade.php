@@ -14,6 +14,24 @@
                         </button>
                     </form>
                 </div>
+                @php
+                    $albumSources = $album->tracks->flatMap(fn ($t) => $t->sources())->unique();
+                    $albumRemovable = $album->tracks->isEmpty() || $album->tracks->every(fn ($t) => $t->isRemovable());
+                @endphp
+                <div class="mt-2 flex flex-wrap items-center gap-2">
+                    <x-source-badges :dlna="$albumSources->contains('dlna')" :spotify="$albumSources->contains('spotify')" :labels="true" :light="true" />
+                    @auth
+                        @if($albumRemovable)
+                            <form method="POST" action="{{ route('albums.destroy', $album) }}" onsubmit="return confirm('Remove this album and its tracks from the library? Your play history is kept.')">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="text-xs text-gray-400 hover:text-red-500 transition-colors">
+                                    <i class="fa-solid fa-trash-can mr-1"></i>Remove from library
+                                </button>
+                            </form>
+                        @endif
+                    @endauth
+                </div>
                 <p class="mt-1.5 text-gray-500 dark:text-gray-500">
                     <a href="{{ route('artists.show', $album->artist) }}" class="hover:underline">{{ $album->artist->name }}</a>
                     @if($album->released_at)
@@ -153,10 +171,6 @@
                     </div>
                 </div>
 
-                @if($spotifyConnected)
-                    <livewire:album-more-on-spotify :album="$album" :key="'spotify-more-'.$album->id" />
-                @endif
-
                 {{-- Tracklist --}}
                 @if($album->tracks->isNotEmpty())
                     @php
@@ -194,7 +208,9 @@
                                     <div class="flex-1 min-w-0">
                                         <p class="text-sm text-gray-900 dark:text-gray-100 truncate flex items-center gap-1.5">
                                             {{ $track->name }}
-                                            <x-source-icon :source="$track->source" />
+                                            @foreach($track->sources() ?: [$track->source] as $trackSource)
+                                                <x-source-icon :source="$trackSource" />
+                                            @endforeach
                                             @if($track->metaValue('explicit') === '1')
                                                 <span class="px-1 rounded bg-gray-200 dark:bg-stone-700 text-[9px] font-semibold text-gray-500 dark:text-gray-400" title="Explicit">E</span>
                                             @endif
@@ -224,7 +240,22 @@
                                             <i class="fa-solid fa-align-left text-xs"></i>
                                         </button>
                                     @endif
-                                    @if($dlnaUrl && $playableDevices->isNotEmpty())
+                                    @auth
+                                        @if($track->isRemovable())
+                                            <form method="POST" action="{{ route('tracks.destroy', $track) }}" class="flex-shrink-0" onsubmit="return confirm('Remove this track from the library? Your play history is kept.')">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" title="Remove from library"
+                                                        class="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity w-7 h-7 rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-stone-700">
+                                                    <i class="fa-solid fa-trash-can text-xs"></i>
+                                                </button>
+                                            </form>
+                                        @endif
+                                    @endauth
+                                    @php
+                                        $trackDevices = $playableDevices->filter(fn ($d) => \App\Domain\Library\LibraryPlayback::trackPlayable($track, $d))->values();
+                                    @endphp
+                                    @if($trackDevices->isNotEmpty())
                                         <button @click="$dispatch('open-modal', 'play-track-{{ $track->id }}')"
                                                 class="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity w-7 h-7 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-stone-700 flex-shrink-0"
                                                 title="Play on device">
@@ -234,7 +265,7 @@
                                             name="play-track-{{ $track->id }}"
                                             title="Play track"
                                             :description="$track->name"
-                                            :devices="$playableDevices"
+                                            :devices="$trackDevices"
                                             :action-template="url('tracks/'.$track->id.'/play').'/{id}'"
                                         />
                                     @endif
@@ -284,6 +315,10 @@
                     </div>
                 @endif
             </div>
+
+            @if($spotifyConnected)
+                <livewire:album-more-on-spotify :album="$album" :key="'spotify-more-'.$album->id" />
+            @endif
         </div>
 
         <!-- Right: Stats + recent plays -->

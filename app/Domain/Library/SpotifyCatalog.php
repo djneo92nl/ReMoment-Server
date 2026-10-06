@@ -87,7 +87,7 @@ class SpotifyCatalog
     /**
      * The tracks of an album's Spotify release, null when it isn't found there.
      *
-     * @return list<array{id: string, name: string, number: int, duration: int}>|null
+     * @return list<array{id: string, name: string, number: int, disc: int, duration: int}>|null
      */
     public function albumTracks(Album $album): ?array
     {
@@ -109,6 +109,7 @@ class SpotifyCatalog
                         'id' => $item['id'],
                         'name' => $item['name'],
                         'number' => (int) ($item['track_number'] ?? 0),
+                        'disc' => (int) ($item['disc_number'] ?? 1),
                         'duration' => intdiv((int) ($item['duration_ms'] ?? 0), 1000),
                     ];
                 }

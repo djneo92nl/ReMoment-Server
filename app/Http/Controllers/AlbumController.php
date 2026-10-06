@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibraryPlayback;
+use App\Domain\Library\LibraryRemover;
 use App\Domain\Library\LibrarySources;
 use App\Domain\Library\NotPlayableException;
 use App\Domain\Library\PlaybackFailedException;
@@ -30,6 +31,7 @@ class AlbumController extends Controller
         $albums = LibrarySources::albums(Album::query(), LeadingSource::hidden($scope))
             ->whereHas('tracks')
             ->with('artist')
+            ->withSourceFlags()
             ->withCount('plays')
             ->when($search !== '', fn ($q) => $q->where(fn ($q) => $q
                 ->where('albums.name', 'like', "%{$search}%")
@@ -51,7 +53,14 @@ class AlbumController extends Controller
 
     public function show(Album $album)
     {
-        $album->load(['artist', 'tracks' => fn ($q) => $q->withCount('plays')->with(['genreRelation', 'metadata' => fn ($q) => $q->whereIn('key', Track::DISPLAY_METADATA)])->orderByDesc('plays_count')]);
+        $album->load(['artist', 'tracks' => fn ($q) => $q->withCount('plays')->with(['genreRelation', 'metadata' => fn ($q) => $q->whereIn('key', [...Track::DISPLAY_METADATA, 'external_id'])])->orderByDesc('plays_count')]);
+
+        // Album order (disc, then track number), tracks without a position last by plays.
+        $album->setRelation('tracks', $album->tracks->sortBy(fn ($t) => [
+            (int) ($t->metaValue('disc_number') ?: 1),
+            (int) ($t->metaValue('track_number') ?: 9999),
+            -$t->plays_count,
+        ])->values());
 
         $totalPlays = $album->plays()->count();
 
@@ -120,6 +129,37 @@ class AlbumController extends Controller
         return back()->with('success', $added > 0
             ? "Added {$added} ".Str::plural('track', $added)." to \"{$album->name}\" from Spotify."
             : "\"{$album->name}\" is already complete.");
+    }
+
+    /** Removes an album that has no DLNA tracks (admin): its tracks, and plays turn into text plays. */
+    public function destroy(Album $album)
+    {
+        $artist = $album->artist;
+        $name = $album->name;
+
+        if (LibraryRemover::album($album) === null) {
+            return back()->with('error', "\"{$name}\" has tracks from the DLNA library and can't be removed here.");
+        }
+
+        return ($artist !== null && \App\Models\Media\Artist::whereKey($artist->id)->exists()
+            ? redirect()->route('artists.show', $artist)
+            : redirect()->route('albums.index'))->with('success', "Removed \"{$name}\" from the library.");
+    }
+
+    /** Removes one track that isn't on DLNA (admin). */
+    public function destroyTrack(Track $track)
+    {
+        $name = $track->name;
+        $albumId = $track->album_id;
+
+        if (!LibraryRemover::track($track)) {
+            return back()->with('error', "\"{$name}\" is in the DLNA library and can't be removed here.");
+        }
+
+        $album = $albumId ? Album::find($albumId) : null;
+
+        return ($album ? redirect()->route('albums.show', $album) : redirect()->route('albums.index'))
+            ->with('success', "Removed \"{$name}\" from the library.");
     }
 
     public function favorite(Request $request, Album $album)

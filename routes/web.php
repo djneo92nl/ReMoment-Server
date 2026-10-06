@@ -42,6 +42,7 @@ Route::post('/albums/{album}/play/{device}', [AlbumController::class, 'play'])->
 Route::post('/albums/{album}/fill', [AlbumController::class, 'fill'])->name('albums.fill');
 Route::post('/albums/{album}/favorite', [AlbumController::class, 'favorite'])->name('albums.favorite');
 Route::post('/tracks/{track}/play/{device}', [DeviceController::class, 'playTrack'])->name('tracks.play');
+Route::post('/spotify/tracks/{spotifyTrackId}/play/{device}', [DeviceController::class, 'playSpotifyTrack'])->where('spotifyTrackId', '[A-Za-z0-9]+')->name('spotify.tracks.play');
 Route::get('/genres', [GenreController::class, 'index'])->name('genres.index');
 Route::get('/genres/{slug}', [GenreController::class, 'show'])->name('genres.show');
 Route::get('/library', [LibraryController::class, 'index'])->name('library.index');
@@ -57,6 +58,9 @@ Route::get('/dashboard', function () {
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+
+    Route::delete('/albums/{album}', [AlbumController::class, 'destroy'])->name('albums.destroy');
+    Route::delete('/tracks/{track}', [AlbumController::class, 'destroyTrack'])->name('tracks.destroy');
 
     Route::get('/setup', fn () => view('setup.index'))->name('setup.index');
 

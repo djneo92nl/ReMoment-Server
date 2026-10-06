@@ -19,6 +19,7 @@ class LibraryController extends Controller
         $recentAlbums = LibrarySources::albums(Album::query(), $hidden)
             ->whereHas('tracks')
             ->with('artist')
+            ->withSourceFlags()
             ->latest()
             ->limit(18)
             ->get();

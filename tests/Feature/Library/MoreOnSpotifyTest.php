@@ -74,6 +74,8 @@ class MoreOnSpotifyTest extends TestCase
         $album = $this->localAlbum();
         Metadata::create(['metadatable_type' => Album::class, 'metadatable_id' => $album->id, 'key' => 'spotify_album_uri', 'value' => 'spotify:album:sa1', 'type' => 'string', 'source' => 'spotify']);
 
+        Metadata::create(['metadatable_type' => Track::class, 'metadatable_id' => $album->tracks()->first()->id, 'key' => 'track_number', 'value' => '1', 'type' => 'int', 'source' => 'dlna']);
+
         $api = Mockery::mock(SpotifyWebAPI::class);
         $api->shouldReceive('getAlbumTracks')->once()->andReturn(['items' => [
             ['id' => 't1', 'name' => 'Help!', 'track_number' => 1, 'duration_ms' => 138000],
@@ -82,10 +84,12 @@ class MoreOnSpotifyTest extends TestCase
         $this->connect($api);
 
         Livewire::test(AlbumMoreOnSpotify::class, ['album' => $album])
+            ->call('load') // records the Spotify id of the track we have and reloads the page once
             ->call('load')
             ->assertSee('More on Spotify')
             ->assertSee('Bonus Demo')
-            ->assertSee('Add all 1 to album');
+            ->assertSee('Add 1 track to album')
+            ->assertSee('In album');
     }
 
     public function test_global_search_shows_spotify_results_marking_what_is_in_the_library(): void
@@ -120,5 +124,42 @@ class MoreOnSpotifyTest extends TestCase
         $this->localAlbum();
 
         Livewire::test(GlobalSearch::class)->set('query', 'beatles')->assertSee('Beatles')->assertDontSee('From Spotify');
+    }
+
+    public function test_the_spotify_list_keeps_album_order_and_records_the_position_of_tracks_we_have(): void
+    {
+        $album = $this->localAlbum();
+        $mine = Track::create(['artist_id' => $album->artist_id, 'album_id' => $album->id, 'name' => 'Stacys Mom', 'external_id' => 'spotify:track:3', 'source' => 'spotify']);
+        Metadata::create(['metadatable_type' => Album::class, 'metadatable_id' => $album->id, 'key' => 'spotify_album_uri', 'value' => 'spotify:album:sa1', 'type' => 'string', 'source' => 'spotify']);
+
+        $api = Mockery::mock(SpotifyWebAPI::class);
+        $api->shouldReceive('getAlbumTracks')->once()->andReturn(['items' => [
+            ['id' => 't1', 'name' => 'Mexican Wine', 'track_number' => 1, 'disc_number' => 1, 'duration_ms' => 1000],
+            ['id' => 't3', 'name' => "Stacy's Mom", 'track_number' => 3, 'disc_number' => 1, 'duration_ms' => 1000],
+            ['id' => 't2', 'name' => 'Bright Future In Sales', 'track_number' => 2, 'disc_number' => 1, 'duration_ms' => 1000],
+        ], 'next' => null]);
+        $this->connect($api);
+
+        $component = Livewire::test(AlbumMoreOnSpotify::class, ['album' => $album])
+            ->call('load')
+            ->assertRedirect(route('albums.show', $album)); // positions were recorded: the page reloads once
+
+        $this->assertSame('3', $mine->fresh()->metaValue('track_number'));
+
+        $component->call('load')->assertNoRedirect()
+            ->assertSeeInOrder(['Mexican Wine', 'Bright Future In Sales', "Stacy's Mom", 'In album']);
+    }
+
+    public function test_playing_a_spotify_row_on_a_device_that_cannot_play_spotify_reports_it(): void
+    {
+        $this->connect(Mockery::mock(SpotifyWebAPI::class));
+        $device = \App\Models\Device::create([
+            'ip_address' => '10.0.0.1', 'device_name' => 'Speaker', 'device_brand_name' => 'Test', 'device_product_type' => 'Speaker',
+            'device_driver' => \Tests\Support\FakePlayerDriver::class, 'device_driver_name' => 'Fake',
+        ]);
+
+        $this->post(route('spotify.tracks.play', ['spotifyTrackId' => 'abc123', 'device' => $device]))
+            ->assertRedirect()
+            ->assertSessionHas('error');
     }
 }
