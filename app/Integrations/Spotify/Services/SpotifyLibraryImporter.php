@@ -193,6 +193,12 @@ class SpotifyLibraryImporter
         $playlist->tracks()->sync($trackIds);
     }
 
+    /** Imports one Spotify track (and its artist and album record) without the rest of its album. */
+    public function importTrackById(string $spotifyTrackId): Track
+    {
+        return $this->importTrackItem($this->tokenService->makeApiClient()->getTrack($spotifyTrackId));
+    }
+
     /** @param  Album|null  $into  put the track on this album (and artist) instead of looking them up by name */
     private function importTrackItem(array $spotifyTrack, ?Album $into = null): Track
     {

@@ -271,6 +271,13 @@
                                                 </div>
                                             @endif
 
+                                            @if($play->track_id === null && $play->track_name !== null)
+                                                <button wire:click="openMatch({{ $play->id }})" type="button" title="Match to a library track"
+                                                        class="flex-shrink-0 text-[11px] px-2 py-1 rounded-lg bg-gray-100 dark:bg-stone-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-stone-700 transition-colors">
+                                                    <i class="fa-solid fa-link mr-1"></i>Match
+                                                </button>
+                                            @endif
+
                                             {{-- Skipped indicator --}}
                                             @if($play->skipped)
                                                 <span class="flex-shrink-0 text-amber-400 dark:text-amber-500 text-xs" title="Skipped">
@@ -325,5 +332,64 @@
                 </div>
             </div>
         @endif
+    @endif
+
+    {{-- Match modal --}}
+    @if($matchPlayId)
+        <div class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-[10vh] bg-black/50" wire:click.self="closeMatch" @keydown.escape.window="$wire.closeMatch()">
+            <div class="w-full max-w-xl bg-white dark:bg-stone-900 rounded-3xl shadow-2xl border border-gray-200/70 dark:border-stone-800 p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-base font-medium text-gray-900 dark:text-gray-100">Match to a library track</h3>
+                    <button wire:click="closeMatch" type="button" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 mb-4">
+                    <input wire:model.live.debounce.400ms="matchName" type="text" placeholder="Track"
+                           class="text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 text-gray-700 dark:text-gray-300 rounded-xl px-3 py-2">
+                    <input wire:model.live.debounce.400ms="matchArtist" type="text" placeholder="Artist"
+                           class="text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 text-gray-700 dark:text-gray-300 rounded-xl px-3 py-2">
+                </div>
+
+                @if($matchError)
+                    <p class="mb-3 text-sm text-red-500">{{ $matchError }}</p>
+                @endif
+
+                <div class="space-y-4 max-h-[50vh] overflow-y-auto">
+                    <div>
+                        <p class="mb-1 text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600">In your library</p>
+                        @forelse($matchLocal as $candidate)
+                            <button wire:click="chooseLocal({{ $candidate['id'] }})" type="button"
+                                    class="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left hover:bg-gray-50 dark:hover:bg-stone-800 transition-colors">
+                                <x-source-icon :source="$candidate['source']" class="w-4" />
+                                <span class="min-w-0 flex-1">
+                                    <span class="block text-sm text-gray-800 dark:text-gray-200 truncate">{{ $candidate['name'] }}</span>
+                                    <span class="block text-xs text-gray-400 dark:text-gray-600 truncate">{{ $candidate['artist'] }}{{ $candidate['album'] ? ' · '.$candidate['album'] : '' }}</span>
+                                </span>
+                                <span class="text-xs text-indigo-600 dark:text-indigo-400">Use</span>
+                            </button>
+                        @empty
+                            <p class="px-3 py-2 text-sm text-gray-400 dark:text-gray-600">No match in the library.</p>
+                        @endforelse
+                    </div>
+
+                    @if($matchSpotify)
+                        <div>
+                            <p class="mb-1 text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600"><i class="fa-brands fa-spotify text-emerald-500 mr-1"></i>On Spotify</p>
+                            @foreach($matchSpotify as $candidate)
+                                <button wire:click="chooseSpotify('{{ $candidate['id'] }}')" wire:loading.attr="disabled" type="button"
+                                        class="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left hover:bg-gray-50 dark:hover:bg-stone-800 transition-colors disabled:opacity-60">
+                                    <i class="fa-brands fa-spotify text-emerald-500 w-4 text-xs"></i>
+                                    <span class="min-w-0 flex-1">
+                                        <span class="block text-sm text-gray-800 dark:text-gray-200 truncate">{{ $candidate['name'] }}</span>
+                                        <span class="block text-xs text-gray-400 dark:text-gray-600 truncate">{{ $candidate['artist'] }}{{ $candidate['album'] ? ' · '.$candidate['album'] : '' }}</span>
+                                    </span>
+                                    <span class="text-xs text-indigo-600 dark:text-indigo-400">Add &amp; use</span>
+                                </button>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+            </div>
+        </div>
     @endif
 </div>

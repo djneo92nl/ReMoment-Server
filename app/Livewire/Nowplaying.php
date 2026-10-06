@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\SpotifyRouting;
+use App\Domain\Library\PlayedTrackAdder;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\SeekInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
@@ -29,6 +30,11 @@ class Nowplaying extends Component
     public ?string $lyricsPlain = null;
 
     public ?string $lyricsSynced = null;
+
+    /** Set once the playing track was added from here: the page to open it on. */
+    public ?string $addedUrl = null;
+
+    public ?string $addFailure = null;
 
     public function mount($device)
     {
@@ -56,6 +62,8 @@ class Nowplaying extends Component
             $this->currentTrackId = $trackSignature;
             $this->lyricsPlain = null;
             $this->lyricsSynced = null;
+            $this->addedUrl = null;
+            $this->addFailure = null;
 
             $track = $this->resolveTrack($cachedNowPlaying);
             if ($track) {
@@ -64,7 +72,12 @@ class Nowplaying extends Component
             }
         }
 
-        return view('livewire.nowplaying');
+        // A playing track the library doesn't have (an external service, radio with a title) can be added.
+        $canAdd = $this->addedUrl === null
+            && $cachedNowPlaying?->track !== null
+            && !PlayedTrackAdder::inLibrary($cachedNowPlaying);
+
+        return view('livewire.nowplaying', ['canAdd' => $canAdd]);
     }
 
     public function updatedVolume($value)
@@ -174,6 +187,21 @@ class Nowplaying extends Component
         }
 
         return null;
+    }
+
+    public function addToLibrary(): void
+    {
+        $nowPlaying = DeviceCache::getNowPlaying($this->device->id);
+        $track = $nowPlaying ? PlayedTrackAdder::add($nowPlaying) : null;
+
+        if ($track === null) {
+            $this->addFailure = 'Nothing to add: this track has no artist or name.';
+
+            return;
+        }
+
+        $this->addFailure = null;
+        $this->addedUrl = $track->album_id ? route('albums.show', $track->album_id).'#track-'.$track->id : route('artists.show', $track->artist_id);
     }
 
     public function standby()
