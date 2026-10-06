@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Library;
 
-use App\Jobs\ImportSpotifyAlbumById;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
 use App\Models\Media\Metadata;
@@ -57,21 +56,6 @@ class FillFromSpotifyTest extends TestCase
         $this->assertSame(1, Album::count());
         $this->assertSame(2, $album->tracks()->count());
         $this->assertSame('spotify:album:alb1', $album->metadata()->where('key', 'spotify_album_uri')->value('value'));
-    }
-
-    public function test_filling_an_artist_queues_every_spotify_album(): void
-    {
-        Queue::fake();
-        $album = $this->dlnaAlbum();
-
-        $api = Mockery::mock(SpotifyWebAPI::class);
-        $api->shouldReceive('search')->andReturn(['artists' => ['items' => [['id' => 'art1', 'name' => 'The Beatles']]]]);
-        $api->shouldReceive('getArtistAlbums')->andReturn(['total' => 2, 'items' => [['id' => 'a1'], ['id' => 'a2']]]);
-        $this->connectSpotify($api);
-
-        $this->post(route('artists.fill', $album->artist))->assertSessionHas('success');
-
-        Queue::assertPushed(ImportSpotifyAlbumById::class, 2);
     }
 
     public function test_album_page_offers_the_filter_once_spotify_tracks_were_added(): void

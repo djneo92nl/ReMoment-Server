@@ -35,7 +35,6 @@ Route::post('/radio/{radio}/favorite', [RadioStationController::class, 'favorite
 Route::post('/radio/{radio}/play/{device}', [RadioStationController::class, 'play'])->name('radio.play');
 Route::get('/artists/{artist}', [ArtistController::class, 'show'])->name('artists.show');
 Route::post('/artists/{artist}/play/{device}', [ArtistController::class, 'play'])->name('artists.play');
-Route::post('/artists/{artist}/fill', [ArtistController::class, 'fill'])->name('artists.fill');
 Route::post('/artists/{artist}/favorite', [ArtistController::class, 'favorite'])->name('artists.favorite');
 Route::get('/albums', [AlbumController::class, 'index'])->name('albums.index');
 Route::get('/albums/{album}', [AlbumController::class, 'show'])->name('albums.show');

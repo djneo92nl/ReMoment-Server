@@ -118,42 +118,6 @@ class SpotifyLibraryImporter
         return null;
     }
 
-    /**
-     * Spotify ids of an artist's albums and singles (not compilations or appearances), newest first.
-     *
-     * @return list<string>
-     */
-    public function artistAlbumIds(Artist $artist): array
-    {
-        $api = $this->tokenService->makeApiClient();
-
-        $spotifyId = $artist->metadata()->where('key', 'spotify_id')->value('value');
-
-        if (!$spotifyId) {
-            $results = $api->search('artist:'.$artist->name, 'artist', ['limit' => 10]);
-
-            foreach ($results['artists']['items'] ?? [] as $candidate) {
-                if (Normalizer::artist($candidate['name'] ?? null) === Normalizer::artist($artist->name)) {
-                    $spotifyId = $candidate['id'];
-                    break;
-                }
-            }
-        }
-
-        if (!$spotifyId) {
-            return [];
-        }
-
-        $ids = [];
-        foreach ($this->paginate(fn ($offset, $limit) => $api->getArtistAlbums($spotifyId, ['include_groups' => 'album,single', 'limit' => $limit, 'offset' => $offset])) as $item) {
-            if (!empty($item['id'])) {
-                $ids[] = $item['id'];
-            }
-        }
-
-        return array_values(array_unique($ids));
-    }
-
     private function importPlaylistItem(array $spotifyPlaylist, \SpotifyWebAPI\SpotifyWebAPI $api): void
     {
         $playlist = Playlist::updateOrCreate(

@@ -83,8 +83,9 @@ class MoreOnSpotifyTest extends TestCase
 
         Livewire::test(AlbumMoreOnSpotify::class, ['album' => $album])
             ->call('load')
-            ->assertSee('1 more track')
-            ->assertSee('Bonus Demo');
+            ->assertSee('More on Spotify')
+            ->assertSee('Bonus Demo')
+            ->assertSee('Add all 1 to album');
     }
 
     public function test_global_search_shows_spotify_results_marking_what_is_in_the_library(): void
