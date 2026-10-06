@@ -34,6 +34,14 @@
                 </label>
             @endforeach
 
+            <label class="flex items-start gap-3 cursor-pointer pt-5 border-t border-gray-100 dark:border-stone-800">
+                <input type="checkbox" name="add_played_tracks" value="1" @checked($addPlayed) class="mt-1 rounded text-indigo-600 focus:ring-indigo-500">
+                <span>
+                    <span class="block text-sm font-medium text-gray-900 dark:text-gray-100">Add played tracks to the library</span>
+                    <span class="block text-xs text-gray-500">Off (default): plays are still logged in the history, with their cover, but tracks that aren't in the library stay out of it.</span>
+                </span>
+            </label>
+
             <button type="submit" class="px-5 py-2.5 rounded-xl bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-sm font-medium">Save</button>
         </form>
     </div>

@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Media\Track;
+use App\Models\Play;
 use App\Services\LastfmSessionService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -21,7 +22,8 @@ class SendNowPlayingToLastfm implements ShouldQueue
 
     public int $backoff = 60;
 
-    public function __construct(public readonly Track $track) {}
+    /** A library track, or a play of a track that isn't in the library (names stored on the play). */
+    public function __construct(public readonly Track|Play $track) {}
 
     public function handle(LastfmSessionService $lastfm): void
     {
@@ -29,23 +31,34 @@ class SendNowPlayingToLastfm implements ShouldQueue
             return;
         }
 
-        $track = $this->track->load('artist', 'album');
+        if ($this->track instanceof Play) {
+            $artist = $this->track->artist_name;
+            $name = $this->track->track_name;
+            $album = $this->track->album_name;
+            $duration = $this->track->duration;
+        } else {
+            $track = $this->track->load('artist', 'album');
+            $artist = $track->artist?->name;
+            $name = $track->name;
+            $album = $track->album?->name;
+            $duration = $track->duration;
+        }
 
-        if (!$track->artist) {
+        if (!$artist || !$name) {
             return;
         }
 
         $params = [
             'method' => 'track.updatenowplaying',
-            'artist' => $track->artist->name,
-            'track' => $track->name,
+            'artist' => $artist,
+            'track' => $name,
         ];
 
-        if ($track->album) {
-            $params['album'] = $track->album->name;
+        if ($album) {
+            $params['album'] = $album;
         }
-        if ($track->duration) {
-            $params['duration'] = $track->duration;
+        if ($duration) {
+            $params['duration'] = $duration;
         }
 
         $lastfm->signedRequest($params);

@@ -6,6 +6,7 @@ use App\Domain\Artwork\SdCardExport;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\DeviceListeners;
 use App\Domain\Library\LeadingSource;
+use App\Domain\Library\LibrarySettings;
 use App\Integrations\Spotify\MusicPlayerDriver as SpotifyDriver;
 use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
 use App\Integrations\Spotify\SpotifyDevice;
@@ -60,6 +61,7 @@ class SettingsController extends Controller
         return view('settings.library', [
             'mode' => LeadingSource::mode(),
             'leading' => LeadingSource::leading(),
+            'addPlayed' => LibrarySettings::addPlayedTracks(),
         ]);
     }
 
@@ -70,6 +72,7 @@ class SettingsController extends Controller
         ]);
 
         Setting::set(LeadingSource::SETTING, $validated['leading_source']);
+        Setting::set(LibrarySettings::ADD_PLAYED_TRACKS, $request->boolean('add_played_tracks') ? '1' : '0');
 
         return redirect()->route('settings.library')->with('success', 'Library settings saved.');
     }

@@ -143,9 +143,11 @@
 
                                     // Art URL (tracks only)
                                     $artUrl = null;
-                                    if ($play->track) {
-                                        $rawArt = \App\Domain\Artwork\LibraryArtwork::coverUrl($play->track->images)
-                                            ?? \App\Domain\Artwork\LibraryArtwork::coverUrl($play->track->album?->images);
+                                    if ($play->isTrackPlay()) {
+                                        $rawArt = ($play->track
+                                            ? (\App\Domain\Artwork\LibraryArtwork::coverUrl($play->track->images)
+                                                ?? \App\Domain\Artwork\LibraryArtwork::coverUrl($play->track->album?->images))
+                                            : null) ?? $play->image_url;
                                         $artUrl = \App\Domain\Artwork\LibraryItemArtwork::forUrl($rawArt)['proxy_120'] ?? $rawArt;
                                     }
                                 @endphp
@@ -173,7 +175,7 @@
                                     <div class="flex-1 ml-4 mb-1">
                                         <div class="bg-white dark:bg-stone-900 rounded-2xl border border-gray-100 dark:border-stone-800 p-3 flex items-center gap-3 hover:border-gray-200 dark:hover:border-stone-700 transition-colors">
 
-                                            @if($play->track)
+                                            @if($play->isTrackPlay())
                                                 {{-- Track: album art --}}
                                                 <div class="w-10 h-10 rounded-xl overflow-hidden bg-gray-100 dark:bg-stone-800 flex-shrink-0">
                                                     @if($artUrl)
@@ -187,16 +189,21 @@
 
                                                 <div class="flex-1 min-w-0">
                                                     <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate leading-snug flex items-center gap-1.5">
-                                                        {{ $play->track->name }}
-                                                        <x-source-icon :source="$play->track->source" />
+                                                        {{ $play->trackTitle() }}
+                                                        <x-source-icon :source="$play->track?->source ?? $play->source_type" />
                                                     </p>
                                                     <p class="text-xs text-gray-400 dark:text-gray-600 truncate mt-0.5 leading-snug">
-                                                        @if($play->track->artist)
+                                                        @if($play->track?->artist)
                                                             <a href="{{ route('artists.show', $play->track->artist) }}" class="hover:underline hover:text-gray-600 dark:hover:text-gray-400">{{ $play->track->artist->name }}</a>
+                                                        @elseif($play->artist_name)
+                                                            {{ $play->artist_name }}
                                                         @endif
-                                                        @if($play->track->album?->name)
+                                                        @if($play->track?->album?->name)
                                                             <span class="text-gray-300 dark:text-stone-700"> &middot; </span>
                                                             <a href="{{ route('albums.show', $play->track->album) }}" class="hover:underline hover:text-gray-600 dark:hover:text-gray-400">{{ $play->track->album->name }}</a>
+                                                        @elseif($play->album_name)
+                                                            <span class="text-gray-300 dark:text-stone-700"> &middot; </span>
+                                                            {{ $play->album_name }}
                                                         @endif
                                                     </p>
                                                     @php

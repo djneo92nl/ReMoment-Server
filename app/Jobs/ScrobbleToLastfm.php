@@ -32,12 +32,16 @@ class ScrobbleToLastfm implements ShouldQueue
             return;
         }
 
-        $track = $play->track;
-        if (!$track || !$track->artist) {
+        // A play of a track that isn't in the library carries its names itself.
+        $artist = $play->track?->artist?->name ?? $play->artist_name;
+        $name = $play->track?->name ?? $play->track_name;
+        $album = $play->track?->album?->name ?? $play->album_name;
+        $duration = $play->track?->duration ?? $play->duration;
+
+        if (!$artist || !$name) {
             return;
         }
 
-        $duration = $track->duration;
         if (!$duration || $duration <= 30) {
             return;
         }
@@ -52,14 +56,14 @@ class ScrobbleToLastfm implements ShouldQueue
 
         $params = [
             'method' => 'track.scrobble',
-            'artist' => $track->artist->name,
-            'track' => $track->name,
+            'artist' => $artist,
+            'track' => $name,
             'timestamp' => $play->played_at->timestamp,
             'duration' => $duration,
         ];
 
-        if ($track->album) {
-            $params['album'] = $track->album->name;
+        if ($album) {
+            $params['album'] = $album;
         }
 
         $lastfm->signedRequest($params);

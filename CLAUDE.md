@@ -544,7 +544,7 @@ Run `php artisan storage:link` once on new environments to create the `public/st
 
 ### Playback History
 
-`StorePlaybackHistory` (queued) persists each play to the `plays` table via the `Play` Eloquent model, finding the track (and its artist/album) through `LibraryIdentity`, so a play counts for the scanned or imported track. `ClosePlaybackHistory` sets `ended_at` when playback stops. Plays can be browsed at `/history`.
+`StorePlaybackHistory` (queued) persists each play to the `plays` table via the `Play` Eloquent model, finding the track (and its artist/album) through `LibraryIdentity`, so a play counts for the scanned or imported track. `ClosePlaybackHistory` sets `ended_at` when playback stops. Library creation from plays is behind the setting `library_add_played_tracks` (default off, `/settings/library`, `LibrarySettings::addPlayedTracks()`): off, only a track already in the library is matched (`LibraryIdentity::lookupTrack`); any other is logged with `track_id` null and its `track_name`, `artist_name`, `album_name`, `image_url` and `duration` on the play (so history, the artwork proxy and Last.fm still work), and nothing is added to the library. Plays can be browsed at `/history`.
 
 ### DLNA Library
 

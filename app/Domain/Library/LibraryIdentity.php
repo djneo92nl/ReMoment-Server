@@ -118,6 +118,31 @@ final class LibraryIdentity
         }
     }
 
+    /**
+     * The library track for a played one, without creating anything: by
+     * external id, else artist + album + name (see track()). Null when the
+     * library doesn't have it.
+     */
+    public static function lookupTrack(string $artistName, ?string $albumName, string $trackName, ?string $externalId, ?string $source, ?int $duration): ?Track
+    {
+        if ($externalId !== null && $externalId !== '' && ($track = self::findByExternalId($externalId, $source))) {
+            return $track;
+        }
+
+        $artist = self::find(Artist::class, fn () => Artist::query()->where('name_key', Normalizer::artist($artistName))->orderBy('id')->first());
+        if ($artist === null) {
+            return null;
+        }
+
+        $album = null;
+        if ($albumName !== null && $albumName !== '') {
+            $album = self::find(Album::class, fn () => Album::query()
+                ->where('artist_id', $artist->id)->where('name_key', Normalizer::album($albumName))->orderBy('id')->first());
+        }
+
+        return self::find(Track::class, fn () => self::match($artist->id, $album?->id, Normalizer::track($trackName), $duration));
+    }
+
     /** A track by an external id: its own (`tracks.external_id` + `source`), or one kept from a merged record. */
     public static function findByExternalId(string $externalId, ?string $source): ?Track
     {

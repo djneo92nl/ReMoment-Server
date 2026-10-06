@@ -4,6 +4,7 @@ namespace App\Listeners\Device;
 
 use App\Domain\Library\Enrichment;
 use App\Domain\Library\LibraryIdentity;
+use App\Domain\Library\LibrarySettings;
 use App\Domain\Library\Normalizer;
 use App\Events\Device\NowPlayingUpdated;
 use App\Integrations\Contracts\RadioControlInterface;
@@ -165,20 +166,44 @@ class StorePlaybackHistory implements ShouldQueue
 
         // One record per artist/album/track whatever the source (LibraryIdentity),
         // so a play of a DLNA-scanned or Spotify-imported track counts for it.
+        $albumName = $nowPlaying->album?->name;
+        $albumName = is_string($albumName) ? trim($albumName) : '';
+
+        // Unless played tracks are added to the library, only a track already in it is
+        // matched; any other is logged as text (names, cover) and leaves the library alone.
+        $matched = null;
+        if (!LibrarySettings::addPlayedTracks()) {
+            $playedName = is_string($npTrack->name) ? trim($npTrack->name) : '';
+            $matched = $playedName === '' ? null : LibraryIdentity::lookupTrack(
+                $artistName,
+                $albumName,
+                $playedName,
+                $npTrack->id ?? $this->spotifyIdFromMeta($npTrack->meta ?? [], $npTrack->source),
+                $npTrack->source ?? $event->sourceType ?? null,
+                $npTrack->duration,
+            );
+
+            if ($matched === null) {
+                $this->storeUnmatchedPlay($event, $artistName, $albumName, $playedName);
+
+                return;
+            }
+        }
+
         $artistSource = $npTrack->artist?->source
             ?? $npTrack->source
             ?? null;
 
-        $artist = LibraryIdentity::artist($artistName, $artistSource);
+        $artist = $matched?->artist ?? LibraryIdentity::artist($artistName, $artistSource);
 
         // Album is OPTIONAL (tracks.album_id nullable)
         $albumId = null;
         $album = null;
 
-        $albumName = $nowPlaying->album?->name;
-        $albumName = is_string($albumName) ? trim($albumName) : '';
-
-        if ($albumName !== '') {
+        if ($matched !== null) {
+            $album = $matched->album;
+            $albumId = $album?->id;
+        } elseif ($albumName !== '') {
             $albumSource = $nowPlaying->album?->source ?? $npTrack->source ?? null;
             $albumImages = $this->normalizeImages($nowPlaying->album?->images ?? []);
 
@@ -254,6 +279,35 @@ class StorePlaybackHistory implements ShouldQueue
         if ($album !== null && $spotifyTrackUri !== null) {
             ImportSpotifyAlbum::dispatch($album, substr($spotifyTrackUri, strlen('spotify:track:')));
         }
+    }
+
+    /** A track play for a track that isn't in the library: kept as text, with the cover for the artwork proxy. */
+    private function storeUnmatchedPlay(NowPlayingUpdated $event, string $artistName, string $albumName, string $trackName): void
+    {
+        if ($trackName === '') {
+            return;
+        }
+
+        $nowPlaying = $event->nowPlaying;
+        $npTrack = $nowPlaying->track;
+
+        $image = $this->normalizeImages($npTrack->images ?? [])[0]['url']
+            ?? $this->normalizeImages($nowPlaying->album?->images ?? [])[0]['url']
+            ?? null;
+
+        $play = Play::create([
+            'device_id' => (int) $event->deviceId,
+            'track_id' => null,
+            'track_name' => $trackName,
+            'artist_name' => $artistName,
+            'album_name' => $albumName !== '' ? $albumName : null,
+            'image_url' => $image,
+            'duration' => $npTrack->duration,
+            'source_type' => $npTrack->source ?? $nowPlaying->platform ?? $event->sourceType ?? 'music',
+            'played_at' => now(),
+        ]);
+
+        SendNowPlayingToLastfm::dispatch($play);
     }
 
     /**
@@ -409,7 +463,7 @@ class StorePlaybackHistory implements ShouldQueue
 
         $play->update(['ended_at' => $endedAt, 'skipped' => $skipped]);
 
-        if ($play->track_id !== null) {
+        if ($play->isTrackPlay()) {
             ScrobbleToLastfm::dispatch($play);
         }
     }

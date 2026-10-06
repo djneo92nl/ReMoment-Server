@@ -92,3 +92,7 @@ Everything referencing library rows: `tracks.album_id`, `tracks.artist_id`, `alb
 ## Leading source
 
 `App\Domain\Library\LeadingSource` decides which source the library pages and API show by default (setting `library_leading_source`: `auto` = DLNA if it has tracks else Spotify, `dlna`, `spotify`, `all`). A scope (`local`, `streaming`, `all`) maps to `LibrarySources` hidden sources (`local` hides `spotify`, `streaming` hides `dlna`), so it's a query filter only. The web pages take `?scope=` and remember it in the session (`<x-library-scope>` toggle); the API takes `?scope=`.
+
+## Plays and the library
+
+With `library_add_played_tracks` off (default), `StorePlaybackHistory` only looks tracks up (`LibraryIdentity::lookupTrack`: external id, else artist + album + name) and creates no artist/album/track. A play of an unknown track is stored with `track_id` null and `track_name`/`artist_name`/`album_name`/`image_url`/`duration`; `Play::trackTitle()` etc. read either. Plays logged while off are not added retroactively when the flag is turned on.

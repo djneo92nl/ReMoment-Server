@@ -33,7 +33,7 @@ class ClosePlaybackHistory
 
         $play->update(['ended_at' => $endedAt, 'skipped' => $skipped]);
 
-        if ($play->track_id !== null) {
+        if ($play->isTrackPlay()) {
             ScrobbleToLastfm::dispatch($play);
         }
     }

@@ -83,7 +83,10 @@ class PlayHistory extends Component
                     $tq->where('name', 'like', "%{$search}%")
                         ->orWhereHas('artist', fn ($aq) => $aq->where('name', 'like', "%{$search}%"))
                         ->orWhereHas('album', fn ($aq) => $aq->where('name', 'like', "%{$search}%"));
-                })->orWhere('radio_name', 'like', "%{$search}%")
+                })->orWhere('track_name', 'like', "%{$search}%")
+                    ->orWhere('artist_name', 'like', "%{$search}%")
+                    ->orWhere('album_name', 'like', "%{$search}%")
+                    ->orWhere('radio_name', 'like', "%{$search}%")
                     ->orWhere('source_name', 'like', "%{$search}%");
             });
         }

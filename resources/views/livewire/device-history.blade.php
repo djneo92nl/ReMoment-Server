@@ -11,8 +11,10 @@
                 @foreach($plays as $play)
                     @php
                         $track = $play->track;
-                        $rawArt = \App\Domain\Artwork\LibraryArtwork::coverUrl($track->images)
-                            ?? \App\Domain\Artwork\LibraryArtwork::coverUrl($track->album?->images);
+                        $rawArt = ($track
+                            ? (\App\Domain\Artwork\LibraryArtwork::coverUrl($track->images)
+                                ?? \App\Domain\Artwork\LibraryArtwork::coverUrl($track->album?->images))
+                            : null) ?? $play->image_url;
                         $artUrl = \App\Domain\Artwork\LibraryItemArtwork::forUrl($rawArt)['proxy_320'] ?? $rawArt;
                     @endphp
 
@@ -22,7 +24,7 @@
                         <div class="w-28 h-28 rounded-2xl overflow-hidden shadow-md ring-1 ring-gray-100 dark:ring-stone-800 mb-3 bg-gray-100 dark:bg-stone-800 relative">
                             @if($artUrl)
                                 <img src="{{ $artUrl }}"
-                                     alt="{{ $track->name }}"
+                                     alt="{{ $play->trackTitle() }}"
                                      class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
                             @else
                                 <div class="w-full h-full flex items-center justify-center">
@@ -37,15 +39,15 @@
 
                             {{-- Source badge --}}
                             <div class="absolute top-1.5 right-1.5 bg-black/50 rounded-md w-5 h-5 flex items-center justify-center">
-                                <x-source-icon :source="$track->source" size="text-[10px]" class="!text-white" />
+                                <x-source-icon :source="$track?->source ?? $play->source_type" size="text-[10px]" class="!text-white" />
                             </div>
                         </div>
 
                         {{-- Track info --}}
                         <p class="text-xs font-medium text-gray-900 dark:text-gray-100 truncate leading-snug"
-                           title="{{ $track->name }}">{{ $track->name }}</p>
+                           title="{{ $play->trackTitle() }}">{{ $play->trackTitle() }}</p>
                         <p class="text-xs text-gray-400 dark:text-gray-600 truncate mt-0.5 leading-snug"
-                           title="{{ $track->artist?->name }}">{{ $track->artist?->name }}</p>
+                           title="{{ $play->artistTitle() }}">{{ $play->artistTitle() }}</p>
                     </div>
                 @endforeach
 

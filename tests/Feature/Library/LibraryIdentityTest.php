@@ -37,6 +37,7 @@ class LibraryIdentityTest extends TestCase
         parent::setUp();
 
         Queue::fake();
+        \App\Models\Setting::set(\App\Domain\Library\LibrarySettings::ADD_PLAYED_TRACKS, '1');
     }
 
     // --- DLNA scan ---
