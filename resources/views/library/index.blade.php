@@ -45,9 +45,9 @@
                             @php $track = $play->track; @endphp
                             <div class="flex items-center gap-3">
                                 <x-artwork-thumb
-                                    :src="$track?->images[0]['url'] ?? $track?->album?->images[0]['url'] ?? null"
+                                    :src="$track?->images[0]['url'] ?? $track?->album?->images[0]['url'] ?? $play->image_url"
                                     :colors="$track?->album?->colors"
-                                    :seed="$track?->name.$track?->id"
+                                    :seed="$play->trackTitle().$play->id"
                                     icon="fa-solid fa-music"
                                     size="w-10 h-10"
                                     rounded="rounded-lg"
@@ -56,11 +56,14 @@
                                     @if($track?->album)
                                         <a href="{{ route('albums.show', $track->album) }}#track-{{ $track->id }}" class="block text-sm text-gray-800 dark:text-gray-200 truncate hover:underline">{{ $track->name }}</a>
                                     @else
-                                        <p class="text-sm text-gray-800 dark:text-gray-200 truncate">{{ $track?->name }}</p>
+                                        <p class="text-sm text-gray-800 dark:text-gray-200 truncate">{{ $play->trackTitle() }}</p>
                                     @endif
                                     <p class="text-xs text-gray-400 dark:text-gray-600 truncate mt-0.5">
                                         @if($track?->artist)
                                             <a href="{{ route('artists.show', $track->artist) }}" class="hover:underline">{{ $track->artist->name }}</a>
+                                        @endif
+                                        @if(!$track?->artist)
+                                            {{ $play->artistTitle() }}
                                         @endif
                                         @if($play->device)
                                             &middot; {{ $play->device->device_name }}

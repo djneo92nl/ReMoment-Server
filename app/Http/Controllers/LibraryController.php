@@ -23,7 +23,7 @@ class LibraryController extends Controller
             ->limit(18)
             ->get();
 
-        $recentPlays = Play::whereNotNull('track_id')
+        $recentPlays = Play::where(fn ($q) => $q->whereNotNull('track_id')->orWhereNotNull('track_name'))
             ->with(['track.album', 'track.artist', 'device'])
             ->orderByDesc('played_at')
             ->limit(10)

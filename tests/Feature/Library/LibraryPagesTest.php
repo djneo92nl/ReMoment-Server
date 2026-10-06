@@ -83,4 +83,18 @@ class LibraryPagesTest extends TestCase
             ->assertSee(route('albums.show', $album).'#track-'.$track->id, false)
             ->assertSee(route('artists.show', $album->artist_id), false);
     }
+
+    public function test_recently_played_includes_plays_of_tracks_not_in_the_library(): void
+    {
+        $device = \App\Models\Device::create([
+            'device_name' => 'Speaker', 'device_brand_name' => 'Test', 'device_product_type' => 'Speaker',
+            'ip_address' => '10.0.0.1', 'device_driver' => \Tests\Support\FakePlayerDriver::class, 'device_driver_name' => 'Fake',
+        ]);
+        \App\Models\Play::create([
+            'device_id' => $device->id, 'track_name' => 'Stranger', 'artist_name' => 'Nobody',
+            'image_url' => 'https://img.test/c.jpg', 'source_type' => 'spotify', 'played_at' => now(),
+        ]);
+
+        $this->get('/library')->assertSee('Stranger')->assertSee('Nobody')->assertSee('https://img.test/c.jpg', false);
+    }
 }
