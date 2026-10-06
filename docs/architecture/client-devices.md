@@ -116,9 +116,9 @@ Response: `{ registration_token, pairing_code, status }`
 
 1. Looks up client by `api_token`; 404 if missing (does not touch `last_seen_at`)
 2. Takes `ARTWORK_PAGE_SIZE` (200) albums of `LibraryArtwork::albumsByRecency()` (played albums by last play, newest first, then the rest by id) from offset `cursor`
-3. Takes each album's cover (`images[0]`, string or `{url}`), dedupes, and reads their `ArtworkCache` entries in one `Cache::many()`; `LibraryArtwork::clientFiles()` takes `proxy_320`/`proxy_120`/`proxy_bg`/`proxy_bg_320x480` (`LibraryArtwork::CLIENT_FILES`) from the entry, else from the files on the public disk (expired entry), else skips the cover
+3. Takes each album's cover (`images[0]`, string or `{url}`), dedupes, and reads their `ArtworkCache` entries in one `Cache::many()`; `LibraryArtwork::clientFiles()` takes `proxy_320`/`proxy_120`/`proxy_bg`/`proxy_bg_320x480`/`proxy_bg_480x480` (`LibraryArtwork::CLIENT_FILES`) from the entry, else from the files on the public disk (expired entry), else skips the cover
 4. On the first page (`cursor` 0) prepends the eight `SourceLogo` items (`NowPlayingArtwork::logo()` renders missing ones)
-5. Returns `{ data: [{kind, hash, proxy_320, proxy_120, proxy_bg, proxy_bg_320x480}], next_cursor }`; `next_cursor` is `cursor + 200` when the page was full
+5. Returns `{ data: [{kind, hash, proxy_320, proxy_120, proxy_bg, proxy_bg_320x480, proxy_bg_480x480}], next_cursor }`; `next_cursor` is `cursor + 200` when the page was full
 
 It never queues processing; `artwork:prerender` and `library:backfill-artwork` (both daily) do.
 

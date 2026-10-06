@@ -43,6 +43,12 @@ class ProcessArtwork implements ShouldQueue
      */
     private const JPEG_QUALITY = 85;
 
+    /** Backgrounds get more quality so the dithering noise survives the JPEG. */
+    private const BACKGROUND_JPEG_QUALITY = 92;
+
+    /** Peak amplitude (of 255) of the noise added to backgrounds: about one RGB565 step. */
+    private const BACKGROUND_DITHER = 4;
+
     /** Percentage of the blurred cover's brightness left after the black overlay. */
     private const BACKGROUND_BRIGHTNESS = 40;
 
@@ -147,7 +153,33 @@ class ProcessArtwork implements ShouldQueue
         $overlay = $manager->create($width, $height)->fill('000000');
         $image->place($overlay, 'top-left', 0, 0, 100 - self::BACKGROUND_BRIGHTNESS);
 
-        return $this->encodeJpeg($image);
+        $this->addDither($image);
+
+        return $this->encodeJpeg($image, self::BACKGROUND_JPEG_QUALITY);
+    }
+
+    /**
+     * A blurred, darkened cover is a very smooth ramp over few levels, which
+     * bands after JPEG and the clients' RGB565 displays. Fine noise before
+     * encoding makes their truncation act as dithering instead.
+     */
+    private function addDither(ImageInterface $image): void
+    {
+        $gd = $image->core()->native();
+        $width = imagesx($gd);
+        $height = imagesy($gd);
+        $amp = self::BACKGROUND_DITHER;
+
+        for ($y = 0; $y < $height; $y++) {
+            for ($x = 0; $x < $width; $x++) {
+                $rgb = imagecolorat($gd, $x, $y);
+                $n = mt_rand(-$amp, $amp);
+                $r = min(255, max(0, (($rgb >> 16) & 0xFF) + $n));
+                $g = min(255, max(0, (($rgb >> 8) & 0xFF) + $n));
+                $b = min(255, max(0, ($rgb & 0xFF) + $n));
+                imagesetpixel($gd, $x, $y, ($r << 16) | ($g << 8) | $b);
+            }
+        }
     }
 
     private function imageData(): string
@@ -163,9 +195,9 @@ class ProcessArtwork implements ShouldQueue
             : Http::timeout(30)->get($this->originalUrl)->throw()->body();
     }
 
-    private function encodeJpeg(ImageInterface $image): string
+    private function encodeJpeg(ImageInterface $image, int $quality = self::JPEG_QUALITY): string
     {
-        return (string) $image->encode(new JpegEncoder(quality: self::JPEG_QUALITY, progressive: false));
+        return (string) $image->encode(new JpegEncoder(quality: $quality, progressive: false));
     }
 
     private function applyColorsToAlbums(array $colors): void

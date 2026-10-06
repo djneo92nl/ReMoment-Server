@@ -231,7 +231,8 @@ The library is shared, so this is the same for every client, whatever devices it
       "proxy_320": "http://remoment.local/storage/artwork/6910ad50fb63f947ac24032558d3b570/320.jpg",
       "proxy_120": "http://remoment.local/storage/artwork/6910ad50fb63f947ac24032558d3b570/120.jpg",
       "proxy_bg": "http://remoment.local/storage/artwork/6910ad50fb63f947ac24032558d3b570/bg_1024x600.jpg",
-      "proxy_bg_320x480": "http://remoment.local/storage/artwork/6910ad50fb63f947ac24032558d3b570/bg_320x480.jpg"
+      "proxy_bg_320x480": "http://remoment.local/storage/artwork/6910ad50fb63f947ac24032558d3b570/bg_320x480.jpg",
+      "proxy_bg_480x480": "http://remoment.local/storage/artwork/6910ad50fb63f947ac24032558d3b570/bg_480x480.jpg"
     },
     {
       "kind": "album",
