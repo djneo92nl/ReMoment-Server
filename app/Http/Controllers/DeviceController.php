@@ -38,7 +38,7 @@ class DeviceController extends Controller
 
     public function create()
     {
-        $driverConfig = collect(config('devices'))->except('discoverers')->all();
+        $driverConfig = collect(config('devices'))->except(['discoverers', 'listeners'])->all();
 
         return view('devices.create', compact('driverConfig'));
     }
@@ -123,7 +123,7 @@ class DeviceController extends Controller
 
     public function edit(Device $device)
     {
-        $driverConfig = collect(config('devices'))->except('discoverers')->all();
+        $driverConfig = collect(config('devices'))->except(['discoverers', 'listeners'])->all();
 
         return view('devices.edit', compact('device', 'driverConfig'));
     }
