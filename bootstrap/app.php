@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AuthenticateAdminToken;
 use App\Http\Middleware\NowHumming;
 use App\Http\Middleware\RedirectToSetupWizard;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -22,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [RedirectToSetupWizard::class]);
         $middleware->api(append: [NowHumming::class]);
+        $middleware->alias(['admin.token' => AuthenticateAdminToken::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->renderable(function (\Exception $e, $request) {

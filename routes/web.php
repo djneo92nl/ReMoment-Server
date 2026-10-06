@@ -69,6 +69,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
     Route::get('/settings/users', [SettingsController::class, 'users'])->name('settings.users');
+    Route::delete('/settings/app-tokens/{token}', [SettingsController::class, 'revokeAppToken'])->name('settings.app-tokens.destroy');
     Route::get('/settings/listeners', [SettingsController::class, 'listeners'])->name('settings.listeners');
     Route::get('/settings/health', [SettingsController::class, 'health'])->name('settings.health');
     Route::post('/settings/listeners/start-all', [SettingsController::class, 'startAllListeners'])->name('settings.listeners.start-all');

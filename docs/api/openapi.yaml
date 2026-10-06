@@ -1,0 +1,1429 @@
+openapi: 3.0.3
+info:
+  title: ReMoment Server API
+  version: "1"
+  description: |
+    Client API of ReMoment Server (unauthenticated, local network). Covers what a
+    playback/library client needs: server info, devices and playback, radio,
+    multiroom, the library, and client registration.
+
+    This file is the contract for native clients (the iOS app is generated from /
+    checked against it). The prose docs in `docs/api/*.md` and CLAUDE.md stay the
+    detailed reference; when an endpoint's shape changes, change this file too.
+
+    Not yet described here: per-device settings (`sound-adjustment`, `bluetooth`,
+    `network`, `wireless-speakers`, `info` — see `docs/api/device-settings.md`) and
+    source controls (`/devices/{id}/controls` — see `docs/api/source-controls.md`).
+
+    Errors on device endpoints: `503 unreachable`, `422 unsupported`, `502 driver_error`.
+    Always check a device's `capabilities` before calling a feature endpoint.
+servers:
+  - url: http://remoment.local/api
+tags:
+  - name: Info
+  - name: Devices
+  - name: Playback
+  - name: Radio
+  - name: Multiroom
+  - name: Library
+  - name: Library playback
+  - name: Clients
+  - name: Admin
+
+paths:
+  /info:
+    get:
+      tags: [Info]
+      summary: Bootstrap info (addresses as the client reached the server)
+      operationId: getInfo
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServerInfo" }
+
+  /devices:
+    get:
+      tags: [Devices]
+      summary: All devices
+      operationId: listDevices
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/DeviceList" }
+  /devices/{device}:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    get:
+      tags: [Devices]
+      summary: Device detail with now playing
+      operationId: getDevice
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/DeviceDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /devices/{device}/{action}:
+    parameters:
+      - { $ref: "#/components/parameters/device" }
+      - name: action
+        in: path
+        required: true
+        schema: { type: string, enum: [play, pause, stop, next, previous] }
+    post:
+      tags: [Playback]
+      summary: Transport control (capability media_controls)
+      operationId: transport
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  action: { type: string }
+        "422": { $ref: "#/components/responses/DeviceError" }
+        "502": { $ref: "#/components/responses/DeviceError" }
+        "503": { $ref: "#/components/responses/DeviceError" }
+
+  /devices/{device}/volume:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    get:
+      tags: [Playback]
+      operationId: getVolume
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Volume" }
+    put:
+      tags: [Playback]
+      operationId: setVolume
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Volume" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Volume" }
+        "422": { $ref: "#/components/responses/DeviceError" }
+        "503": { $ref: "#/components/responses/DeviceError" }
+  /devices/{device}/mute:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    get:
+      tags: [Playback]
+      operationId: getMute
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Mute" }
+    put:
+      tags: [Playback]
+      operationId: setMute
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Mute" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Mute" }
+  /devices/{device}/seek:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    put:
+      tags: [Playback]
+      summary: Seek within the current track (capability seek)
+      operationId: seek
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [position]
+              properties:
+                position: { type: integer, minimum: 0, description: Seconds from the start of the track }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  position: { type: integer }
+        "422": { $ref: "#/components/responses/DeviceError" }
+  /devices/{device}/queue:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    get:
+      tags: [Playback]
+      summary: Up Next (capability queue)
+      operationId: getQueue
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  up_next:
+                    type: array
+                    items: { $ref: "#/components/schemas/QueueItem" }
+  /devices/{device}/queue/jump:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    post:
+      tags: [Playback]
+      summary: Play the entry `position` places ahead (capability queue_jump)
+      operationId: queueJump
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [position]
+              properties:
+                position: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  position: { type: integer }
+  /devices/{device}/shuffle:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    put:
+      tags: [Playback]
+      summary: Capability shuffle
+      operationId: setShuffle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [shuffle]
+              properties:
+                shuffle: { type: boolean }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  shuffle: { type: boolean }
+  /devices/{device}/repeat:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    put:
+      tags: [Playback]
+      summary: Capability repeat
+      operationId: setRepeat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [repeat]
+              properties:
+                repeat: { $ref: "#/components/schemas/Repeat" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  repeat: { $ref: "#/components/schemas/Repeat" }
+  /devices/{device}/like:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    put:
+      tags: [Playback]
+      summary: Save/remove the playing track in the Spotify library (capability like)
+      operationId: setLike
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [liked]
+              properties:
+                liked: { type: boolean }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  liked: { type: boolean }
+  /devices/{device}/power:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    put:
+      tags: [Playback]
+      summary: Wake or standby (capability power). Mozart can only be put in standby.
+      operationId: setPower
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [on]
+              properties:
+                on: { type: boolean }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  on: { type: boolean }
+        "422": { $ref: "#/components/responses/DeviceError" }
+
+  /devices/{device}/sources:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    get:
+      tags: [Devices]
+      summary: Live source list (capability source_control)
+      operationId: listSources
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sources:
+                    type: array
+                    items: { $ref: "#/components/schemas/Source" }
+  /devices/{device}/sources/activate:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    post:
+      tags: [Devices]
+      summary: Switch to a source (capability source_activation)
+      operationId: activateSource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source_id]
+              properties:
+                source_id: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  source_id: { type: string }
+
+  /devices/{device}/radio:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    get:
+      tags: [Radio]
+      summary: Stations playable on this device (capability radio_control)
+      operationId: listRadio
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stations:
+                    type: array
+                    items: { $ref: "#/components/schemas/RadioStation" }
+  /devices/{device}/radio/{station}:
+    parameters:
+      - { $ref: "#/components/parameters/device" }
+      - name: station
+        in: path
+        required: true
+        schema: { type: integer }
+    post:
+      tags: [Radio]
+      operationId: playRadio
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  station: { type: string }
+  /radio/{station}/favorite:
+    parameters:
+      - name: station
+        in: path
+        required: true
+        schema: { type: integer }
+    put:
+      tags: [Radio]
+      operationId: favoriteRadio
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FavoriteBody" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FavoriteBody" }
+
+  /devices/{device}/multiroom:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    get:
+      tags: [Multiroom]
+      summary: Devices this one can join and devices listening to it (capability multi_room)
+      operationId: getMultiroom
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  joinable:
+                    type: array
+                    items: { $ref: "#/components/schemas/MultiroomPeer" }
+                  listeners:
+                    type: array
+                    items: { $ref: "#/components/schemas/MultiroomPeer" }
+  /devices/{device}/multiroom/join:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    post:
+      tags: [Multiroom]
+      operationId: multiroomJoin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [host_device_id]
+              properties:
+                host_device_id: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  joined: { type: string, description: Name of the host device }
+  /devices/{device}/multiroom/leave:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    delete:
+      tags: [Multiroom]
+      operationId: multiroomLeave
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+
+  /library/artists:
+    get:
+      tags: [Library]
+      summary: Artists with albums, alphabetical ("The " ignored), 50 per page
+      operationId: listArtists
+      parameters:
+        - { $ref: "#/components/parameters/cursor" }
+        - name: letter
+          in: query
+          description: Start at the first artist at or after this letter (`#` = the start)
+          schema: { type: string, pattern: "^[A-Za-z#]$" }
+        - { $ref: "#/components/parameters/client" }
+        - { $ref: "#/components/parameters/scope" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/ArtistItem" }
+                  next_cursor: { type: string, nullable: true }
+  /library/artists/{artist}:
+    parameters:
+      - name: artist
+        in: path
+        required: true
+        schema: { type: integer }
+      - { $ref: "#/components/parameters/client" }
+      - { $ref: "#/components/parameters/scope" }
+    get:
+      tags: [Library]
+      operationId: getArtist
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ArtistDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /library/artists/{artist}/favorite:
+    parameters:
+      - name: artist
+        in: path
+        required: true
+        schema: { type: integer }
+    put:
+      tags: [Library]
+      operationId: favoriteArtist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FavoriteBody" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FavoriteBody" }
+  /library/albums:
+    get:
+      tags: [Library]
+      summary: All albums with tracks, 60 per page
+      operationId: listAlbums
+      parameters:
+        - { $ref: "#/components/parameters/cursor" }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [name, artist, year, added, plays], default: name }
+        - { $ref: "#/components/parameters/client" }
+        - { $ref: "#/components/parameters/scope" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/AlbumItem" }
+                  next_cursor: { type: string, nullable: true }
+  /library/albums/{album}:
+    parameters:
+      - name: album
+        in: path
+        required: true
+        schema: { type: integer }
+      - name: device_id
+        in: query
+        description: Make `playable` specific to this device
+        schema: { type: integer }
+      - { $ref: "#/components/parameters/client" }
+      - { $ref: "#/components/parameters/scope" }
+    get:
+      tags: [Library]
+      operationId: getAlbum
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AlbumDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /library/albums/{album}/favorite:
+    parameters:
+      - name: album
+        in: path
+        required: true
+        schema: { type: integer }
+    put:
+      tags: [Library]
+      operationId: favoriteAlbum
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FavoriteBody" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FavoriteBody" }
+  /library/genres:
+    get:
+      tags: [Library]
+      operationId: listGenres
+      parameters:
+        - { $ref: "#/components/parameters/client" }
+        - { $ref: "#/components/parameters/scope" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/GenreItem" }
+  /library/genres/{slug}:
+    parameters:
+      - name: slug
+        in: path
+        required: true
+        schema: { type: string }
+      - { $ref: "#/components/parameters/client" }
+      - { $ref: "#/components/parameters/scope" }
+    get:
+      tags: [Library]
+      operationId: getGenre
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  slug: { type: string }
+                  name: { type: string }
+                  artists:
+                    type: array
+                    items: { $ref: "#/components/schemas/ArtistItem" }
+                  albums:
+                    type: array
+                    items: { $ref: "#/components/schemas/AlbumItem" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /library/playlists:
+    get:
+      tags: [Library]
+      summary: Playlists with tracks, recently played first, 50 per page
+      operationId: listPlaylists
+      parameters:
+        - { $ref: "#/components/parameters/cursor" }
+        - { $ref: "#/components/parameters/client" }
+        - { $ref: "#/components/parameters/scope" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/PlaylistItem" }
+                  next_cursor: { type: string, nullable: true }
+  /library/playlists/{playlist}:
+    parameters:
+      - name: playlist
+        in: path
+        required: true
+        schema: { type: integer }
+      - name: device_id
+        in: query
+        schema: { type: integer }
+      - { $ref: "#/components/parameters/client" }
+      - { $ref: "#/components/parameters/scope" }
+    get:
+      tags: [Library]
+      operationId: getPlaylist
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlaylistDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /library/recent:
+    get:
+      tags: [Library]
+      summary: Most recently played distinct albums
+      operationId: listRecent
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 30 }
+        - { $ref: "#/components/parameters/client" }
+        - { $ref: "#/components/parameters/scope" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/AlbumItem" }
+  /library/favorites:
+    get:
+      tags: [Library]
+      operationId: listFavorites
+      parameters:
+        - { $ref: "#/components/parameters/client" }
+        - { $ref: "#/components/parameters/scope" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  albums:
+                    type: array
+                    items: { $ref: "#/components/schemas/AlbumItem" }
+                  artists:
+                    type: array
+                    items: { $ref: "#/components/schemas/ArtistItem" }
+  /library/search:
+    get:
+      tags: [Library]
+      summary: Substring search over artist, album and track names
+      operationId: searchLibrary
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 2, maxLength: 100 }
+        - { $ref: "#/components/parameters/client" }
+        - { $ref: "#/components/parameters/scope" }
+      responses:
+        "200":
+          description: At most 10 artists, 15 albums, 20 tracks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  artists:
+                    type: array
+                    items: { $ref: "#/components/schemas/ArtistItem" }
+                  albums:
+                    type: array
+                    items: { $ref: "#/components/schemas/AlbumItem" }
+                  tracks:
+                    type: array
+                    items: { $ref: "#/components/schemas/SearchTrack" }
+
+  /devices/{device}/library/play:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    post:
+      tags: [Library playback]
+      summary: Play one library track (capability library_playback)
+      operationId: playTrack
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [track_id]
+              properties:
+                track_id: { type: integer }
+      responses:
+        "200": { $ref: "#/components/responses/PlayedOk" }
+        "422": { $ref: "#/components/responses/DeviceError" }
+  /devices/{device}/library/play-album:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    post:
+      tags: [Library playback]
+      operationId: playAlbum
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [album_id]
+              properties:
+                album_id: { type: integer }
+                start_track_id: { type: integer }
+                shuffle: { type: boolean, default: false }
+      responses:
+        "200": { $ref: "#/components/responses/PlayedOk" }
+        "422": { $ref: "#/components/responses/DeviceError" }
+  /devices/{device}/library/play-artist:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    post:
+      tags: [Library playback]
+      operationId: playArtist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [artist_id]
+              properties:
+                artist_id: { type: integer }
+                shuffle: { type: boolean, default: false }
+      responses:
+        "200": { $ref: "#/components/responses/PlayedOk" }
+        "422": { $ref: "#/components/responses/DeviceError" }
+  /devices/{device}/library/play-playlist:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    post:
+      tags: [Library playback]
+      operationId: playPlaylist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [playlist_id]
+              properties:
+                playlist_id: { type: integer }
+                start_track_id: { type: integer }
+                shuffle: { type: boolean, default: false }
+      responses:
+        "200": { $ref: "#/components/responses/PlayedOk" }
+        "422": { $ref: "#/components/responses/DeviceError" }
+
+  /admin/login:
+    post:
+      tags: [Admin]
+      summary: Sign in as the shared admin (password only) and get a bearer token
+      operationId: adminLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string }
+                device_name: { type: string, maxLength: 100, description: Labels the sign-in under Settings › Users }
+      responses:
+        "200":
+          description: The plain token is shown once; store it in the Keychain
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string, example: rmt_… }
+                  token_id: { type: integer }
+                  name: { type: string, nullable: true }
+        "401":
+          description: invalid_credentials
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429":
+          description: too_many_attempts (5 wrong passwords per minute per IP)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+                  message: { type: string }
+                  retry_after: { type: integer }
+  /admin/me:
+    get:
+      tags: [Admin]
+      summary: Check the stored token
+      operationId: adminMe
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  authenticated: { type: boolean }
+                  token_id: { type: integer }
+                  name: { type: string, nullable: true }
+                  last_used_at: { type: string, nullable: true }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+  /admin/token:
+    delete:
+      tags: [Admin]
+      summary: Sign out (revokes this token)
+      operationId: adminLogout
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+
+  /clients/register:
+    post:
+      tags: [Clients]
+      summary: Register a client (idempotent per hardware_id)
+      operationId: registerClient
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                hardware_id: { type: string }
+                firmware_version: { type: string }
+                build_number: { type: integer }
+                metadata: { type: object, additionalProperties: true }
+      responses:
+        "200":
+          description: Already registered
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Registration" }
+        "201":
+          description: Newly registered
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Registration" }
+  /clients/status/{registrationToken}:
+    parameters:
+      - name: registrationToken
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Clients]
+      summary: Poll for approval
+      operationId: clientStatus
+      responses:
+        "200":
+          description: pending, or approved with the api_token
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClientStatus" }
+  /clients/{apiToken}/devices:
+    parameters: [{ $ref: "#/components/parameters/apiToken" }]
+    get:
+      tags: [Clients]
+      summary: Devices this client may see (all of them for a multi client with none assigned)
+      operationId: clientDevices
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  devices:
+                    type: array
+                    items: { $ref: "#/components/schemas/DeviceList" }
+  /clients/{apiToken}/heartbeat:
+    parameters: [{ $ref: "#/components/parameters/apiToken" }]
+    put:
+      tags: [Clients]
+      operationId: clientHeartbeat
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firmware_version: { type: string }
+                build_number: { type: integer }
+                metadata: { type: object, additionalProperties: true }
+      responses:
+        "200":
+          description: OK
+  /clients/{apiToken}/artwork:
+    parameters:
+      - { $ref: "#/components/parameters/apiToken" }
+      - { $ref: "#/components/parameters/cursor" }
+    get:
+      tags: [Clients]
+      summary: Processed covers to pre-cache, by hash
+      operationId: clientArtwork
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/PrecacheArtwork" }
+                  next_cursor: { type: string, nullable: true }
+
+components:
+  securitySchemes:
+    adminToken:
+      type: http
+      scheme: bearer
+      description: "Token from POST /admin/login (rmt_…). Only routes marked with security need it; the rest of the API is open."
+  parameters:
+    device:
+      name: device
+      in: path
+      required: true
+      schema: { type: integer }
+    apiToken:
+      name: apiToken
+      in: path
+      required: true
+      schema: { type: string }
+    cursor:
+      name: cursor
+      in: query
+      description: Opaque; pass back `next_cursor` until it is null
+      schema: { type: string }
+    client:
+      name: client
+      in: query
+      description: Client api_token, applies the sources hidden for that client
+      schema: { type: string }
+    scope:
+      name: scope
+      in: query
+      description: Library scope. Default is the leading source (DLNA when it has tracks, else Spotify)
+      schema: { type: string, enum: [local, streaming, all] }
+
+  responses:
+    Unauthenticated:
+      description: Missing, unknown or revoked admin token (drop it and sign in again)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Unknown id (also a record merged away by library:merge-duplicates)
+    DeviceError:
+      description: unreachable (503), unsupported / not_playable / invalid (422), driver_error (502)
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: { type: string, example: unsupported }
+              message: { type: string }
+    PlayedOk:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, example: ok }
+              track: { type: string }
+              album: { type: string }
+              artist: { type: string }
+              playlist: { type: string }
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string, example: unauthenticated }
+        message: { type: string }
+    ServerInfo:
+      type: object
+      required: [name, version, api_version, base_url, api_base_url, artwork_base_url, mqtt]
+      properties:
+        name: { type: string }
+        version: { type: string }
+        api_version: { type: integer, description: Bumped on breaking changes }
+        base_url: { type: string }
+        api_base_url: { type: string }
+        artwork_base_url: { type: string, description: "Prefix artwork paths with this, taking the path from /storage/ on" }
+        mqtt:
+          type: object
+          required: [host, port, ws_port, ws_url, topic_prefix]
+          properties:
+            host: { type: string }
+            port: { type: integer, description: Plain MQTT over TCP }
+            ws_port: { type: integer }
+            ws_url: { type: string, example: "ws://192.168.1.100:9001" }
+            topic_prefix: { type: string, example: remoment/player }
+        placeholder:
+          allOf: [{ $ref: "#/components/schemas/Artwork" }]
+          nullable: true
+
+    State:
+      type: string
+      enum: [playing, standby, paused, unreachable]
+    Repeat:
+      type: string
+      enum: [off, all, one]
+    Capability:
+      type: string
+      enum: [media_controls, volume_control, radio_control, source_control, source_activation, multi_room, library_playback, seek, queue, queue_jump, shuffle, repeat, like, power, sound_adjustment, bluetooth, device_info, battery, network_settings, wireless_speakers, wired_speakers, source_controls]
+    Battery:
+      type: object
+      nullable: true
+      properties:
+        level: { type: integer, minimum: 0, maximum: 100 }
+        charging: { type: boolean }
+    Modes:
+      type: object
+      description: Each value is null when unknown or unsupported
+      properties:
+        shuffle: { type: boolean, nullable: true }
+        repeat: { allOf: [{ $ref: "#/components/schemas/Repeat" }], nullable: true }
+        liked: { type: boolean, nullable: true }
+    Volume:
+      type: object
+      required: [volume]
+      properties:
+        volume: { type: integer, minimum: 0, maximum: 100 }
+    Mute:
+      type: object
+      required: [muted]
+      properties:
+        muted: { type: boolean }
+    FavoriteBody:
+      type: object
+      required: [favorite]
+      properties:
+        favorite: { type: boolean }
+
+    DeviceList:
+      type: object
+      properties:
+        id: { type: integer }
+        device_name: { type: string }
+        device_brand_name: { type: string }
+        device_product_type: { type: string }
+        device_driver_name: { type: string }
+        ip_address: { type: string }
+        state: { $ref: "#/components/schemas/State" }
+        last_seen: { type: string, nullable: true }
+        capabilities:
+          type: array
+          items: { $ref: "#/components/schemas/Capability" }
+        battery: { $ref: "#/components/schemas/Battery" }
+        mqtt_topic: { type: string, example: remoment/player/1 }
+    DeviceDetail:
+      allOf:
+        - { $ref: "#/components/schemas/DeviceList" }
+        - type: object
+          properties:
+            now_playing:
+              allOf: [{ $ref: "#/components/schemas/NowPlaying" }]
+              nullable: true
+
+    NowPlaying:
+      type: object
+      properties:
+        track:
+          type: object
+          nullable: true
+          properties:
+            id: { type: string }
+            name: { type: string }
+            source: { type: string }
+            duration: { type: integer, nullable: true }
+            artist:
+              type: object
+              nullable: true
+              properties:
+                name: { type: string }
+                images: { type: array, items: { type: string } }
+                source: { type: string }
+            images: { type: array, items: { type: string } }
+            meta: { type: array, items: { type: object, additionalProperties: true } }
+        album:
+          type: object
+          nullable: true
+          properties:
+            name: { type: string }
+            images: { type: array, items: { type: string } }
+            released_at: { type: string, nullable: true }
+            artist:
+              type: object
+              properties:
+                name: { type: string }
+        radio:
+          type: object
+          nullable: true
+          properties:
+            name: { type: string }
+            genre: { type: string, nullable: true }
+            images: { type: array, items: { type: string } }
+        source:
+          type: object
+          nullable: true
+          properties:
+            name: { type: string }
+            category: { type: string }
+            sourceType: { type: string }
+            connector: { type: string, nullable: true }
+            jid: { type: string, nullable: true }
+        state: { $ref: "#/components/schemas/State" }
+        position: { type: integer, nullable: true, description: Seconds into the track }
+        platform: { type: string }
+        type: { type: string }
+        endTime: { type: string, nullable: true }
+        artwork:
+          allOf: [{ $ref: "#/components/schemas/Artwork" }]
+          description: Absent while a new cover is still being processed; show the placeholder
+        modes: { $ref: "#/components/schemas/Modes" }
+
+    Artwork:
+      type: object
+      description: Full artwork object (now playing, MQTT /data, placeholder). Take the path from /storage/ on and prefix artwork_base_url.
+      properties:
+        kind: { type: string, enum: [album, radio, source] }
+        proxy_512: { type: string }
+        proxy_320: { type: string }
+        proxy_120: { type: string }
+        proxy_bg: { type: string, description: "Blurred, darkened 1024x600 background" }
+        proxy_bg_320x480: { type: string }
+        proxy_bg_480x480: { type: string }
+        colors: { type: array, items: { type: string, example: "#1a2b3c" }, description: Five dominant colors }
+        safe_colors: { type: array, items: { type: string }, description: "colors lightened to >=65% lightness for text on dark backgrounds" }
+    LibraryArtwork:
+      type: object
+      nullable: true
+      description: Small artwork object of library items; null until processed
+      properties:
+        hash: { type: string, description: "md5 of the source image URL; stable cache key" }
+        proxy_120: { type: string }
+        proxy_320: { type: string }
+    PrecacheArtwork:
+      type: object
+      properties:
+        kind: { type: string, enum: [source, playlist, album] }
+        hash: { type: string }
+        proxy_320: { type: string }
+        proxy_120: { type: string }
+        proxy_bg: { type: string }
+        proxy_bg_320x480: { type: string }
+        proxy_bg_480x480: { type: string }
+
+    QueueItem:
+      type: object
+      properties:
+        name: { type: string }
+        artist: { type: string, nullable: true }
+        album: { type: string, nullable: true }
+        image: { type: string, nullable: true }
+        duration: { type: integer, nullable: true }
+        uri: { type: string, nullable: true }
+        artwork: { $ref: "#/components/schemas/LibraryArtwork" }
+    Source:
+      type: object
+      properties:
+        source_id: { type: string }
+        friendly_name: { type: string }
+        source_type: { type: string }
+        category: { type: string }
+        in_use: { type: boolean }
+        borrowed: { type: boolean }
+        provider_jid: { type: string, nullable: true }
+        provider_name: { type: string, nullable: true }
+    RadioStation:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        genre: { type: string, nullable: true }
+        favorite: { type: boolean }
+        artwork:
+          allOf: [{ $ref: "#/components/schemas/Artwork" }]
+          nullable: true
+    MultiroomPeer:
+      type: object
+      properties:
+        id: { type: integer }
+        device_name: { type: string }
+        state: { $ref: "#/components/schemas/State" }
+
+    ArtistItem:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        album_count: { type: integer }
+        artwork: { $ref: "#/components/schemas/LibraryArtwork" }
+        favorite: { type: boolean }
+    AlbumItem:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        artist_name: { type: string, nullable: true }
+        year: { type: integer, nullable: true }
+        artwork: { $ref: "#/components/schemas/LibraryArtwork" }
+        favorite: { type: boolean }
+    PlaylistItem:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        track_count: { type: integer }
+        owner: { type: string, nullable: true }
+        artwork: { $ref: "#/components/schemas/LibraryArtwork" }
+    GenreItem:
+      type: object
+      properties:
+        slug: { type: string }
+        name: { type: string }
+        artist_count: { type: integer }
+        album_count: { type: integer }
+    ArtistDetail:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        favorite: { type: boolean }
+        genres: { type: array, items: { type: string } }
+        details:
+          type: object
+          additionalProperties: true
+          description: "bio, wikipedia_url, links, images, mood, style, tags, listeners, playcount … all may be null; see docs/api/library.md"
+        albums:
+          type: array
+          items: { $ref: "#/components/schemas/AlbumItem" }
+    AlbumDetail:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        artist:
+          type: object
+          nullable: true
+          properties:
+            id: { type: integer }
+            name: { type: string }
+        year: { type: integer, nullable: true }
+        artwork: { $ref: "#/components/schemas/LibraryArtwork" }
+        favorite: { type: boolean }
+        genres: { type: array, items: { type: string } }
+        details:
+          type: object
+          additionalProperties: true
+          description: "label, release type, mood, rating, credits … see docs/api/library.md"
+        playable: { type: boolean }
+        tracks:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              name: { type: string }
+              duration: { type: integer, nullable: true }
+              playable: { type: boolean }
+              details: { type: object, additionalProperties: true }
+    PlaylistDetail:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        owner: { type: string, nullable: true }
+        artwork: { $ref: "#/components/schemas/LibraryArtwork" }
+        playable: { type: boolean }
+        tracks:
+          type: array
+          description: First 200 tracks in playlist order
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              name: { type: string }
+              artist_name: { type: string, nullable: true }
+              duration: { type: integer, nullable: true }
+              playable: { type: boolean }
+    SearchTrack:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        artist_name: { type: string, nullable: true }
+        album_id: { type: integer }
+        album_name: { type: string, nullable: true }
+        duration: { type: integer, nullable: true }
+        artwork: { $ref: "#/components/schemas/LibraryArtwork" }
+
+    Registration:
+      type: object
+      properties:
+        registration_token: { type: string }
+        pairing_code: { type: string, example: K7M3QX }
+        status: { type: string, example: pending }
+    ClientStatus:
+      type: object
+      properties:
+        status: { type: string, enum: [pending, approved] }
+        api_token: { type: string }
+        type: { type: string, enum: [single, multi] }
+        devices:
+          type: array
+          items: { $ref: "#/components/schemas/DeviceList" }

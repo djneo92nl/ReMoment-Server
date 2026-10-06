@@ -30,5 +30,31 @@
                 </div>
             @endforeach
         </div>
+
+        <div class="mt-8 bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 overflow-hidden">
+            <div class="px-8 py-5 border-b border-gray-100 dark:border-stone-800">
+                <h2 class="text-sm font-medium text-gray-900 dark:text-gray-100">Signed-in apps</h2>
+                <p class="mt-1 text-sm text-gray-500">Apps that signed in with the admin password. Changing the password signs them all out.</p>
+            </div>
+
+            @forelse($appTokens as $appToken)
+                <div class="flex items-center gap-4 px-8 py-4 border-b border-gray-50 dark:border-stone-800/50 last:border-0">
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{{ $appToken->name ?: 'Unnamed app' }}</div>
+                        <div class="text-xs text-gray-500">
+                            Signed in {{ $appToken->created_at->diffForHumans() }}
+                            · {{ $appToken->last_used_at ? 'last used '.$appToken->last_used_at->diffForHumans().($appToken->last_used_ip ? ' from '.$appToken->last_used_ip : '') : 'not used yet' }}
+                        </div>
+                    </div>
+                    <form method="POST" action="{{ route('settings.app-tokens.destroy', $appToken) }}">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="text-sm font-medium text-red-600 hover:text-red-700">Sign out</button>
+                    </form>
+                </div>
+            @empty
+                <div class="px-8 py-6 text-sm text-gray-500">No apps are signed in.</div>
+            @endforelse
+        </div>
     </div>
 </x-app-layout>

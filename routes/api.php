@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AdminAuthController;
 use App\Http\Controllers\Api\ClientController;
 use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\DeviceSettingsController;
@@ -84,3 +85,10 @@ Route::get('/clients/status/{registrationToken}', [ClientController::class, 'sta
 Route::get('/clients/{apiToken}/devices', [ClientController::class, 'devices']);
 Route::put('/clients/{apiToken}/heartbeat', [ClientController::class, 'heartbeat']);
 Route::get('/clients/{apiToken}/artwork', [ClientController::class, 'artwork']);
+
+// Admin token login for apps. Routes that change configuration go in the `admin.token` group (see docs/api/admin-auth.md).
+Route::post('/admin/login', [AdminAuthController::class, 'login']);
+Route::middleware('admin.token')->group(function () {
+    Route::get('/admin/me', [AdminAuthController::class, 'me']);
+    Route::delete('/admin/token', [AdminAuthController::class, 'logout']);
+});

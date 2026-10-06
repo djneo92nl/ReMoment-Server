@@ -8,7 +8,7 @@ ReMoment Server is a Laravel 12 application that acts as a universal controller 
 
 ## Auth Model
 
-There is exactly **one shared admin login** (seeded by `DatabaseSeeder` as `admin@admin.com`) — there is no self-registration route, no multiple accounts, and no per-user profiles or roles. This one login gates only admin setup/config actions: `/settings/*`, the Spotify/Last.fm OAuth connect flows, and client device approval. Every other page — `/devices`, `/receiver`, `/history`, `/library`, `/stats`, playback controls, etc. — is intentionally guest-accessible with no login required, matching the REST API (also unauthenticated). **Never add user registration, multiple accounts, profiles, or role-based access** — this is a deliberate, permanent constraint, not an oversight to "fix."
+There is exactly **one shared admin login** (seeded by `DatabaseSeeder` as `admin@admin.com`) — there is no self-registration route, no multiple accounts, and no per-user profiles or roles. This one login gates only admin setup/config actions: `/settings/*`, the Spotify/Last.fm OAuth connect flows, and client device approval. Every other page — `/devices`, `/receiver`, `/history`, `/library`, `/stats`, playback controls, etc. — is intentionally guest-accessible with no login required, matching the REST API (also unauthenticated). Apps that can't use the session cookie sign in with that same password at `POST /api/admin/login` and get a bearer token (one hashed row per app install in `admin_tokens`, revocable under Settings › Users, all revoked when the password changes; see `docs/api/admin-auth.md`). Admin API routes go inside `Route::middleware('admin.token')`. A token is not an account. **Never add user registration, multiple accounts, profiles, or role-based access** — this is a deliberate, permanent constraint, not an oversight to "fix."
 
 ## Documentation
 
@@ -21,6 +21,8 @@ docs/
     library.md              Library browse (artists, albums, playlists), favorites, play album/artist/playlist on a device (DLNA or Spotify), playlist artwork
     source-controls.md      Per-source controls (change disc, FM presets) from control profiles: GET/POST /api/devices/{id}/controls, resolution, transports
     server-info.md          GET /api/info bootstrap endpoint (API/MQTT/artwork addresses for clients)
+    admin-auth.md           Token login of the single admin for apps: POST /api/admin/login, bearer tokens, revocation, what it gates
+    openapi.yaml            OpenAPI 3 contract for native clients (info, devices, playback, radio, multiroom, library, clients); update it when an endpoint's shape changes
     device-settings.md      Sound adjustment (bass/treble/loudness), Bluetooth pairing, device name: endpoints, shapes, per-platform support
   architecture/
     client-devices.md       DB schema, model, controller, admin UI internals
@@ -99,7 +101,7 @@ Base URL: `/api` — no authentication required.
 
 ### Server Info
 
-**`GET /api/info`** — bootstrap info for client devices: `{ name, version, api_version, base_url, api_base_url, artwork_base_url, mqtt: { host, port, topic_prefix }, placeholder }`. `placeholder` is a full artwork object (`kind: "source"`, the music-note logo, rendered on the spot if missing) for clients to show whenever there is no artwork, e.g. while a cover is first processed. Addresses are as the client reached the server; `mqtt.host` is `MQTT_PUBLIC_HOST` or the request host (never the Docker-internal `MQTT_HOST`). See `docs/api/server-info.md`.
+**`GET /api/info`** — bootstrap info for client devices: `{ name, version, api_version, base_url, api_base_url, artwork_base_url, mqtt: { host, port, ws_port, ws_url, topic_prefix }, placeholder }`. `placeholder` is a full artwork object (`kind: "source"`, the music-note logo, rendered on the spot if missing) for clients to show whenever there is no artwork, e.g. while a cover is first processed. Addresses are as the client reached the server; `mqtt.host` is `MQTT_PUBLIC_HOST` or the request host (never the Docker-internal `MQTT_HOST`); `mqtt.ws_port`/`ws_url` are the WebSocket listener (`MQTT_PUBLIC_WS_PORT`, default 9001; `MQTT_WS_URL` overrides the URL). See `docs/api/server-info.md`.
 
 ### Device List & Detail
 
@@ -371,6 +373,7 @@ Browse, favorites and playback for clients; full shapes in `docs/api/library.md`
 
 ```
 GET  /api/library/artists?cursor=          → { data: [ArtistItem], next_cursor }   alphabetical ("The " ignored), 50/page, only artists with albums
+GET  /api/library/albums?cursor=&sort=      → { data: [AlbumItem], next_cursor }   sort name (default) | artist | year | added | plays, 60/page, only albums with tracks
 GET  /api/library/artists/{id}             → { id, name, favorite, genres, details (bio, links, images, mood, Last.fm stats …), albums: [AlbumItem] }   newest year first, then name
 GET  /api/library/albums/{id}?device_id=   → { id, name, artist: {id, name}, year, artwork, favorite, genres, details (label, release type, mood, rating, credits …), playable, tracks: [{ id, name, duration, playable, details }] }
 GET  /api/library/genres                   → { data: [{ slug, name, artist_count, album_count }] }   canonical genres, most artists first

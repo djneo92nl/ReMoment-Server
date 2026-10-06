@@ -85,8 +85,17 @@ class SettingsController extends Controller
     public function users()
     {
         $users = User::orderBy('name')->get();
+        $appTokens = \App\Models\AdminToken::orderByDesc('last_used_at')->orderByDesc('id')->get();
 
-        return view('settings.users', compact('users'));
+        return view('settings.users', compact('users', 'appTokens'));
+    }
+
+    /** Signs an app out: its token stops working. */
+    public function revokeAppToken(\App\Models\AdminToken $token)
+    {
+        $token->delete();
+
+        return redirect()->route('settings.users')->with('status', 'app-signed-out');
     }
 
     public function health()
