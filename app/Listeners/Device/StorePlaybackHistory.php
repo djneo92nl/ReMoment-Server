@@ -295,6 +295,10 @@ class StorePlaybackHistory implements ShouldQueue
             ?? $this->normalizeImages($nowPlaying->album?->images ?? [])[0]['url']
             ?? null;
 
+        // A radio stream that reports artist and title keeps its station, as a library track play does.
+        $radio = $nowPlaying->radio;
+        $radioStation = $radio !== null ? $this->resolveRadioStation($radio->name, $radio->id, (int) $event->deviceId) : null;
+
         $play = Play::create([
             'device_id' => (int) $event->deviceId,
             'track_id' => null,
@@ -304,6 +308,8 @@ class StorePlaybackHistory implements ShouldQueue
             'image_url' => $image,
             'duration' => $npTrack->duration,
             'source_type' => $npTrack->source ?? $nowPlaying->platform ?? $event->sourceType ?? 'music',
+            'radio_name' => $radio?->name,
+            'radio_station_id' => $radioStation?->id,
             'played_at' => now(),
         ]);
 

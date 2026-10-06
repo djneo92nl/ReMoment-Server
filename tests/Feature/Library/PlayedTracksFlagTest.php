@@ -114,4 +114,26 @@ class PlayedTracksFlagTest extends TestCase
         $this->post('/settings/library', ['leading_source' => 'auto']);
         $this->assertFalse(LibrarySettings::addPlayedTracks());
     }
+
+    public function test_a_radio_play_with_artist_and_title_keeps_its_station_when_unmatched(): void
+    {
+        $device = Device::create([
+            'ip_address' => '10.0.0.2', 'device_name' => 'Radio', 'device_brand_name' => 'Test', 'device_product_type' => 'Speaker',
+            'device_driver' => FakePlayerDriver::class, 'device_driver_name' => 'Fake',
+        ]);
+        $artistData = new ArtistData(name: 'Nobody');
+        $nowPlaying = new NowPlaying(
+            track: new TrackData(id: null, name: 'Stranger', artist: $artistData, duration: 200),
+            radio: new \App\Domain\Media\Radio(name: 'Radio 538'),
+            type: 'music',
+            platform: 'media',
+        );
+
+        (new StorePlaybackHistory)->handle(new NowPlayingUpdated((string) $device->id, $nowPlaying, 'media'));
+
+        $play = Play::sole();
+        $this->assertSame('Radio 538', $play->radio_name);
+        $this->assertSame('Stranger', $play->track_name);
+        $this->assertNull($play->track_id);
+    }
 }
