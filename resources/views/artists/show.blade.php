@@ -232,6 +232,10 @@
                     </div>
                 </div>
             @endif
+
+            @if($spotifyConnected)
+                <livewire:artist-more-on-spotify :artist="$artist" :key="'spotify-more-'.$artist->id" />
+            @endif
         </div>
 
         <!-- Right: Recent plays -->

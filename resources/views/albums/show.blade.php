@@ -153,6 +153,10 @@
                     </div>
                 </div>
 
+                @if($spotifyConnected)
+                    <livewire:album-more-on-spotify :album="$album" :key="'spotify-more-'.$album->id" />
+                @endif
+
                 {{-- Tracklist --}}
                 @if($album->tracks->isNotEmpty())
                     @php
