@@ -188,7 +188,7 @@
                                 $recordingMbid = $track->metaValue('mbid');
                                 $hasInfo = $quality || $credits || $trackGenres || $isrc || $popularity !== null || $listeners;
                             @endphp
-                            <div x-data="{ panel: null }" @if($localCount > 0 && !$dlnaUrl) x-show="!localOnly" @endif>
+                            <div id="track-{{ $track->id }}" class="scroll-mt-24" x-data="{ panel: null }" @if($localCount > 0 && !$dlnaUrl) x-show="!localOnly" @endif>
                                 <div class="flex items-center gap-4 px-6 py-3 hover:bg-gray-50 dark:hover:bg-stone-800/30 transition-colors group">
                                     <span class="w-5 text-center text-xs text-gray-300 dark:text-stone-600 flex-shrink-0">{{ $track->metaValue('track_number') ?? $i + 1 }}</span>
                                     <div class="flex-1 min-w-0">

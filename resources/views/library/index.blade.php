@@ -53,9 +53,15 @@
                                     rounded="rounded-lg"
                                 />
                                 <div class="flex-1 min-w-0">
-                                    <p class="text-sm text-gray-800 dark:text-gray-200 truncate">{{ $track?->name }}</p>
+                                    @if($track?->album)
+                                        <a href="{{ route('albums.show', $track->album) }}#track-{{ $track->id }}" class="block text-sm text-gray-800 dark:text-gray-200 truncate hover:underline">{{ $track->name }}</a>
+                                    @else
+                                        <p class="text-sm text-gray-800 dark:text-gray-200 truncate">{{ $track?->name }}</p>
+                                    @endif
                                     <p class="text-xs text-gray-400 dark:text-gray-600 truncate mt-0.5">
-                                        {{ $track?->artist?->name }}
+                                        @if($track?->artist)
+                                            <a href="{{ route('artists.show', $track->artist) }}" class="hover:underline">{{ $track->artist->name }}</a>
+                                        @endif
                                         @if($play->device)
                                             &middot; {{ $play->device->device_name }}
                                         @endif
