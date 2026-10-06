@@ -60,7 +60,7 @@ php artisan library:merge-duplicates             # asks for confirmation, then m
 php artisan library:merge-duplicates --force     # no confirmation (scripts)
 ```
 
-Not run automatically: it deletes records whose ids clients may hold, so it is a deliberate admin step. Run it once after deploying this, after a Normalizer rule change, and whenever duplicates appear (e.g. after two imports ran concurrently). It is idempotent: a second run reports "No duplicates found."
+Scheduled weekly (Sunday 04:00, `--force`, `routes/console.php`). It deletes records whose ids clients may hold, so a client that cached the id of a merged-away record gets a 404 until it re-reads the list; that is why it isn't daily. Run it by hand after a Normalizer rule change or when duplicates appear (e.g. after two imports ran concurrently). It is idempotent: a second run reports "No duplicates found."
 
 `LibraryMerger::plan()` computes keys in memory and groups:
 

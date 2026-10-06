@@ -18,6 +18,9 @@ Schedule::command('library:backfill-lastfm')->daily();
 Schedule::command('library:enrich')->daily();
 Schedule::command('library:artist-images')->daily();
 
+// Folds duplicate artists/albums/tracks together (ids of merged records disappear), so weekly and off-hours.
+Schedule::command('library:merge-duplicates --force')->weeklyOn(0, '04:00')->withoutOverlapping();
+
 // Health heartbeats — see App\Domain\Health\Heartbeat and /settings/health.
 Schedule::call(function () {
     Heartbeat::beat(Heartbeat::SCHEDULER);
