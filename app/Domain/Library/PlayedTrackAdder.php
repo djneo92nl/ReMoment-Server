@@ -4,7 +4,6 @@ namespace App\Domain\Library;
 
 use App\Domain\Media\NowPlaying;
 use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
-use App\Jobs\ImportSpotifyAlbum;
 use App\Models\Media\Track;
 use App\Models\Play;
 use App\Services\SpotifyTokenService;
@@ -26,7 +25,7 @@ class PlayedTrackAdder
             return true; // nothing to add
         }
 
-        $found = LibraryIdentity::lookupTrack($artist, $nowPlaying->album?->name, $name, self::externalId($nowPlaying), $track->source, $track->duration);
+        $found = LibraryIdentity::lookupTrack($artist, $nowPlaying->album?->name, $name, NowPlayingTrackResolver::externalId($nowPlaying), $track->source, $track->duration);
 
         // A radio stub (the stream's own announcement) isn't a library track yet.
         return $found !== null && !$found->isRadioStub();
@@ -43,7 +42,7 @@ class PlayedTrackAdder
         }
 
         $source = $npTrack->source;
-        $externalId = self::externalId($nowPlaying);
+        $externalId = NowPlayingTrackResolver::externalId($nowPlaying);
         $stub = LibraryIdentity::lookupTrack($artistName, $nowPlaying->album?->name, $name, $externalId, $source, $npTrack->duration);
         $stub = $stub?->isRadioStub() ? $stub : null;
 
@@ -58,29 +57,7 @@ class PlayedTrackAdder
             return $track;
         }
 
-        $artist = LibraryIdentity::artist($artistName, $npTrack->artist?->source ?? $source);
-
-        $album = null;
-        $albumName = trim((string) $nowPlaying->album?->name);
-        if ($albumName !== '') {
-            $album = LibraryIdentity::album($artist, $albumName, $nowPlaying->album?->source ?? $source, [
-                'images' => self::images($nowPlaying->album?->images ?? []) ?: null,
-                'released_at' => $nowPlaying->album?->released_at ?? null,
-            ]);
-        }
-
-        $track = LibraryIdentity::track($artist, $album, $name, $externalId, $source, [
-            'duration' => $npTrack->duration,
-            'images' => self::images($npTrack->images ?? []) ?: null,
-        ]);
-
-        if ($track->wasRecentlyCreated) {
-            Enrichment::queue($track);
-        }
-
-        if ($album !== null && ($spotifyId = SpotifyUri::trackId($externalId)) !== null) {
-            ImportSpotifyAlbum::dispatch($album, $spotifyId);
-        }
+        [$track] = NowPlayingTrackResolver::resolve($nowPlaying);
 
         self::linkPlays($track, $name, $artistName);
 
@@ -133,32 +110,5 @@ class PlayedTrackAdder
             ->where('track_name', $trackName)
             ->where('artist_name', $artistName)
             ->update(['track_id' => $track->id]);
-    }
-
-    private static function externalId(NowPlaying $nowPlaying): ?string
-    {
-        $track = $nowPlaying->track;
-
-        if ($track?->id) {
-            return $track->id;
-        }
-
-        return SpotifyUri::fromMeta($track?->meta ?? [], $track?->source);
-    }
-
-    /** @return list<array{url: string}> */
-    private static function images(array $images): array
-    {
-        $normalized = [];
-
-        foreach ($images as $image) {
-            if (is_string($image) && trim($image) !== '') {
-                $normalized[] = ['url' => trim($image)];
-            } elseif (is_array($image) && !empty($image['url'])) {
-                $normalized[] = $image;
-            }
-        }
-
-        return $normalized;
     }
 }

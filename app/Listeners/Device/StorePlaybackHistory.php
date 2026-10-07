@@ -7,10 +7,10 @@ use App\Domain\Library\Enrichment;
 use App\Domain\Library\LibraryIdentity;
 use App\Domain\Library\LibrarySettings;
 use App\Domain\Library\Normalizer;
+use App\Domain\Library\NowPlayingTrackResolver;
 use App\Domain\Library\SpotifyUri;
 use App\Events\Device\NowPlayingUpdated;
 use App\Integrations\Contracts\RadioControlInterface;
-use App\Jobs\ImportSpotifyAlbum;
 use App\Jobs\ScrobbleToLastfm;
 use App\Jobs\SendNowPlayingToLastfm;
 use App\Models\Device;
@@ -193,54 +193,13 @@ class StorePlaybackHistory implements ShouldQueue
             }
         }
 
-        $artistSource = $npTrack->artist?->source
-            ?? $npTrack->source
-            ?? null;
-
-        $artist = $matched?->artist ?? LibraryIdentity::artist($artistName, $artistSource);
-
-        // Album is OPTIONAL (tracks.album_id nullable)
-        $albumId = null;
-        $album = null;
-
-        if ($matched !== null) {
-            $album = $matched->album;
-            $albumId = $album?->id;
-        } elseif ($albumName !== '') {
-            $albumSource = $nowPlaying->album?->source ?? $npTrack->source ?? null;
-            $albumImages = $this->normalizeImages($nowPlaying->album?->images ?? []);
-
-            $album = LibraryIdentity::album($artist, $albumName, $albumSource, [
-                'images' => $albumImages ?: null,
-                'released_at' => $nowPlaying->album?->released_at ?? null,
-            ]);
-
-            $albumId = $album->id;
-        }
-
-        $trackSource = $npTrack->source ?? $event->sourceType ?? null;
-        $trackName = $npTrack->name ?? '';
-
-        $trackName = is_string($trackName) ? trim($trackName) : '';
-        if ($trackName === '') {
+        if (trim((string) $npTrack->name) === '') {
             return;
         }
 
-        $track = LibraryIdentity::track(
-            $artist,
-            $album,
-            $trackName,
-            $npTrack->id ?? SpotifyUri::fromMeta($npTrack->meta ?? [], $npTrack->source),
-            $trackSource,
-            [
-                'duration' => $npTrack->duration,
-                'images' => $this->normalizeImages($npTrack->images ?? []) ?: null,
-            ],
-        );
+        [$track, $album] = NowPlayingTrackResolver::resolve($nowPlaying, $event->sourceType, $matched);
 
-        if ($track->wasRecentlyCreated) {
-            Enrichment::queue($track);
-        }
+        $trackSource = $npTrack->source ?? $event->sourceType ?? null;
 
         // --- Resolve radio station when track is playing via a radio source ---
         $radioStation = null;
@@ -270,16 +229,8 @@ class StorePlaybackHistory implements ShouldQueue
         }
 
         // --- Enrich Spotify tracks with API metadata (release date, etc.) ---
-        if ($npTrack->source === 'spotify' && $albumId !== null) {
+        if ($npTrack->source === 'spotify' && $album !== null) {
             $this->enrichSpotifyAlbum($album, $npTrack->meta ?? []);
-        }
-
-        // --- Add the rest of the album to the library ---
-        $spotifyTrackId = SpotifyUri::trackId($track->external_id)
-            ?? SpotifyUri::trackId(SpotifyUri::fromMeta($npTrack->meta ?? [], $npTrack->source));
-
-        if ($album !== null && $spotifyTrackId !== null) {
-            ImportSpotifyAlbum::dispatch($album, $spotifyTrackId);
         }
     }
 
@@ -293,8 +244,8 @@ class StorePlaybackHistory implements ShouldQueue
         $nowPlaying = $event->nowPlaying;
         $npTrack = $nowPlaying->track;
 
-        $image = $this->normalizeImages($npTrack->images ?? [])[0]['url']
-            ?? $this->normalizeImages($nowPlaying->album?->images ?? [])[0]['url']
+        $image = NowPlayingTrackResolver::images($npTrack->images ?? [])[0]['url']
+            ?? NowPlayingTrackResolver::images($nowPlaying->album?->images ?? [])[0]['url']
             ?? null;
 
         // A radio stream that reports artist and title keeps its station, as a library track play does.
@@ -316,28 +267,6 @@ class StorePlaybackHistory implements ShouldQueue
         ]);
 
         SendNowPlayingToLastfm::dispatch($play);
-    }
-
-    /**
-     * Listeners report images as plain URL strings, the library stores (and the views read)
-     * them as `{url}` entries like the Spotify importer does.
-     *
-     * @param  array<int, mixed>  $images
-     * @return array<int, array<string, mixed>>
-     */
-    private function normalizeImages(array $images): array
-    {
-        $normalized = [];
-
-        foreach ($images as $image) {
-            if (is_string($image) && trim($image) !== '') {
-                $normalized[] = ['url' => trim($image)];
-            } elseif (is_array($image) && !empty($image['url'])) {
-                $normalized[] = $image;
-            }
-        }
-
-        return $normalized;
     }
 
     private function enrichSpotifyAlbum(?Album $album, array $meta): void
