@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Library\LibraryPlayback;
-use App\Domain\Library\NotPlayableException;
+use App\Http\Controllers\Concerns\FlashesLibraryPlayback;
 use App\Models\Device;
 use App\Models\DeviceMeta;
 use App\Models\Media\Playlist;
@@ -11,6 +11,8 @@ use Illuminate\Http\Request;
 
 class PlaylistController extends Controller
 {
+    use FlashesLibraryPlayback;
+
     public function index()
     {
         $playlists = Playlist::withCount('tracks')
@@ -55,17 +57,9 @@ class PlaylistController extends Controller
         return view('playlists.show', compact('playlist', 'playableDevices', 'spotifyDevices'));
     }
 
-    public function play(Playlist $playlist, Device $device)
+    public function play(Playlist $playlist, Device $device, LibraryPlayback $library)
     {
-        try {
-            app(LibraryPlayback::class)->playPlaylist($device, $playlist);
-        } catch (NotPlayableException) {
-            return back()->with('error', "{$device->device_name} can't play \"{$playlist->name}\".");
-        } catch (\Throwable $e) {
-            return back()->with('error', "Could not play \"{$playlist->name}\" on {$device->device_name}: {$e->getMessage()}");
-        }
-
-        return back()->with('success', "Playing \"{$playlist->name}\" on {$device->device_name}.");
+        return $this->flashPlayback(fn () => $library->playPlaylist($device, $playlist), $device, $playlist->name);
     }
 
     private function libraryCapableDevices(): \Illuminate\Support\Collection

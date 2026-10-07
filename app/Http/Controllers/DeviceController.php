@@ -7,8 +7,8 @@ use App\Domain\Device\DeviceCapabilities;
 use App\Domain\Device\MultiRoomGroups;
 use App\Domain\Device\SpotifyRouting;
 use App\Domain\Library\LibraryPlayback;
-use App\Domain\Library\NotPlayableException;
 use App\Domain\Library\SpotifyUri;
+use App\Http\Controllers\Concerns\FlashesLibraryPlayback;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
 use App\Models\Media\Track;
@@ -17,6 +17,8 @@ use Illuminate\Http\Request;
 
 class DeviceController extends Controller
 {
+    use FlashesLibraryPlayback;
+
     public function index(Request $request)
     {
         $showHidden = $request->boolean('hidden');
@@ -149,29 +151,13 @@ class DeviceController extends Controller
 
     public function playTrack(Track $track, Device $device, LibraryPlayback $library)
     {
-        try {
-            $library->playTrack($device, $track);
-        } catch (NotPlayableException) {
-            return back()->with('error', "{$device->device_name} can't play \"{$track->name}\".");
-        } catch (\Throwable $e) {
-            return back()->with('error', "Could not play \"{$track->name}\" on {$device->device_name}: {$e->getMessage()}");
-        }
-
-        return back()->with('success', "Playing \"{$track->name}\" on {$device->device_name}.");
+        return $this->flashPlayback(fn () => $library->playTrack($device, $track), $device, $track->name);
     }
 
     /** Plays a Spotify track that isn't in the library (a "More on Spotify" row). */
     public function playSpotifyTrack(string $spotifyTrackId, Device $device, LibraryPlayback $library)
     {
-        try {
-            $library->playSpotifyUri($device, SpotifyUri::track($spotifyTrackId));
-        } catch (NotPlayableException) {
-            return back()->with('error', "{$device->device_name} can't play that track.");
-        } catch (\Throwable $e) {
-            return back()->with('error', "Could not play on {$device->device_name}: {$e->getMessage()}");
-        }
-
-        return back()->with('success', "Playing on {$device->device_name}.");
+        return $this->flashPlayback(fn () => $library->playSpotifyUri($device, SpotifyUri::track($spotifyTrackId)), $device, null);
     }
 
     public function standby(Device $device)

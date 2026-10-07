@@ -6,8 +6,7 @@ use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\LibraryRemover;
 use App\Domain\Library\LibrarySources;
-use App\Domain\Library\NotPlayableException;
-use App\Domain\Library\PlaybackFailedException;
+use App\Http\Controllers\Concerns\FlashesLibraryPlayback;
 use App\Models\Device;
 use App\Models\Media\Artist;
 use App\Models\Media\Genre;
@@ -17,6 +16,8 @@ use Illuminate\Http\Request;
 
 class ArtistController extends Controller
 {
+    use FlashesLibraryPlayback;
+
     public function index(Request $request)
     {
         $sort = in_array($request->query('sort'), ['name', 'plays', 'albums'], true) ? $request->query('sort') : 'name';
@@ -105,19 +106,7 @@ class ArtistController extends Controller
 
     public function play(Request $request, Artist $artist, Device $device, LibraryPlayback $library)
     {
-        try {
-            $result = $library->playArtist($device, $artist, $request->boolean('shuffle'));
-        } catch (NotPlayableException) {
-            return back()->with('error', "\"{$artist->name}\" has no tracks {$device->device_name} can play.");
-        } catch (PlaybackFailedException $e) {
-            return back()->with('error', "Could not play \"{$artist->name}\" on {$device->device_name}: {$e->getMessage()}");
-        }
-
-        $message = $result->playable < $result->total
-            ? "Playing {$result->playable} of {$result->total} tracks by \"{$artist->name}\" on {$device->device_name}."
-            : "Playing \"{$artist->name}\" on {$device->device_name}.";
-
-        return back()->with('success', $message);
+        return $this->flashPlayback(fn () => $library->playArtist($device, $artist, $request->boolean('shuffle')), $device, $artist->name);
     }
 
     /** Removes an artist and everything of theirs that isn't on DLNA (admin); an empty artist just goes. */

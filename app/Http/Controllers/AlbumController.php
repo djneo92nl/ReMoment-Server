@@ -6,8 +6,7 @@ use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\LibraryRemover;
 use App\Domain\Library\LibrarySources;
-use App\Domain\Library\NotPlayableException;
-use App\Domain\Library\PlaybackFailedException;
+use App\Http\Controllers\Concerns\FlashesLibraryPlayback;
 use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
 use App\Models\Device;
 use App\Models\Media\Album;
@@ -19,6 +18,8 @@ use Illuminate\Support\Str;
 
 class AlbumController extends Controller
 {
+    use FlashesLibraryPlayback;
+
     public function index(Request $request)
     {
         $sort = in_array($request->query('sort'), ['plays', 'recent', 'name', 'artist', 'year'], true)
@@ -87,19 +88,7 @@ class AlbumController extends Controller
 
     public function play(Request $request, Album $album, Device $device, LibraryPlayback $library)
     {
-        try {
-            $result = $library->playAlbum($device, $album, shuffle: $request->boolean('shuffle'));
-        } catch (NotPlayableException) {
-            return back()->with('error', "\"{$album->name}\" has no tracks {$device->device_name} can play.");
-        } catch (PlaybackFailedException $e) {
-            return back()->with('error', "Could not play \"{$album->name}\" on {$device->device_name}: {$e->getMessage()}");
-        }
-
-        $message = $result->playable < $result->total
-            ? "Playing {$result->playable} of {$result->total} tracks from \"{$album->name}\" on {$device->device_name}."
-            : "Playing \"{$album->name}\" on {$device->device_name}.";
-
-        return back()->with('success', $message);
+        return $this->flashPlayback(fn () => $library->playAlbum($device, $album, shuffle: $request->boolean('shuffle')), $device, $album->name);
     }
 
     /** Adds the album's missing tracks from Spotify, whatever source the album came from. */
