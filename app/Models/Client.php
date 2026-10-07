@@ -37,6 +37,12 @@ class Client extends Model
 
     public const PAIRING_CODE_LENGTH = 6;
 
+    /** The client with this API token; 404 when none. */
+    public static function byApiToken(string $apiToken): self
+    {
+        return static::where('api_token', $apiToken)->firstOrFail();
+    }
+
     public static function generateToken(): string
     {
         return Str::random(48);

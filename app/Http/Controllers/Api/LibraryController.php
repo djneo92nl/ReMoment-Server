@@ -397,7 +397,7 @@ class LibraryController extends Controller
         ]);
 
         $client = $request->filled('client')
-            ? LibrarySources::hiddenFor(Client::where('api_token', $request->query('client'))->firstOrFail())
+            ? LibrarySources::hiddenFor(Client::byApiToken((string) $request->query('client')))
             : [];
 
         return array_values(array_unique([

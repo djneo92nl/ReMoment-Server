@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Domain\Library\Enrichment;
 use App\Domain\Library\Normalizer;
+use App\Domain\Library\SpotifyImages;
 use App\Models\Media\Artist;
 use App\Services\SpotifyTokenService;
 use Illuminate\Bus\Queueable;
@@ -62,7 +63,7 @@ class FetchSpotifyArtistImages implements ShouldQueue
         foreach (array_chunk(array_keys($bySpotifyId), self::BATCH) as $ids) {
             foreach ($api->getArtists($ids)['artists'] ?? [] as $spotifyArtist) {
                 foreach ($bySpotifyId[$spotifyArtist['id'] ?? ''] ?? [] as $artist) {
-                    $this->save($artist, $this->pickImage($spotifyArtist['images'] ?? []));
+                    $this->save($artist, SpotifyImages::pick($spotifyArtist['images'] ?? [], self::MIN_WIDTH));
                 }
             }
         }
@@ -82,20 +83,6 @@ class FetchSpotifyArtistImages implements ShouldQueue
         }
 
         return null;
-    }
-
-    /** The smallest image that is still at least MIN_WIDTH wide, else the largest. */
-    private function pickImage(array $images): ?string
-    {
-        usort($images, fn ($a, $b) => ($a['width'] ?? 0) <=> ($b['width'] ?? 0));
-
-        foreach ($images as $image) {
-            if (($image['width'] ?? 0) >= self::MIN_WIDTH && !empty($image['url'])) {
-                return $image['url'];
-            }
-        }
-
-        return $images ? end($images)['url'] ?? null : null;
     }
 
     private function save(Artist $artist, ?string $url): void

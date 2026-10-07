@@ -81,7 +81,7 @@ class ClientController extends Controller
 
     public function devices(string $apiToken): JsonResponse
     {
-        $client = Client::where('api_token', $apiToken)->firstOrFail();
+        $client = Client::byApiToken($apiToken);
         $client->update(['last_seen_at' => now()]);
 
         return response()->json([
@@ -91,7 +91,7 @@ class ClientController extends Controller
 
     public function heartbeat(Request $request, string $apiToken): JsonResponse
     {
-        $client = Client::where('api_token', $apiToken)->firstOrFail();
+        $client = Client::byApiToken($apiToken);
 
         $data = $request->validate([
             'firmware_version' => ['nullable', 'string', 'max:50'],
@@ -121,7 +121,7 @@ class ClientController extends Controller
      */
     public function artwork(Request $request, string $apiToken): JsonResponse
     {
-        $client = Client::where('api_token', $apiToken)->firstOrFail();
+        $client = Client::byApiToken($apiToken);
 
         $validated = $request->validate([
             'cursor' => ['nullable', 'integer', 'min:0'],

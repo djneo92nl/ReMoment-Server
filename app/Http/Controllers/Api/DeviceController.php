@@ -280,7 +280,7 @@ class DeviceController extends Controller
     public function radioStations(Request $request, Device $device): JsonResponse
     {
         $request->validate(['client' => ['nullable', 'string', 'max:100']]);
-        $client = $request->filled('client') ? Client::where('api_token', $request->query('client'))->firstOrFail() : null;
+        $client = $request->filled('client') ? Client::byApiToken((string) $request->query('client')) : null;
 
         if ($error = $this->assertReachable($device)) {
             return $error;

@@ -39,7 +39,7 @@ class SpotifyCatalog
                 'artists' => array_map(fn ($a) => [
                     'id' => $a['id'],
                     'name' => $a['name'],
-                    'image' => $this->image($a['images'] ?? []),
+                    'image' => SpotifyImages::pick($a['images'] ?? [], 200),
                 ], $results['artists']['items'] ?? []),
                 'albums' => array_map(fn ($a) => $this->albumItem($a), $results['albums']['items'] ?? []),
             ];
@@ -158,21 +158,7 @@ class SpotifyCatalog
             'name' => $album['name'],
             'artist' => $album['artists'][0]['name'] ?? null,
             'year' => isset($album['release_date']) ? substr($album['release_date'], 0, 4) : null,
-            'image' => $this->image($album['images'] ?? []),
+            'image' => SpotifyImages::pick($album['images'] ?? [], 200),
         ];
-    }
-
-    /** A medium-sized image: the smallest one at least 200px wide, else the largest. */
-    private function image(array $images): ?string
-    {
-        usort($images, fn ($a, $b) => ($a['width'] ?? 0) <=> ($b['width'] ?? 0));
-
-        foreach ($images as $image) {
-            if (($image['width'] ?? 0) >= 200) {
-                return $image['url'];
-            }
-        }
-
-        return $images ? (end($images)['url'] ?? null) : null;
     }
 }
