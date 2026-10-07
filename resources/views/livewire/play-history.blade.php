@@ -237,7 +237,7 @@
                                                     @endif
                                                     @if($play->ended_at)
                                                         <p class="text-[10px] text-gray-300 dark:text-stone-700 mt-0.5">
-                                                            {{ gmdate('G:i', $play->played_at->diffInSeconds($play->ended_at)) }}
+                                                            {{ \App\Domain\Helpers\TimeHelper::secondsToMinutes((int) $play->played_at->diffInSeconds($play->ended_at)) }}
                                                         </p>
                                                     @endif
                                                 </div>

@@ -232,7 +232,7 @@
                                             @endif
                                         </p>
                                         @if($track->duration)
-                                            <p class="text-xs text-gray-400 dark:text-gray-600 mt-0.5">{{ gmdate('g:i', $track->duration) }}</p>
+                                            <p class="text-xs text-gray-400 dark:text-gray-600 mt-0.5">{{ \App\Domain\Helpers\TimeHelper::secondsToMinutes((int) $track->duration) }}</p>
                                         @endif
                                     </div>
                                     {{-- Fixed slots, so the columns line up whatever a track has --}}

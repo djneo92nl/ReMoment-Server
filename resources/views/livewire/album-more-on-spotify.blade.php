@@ -30,7 +30,7 @@
                                 @endif
                             </p>
                             @if($row['duration'])
-                                <span class="text-xs text-gray-400 dark:text-gray-600 flex-shrink-0">{{ gmdate('g:i', $row['duration']) }}</span>
+                                <span class="text-xs text-gray-400 dark:text-gray-600 flex-shrink-0">{{ \App\Domain\Helpers\TimeHelper::secondsToMinutes((int) $row['duration']) }}</span>
                             @endif
                             @php
                                 // A track we have plays from the library when it can, else by its Spotify id like the others.

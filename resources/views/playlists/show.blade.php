@@ -47,7 +47,7 @@
                                         <p class="text-xs text-gray-400 dark:text-gray-600 mt-0.5 truncate">
                                             {{ $track->artist?->name }}
                                             @if($track->duration)
-                                                &middot; {{ gmdate('g:i', $track->duration) }}
+                                                &middot; {{ \App\Domain\Helpers\TimeHelper::secondsToMinutes((int) $track->duration) }}
                                             @endif
                                         </p>
                                     </div>
