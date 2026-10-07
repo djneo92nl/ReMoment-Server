@@ -269,11 +269,8 @@ class DeviceController extends Controller
     public function favoriteRadio(Request $request, RadioStation $station): JsonResponse
     {
         $request->validate(['favorite' => ['required', 'boolean']]);
-        $favorite = $request->boolean('favorite');
 
-        $station->update(['favorited_at' => $favorite ? ($station->favorited_at ?? now()) : null]);
-
-        return response()->json(['favorite' => $favorite]);
+        return response()->json(['favorite' => $station->setFavorite($request->boolean('favorite'))]);
     }
 
     /** The stations playRadio() accepts for this device, in /radio's order (by name). */

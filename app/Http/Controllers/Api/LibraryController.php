@@ -364,15 +364,12 @@ class LibraryController extends Controller
         return response()->json(['favorite' => $this->setFavorite($request, $artist)]);
     }
 
-    /** Keeps the original favorited_at when an already favorite item is favorited again. */
     private function setFavorite(Request $request, Album|Artist $model): bool
     {
         $request->validate(['favorite' => ['required', 'boolean']]);
         $favorite = $request->boolean('favorite');
 
-        $model->update(['favorited_at' => $favorite ? ($model->favorited_at ?? now()) : null]);
-
-        return $favorite;
+        return $model->setFavorite($favorite);
     }
 
     /** Eager loads what artistItem() reads: album count, and albums for the cover. */

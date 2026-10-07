@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Favoritable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class RadioStation extends Model
 {
+    use Favoritable;
+
     protected $fillable = [
         'name',
         'image_url',

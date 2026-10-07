@@ -161,7 +161,7 @@ class AlbumController extends Controller
 
     public function favorite(Request $request, Album $album)
     {
-        $album->update(['favorited_at' => $album->favorited_at ? null : now()]);
+        $album->toggleFavorite();
 
         return back();
     }

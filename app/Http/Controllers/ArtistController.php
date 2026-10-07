@@ -134,7 +134,7 @@ class ArtistController extends Controller
 
     public function favorite(Artist $artist)
     {
-        $artist->update(['favorited_at' => $artist->favorited_at ? null : now()]);
+        $artist->toggleFavorite();
 
         return back();
     }

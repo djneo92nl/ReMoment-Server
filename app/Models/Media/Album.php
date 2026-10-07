@@ -4,6 +4,7 @@ namespace App\Models\Media;
 
 use App\Domain\Library\LibrarySources;
 use App\Domain\Library\Normalizer;
+use App\Models\Concerns\Favoritable;
 use App\Models\Media\Concerns\HasGenres;
 use App\Models\Media\Concerns\ReadsMetadata;
 use App\Models\Play;
@@ -15,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Album extends Model
 {
-    use HasGenres, ReadsMetadata;
+    use Favoritable, HasGenres, ReadsMetadata;
 
     protected $table = 'albums';
 

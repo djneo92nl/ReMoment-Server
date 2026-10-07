@@ -85,7 +85,7 @@ class RadioStationController extends Controller
 
     public function favorite(RadioStation $radio)
     {
-        $radio->update(['favorited_at' => $radio->favorited_at ? null : now()]);
+        $radio->toggleFavorite();
 
         return back();
     }
