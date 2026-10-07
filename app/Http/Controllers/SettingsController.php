@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Domain\Artwork\SdCardExport;
 use App\Domain\Device\DeviceCache;
-use App\Domain\Device\DeviceListeners;
 use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibrarySettings;
 use App\Integrations\Spotify\MusicPlayerDriver as SpotifyDriver;
@@ -125,21 +124,6 @@ class SettingsController extends Controller
         return view('settings.devices');
     }
 
-    public function startListener(Device $device)
-    {
-        if (!DeviceListeners::supports($device)) {
-            return back()->with('error', "There is no listener for {$device->device_name}'s driver.");
-        }
-
-        if (DeviceCache::isListenerRunning($device->id)) {
-            return back()->with('error', "Listener for {$device->device_name} is already running.");
-        }
-
-        $this->spawnListener($device);
-
-        return back()->with('success', "Listener started for {$device->device_name}.");
-    }
-
     public function spotifyConnect(SpotifyTokenService $spotify)
     {
         $spotifyDevices = [];
@@ -248,28 +232,5 @@ class SettingsController extends Controller
         $artworkExports = SdCardExport::all();
 
         return view('settings.clients', compact('clientCount', 'pendingCount', 'artworkExports'));
-    }
-
-    public function startAllListeners()
-    {
-        $started = 0;
-
-        foreach (Device::all()->filter(fn (Device $device) => DeviceListeners::supports($device)) as $device) {
-            if (!DeviceCache::isListenerRunning($device->id)) {
-                $this->spawnListener($device);
-                $started++;
-            }
-        }
-
-        $message = $started > 0
-            ? "Started {$started} ".($started === 1 ? 'listener' : 'listeners').'.'
-            : 'All listeners are already running.';
-
-        return back()->with('success', $message);
-    }
-
-    private function spawnListener(Device $device): void
-    {
-        shell_exec('php '.base_path('artisan')." device:listen-single '{$device->id}' > /dev/null 2>&1 &");
     }
 }

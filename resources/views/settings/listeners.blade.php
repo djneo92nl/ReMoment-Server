@@ -9,16 +9,6 @@
                 </div>
             </div>
 
-            @if($devices->where('can_start', true)->isNotEmpty())
-                <form method="POST" action="{{ route('settings.listeners.start-all') }}">
-                    @csrf
-                    <button type="submit"
-                            class="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-sm font-medium transition-colors">
-                        <i class="fa-solid fa-play"></i>
-                        <span class="hidden sm:inline">Start all ASE</span>
-                    </button>
-                </form>
-            @endif
         </div>
     </x-slot>
 
@@ -27,7 +17,7 @@
         <!-- Explainer -->
         <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl px-6 py-4 text-sm text-blue-800 dark:text-blue-300">
             <i class="fa-solid fa-circle-info mr-2"></i>
-            Listeners are long-running processes that stream real-time state from devices. Each device has its own listener.
+            Listeners are long-running processes that stream real-time state from devices. Each device has its own listener, started and restarted automatically by the container (<code>php artisan device:listen</code>).
             A listener heartbeat expires after <strong>10 seconds</strong> — if a listener crashes it will show as inactive shortly after.
         </div>
 
@@ -44,8 +34,7 @@
                 <div class="grid grid-cols-12 gap-4 px-8 py-4 border-b border-gray-100 dark:border-stone-800">
                     <div class="col-span-4 text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600">Device</div>
                     <div class="col-span-3 text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600">Driver</div>
-                    <div class="col-span-3 text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600">Status</div>
-                    <div class="col-span-2"></div>
+                    <div class="col-span-5 text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600">Status</div>
                 </div>
 
                 @foreach($devices as $row)
@@ -72,7 +61,7 @@
                         </div>
 
                         <!-- Status -->
-                        <div class="col-span-3">
+                        <div class="col-span-5">
                             @if($row['listener_running'])
                                 <div class="flex items-center gap-2">
                                     <span class="relative flex w-2.5 h-2.5">
@@ -93,36 +82,9 @@
                                 </div>
                             @endif
                         </div>
-
-                        <!-- Action -->
-                        <div class="col-span-2 flex justify-end">
-                            @if($row['can_start'] && !$row['listener_running'])
-                                <form method="POST" action="{{ route('settings.listeners.start', $device) }}">
-                                    @csrf
-                                    <button type="submit"
-                                            class="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 rounded-xl text-xs font-medium transition-colors">
-                                        <i class="fa-solid fa-play text-xs"></i>
-                                        Start
-                                    </button>
-                                </form>
-                            @elseif($row['listener_running'])
-                                <span class="text-xs text-gray-400 dark:text-gray-600 px-3 py-1.5">Running</span>
-                            @endif
-                        </div>
                     </div>
                 @endforeach
             @endif
-        </div>
-
-        <!-- Info card -->
-        <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8">
-            <h2 class="text-base font-medium text-gray-900 dark:text-gray-100 mb-5">Start all listeners</h2>
-            <p class="text-sm text-gray-500 dark:text-gray-500 mb-5">
-                Run this command to start listeners for all devices, whatever the brand. It keeps them running and restarts any that stop.
-            </p>
-            <div class="bg-gray-900 dark:bg-stone-950 rounded-2xl px-5 py-4 font-mono text-sm text-gray-300">
-                php artisan device:listen
-            </div>
         </div>
     </div>
 </x-app-layout>

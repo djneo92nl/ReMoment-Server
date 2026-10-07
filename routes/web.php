@@ -76,8 +76,6 @@ Route::middleware('auth')->group(function () {
     Route::delete('/settings/app-tokens/{token}', [SettingsController::class, 'revokeAppToken'])->name('settings.app-tokens.destroy');
     Route::get('/settings/listeners', [SettingsController::class, 'listeners'])->name('settings.listeners');
     Route::get('/settings/health', [SettingsController::class, 'health'])->name('settings.health');
-    Route::post('/settings/listeners/start-all', [SettingsController::class, 'startAllListeners'])->name('settings.listeners.start-all');
-    Route::post('/settings/listeners/{device}/start', [SettingsController::class, 'startListener'])->name('settings.listeners.start');
 
     Route::get('/settings/devices', [SettingsController::class, 'devices'])->name('settings.devices');
 
