@@ -38,46 +38,19 @@ trait ManagesMultiroom
         }
 
         // Playing sessions this device can join (other same-brand Playing devices)
-        $this->joinableSessions = Device::where('id', '!=', $this->multiroomDevice()->id)
-            ->where('device_brand_name', $this->multiroomDevice()->device_brand_name)
-            ->get()
-            ->filter(function ($d) {
-                try {
-                    return $d->state === State::Playing && $d->driver instanceof MultiRoomInterface;
-                } catch (\Throwable) {
-                    return false;
-                }
-            })
-            ->map(fn ($d) => ['id' => $d->id, 'device_name' => $d->device_name])
-            ->values()
-            ->all();
+        $this->joinableSessions = $this->sameBrandPeers(playing: true);
 
         // If this device is playing, also load listener info
         if ($this->multiroomDevice()->state === State::Playing) {
             try {
-                $listenerIds = $driver->getCurrentPeerIds();
-                $this->currentListeners = $this->mapPeerIdsToDevices($listenerIds);
+                $this->currentListeners = $this->mapPeerIdsToDevices($driver->getCurrentPeerIds());
 
                 // Pre-validated list from device API; empty when the device lists none or we know none of them
                 $this->invitableDevices = $this->mapPeerIdsToDevices($driver->getJoinablePeerIds());
 
                 if (empty($this->invitableDevices)) {
                     // Optimistic fallback: all same-brand non-playing devices
-                    $currentListenerDeviceIds = array_column($this->currentListeners, 'id');
-                    $this->invitableDevices = Device::where('id', '!=', $this->multiroomDevice()->id)
-                        ->where('device_brand_name', $this->multiroomDevice()->device_brand_name)
-                        ->whereNotIn('id', $currentListenerDeviceIds)
-                        ->get()
-                        ->filter(function ($d) {
-                            try {
-                                return $d->state !== State::Playing && $d->driver instanceof MultiRoomInterface;
-                            } catch (\Throwable) {
-                                return false;
-                            }
-                        })
-                        ->map(fn ($d) => ['id' => $d->id, 'device_name' => $d->device_name])
-                        ->values()
-                        ->all();
+                    $this->invitableDevices = $this->sameBrandPeers(playing: false, except: array_column($this->currentListeners, 'id'));
                 }
             } catch (\Throwable $e) {
                 $this->multiroomError = 'Could not retrieve multiroom info.';
@@ -89,34 +62,22 @@ trait ManagesMultiroom
 
     public function joinSession(int $hostDeviceId): void
     {
-        $this->multiroomError = null;
-        try {
-            $driver = $this->multiroomDevice()->driver;
-            if (!($driver instanceof MultiRoomInterface)) {
-                return;
-            }
-            $hostDevice = Device::findOrFail($hostDeviceId);
-            $driver->joinSession($hostDevice);
-        } catch (\Throwable $e) {
-            $this->multiroomError = 'Join failed: '.$e->getMessage();
-        }
+        $this->multiroomAction('Join failed', function () use ($hostDeviceId) {
+            $this->multiRoomDriver($this->multiroomDevice())?->joinSession(Device::findOrFail($hostDeviceId));
+        });
     }
 
     public function inviteDevice(int $guestDeviceId): void
     {
-        $this->multiroomError = null;
-        try {
-            $guestDevice = Device::findOrFail($guestDeviceId);
-            $guestDriver = $guestDevice->driver;
-            if (!($guestDriver instanceof MultiRoomInterface)) {
-                return;
+        $this->multiroomAction('Invite failed', function () use ($guestDeviceId) {
+            $guestDriver = $this->multiRoomDriver(Device::findOrFail($guestDeviceId));
+
+            if ($guestDriver !== null) {
+                $guestDriver->joinSession($this->multiroomDevice());
+                // Refresh listener list
+                $this->loadMultiRoomData();
             }
-            $guestDriver->joinSession($this->multiroomDevice());
-            // Refresh listener list
-            $this->loadMultiRoomData();
-        } catch (\Throwable $e) {
-            $this->multiroomError = 'Invite failed: '.$e->getMessage();
-        }
+        });
     }
 
     /** Volume of one room of this session (this device's own, or a joined room's). */
@@ -135,29 +96,57 @@ trait ManagesMultiroom
     /** Removes a device from the group this device hosts: the device leaves by itself. */
     public function removeListener(int $listenerId): void
     {
-        $this->multiroomError = null;
-        try {
-            $listener = Device::findOrFail($listenerId);
-            $driver = $listener->driver;
-            if ($driver instanceof MultiRoomInterface) {
-                $driver->leaveSession();
-            }
-        } catch (\Throwable $e) {
-            $this->multiroomError = 'Remove failed: '.$e->getMessage();
-        }
+        $this->multiroomAction('Remove failed', fn () => $this->multiRoomDriver(Device::findOrFail($listenerId))?->leaveSession());
     }
 
     public function leaveSession(): void
     {
+        $this->multiroomAction('Leave failed', fn () => $this->multiRoomDriver($this->multiroomDevice())?->leaveSession());
+    }
+
+    /** Runs a multiroom action; a failure is shown as "$failure: reason". */
+    private function multiroomAction(string $failure, \Closure $action): void
+    {
         $this->multiroomError = null;
+
         try {
-            $driver = $this->multiroomDevice()->driver;
-            if ($driver instanceof MultiRoomInterface) {
-                $driver->leaveSession();
-            }
+            $action();
         } catch (\Throwable $e) {
-            $this->multiroomError = 'Leave failed: '.$e->getMessage();
+            $this->multiroomError = "{$failure}: {$e->getMessage()}";
         }
+    }
+
+    private function multiRoomDriver(Device $device): ?MultiRoomInterface
+    {
+        $driver = $device->driver;
+
+        return $driver instanceof MultiRoomInterface ? $driver : null;
+    }
+
+    /**
+     * Other devices of this device's brand that can do multiroom, as `{id, device_name}`:
+     * the ones playing (sessions to join) or not (devices to invite).
+     *
+     * @param  int[]  $except
+     */
+    private function sameBrandPeers(bool $playing, array $except = []): array
+    {
+        $device = $this->multiroomDevice();
+
+        return Device::where('id', '!=', $device->id)
+            ->where('device_brand_name', $device->device_brand_name)
+            ->whereNotIn('id', $except)
+            ->get()
+            ->filter(function ($d) use ($playing) {
+                try {
+                    return ($d->state === State::Playing) === $playing && $d->driver instanceof MultiRoomInterface;
+                } catch (\Throwable) {
+                    return false;
+                }
+            })
+            ->map(fn ($d) => ['id' => $d->id, 'device_name' => $d->device_name])
+            ->values()
+            ->all();
     }
 
     private function mapPeerIdsToDevices(array $ids): array
