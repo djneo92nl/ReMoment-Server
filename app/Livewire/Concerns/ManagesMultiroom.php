@@ -7,6 +7,8 @@ use App\Domain\Device\MultiRoomPeers;
 use App\Domain\Device\State;
 use App\Integrations\Contracts\MultiRoomInterface;
 use App\Models\Device;
+use Illuminate\Database\Eloquent\Collection;
+use Livewire\Attributes\Computed;
 
 /**
  * The multiroom picker's state and actions (view: livewire.partials.multiroom-modal), for a Livewire
@@ -102,6 +104,15 @@ trait ManagesMultiroom
     public function leaveSession(): void
     {
         $this->multiroomAction('Leave failed', fn () => $this->multiRoomDriver($this->multiroomDevice())?->leaveSession());
+    }
+
+    /** The devices of every row of the picker (members, invitable, joinable), by id. */
+    #[Computed]
+    public function multiroomRooms(): Collection
+    {
+        $ids = array_merge(array_column($this->currentListeners, 'id'), array_column($this->invitableDevices, 'id'), array_column($this->joinableSessions, 'id'));
+
+        return Device::whereIn('id', $ids)->get()->keyBy('id');
     }
 
     /** Runs a multiroom action; a failure is shown as "$failure: reason". */

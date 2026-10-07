@@ -219,18 +219,7 @@
                                  :style="expanded ? '' : 'max-height: 4rem'"
                                  style="max-height: 4rem">
                                 @foreach($quickSources as $i => $source)
-                                    @php
-                                        $sourceIcon = match(strtoupper($source['type'] ?? '')) {
-                                            'HDMI', 'TV' => 'fa-display',
-                                            'TUNEIN', 'RADIO' => 'fa-tower-broadcast',
-                                            'LINEIN' => 'fa-plug',
-                                            'DLNA', 'UPNP' => 'fa-network-wired',
-                                            'CD', 'DVD' => 'fa-compact-disc',
-                                            'OPTICAL' => 'fa-circle',
-                                            'BLUETOOTH' => 'fa-bluetooth',
-                                            default => 'fa-plug',
-                                        };
-                                    @endphp
+                                    @php $sourceIcon = \App\Domain\Device\SourceIcon::for($source['type'] ?? null); @endphp
                                     <button wire:click="activateSource('{{ $source['id'] }}')"
                                             class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-stone-800 hover:bg-gray-200 dark:hover:bg-stone-700 transition-colors text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 flex-shrink-0">
                                         <i class="fa-solid {{ $sourceIcon }} text-xs"></i>

@@ -19,13 +19,7 @@
                     <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{{ $description }}</p>
                 @endif
             </div>
-            <button
-                type="button"
-                @click="$dispatch('close-modal', '{{ $name }}')"
-                class="ml-4 flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-stone-800 hover:text-gray-600 dark:hover:text-gray-300 transition-colors flex-shrink-0"
-            >
-                <i class="fa-solid fa-xmark text-xs"></i>
-            </button>
+            <x-modal-close :name="$name" class="ml-4" />
         </div>
 
         {{-- Players, each as a small player; a device in a multiroom session says so --}}

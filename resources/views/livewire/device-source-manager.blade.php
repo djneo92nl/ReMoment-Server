@@ -1,14 +1,5 @@
 @php
-    $typeIcon = fn($type) => match(strtoupper($type ?? '')) {
-        'HDMI', 'TV'         => 'fa-display',
-        'TUNEIN', 'RADIO'    => 'fa-tower-broadcast',
-        'LINEIN'             => 'fa-plug',
-        'DLNA', 'UPNP'       => 'fa-network-wired',
-        'CD', 'DVD'          => 'fa-compact-disc',
-        'OPTICAL'            => 'fa-circle',
-        'BLUETOOTH'          => 'fa-bluetooth',
-        default              => 'fa-plug',
-    };
+    $typeIcon = fn ($type) => \App\Domain\Device\SourceIcon::for($type);
     $allSources     = collect($sources);
     $ownSources     = $allSources->where('borrowed', false)->values();
     $borrowedSources = $allSources->where('borrowed', true)->values();

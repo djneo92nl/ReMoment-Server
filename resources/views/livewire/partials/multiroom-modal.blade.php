@@ -11,10 +11,7 @@
                         <h3 class="text-gray-900 dark:text-gray-100" style="font-size:1.25rem;font-weight:700;letter-spacing:.01em">Multiroom</h3>
                         <p style="font-size:.9rem;font-weight:600;color:#d99a00">{{ $subtitle }}</p>
                     </div>
-                    <button @click="$dispatch('close')"
-                            class="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-stone-800 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
-                        <i class="fa-solid fa-xmark text-xs"></i>
-                    </button>
+                    <x-modal-close />
                 </div>
 
                 @if(!$multiRoomDataLoaded)
@@ -27,8 +24,7 @@
                     @endif
 
                     @php
-                        $peerIds = array_merge(array_column($currentListeners, 'id'), array_column($invitableDevices, 'id'), array_column($joinableSessions, 'id'));
-                        $rooms = \App\Models\Device::whereIn('id', $peerIds)->get()->keyBy('id');
+                        $rooms = $this->multiroomRooms;
                     @endphp
                     <div style="display:flex;flex-direction:column;gap:.6rem;max-height:60vh;overflow-y:auto">
                         @if($isHosting)
