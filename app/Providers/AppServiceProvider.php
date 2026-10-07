@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Events\Device\BatteryUpdated;
 use App\Events\Device\DeviceStateChanged;
+use App\Events\Device\MultiRoomUpdated;
 use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
 use App\Events\Device\PlaybackModesUpdated;
@@ -14,6 +15,7 @@ use App\Listeners\Device\DispatchArtworkProcessing;
 use App\Listeners\Device\HoldOwnModesWhileSpotifyRouted;
 use App\Listeners\Device\PublishBatteryToMqtt;
 use App\Listeners\Device\PublishModesToMqtt;
+use App\Listeners\Device\PublishMultiRoomToMqtt;
 use App\Listeners\Device\PublishNowPlayingToMqtt;
 use App\Listeners\Device\PublishProgressToMqtt;
 use App\Listeners\Device\PublishStateToMqtt;
@@ -67,6 +69,9 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(PlaybackModesUpdated::class, HoldOwnModesWhileSpotifyRouted::class);
         Event::listen(PlaybackModesUpdated::class, UpdateDeviceCache::class);
         Event::listen(PlaybackModesUpdated::class, PublishModesToMqtt::class);
+
+        Event::listen(MultiRoomUpdated::class, UpdateDeviceCache::class);
+        Event::listen(MultiRoomUpdated::class, PublishMultiRoomToMqtt::class);
         Event::listen(DeviceStateChanged::class, PublishStateToMqtt::class);
         Event::listen(DeviceStateChanged::class, SyncNowPlayingDataWithState::class);
         Event::listen(DeviceStateChanged::class, SwitchToDefaultSource::class);

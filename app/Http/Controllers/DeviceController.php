@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\DeviceCapabilities;
+use App\Domain\Device\MultiRoomGroups;
 use App\Domain\Device\SpotifyRouting;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\NotPlayableException;
@@ -24,8 +25,9 @@ class DeviceController extends Controller
         $all = Device::all();
         $hiddenCount = $all->where('hidden', true)->count();
 
-        // The Spotify virtual device is hidden while Spotify plays on a mapped speaker in the list.
-        $devices = SpotifyRouting::visible($all->filter(fn (Device $device) => !$device->hidden || $showHidden))
+        // The Spotify virtual device is hidden while Spotify plays on a mapped speaker in the list; a device
+        // joined to a host in the list is shown on the host's card.
+        $devices = MultiRoomGroups::withoutListeners(SpotifyRouting::visible($all->filter(fn (Device $device) => !$device->hidden || $showHidden)))
             ->sortByDesc(fn ($d) => match ($d->state) {
                 \App\Domain\Device\State::Playing => 3,
                 \App\Domain\Device\State::Paused => 2,

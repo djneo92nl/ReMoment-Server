@@ -2,6 +2,7 @@
 
 namespace App\Integrations\BangOlufsen\Ase\Services;
 
+use App\Domain\Device\Cache\MultiRoom;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
 use App\Domain\Media\AlbumData;
@@ -10,11 +11,13 @@ use App\Domain\Media\NowPlaying;
 use App\Domain\Media\Radio;
 use App\Domain\Media\Source;
 use App\Domain\Media\TrackData;
+use App\Events\Device\MultiRoomUpdated;
 use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
 use App\Events\Device\ProgressUpdated;
 use App\Events\Device\VolumeUpdated;
 use App\Integrations\Contracts\DeviceListenerInterface;
+use App\Integrations\Contracts\MultiRoomStatusInterface;
 use App\Models\Device;
 use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Log;
@@ -69,6 +72,8 @@ class DeviceListener implements DeviceListenerInterface
                 DeviceCache::updateState($deviceId, State::Standby);
 
                 $buffer = '';
+                $lastMultiRoomCheck = 0;
+                $this->refreshMultiRoom($deviceId);
 
                 while (!$body->eof()) {
                     $chunk = $body->read(1024);
@@ -98,6 +103,12 @@ class DeviceListener implements DeviceListenerInterface
                     }
 
                     cache()->put($cacheKey, true, now()->addSeconds(10));
+
+                    // Joining or leaving a session doesn't show in the notifications we read: look now and then.
+                    if (time() - $lastMultiRoomCheck >= self::MULTIROOM_CHECK_SECONDS) {
+                        $lastMultiRoomCheck = time();
+                        $this->refreshMultiRoom($deviceId);
+                    }
                 }
             } catch (\Throwable $e) {
                 $hadError = true;
@@ -110,6 +121,7 @@ class DeviceListener implements DeviceListenerInterface
                 }
             } finally {
                 cache()->forget($cacheKey);
+                MultiRoom::forget((int) $deviceId);
                 DeviceCache::updateState($deviceId, State::Unreachable);
             }
 
@@ -122,6 +134,26 @@ class DeviceListener implements DeviceListenerInterface
             sleep($retryDelaySeconds);
         }
 
+    }
+
+    private const MULTIROOM_CHECK_SECONDS = 5;
+
+    /** Reads the device's multiroom role and announces it when it changed. */
+    protected function refreshMultiRoom(string $deviceId): void
+    {
+        try {
+            $driver = Device::find($deviceId)?->driver;
+            if (!($driver instanceof MultiRoomStatusInterface)) {
+                return;
+            }
+
+            $status = $driver->getMultiRoomStatus();
+            if (MultiRoom::get((int) $deviceId)?->toArray() !== $status->toArray()) {
+                event(new MultiRoomUpdated($deviceId, $status));
+            }
+        } catch (\Throwable $e) {
+            Log::debug("ASE listener [{$deviceId}] multiroom status failed: {$e->getMessage()}");
+        }
     }
 
     protected function applyNotification(array $payload, string $deviceId): void

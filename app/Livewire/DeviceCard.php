@@ -296,6 +296,39 @@ class DeviceCard extends Component
         }
     }
 
+    /** Volume of one room of this session (this device's own, or a joined room's). */
+    public function setMemberVolume(int $deviceId, int $volume): void
+    {
+        $volume = max(0, min(100, $volume));
+
+        try {
+            $driver = Device::findOrFail($deviceId)->driver;
+            if ($driver instanceof VolumeControlInterface) {
+                $driver->setVolume($volume);
+                Volume::updateVolume($deviceId, $volume);
+                if ($deviceId === $this->device->id) {
+                    $this->volume = $volume;
+                }
+            }
+        } catch (\Throwable) {
+        }
+    }
+
+    /** Removes a device from the group this device hosts: the device leaves by itself. */
+    public function removeListener(int $listenerId): void
+    {
+        $this->multiroomError = null;
+        try {
+            $listener = Device::findOrFail($listenerId);
+            $driver = $listener->driver;
+            if ($driver instanceof MultiRoomInterface) {
+                $driver->leaveSession();
+            }
+        } catch (\Throwable $e) {
+            $this->multiroomError = 'Remove failed: '.$e->getMessage();
+        }
+    }
+
     public function leaveSession(): void
     {
         $this->multiroomError = null;

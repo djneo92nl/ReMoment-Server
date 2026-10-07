@@ -34,7 +34,12 @@
         {{-- Grid: active devices span 2 columns via the component itself (md:col-span-2 set inside) --}}
         <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             @foreach($devices as $device)
-                <div class="{{ $device->hidden ? 'opacity-40' : '' }}">
+                @php
+                    // The grid item is this wrapper, so the wide card for a playing device is set here.
+                    $active = in_array($device->state, [\App\Domain\Device\State::Playing, \App\Domain\Device\State::Paused], true)
+                        && \App\Domain\Device\DeviceCache::isListenerRunning($device->id);
+                @endphp
+                <div class="{{ $device->hidden ? 'opacity-40' : '' }} {{ $active ? 'md:col-span-2' : '' }}">
                     <livewire:device-card :device="$device" :key="'dc-'.$device->id" />
                 </div>
             @endforeach

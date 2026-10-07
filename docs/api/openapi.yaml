@@ -1195,6 +1195,23 @@ components:
       properties:
         level: { type: integer, minimum: 0, maximum: 100 }
         charging: { type: boolean }
+    MultiRoom:
+      type: object
+      nullable: true
+      description: Multiroom role as the device's listener last saw it; null while unknown (ASE only for now)
+      properties:
+        role: { type: string, enum: [standalone, host, listener] }
+        host:
+          type: object
+          nullable: true
+          description: The device this one is joined to (role listener)
+          properties: { id: { type: integer }, name: { type: string } }
+        listeners:
+          type: array
+          description: Devices listening to this one (role host)
+          items:
+            type: object
+            properties: { id: { type: integer }, name: { type: string } }
     Modes:
       type: object
       description: Each value is null when unknown or unsupported
@@ -1233,6 +1250,7 @@ components:
           type: array
           items: { $ref: "#/components/schemas/Capability" }
         battery: { $ref: "#/components/schemas/Battery" }
+        multiroom: { $ref: "#/components/schemas/MultiRoom" }
         mqtt_topic: { type: string, example: remoment/player/1 }
     DeviceDetail:
       allOf:

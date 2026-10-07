@@ -74,4 +74,61 @@ class AseMultiRoomJoinTest extends TestCase
 
         $this->assertSame('2730.1200316.28922783@products.bang-olufsen.com', $device->getMultiRoomId());
     }
+
+    private function statusDriver(array $activeSources, string $own = 'm3'): object
+    {
+        $api = (new FakeAseConnector)->seed('BeoZone/Zone/ActiveSources', $activeSources);
+
+        return new class($api, $own)
+        {
+            use MultiRoomControls;
+
+            public function __construct(private HttpConnector $api, private string $own) {}
+
+            public function getMultiRoomId(): ?string
+            {
+                return $this->own;
+            }
+
+            public function getActiveSources(): array
+            {
+                return $this->api->get('BeoZone/Zone/ActiveSources');
+            }
+
+            protected function deviceApiClient(): HttpConnector
+            {
+                return $this->api;
+            }
+        };
+    }
+
+    public function test_status_is_standalone_while_idle(): void
+    {
+        $status = $this->statusDriver(['activeSources' => ['primary' => '', 'primaryJid' => '']])->getMultiRoomStatus();
+
+        $this->assertSame('standalone', $status->role);
+    }
+
+    public function test_status_is_host_with_the_other_listeners(): void
+    {
+        $status = $this->statusDriver(['activeSources' => ['primaryJid' => 'm3'], 'primaryExperience' => ['listenerList' => ['listener' => [['jid' => 'm5'], ['jid' => 'm3']]]]])->getMultiRoomStatus();
+
+        $this->assertSame('host', $status->role);
+        $this->assertSame(['m5'], $status->listenerPeerIds);
+    }
+
+    public function test_playing_alone_is_standalone_even_though_the_host_lists_itself(): void
+    {
+        $status = $this->statusDriver(['activeSources' => ['primaryJid' => 'm3'], 'primaryExperience' => ['listenerList' => ['listener' => ['jid' => 'm3']]]])->getMultiRoomStatus();
+
+        $this->assertSame('standalone', $status->role);
+    }
+
+    public function test_status_is_listener_when_the_primary_is_another_device(): void
+    {
+        $status = $this->statusDriver(['activeSources' => ['primaryJid' => 'm3'], 'primaryExperience' => ['listenerList' => ['listener' => [['jid' => 'm5']]]]], own: 'm5')->getMultiRoomStatus();
+
+        $this->assertSame('listener', $status->role);
+        $this->assertSame('m3', $status->hostPeerId);
+    }
 }

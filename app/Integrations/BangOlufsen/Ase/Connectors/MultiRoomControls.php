@@ -2,6 +2,7 @@
 
 namespace App\Integrations\BangOlufsen\Ase\Connectors;
 
+use App\Domain\Device\MultiRoomStatus;
 use App\Integrations\Common\UnsupportedOperationException;
 use App\Integrations\Contracts\SessionHostInterface;
 use App\Models\Device;
@@ -59,6 +60,26 @@ trait MultiRoomControls
         $current = $this->getCurrentPeerIds();
 
         return array_values(array_diff($all, $current));
+    }
+
+    /**
+     * Idle: primaryJid is empty. Hosting: primaryJid is our own and the listener list holds others besides us.
+     * Joined: primaryJid is the host's.
+     */
+    public function getMultiRoomStatus(): MultiRoomStatus
+    {
+        $primary = $this->getActiveSources()['activeSources']['primaryJid'] ?? '';
+        $own = $this->getMultiRoomId();
+
+        if ($primary === '' || $own === null) {
+            return MultiRoomStatus::standalone();
+        }
+
+        if ($primary !== $own) {
+            return MultiRoomStatus::joined($primary);
+        }
+
+        return MultiRoomStatus::hosting(array_values(array_diff($this->getCurrentPeerIds(), [$own])));
     }
 
     public function getCurrentPeerIds(): array

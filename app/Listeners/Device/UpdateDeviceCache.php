@@ -4,11 +4,13 @@ namespace App\Listeners\Device;
 
 use App\Domain\Device\Cache\Battery;
 use App\Domain\Device\Cache\Modes;
+use App\Domain\Device\Cache\MultiRoom;
 use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
 use App\Domain\Media\NowPlaying;
 use App\Events\Device\BatteryUpdated;
+use App\Events\Device\MultiRoomUpdated;
 use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
 use App\Events\Device\PlaybackModesUpdated;
@@ -84,6 +86,12 @@ class UpdateDeviceCache
 
         if ($event instanceof PlaybackModesUpdated) {
             Modes::put($deviceId, $event->modes);
+
+            return;
+        }
+
+        if ($event instanceof MultiRoomUpdated) {
+            MultiRoom::put($deviceId, $event->status);
 
             return;
         }

@@ -53,6 +53,7 @@
             </div>
 
             <div class="flex items-center gap-2 flex-shrink-0">
+                <x-multiroom-badge :device="$device" />
                 <x-battery :device-id="$device->id" />
                 <span class="text-sm text-gray-500 dark:text-gray-400 hidden sm:block truncate max-w-40">{{ $device->device_name }}</span>
                 <a href="/receiver?device={{ $device->id }}" target="_blank"
@@ -285,6 +286,28 @@
             </p>
         @endif
 
+        {{-- ── Multiroom session: every room playing this ── --}}
+        @php
+            $group = \App\Domain\Device\Cache\MultiRoom::get($device->id)?->resolve($device);
+        @endphp
+        @if($group && $group['role'] === 'host' && $group['listeners'])
+            <div class="mt-5 rounded-2xl border px-4 py-3" style="background: rgba(14,165,233,.12); border-color: rgba(14,165,233,.4);">
+                <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider" style="color:#0369a1;">
+                    <i class="fa-solid fa-layer-group"></i>
+                    <span>Multiroom · {{ count($group['listeners']) + 1 }} rooms</span>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-top:.6rem">
+                    <x-room-tile :id="$device->id" :name="$device->device_name" role="host"
+                                 :volume="\App\Domain\Device\Cache\Volume::getVolume($device->id)" wire:key="room-{{ $device->id }}" />
+                    @foreach($group['listeners'] as $room)
+                        <x-room-tile :id="$room['id']" :name="$room['name']" role="member"
+                                     :volume="\App\Domain\Device\Cache\Volume::getVolume($room['id'])"
+                                     :toggle="'removeListener('.$room['id'].')'" wire:key="room-{{ $room['id'] }}" />
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
         {{-- ── Footer ── --}}
         <div class="mt-5 pt-4 border-t border-gray-100 dark:border-stone-800 flex items-center justify-between text-xs text-gray-400 dark:text-gray-600">
             <span>{{ $device->device_brand_name }} · {{ $device->device_product_type }}</span>
@@ -309,111 +332,70 @@
 
     </div>
 
-    {{-- ── Multiroom modal ── --}}
+    {{-- ── Multiroom picker: tiles for the rooms, a check marks who is in the session (B&O style) ── --}}
     @if($supportsMultiRoom)
         <x-modal name="multiroom-{{ $device->id }}" maxWidth="md">
-            <div class="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100 dark:border-stone-800">
-                <div class="flex items-center gap-2.5">
-                    <i class="fa-solid fa-layer-group text-blue-500 dark:text-blue-400"></i>
-                    <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">Multiroom</h3>
-                    <span class="text-xs text-gray-400 dark:text-gray-600">{{ $device->device_name }}</span>
+            @php
+                $isHosting = $state === \App\Domain\Device\State::Playing;
+                $inSession = array_column($currentListeners, 'id');
+                $subtitle = $isHosting && count($currentListeners) > 0 ? $device->device_name.' + '.count($currentListeners) : $device->device_name;
+            @endphp
+            <div class="bg-white dark:bg-stone-900" style="padding:1.25rem 1.25rem 1.5rem">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1rem">
+                    <div>
+                        <h3 class="text-gray-900 dark:text-gray-100" style="font-size:1.25rem;font-weight:700;letter-spacing:.01em">Multiroom</h3>
+                        <p style="font-size:.9rem;font-weight:600;color:#d99a00">{{ $subtitle }}</p>
+                    </div>
+                    <button @click="$dispatch('close')"
+                            class="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-stone-800 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                        <i class="fa-solid fa-xmark text-xs"></i>
+                    </button>
                 </div>
-                <button @click="$dispatch('close')"
-                        class="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-stone-800 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
-                    <i class="fa-solid fa-xmark text-xs"></i>
-                </button>
-            </div>
-
-            <div class="px-3 py-3 space-y-1 max-h-[70vh] overflow-y-auto">
 
                 @if(!$multiRoomDataLoaded)
-                    <div class="px-3 py-8 text-center">
+                    <div style="padding:2rem 0;text-align:center">
                         <i class="fa-solid fa-circle-notch fa-spin text-gray-300 dark:text-stone-600 text-2xl"></i>
                     </div>
                 @else
                     @if($multiroomError)
-                        <div class="px-3 py-2 text-xs text-red-500 dark:text-red-400">{{ $multiroomError }}</div>
+                        <p class="text-red-500 dark:text-red-400" style="font-size:.8rem;margin-bottom:.75rem">{{ $multiroomError }}</p>
                     @endif
 
-                    {{-- Sessions to join (shown when not playing, or always for context) --}}
-                    @if(count($joinableSessions) > 0)
-                        <p class="px-3 pt-2 pb-1 text-xs font-medium text-gray-400 dark:text-gray-600 uppercase tracking-wider">Join a session</p>
-                        @foreach($joinableSessions as $session)
-                            <div class="flex items-center gap-3 px-3 py-2 rounded-xl group hover:bg-gray-50 dark:hover:bg-stone-800">
-                                <i class="fa-solid fa-music text-gray-400 dark:text-gray-500 text-xs w-4 text-center flex-shrink-0"></i>
-                                <span class="flex-1 text-sm text-gray-800 dark:text-gray-200 truncate">{{ $session['device_name'] }}</span>
-                                <button wire:click="joinSession({{ $session['id'] }})"
-                                        wire:loading.attr="disabled"
-                                        @click="$dispatch('close')"
-                                        class="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 transition-colors opacity-0 group-hover:opacity-100">
-                                    <i class="fa-solid fa-arrow-right-to-bracket text-xs"></i>
-                                </button>
-                            </div>
-                        @endforeach
-                    @elseif($state !== \App\Domain\Device\State::Playing)
-                        <div class="px-3 py-8 text-center">
-                            <p class="text-sm text-gray-400 dark:text-gray-600">No active sessions to join.</p>
-                        </div>
-                    @endif
+                    @php
+                        $peerIds = array_merge(array_column($currentListeners, 'id'), array_column($invitableDevices, 'id'), array_column($joinableSessions, 'id'));
+                        $rooms = \App\Models\Device::whereIn('id', $peerIds)->get()->keyBy('id');
+                    @endphp
+                    <div style="display:flex;flex-direction:column;gap:.6rem;max-height:60vh;overflow-y:auto">
+                        @if($isHosting)
+                            <x-mini-player :device="$device" volume-method="setMemberVolume" tag="Host" :in-session="true" wire:key="mr-host" />
 
-                    {{-- Current listeners (shown when playing) --}}
-                    @if($state === \App\Domain\Device\State::Playing)
-                        @if(count($currentListeners) > 0)
-                            <p class="px-3 pt-2 pb-1 text-xs font-medium text-gray-400 dark:text-gray-600 uppercase tracking-wider">Listening now</p>
-                            @foreach($currentListeners as $listener)
-                                <div class="flex items-center gap-3 px-3 py-2 rounded-xl group">
-                                    <span class="relative flex w-2.5 h-2.5 flex-shrink-0">
-                                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                        <span class="relative inline-flex rounded-full w-2.5 h-2.5 bg-emerald-500"></span>
-                                    </span>
-                                    <span class="flex-1 text-sm text-gray-800 dark:text-gray-200 truncate">{{ $listener['device_name'] }}</span>
-                                </div>
+                            @foreach($currentListeners as $member)
+                                @continue(!$rooms->has($member['id']))
+                                <x-mini-player :device="$rooms[$member['id']]" volume-method="setMemberVolume" :in-session="true"
+                                               :toggle="'removeListener('.$member['id'].')'" wire:key="mr-in-{{ $member['id'] }}" />
                             @endforeach
-                        @endif
 
-                        {{-- Invitable devices --}}
-                        @if(count($invitableDevices) > 0)
-                            <p class="px-3 pt-2 pb-1 text-xs font-medium text-gray-400 dark:text-gray-600 uppercase tracking-wider">Invite to session</p>
                             @foreach($invitableDevices as $guest)
-                                <div class="flex items-center gap-3 px-3 py-2 rounded-xl group hover:bg-gray-50 dark:hover:bg-stone-800">
-                                    <i class="fa-solid fa-speaker text-gray-400 dark:text-gray-500 text-xs w-4 text-center flex-shrink-0"></i>
-                                    <span class="flex-1 text-sm text-gray-800 dark:text-gray-200 truncate">{{ $guest['device_name'] }}</span>
-                                    <button wire:click="inviteDevice({{ $guest['id'] }})"
-                                            wire:loading.attr="disabled"
-                                            class="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors opacity-0 group-hover:opacity-100">
-                                        <i class="fa-solid fa-plus text-xs"></i>
-                                    </button>
-                                </div>
+                                @continue(in_array($guest['id'], $inSession, true) || !$rooms->has($guest['id']))
+                                <x-mini-player :device="$rooms[$guest['id']]" :in-session="false"
+                                               :toggle="'inviteDevice('.$guest['id'].')'" wire:key="mr-out-{{ $guest['id'] }}" />
+                            @endforeach
+                        @else
+                            {{-- not playing: join a room that is --}}
+                            @foreach($joinableSessions as $session)
+                                @continue(!$rooms->has($session['id']))
+                                <x-mini-player :device="$rooms[$session['id']]" :in-session="false" :toggle="'joinSession('.$session['id'].')'"
+                                               :close-on-toggle="true" wire:key="mr-join-{{ $session['id'] }}" />
                             @endforeach
                         @endif
+                    </div>
 
-                        @if(count($currentListeners) === 0 && count($invitableDevices) === 0)
-                            <p class="px-3 py-4 text-xs text-gray-400 dark:text-gray-600 text-center">No other {{ $device->device_brand_name }} devices available.</p>
-                        @endif
-
-                        {{-- Leave current session --}}
-                        @if(count($joinableSessions) > 0)
-                            <div class="px-3 pt-2 pb-1 border-t border-gray-100 dark:border-stone-800 mt-2"></div>
-                            <button wire:click="leaveSession" @click="$dispatch('close')"
-                                    class="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
-                                <i class="fa-solid fa-arrow-right-from-bracket text-xs w-4 text-center flex-shrink-0"></i>
-                                Leave session
-                            </button>
-                        @endif
-                    @endif
-
-                    {{-- Leave option for non-playing joined device --}}
-                    @if($state !== \App\Domain\Device\State::Playing && count($joinableSessions) === 0)
-                        <div class="px-3 pt-2">
-                            <button wire:click="leaveSession" @click="$dispatch('close')"
-                                    class="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
-                                <i class="fa-solid fa-arrow-right-from-bracket text-xs w-4 text-center flex-shrink-0"></i>
-                                Leave session
-                            </button>
-                        </div>
+                    @if(($isHosting && count($currentListeners) === 0 && count($invitableDevices) === 0) || (!$isHosting && count($joinableSessions) === 0))
+                        <p class="text-gray-400 dark:text-gray-600" style="font-size:.85rem;text-align:center;padding:1rem 0 0">
+                            {{ $isHosting ? "No other {$device->device_brand_name} devices available." : 'Nothing is playing that this device can join.' }}
+                        </p>
                     @endif
                 @endif
-
             </div>
         </x-modal>
     @endif

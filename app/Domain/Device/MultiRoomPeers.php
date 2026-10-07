@@ -5,6 +5,7 @@ namespace App\Domain\Device;
 use App\Integrations\Contracts\MultiRoomInterface;
 use App\Models\Device;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Cache;
 
 class MultiRoomPeers
 {
@@ -55,6 +56,11 @@ class MultiRoomPeers
             ->get();
 
         foreach ($candidates as $candidate) {
+            // Unreachable devices only cost a timeout, and a device that can't tell is not asked again at once.
+            if ($candidate->state === State::Unreachable || !Cache::add("multiroom:jid-lookup:{$candidate->id}", true, 600)) {
+                continue;
+            }
+
             try {
                 $driver = $candidate->driver;
                 if ($driver instanceof MultiRoomInterface && $driver->getMultiRoomId()) {
