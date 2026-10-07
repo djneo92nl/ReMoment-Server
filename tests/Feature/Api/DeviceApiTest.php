@@ -341,6 +341,18 @@ class DeviceApiTest extends TestCase
             ]);
     }
 
+    public function test_multiroom_maps_peers_of_another_platform(): void
+    {
+        $device = $this->makeDevice();
+        $mozart = $this->makeDevice(state: State::Playing, name: 'Beolab 28');
+        $mozart->meta()->create(['key' => 'mozart_jid', 'value' => 'peer-mozart']);
+        FakePlayerDriver::$peers = ['peer-mozart'];
+
+        $this->getJson("/api/devices/{$device->id}/multiroom")
+            ->assertOk()
+            ->assertJsonPath('joinable.0.id', $mozart->id);
+    }
+
     public function test_multiroom_join_and_leave(): void
     {
         $device = $this->makeDevice();

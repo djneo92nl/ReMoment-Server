@@ -15,6 +15,11 @@ return [
         \Remoment\MozartDriver\MusicPlayerDriver::class => \Remoment\MozartDriver\Services\DeviceListener::class,
     ],
 
+    // device_meta keys holding a platform's multiroom peer ID (see MultiRoomInterface::multiRoomMetaKey()).
+    // Peer IDs are matched across all of them: ASE and Mozart JIDs are mostly interchangeable, so an ASE
+    // device can list a Mozart listener and vice versa.
+    'multiroom_meta_keys' => ['ase_jid', 'mozart_jid', 'sonos_uuid'],
+
     'Bang & Olufsen' => [
         'BeoSound Essence' => [
             'driver_name' => 'ASE',

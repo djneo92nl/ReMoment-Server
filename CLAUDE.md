@@ -612,7 +612,7 @@ device_meta: key = 'spotify_connect_name', value = '<Spotify device name>'
 - `leaveSession()` – calls `BecomeCoordinatorOfStandaloneGroup` SOAP action on the speaker
 - `getJoinablePeerIds()` returns `[]`; UI falls back to showing all Sonos devices
 
-**JID-to-Device lookup:** query `device_meta` where `key IN ('ase_jid', 'sonos_uuid')` and `value IN ($peerIds)`.
+**JID-to-Device lookup:** `App\Domain\Device\MultiRoomPeers::devices()` queries `device_meta` where `key` is one of `config('devices.multiroom_meta_keys')` (`ase_jid`, `mozart_jid`, `sonos_uuid`) and `value IN ($peerIds)`, so ASE and Mozart (whose JIDs are mostly interchangeable) list each other. Add a new platform's key to that config.
 
 Populate JIDs for all B&O devices with: `php artisan devices:sync-sources`
 

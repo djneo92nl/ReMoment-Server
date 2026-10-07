@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Domain\Artwork\LibraryItemArtwork;
 use App\Domain\Artwork\RadioStationArtwork;
 use App\Domain\Device\Cache\Modes;
+use App\Domain\Device\MultiRoomPeers;
 use App\Domain\Device\PlaybackModes;
 use App\Domain\Device\RepeatMode;
 use App\Domain\Device\SpotifyRouting;
@@ -649,19 +650,6 @@ class DeviceController extends Controller
 
     private function mapPeerIdsToDevices(array $ids, Device $exclude): \Illuminate\Support\Collection
     {
-        if (empty($ids)) {
-            return collect();
-        }
-
-        $driver = $exclude->driver;
-        if (!($driver instanceof MultiRoomInterface)) {
-            return collect();
-        }
-
-        $metaKey = $driver->multiRoomMetaKey();
-
-        return Device::whereHas('meta', function ($q) use ($ids, $metaKey) {
-            $q->where('key', $metaKey)->whereIn('value', $ids);
-        })->where('id', '!=', $exclude->id)->get();
+        return MultiRoomPeers::devices($ids, $exclude);
     }
 }

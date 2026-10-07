@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\DeviceCache;
+use App\Domain\Device\MultiRoomPeers;
 use App\Domain\Device\SpotifyRouting;
 use App\Domain\Device\State;
 use App\Integrations\Contracts\MediaControlsInterface;
@@ -312,21 +313,7 @@ class DeviceCard extends Component
 
     private function mapPeerIdsToDevices(array $ids): array
     {
-        if (empty($ids)) {
-            return [];
-        }
-
-        $driver = $this->device->driver;
-        if (!($driver instanceof MultiRoomInterface)) {
-            return [];
-        }
-
-        $metaKey = $driver->multiRoomMetaKey();
-
-        return Device::whereHas('meta', function ($q) use ($ids, $metaKey) {
-            $q->where('key', $metaKey)->whereIn('value', $ids);
-        })->where('id', '!=', $this->device->id)
-            ->get()
+        return MultiRoomPeers::devices($ids, $this->device)
             ->map(fn ($d) => ['id' => $d->id, 'device_name' => $d->device_name])
             ->all();
     }
