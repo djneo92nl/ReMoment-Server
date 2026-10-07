@@ -32,11 +32,6 @@ class FakeSleepDigitsDriver implements DigitsInterface, MusicPlayerDriverInterfa
         self::$throw = null;
     }
 
-    public function getCurrentPlayingAttribute(): array
-    {
-        return [];
-    }
-
     public function sendDigit(int $digit): void
     {
         $this->failIfAsked();

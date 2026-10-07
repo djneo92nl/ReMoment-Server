@@ -35,11 +35,6 @@ class FakeSpotifyDriver implements LikeInterface, MediaControlsInterface, MusicP
         self::$calls[] = [$method, $argument];
     }
 
-    public function getCurrentPlayingAttribute(): array
-    {
-        return [];
-    }
-
     public function play(): void
     {
         $this->record('play');

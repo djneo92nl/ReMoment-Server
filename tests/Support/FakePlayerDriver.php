@@ -3,7 +3,6 @@
 namespace Tests\Support;
 
 use App\Domain\Device\AvailableSource;
-use App\Domain\Device\DeviceCache;
 use App\Domain\Device\QueueItem;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
@@ -53,12 +52,6 @@ class FakePlayerDriver implements MediaControlsInterface, MultiRoomInterface, Mu
         }
 
         self::$calls[] = [$method, $argument];
-    }
-
-    public function getCurrentPlayingAttribute(): array
-    {
-        // Like the real drivers: live state comes from what listeners cached.
-        return DeviceCache::getNowPlaying($this->device->id)?->toArray() ?? [];
     }
 
     public function play(): void

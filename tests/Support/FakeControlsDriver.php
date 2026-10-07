@@ -2,7 +2,6 @@
 
 namespace Tests\Support;
 
-use App\Domain\Device\DeviceCache;
 use App\Domain\Device\RepeatMode;
 use App\Integrations\Contracts\LikeInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
@@ -37,11 +36,6 @@ class FakeControlsDriver implements LikeInterface, MusicPlayerDriverInterface, R
         }
 
         self::$calls[] = [$method, $argument];
-    }
-
-    public function getCurrentPlayingAttribute(): array
-    {
-        return DeviceCache::getNowPlaying($this->device->id)?->toArray() ?? [];
     }
 
     public function setShuffle(bool $shuffle): void

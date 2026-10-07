@@ -65,8 +65,6 @@ class MusicPlayerDriver implements BatteryInterface, DeviceInfoInterface, Librar
         return SonosBattery::fetch($this->device->ip_address);
     }
 
-    public function getCurrentPlayingAttribute(): array {}
-
     public function radioPlatform(): string
     {
         return 'tunein';

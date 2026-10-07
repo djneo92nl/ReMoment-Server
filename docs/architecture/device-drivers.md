@@ -8,7 +8,7 @@ All contracts live in `app/Integrations/Contracts/`.
 
 | Interface | Methods | Required? |
 |-----------|---------|-----------|
-| `MusicPlayerDriverInterface` | `__construct(Device $device)`, `getCurrentPlayingAttribute()` | Yes, for all drivers |
+| `MusicPlayerDriverInterface` | `__construct(Device $device)` (live playback comes from the listener via `DeviceCache`, not from the driver) | Yes, for all drivers |
 | `MediaControlsInterface` | `play()`, `pause()`, `stop()`, `next()`, `previous()` | If device supports transport control |
 | `VolumeControlInterface` | `setVolume(int): int`, `getVolume(): int`, `incrementVolume()`, `decrementVolume()`, `mute()`, `unmute()`, `isMuted(): bool` | If device supports volume |
 | `SeekInterface` | `seek(int $seconds)` | If device can jump within the current track (Sonos, Spotify, Mozart) |
@@ -108,11 +108,6 @@ use App\Models\Device;
 class MusicPlayerDriver implements MusicPlayerDriverInterface, MediaControlsInterface, VolumeControlInterface
 {
     public function __construct(public Device $device) {}
-
-    public function getCurrentPlayingAttribute()
-    {
-        return DeviceCache::getNowPlaying($this->device->id)?->toArray() ?? [];
-    }
 
     public function play(): void   { /* call device API */ }
     public function pause(): void  { /* call device API */ }

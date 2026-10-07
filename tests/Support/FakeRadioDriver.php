@@ -12,11 +12,6 @@ class FakeRadioDriver implements MusicPlayerDriverInterface, RadioControlInterfa
 {
     public function __construct(public Device $device) {}
 
-    public function getCurrentPlayingAttribute(): array
-    {
-        return [];
-    }
-
     public function radioPlatform(): string
     {
         return 'fakeradio';

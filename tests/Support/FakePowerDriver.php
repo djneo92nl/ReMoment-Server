@@ -27,11 +27,6 @@ class FakePowerDriver implements MusicPlayerDriverInterface, PowerInterface
         self::$standbyOnly = false;
     }
 
-    public function getCurrentPlayingAttribute(): array
-    {
-        return [];
-    }
-
     public function powerOn(): void
     {
         if (self::$standbyOnly) {

@@ -10,8 +10,4 @@ class FakeBareDriver implements MusicPlayerDriverInterface
 {
     public function __construct(public Device $device) {}
 
-    public function getCurrentPlayingAttribute(): array
-    {
-        return [];
-    }
 }

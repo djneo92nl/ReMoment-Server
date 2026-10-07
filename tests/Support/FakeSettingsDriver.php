@@ -58,11 +58,6 @@ class FakeSettingsDriver implements BluetoothInterface, DeviceInfoInterface, Mus
         self::$paired = [new BluetoothDevice('phone-1', 'Remko iPhone', 'AA:BB:CC:DD:EE:FF', true)];
     }
 
-    public function getCurrentPlayingAttribute(): array
-    {
-        return [];
-    }
-
     public function getSoundAdjustment(): SoundAdjustment
     {
         $this->failIfAsked();

@@ -33,9 +33,4 @@ class FakeSourceDriver implements MusicPlayerDriverInterface, SourceActivationIn
 
         self::$activated[] = $sourceId;
     }
-
-    public function getCurrentPlayingAttribute(): array
-    {
-        return [];
-    }
 }

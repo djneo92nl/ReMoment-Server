@@ -2,7 +2,6 @@
 
 namespace App\Integrations\Spotify;
 
-use App\Domain\Device\DeviceCache;
 use App\Domain\Device\QueueItem;
 use App\Domain\Device\RepeatMode;
 use App\Integrations\Contracts\LikeInterface;
@@ -20,11 +19,6 @@ use Illuminate\Support\Facades\Cache;
 class MusicPlayerDriver implements LikeInterface, MediaControlsInterface, MusicPlayerDriverInterface, QueueInterface, QueueJumpInterface, RepeatInterface, SeekInterface, ShuffleInterface
 {
     public function __construct(public Device $device) {}
-
-    public function getCurrentPlayingAttribute(): array
-    {
-        return DeviceCache::getNowPlaying($this->device->id)?->toArray() ?? [];
-    }
 
     public function play(): void
     {

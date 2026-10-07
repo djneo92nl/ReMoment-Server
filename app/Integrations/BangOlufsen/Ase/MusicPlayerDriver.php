@@ -2,8 +2,6 @@
 
 namespace App\Integrations\BangOlufsen\Ase;
 
-use App\Domain\Device\DeviceCache;
-use App\Domain\Device\State;
 use App\Integrations\BangOlufsen\Ase\Connectors\BluetoothControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\ContentControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\DeviceControls;
@@ -82,14 +80,5 @@ class MusicPlayerDriver implements BluetoothInterface, DeviceInfoInterface, Libr
     public function playRadioStation(RadioStation $station): void
     {
         $this->playBeoRadioStation($station->getMeta('beoradio'));
-    }
-
-    public function getCurrentPlayingAttribute(): array
-    {
-        if (DeviceCache::getState($this->device->id) === State::Unreachable) {
-            return [];
-        }
-
-        return DeviceCache::getNowPlaying($this->device->id)?->toArray() ?? [];
     }
 }

@@ -30,11 +30,6 @@ class FakeWiredSpeakersDriver implements MusicPlayerDriverInterface, WiredSpeake
         self::$outputs = ['pl_1' => ['type' => 'Other', 'sound' => 'none'], 'pl_2' => ['type' => 'Other', 'sound' => 'none']];
     }
 
-    public function getCurrentPlayingAttribute(): array
-    {
-        return [];
-    }
-
     public function getWiredSpeakers(): WiredSpeakersState
     {
         $this->failIfAsked();

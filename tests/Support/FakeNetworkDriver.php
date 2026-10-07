@@ -38,11 +38,6 @@ class FakeNetworkDriver implements MusicPlayerDriverInterface, NetworkSettingsIn
         self::$networks = [new WifiNetwork('HomeNet', '5ghz', 'wpa2PskTkip', true, false)];
     }
 
-    public function getCurrentPlayingAttribute(): array
-    {
-        return [];
-    }
-
     public function getNetwork(): NetworkState
     {
         $this->failIfAsked();

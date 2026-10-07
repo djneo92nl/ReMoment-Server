@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Domain\Device\DeviceCache;
-use App\Domain\Device\State;
 use App\Domain\Library\LibraryPlayback;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
 use Illuminate\Database\Eloquent\Model;
@@ -84,18 +83,6 @@ class Device extends Model
     public function getStateAttribute(): ?\App\Domain\Device\State
     {
         return DeviceCache::getState($this->id);
-    }
-
-    public function getCurrentPlayingAttribute()
-    {
-        if ($this->getStateAttribute() !== State::Unreachable) {
-            $driver = $this->getDriverAttribute();
-
-            return $driver->getCurrentPlayingAttribute();
-        }
-
-        return false;
-
     }
 
     public function meta(): HasMany

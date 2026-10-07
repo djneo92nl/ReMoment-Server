@@ -11,7 +11,6 @@ namespace Remoment\MozartDriver;
 use App\Domain\Device\AvailableSource;
 use App\Domain\Device\BatteryStatus;
 use App\Domain\Device\Cache\Volume;
-use App\Domain\Device\DeviceCache;
 use App\Domain\Device\RepeatMode;
 use App\Domain\Device\State;
 use App\Integrations\Common\UnsupportedOperationException;
@@ -77,15 +76,6 @@ class MusicPlayerDriver implements BatteryInterface, BluetoothInterface, DeviceI
             max(0, min(100, (int) $state['batteryLevel'])),
             (bool) ($state['isCharging'] ?? false) || ($state['state'] ?? null) === 'Charging',
         );
-    }
-
-    public function getCurrentPlayingAttribute(): array
-    {
-        if (DeviceCache::getState($this->device->id) === State::Unreachable) {
-            return [];
-        }
-
-        return DeviceCache::getNowPlaying($this->device->id)?->toArray() ?? [];
     }
 
     // --- MediaControlsInterface ---
