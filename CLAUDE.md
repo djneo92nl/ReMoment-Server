@@ -722,6 +722,10 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 
 ---
 
+## Tests
+
+`composer test` runs everything on SQLite. Fixtures to reuse instead of writing the attribute list again: `Device::factory()` (a device driven by `Tests\Support\FakePlayerDriver`; `->driver($class)`, `->inState(State::Playing)`, or override any attribute), and the traits in `tests/Support`: `CachesArtwork` (a processed cover's cache entry), `FakesSpotify` (`connectSpotify($api = null)` / `disconnectSpotify()`) and `MakesLibraryTracks` (a track playable from DLNA and/or Spotify). The `Fake*Driver` classes there each implement just the contracts one test area needs.
+
 ## Code Style
 
 Laravel Pint with the `laravel` preset (`pint.json`). Run `./vendor/bin/pint` before committing.

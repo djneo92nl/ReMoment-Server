@@ -20,6 +20,7 @@ use Tests\Support\CachesArtwork;
 use Tests\Support\FakeBareDriver;
 use Tests\Support\FakeLibraryPlaybackDriver;
 use Tests\Support\FakesSpotify;
+use Tests\Support\MakesLibraryTracks;
 use Tests\TestCase;
 
 /** Contract tests for /api/library/playlists* and play-playlist (docs/api/library.md). */
@@ -27,6 +28,7 @@ class LibraryPlaylistsApiTest extends TestCase
 {
     use CachesArtwork;
     use FakesSpotify;
+    use MakesLibraryTracks;
     use RefreshDatabase;
 
     private Artist $artist;
@@ -50,23 +52,7 @@ class LibraryPlaylistsApiTest extends TestCase
 
     private function track(?Album $album, string $name, bool $dlna = true, ?string $spotifyId = null): Track
     {
-        $track = Track::create([
-            'album_id' => $album?->id,
-            'artist_id' => $this->artist->id,
-            'external_id' => $spotifyId ? "spotify:track:{$spotifyId}" : uniqid('dlna:', true),
-            'name' => $name,
-            'duration' => 200,
-            'source' => $spotifyId ? 'spotify' : 'dlna',
-        ]);
-
-        if ($dlna) {
-            Metadata::create([
-                'metadatable_type' => Track::class, 'metadatable_id' => $track->id,
-                'key' => 'dlna_url', 'value' => "http://nas.test/{$track->id}.flac", 'type' => 'url', 'source' => 'dlna:1',
-            ]);
-        }
-
-        return $track;
+        return $this->makeLibraryTrack($album, $name, $dlna, $spotifyId, $this->artist->id);
     }
 
     /** @param array<int, Track> $tracks in playlist order */

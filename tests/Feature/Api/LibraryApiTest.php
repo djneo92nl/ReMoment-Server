@@ -11,7 +11,6 @@ use App\Models\Device;
 use App\Models\DeviceMeta;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
-use App\Models\Media\Metadata;
 use App\Models\Media\Track;
 use App\Models\Play;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -20,12 +19,14 @@ use Mockery;
 use Tests\Support\FakeBareDriver;
 use Tests\Support\FakeLibraryPlaybackDriver;
 use Tests\Support\FakesSpotify;
+use Tests\Support\MakesLibraryTracks;
 use Tests\TestCase;
 
 /** Contract tests for /api/library/* and playing albums/artists on a device (docs/api/library.md). */
 class LibraryApiTest extends TestCase
 {
     use FakesSpotify;
+    use MakesLibraryTracks;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -54,27 +55,7 @@ class LibraryApiTest extends TestCase
 
     private function track(Album $album, string $name, bool $dlna = true, ?string $spotifyId = null): Track
     {
-        $track = Track::create([
-            'album_id' => $album->id,
-            'artist_id' => $album->artist_id,
-            'external_id' => $spotifyId ? "spotify:track:{$spotifyId}" : uniqid('dlna:', true),
-            'name' => $name,
-            'duration' => 200,
-            'source' => $spotifyId ? 'spotify' : 'dlna',
-        ]);
-
-        if ($dlna) {
-            Metadata::create([
-                'metadatable_type' => Track::class,
-                'metadatable_id' => $track->id,
-                'key' => 'dlna_url',
-                'value' => "http://nas.test/{$track->id}.flac",
-                'type' => 'url',
-                'source' => 'dlna:1',
-            ]);
-        }
-
-        return $track;
+        return $this->makeLibraryTrack($album, $name, $dlna, $spotifyId);
     }
 
     private function device(string $driver = FakeLibraryPlaybackDriver::class, State $state = State::Standby): Device
