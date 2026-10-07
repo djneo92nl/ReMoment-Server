@@ -2,10 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Domain\Device\HardwareFeatures;
 use App\Http\Controllers\Api\Concerns\GuardsDeviceAccess;
 use App\Http\Controllers\Controller;
-use App\Integrations\Common\UnsupportedOperationException;
 use App\Integrations\Contracts\BluetoothInterface;
 use App\Integrations\Contracts\DeviceInfoInterface;
 use App\Integrations\Contracts\DigitsInterface;
@@ -224,37 +222,5 @@ class DeviceSettingsController extends Controller
     private function networkChanged(): array
     {
         return ['status' => 'ok', 'message' => 'Applied. The device may take a moment, and may answer on a new address.'];
-    }
-
-    /**
-     * Shared order of checks for a capability endpoint (after validation):
-     * 503 unreachable, 422 unsupported, then the driver call, where an
-     * operation the driver can't do is 422, a bad value 422 and any other
-     * failure 502.
-     */
-    private function withDriver(Device $device, string $contract, string $capability, \Closure $callback): JsonResponse
-    {
-        if ($error = $this->assertReachable($device)) {
-            return $error;
-        }
-
-        $driver = $device->driver;
-
-        if (!($driver instanceof $contract) || !HardwareFeatures::allows($device, $capability)) {
-            return $this->unsupported($capability);
-        }
-
-        try {
-            return response()->json($callback($driver));
-        } catch (UnsupportedOperationException $e) {
-            return response()->json(['error' => 'unsupported', 'message' => $e->getMessage()], 422);
-        } catch (\InvalidArgumentException $e) {
-            return response()->json(['error' => 'invalid', 'message' => $e->getMessage()], 422);
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'driver_error',
-                'message' => 'The device did not respond: '.$e->getMessage(),
-            ], 502);
-        }
     }
 }

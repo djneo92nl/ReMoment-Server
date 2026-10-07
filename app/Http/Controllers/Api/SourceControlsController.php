@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Domain\Control\SourceControls;
 use App\Http\Controllers\Api\Concerns\GuardsDeviceAccess;
 use App\Http\Controllers\Controller;
-use App\Integrations\Common\UnsupportedOperationException;
 use App\Models\Device;
 use Illuminate\Http\JsonResponse;
 
@@ -34,17 +33,10 @@ class SourceControlsController extends Controller
             return $error;
         }
 
-        try {
+        return $this->answerDriverCall(function () use ($device, $control) {
             SourceControls::run($device, $control);
-        } catch (UnsupportedOperationException $e) {
-            return response()->json(['error' => 'unsupported', 'message' => $e->getMessage()], 422);
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'driver_error',
-                'message' => 'The device did not respond: '.$e->getMessage(),
-            ], 502);
-        }
 
-        return response()->json(['status' => 'ok', 'control' => $control]);
+            return ['status' => 'ok', 'control' => $control];
+        });
     }
 }
