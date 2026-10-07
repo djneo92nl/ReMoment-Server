@@ -2,6 +2,7 @@
 
 namespace App\Listeners\Device;
 
+use App\Domain\Artwork\ArtworkCache;
 use App\Domain\Library\Enrichment;
 use App\Domain\Library\LibraryIdentity;
 use App\Domain\Library\LibrarySettings;
@@ -81,6 +82,7 @@ class StorePlaybackHistory implements ShouldQueue
                 'source_type' => 'radio',
                 'radio_name' => $radio->name,
                 'radio_station_id' => $radioStation?->id,
+                'image_url' => ArtworkCache::extractImageUrl($nowPlaying),
                 'played_at' => now(),
             ]);
 

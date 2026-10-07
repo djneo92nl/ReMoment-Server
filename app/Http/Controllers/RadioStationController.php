@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Domain\Artwork\RadioLogoFinder;
 use App\Domain\Artwork\RadioStationArtwork;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Models\Device;
@@ -50,8 +49,6 @@ class RadioStationController extends Controller
             'image_url' => ['nullable', 'url', 'max:2048'],
         ]);
 
-        $validated['image_url'] ??= RadioLogoFinder::find($validated['name']);
-
         $station = RadioStation::create($validated);
 
         foreach ($request->input('identifiers', []) as $platform => $identifier) {
@@ -77,8 +74,6 @@ class RadioStationController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'image_url' => ['nullable', 'url', 'max:2048'],
         ]);
-
-        $validated['image_url'] ??= RadioLogoFinder::find($validated['name']);
 
         $radio->update($validated);
 
