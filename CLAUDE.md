@@ -36,6 +36,7 @@ docs/
     library-identity.md      One record per artist/album/track across sources: name keys, find-or-create, library:merge-duplicates
     live-updates.md          MQTT-over-WebSocket push to Livewire + /receiver, topics, fallback polling
     sd-card-export.md        Admin zip of recent covers/backgrounds + logos in the touch client's SD layout
+    refactor-hardware-check.md  Checklist for real devices after the duplicate-code cleanup: listeners, discovery, DLNA playback, volume, multiroom, API errors, artwork, MQTT
     plugin-architecture.md  Design doc: extracting drivers into composable packages
     setup-wizard.md          First-time setup wizard: steps, Setting flags, auto-redirect middleware
   frontend/
