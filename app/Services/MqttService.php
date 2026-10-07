@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Cache;
 use PhpMqtt\Client\ConnectionSettings;
 use PhpMqtt\Client\MqttClient;
 
@@ -46,6 +47,22 @@ class MqttService
                 report($e);
             }
         }
+    }
+
+    /**
+     * Retained publish that skips a payload equal to the last one published under `$dedupeKey`:
+     * device listeners re-report the same state on every poll, only real changes are worth a message.
+     */
+    public function publishIfChanged(string $topic, string $payload, string $dedupeKey): bool
+    {
+        if (Cache::get($dedupeKey) === $payload) {
+            return false;
+        }
+        Cache::put($dedupeKey, $payload, 3600);
+
+        $this->publish($topic, $payload, retain: true);
+
+        return true;
     }
 
     public function disconnect(): void

@@ -5,7 +5,6 @@ namespace App\Listeners\Device;
 use App\Events\Device\MultiRoomUpdated;
 use App\Models\Device;
 use App\Services\MqttService;
-use Illuminate\Support\Facades\Cache;
 
 class PublishMultiRoomToMqtt
 {
@@ -23,13 +22,6 @@ class PublishMultiRoomToMqtt
 
         $payload = json_encode($event->status->resolve($device));
 
-        // Only publish real changes.
-        $key = "mqtt_published_multiroom_{$deviceId}";
-        if (Cache::get($key) === $payload) {
-            return;
-        }
-        Cache::put($key, $payload, 3600);
-
-        $this->mqttService->publish("remoment/player/{$deviceId}/multiroom", $payload, retain: true);
+        $this->mqttService->publishIfChanged("remoment/player/{$deviceId}/multiroom", $payload, "mqtt_published_multiroom_{$deviceId}");
     }
 }
