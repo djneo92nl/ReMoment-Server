@@ -8,7 +8,8 @@ use App\Models\Device;
 /**
  * Brings a device's stored sources (`device_sources`) in line with what its
  * driver reports. Hidden/sort preferences survive, keyed by source id; a
- * newly seen borrowed (shared) source starts hidden.
+ * newly seen source is placed at the device's position and a newly seen
+ * borrowed (shared) source starts hidden.
  */
 final class SourceSync
 {
@@ -16,6 +17,14 @@ final class SourceSync
     public static function sync(Device $device, SourcesInterface $driver): int
     {
         $sources = $driver->getSources();
+        self::store($device, $sources);
+
+        return count($sources);
+    }
+
+    /** Stores sources a driver already returned. @param  AvailableSource[]  $sources */
+    public static function store(Device $device, array $sources): void
+    {
         $syncedIds = [];
 
         foreach ($sources as $position => $s) {
@@ -28,7 +37,6 @@ final class SourceSync
                 'borrowed' => $s->borrowed,
                 'provider_jid' => $s->providerJid,
                 'provider_name' => $s->providerName,
-                'sort_order' => $position,
             ];
 
             $existing = $device->deviceSources()->where('source_id', $s->sourceId)->first();
@@ -38,13 +46,12 @@ final class SourceSync
                 $device->deviceSources()->create([
                     ...$fields,
                     'source_id' => $s->sourceId,
+                    'sort_order' => $position,
                     'hidden' => $s->borrowed,
                 ]);
             }
         }
 
         $device->deviceSources()->whereNotIn('source_id', $syncedIds)->delete();
-
-        return count($sources);
     }
 }

@@ -313,6 +313,25 @@ class DeviceApiTest extends TestCase
         $this->assertDatabaseHas('device_sources', ['device_id' => $device->id, 'source_id' => 'MUSIC']);
     }
 
+    public function test_listing_sources_keeps_hidden_and_sort_preferences(): void
+    {
+        $device = $this->makeDevice();
+        $device->deviceSources()->create([
+            'source_id' => 'MUSIC', 'friendly_name' => 'Old name', 'source_type' => 'MUSIC', 'category' => 'music',
+            'hidden' => true, 'sort_order' => 7,
+        ]);
+        $device->deviceSources()->create([
+            'source_id' => 'GONE', 'friendly_name' => 'Gone', 'source_type' => 'LINE', 'category' => 'music',
+        ]);
+
+        $this->getJson("/api/devices/{$device->id}/sources")->assertOk();
+
+        $this->assertDatabaseHas('device_sources', [
+            'device_id' => $device->id, 'source_id' => 'MUSIC', 'friendly_name' => 'Music', 'hidden' => true, 'sort_order' => 7,
+        ]);
+        $this->assertDatabaseMissing('device_sources', ['device_id' => $device->id, 'source_id' => 'GONE']);
+    }
+
     public function test_activate_source(): void
     {
         $device = $this->makeDevice();

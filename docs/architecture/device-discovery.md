@@ -12,13 +12,12 @@ One command for every brand. It runs the discoverers registered under `discovere
 
 A new brand needs a `DiscoveryInterface` implementation in `config('devices.discoverers')`, nothing else.
 
-- **ASE** (`AseDiscovery`): SSDP M-SEARCH to `239.255.255.250:1900` for `urn:schemas-upnp-org:device:MediaRenderer:1`, fetches each responder's UPnP XML descriptor, resolves the driver from `config/devices.php` by manufacturer + model.
-- **Mozart** (`Remoment\MozartDriver\MozartDiscovery`): UPnP MediaRenderer discovery like ASE.
+- **ASE** (`AseDiscovery`) and **Mozart** (`Remoment\MozartDriver\MozartDiscovery`) share `App\Integrations\Common\UpnpMediaRendererDiscovery`: an SSDP M-SEARCH (`SsdpClient`) for `urn:schemas-upnp-org:device:MediaRenderer:1`, then each responder's UPnP XML descriptor is fetched and the driver resolved from `config/devices.php` by manufacturer + model. Each subclass only names its `driver_name` (`ASE` / `Mozart`), so it reports just its own platform's models.
 - **Sonos** (`SonosDiscovery`): does not depend on multicast alone. Seeds are the `--host` / "Known device IPs" input, the IPs of Sonos devices already stored, and an SSDP search (`ZonePlayer:1`). The first seed that answers on port 1400 lists the whole household through `ZoneGroupTopology` (`SonosTopology`), so one reachable speaker finds the rest. Stereo-pair secondaries, satellites and Boost bridges are skipped.
 
 ## Docker and multicast
 
-SSDP and mDNS multicast do not cross a Docker bridge. `docker-compose.prod.yml` therefore runs `app` with `network_mode: host` (Linux: LXC, Raspberry Pi); Redis, Meilisearch and Mosquitto publish on loopback and the app reaches them on `127.0.0.1` (`REDIS_HOST`, `MQTT_HOST` in `ansible/templates/env.j2`). `APP_PORT` sets the `artisan serve` port. Local Sail on macOS cannot do this; use the "Known device IPs" field there. `App\Services\Discovery\SsdpClient` sends the M-SEARCH three times from every local IPv4 interface and is shared by the ASE and DLNA discoverers. Mozart mDNS still uses its own socket code.
+SSDP and mDNS multicast do not cross a Docker bridge. `docker-compose.prod.yml` therefore runs `app` with `network_mode: host` (Linux: LXC, Raspberry Pi); Redis, Meilisearch and Mosquitto publish on loopback and the app reaches them on `127.0.0.1` (`REDIS_HOST`, `MQTT_HOST` in `ansible/templates/env.j2`). `APP_PORT` sets the `artisan serve` port. Local Sail on macOS cannot do this; use the "Known device IPs" field there. `App\Services\Discovery\SsdpClient` sends the M-SEARCH three times from every local IPv4 interface and is shared by the ASE, Mozart and DLNA discoverers.
 
 ## Starting Device Listeners
 

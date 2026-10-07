@@ -8,6 +8,7 @@ use App\Domain\Device\Cache\Modes;
 use App\Domain\Device\MultiRoomPeers;
 use App\Domain\Device\PlaybackModes;
 use App\Domain\Device\RepeatMode;
+use App\Domain\Device\SourceSync;
 use App\Domain\Device\SpotifyRouting;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\LibrarySources;
@@ -354,19 +355,7 @@ class DeviceController extends Controller
             ], 502);
         }
 
-        $device->deviceSources()->delete();
-        $device->deviceSources()->createMany(
-            array_map(fn ($s) => [
-                'source_id' => $s->sourceId,
-                'friendly_name' => $s->friendlyName,
-                'source_type' => $s->sourceType,
-                'category' => $s->category,
-                'in_use' => $s->inUse,
-                'borrowed' => $s->borrowed,
-                'provider_jid' => $s->providerJid,
-                'provider_name' => $s->providerName,
-            ], $sources)
-        );
+        SourceSync::store($device, $sources);
 
         return response()->json(['sources' => array_map(fn ($s) => $s->toArray(), $sources)]);
     }
