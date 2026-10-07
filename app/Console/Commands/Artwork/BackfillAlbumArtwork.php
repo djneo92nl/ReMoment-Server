@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Console\Commands\Artwork;
 
 use App\Domain\Artwork\ArtworkCache;
 use App\Domain\Artwork\PlaylistArtwork;
@@ -10,7 +10,7 @@ use Illuminate\Console\Command;
 
 class BackfillAlbumArtwork extends Command
 {
-    protected $signature = 'library:backfill-artwork';
+    protected $signature = 'artwork:backfill';
 
     protected $description = 'Queue color/artwork extraction for album covers with no colors yet, or whose cached proxies are outdated, and for playlist covers that are missing or outdated';
 

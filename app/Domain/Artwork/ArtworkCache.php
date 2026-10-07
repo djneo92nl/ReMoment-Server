@@ -12,7 +12,7 @@ final class ArtworkCache
     /**
      * Keys every entry written by ProcessArtwork has. Entries cached before a
      * key was added count as missing, so they get regenerated on next play
-     * (DispatchArtworkProcessing) or by `library:backfill-artwork`.
+     * (DispatchArtworkProcessing) or by `artwork:backfill`.
      * The background keys are ArtworkBackgrounds::key() of each size.
      */
     public const REQUIRED_KEYS = ['proxy_512', 'proxy_320', 'proxy_120', 'proxy_bg', 'proxy_bg_320x480', 'proxy_bg_480x480', 'colors', 'safe_colors'];

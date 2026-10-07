@@ -74,7 +74,7 @@ class ArtistImagesTest extends TestCase
         Metadata::create(['metadatable_type' => Artist::class, 'metadatable_id' => $done->id, 'key' => 'spotify_image', 'value' => 'u', 'type' => 'url', 'source' => 'spotify']);
         $this->connect(Mockery::mock(SpotifyWebAPI::class));
 
-        $this->artisan('library:artist-images')->assertSuccessful();
+        $this->artisan('library:enrich --only=artist-images')->assertSuccessful();
 
         Queue::assertPushed(FetchSpotifyArtistImages::class, 2);
         Queue::assertPushed(FetchSpotifyArtistImages::class, fn ($job) => $job->artistIds === [$with->id]);

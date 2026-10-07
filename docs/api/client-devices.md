@@ -216,7 +216,7 @@ Lists processed artwork so a client can pre-cache it (e.g. on SD) before it is p
 3. Library albums (`kind: "album"`) that have been played, by their last play in the playback history, newest first.
 4. The rest of the library (`albums` table: Spotify library import and DLNA scans), by album id.
 
-The library is shared, so this is the same for every client, whatever devices it is assigned. Only covers whose 320, 120 and every background file (1024×600 and 320×480) have all been processed are listed; others are skipped (not queued by this call). `artwork:prerender` (daily) processes playlist covers and the last 500 played albums and `library:backfill-artwork` (daily) the rest of the library, so skipped covers appear on a later sweep.
+The library is shared, so this is the same for every client, whatever devices it is assigned. Only covers whose 320, 120 and every background file (1024×600 and 320×480) have all been processed are listed; others are skipped (not queued by this call). `artwork:prerender` (daily) processes playlist covers and the last 500 played albums and `artwork:backfill` (daily) the rest of the library, so skipped covers appear on a later sweep.
 
 **Query:** `cursor` (optional) — the `next_cursor` of the previous page; omit for the first page. Treat it as opaque.
 

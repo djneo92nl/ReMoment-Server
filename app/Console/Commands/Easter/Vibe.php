@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Console\Commands\Easter;
 
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;

@@ -32,7 +32,7 @@ Tracks, albums and artists get extra data from outside services, stored in the p
 
 - Spotify import and play history queue a newly created track.
 - A DLNA scan queues a batch of `Enrichment::SCAN_BATCH` (100) tracks at its end, so a first scan of a big library doesn't flood the (shared) queue.
-- `php artisan library:enrich [--limit=200] [--dry-run]` (scheduled daily) queues the newest tracks still missing a source, any library source, and the artists and albums that have an `mbid` but no MusicBrainz details yet (this is how libraries enriched before the detail jobs existed get them). The backlog is worked off over several days.
+- `php artisan library:enrich [--only=metadata|artist-images] [--limit=200] [--dry-run]` (scheduled daily; `artist-images` queues Spotify photos for artists without one, a connected Spotify account needed)  queues the newest tracks still missing a source, any library source, and the artists and albums that have an `mbid` but no MusicBrainz details yet (this is how libraries enriched before the detail jobs existed get them). The backlog is worked off over several days.
 
 Add a source: write a job with `EnrichesFromSource`, add its source constant and job to `Enrichment::trackJobs()`, and its marker check to `Enrichment::backlog()`.
 

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Console\Commands\Library;
 
 use App\Domain\Library\GenreSync;
 use App\Models\Media\Metadata;

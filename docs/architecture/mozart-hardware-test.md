@@ -6,7 +6,7 @@ Connecting proves the REST client works; it says nothing about the notification 
 
 ## 1. Discovery and connecting (highest risk)
 
-- [ ] `php artisan device:mozart-discovery` finds the device. **Unverified:** assumes Mozart is a UPnP MediaRenderer like ASE. If not, add it manually at `/devices/create` and note what SSDP actually returns.
+- [ ] `php artisan device:discover --brand=mozart` finds the device. **Unverified:** assumes Mozart is a UPnP MediaRenderer like ASE. If not, add it manually at `/devices/create` and note what SSDP actually returns.
 - [ ] REST works: device info, volume read and sources list return data.
 - [ ] WebSocket connects on port 9000 (`config('mozart.*')`). **Unverified:** the spec documents no real-time connection info; 9000 is a community convention. Run `php artisan device:listen-single {id}` and confirm `/settings/health` shows the listener alive.
 - [ ] Listener reconnects after the device reboots or the network drops.

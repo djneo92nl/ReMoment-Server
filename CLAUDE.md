@@ -63,11 +63,11 @@ php artisan test tests/Path/To/TestFile.php
 # Code style
 ./vendor/bin/pint
 
-# Device discovery (SSDP)
-php artisan device:discovery
+# Discover devices of every registered brand (SSDP/mDNS/Sonos topology) and store them
+php artisan device:discover [--brand=sonos|ase|mozart] [--host=192.168.1.9]
 
 # Sync B&O source/JID data for all ASE devices
-php artisan devices:sync-sources
+php artisan device:sync-sources
 
 # Map a B&O ASE device's (or NetworkLink/MasterLink converter's) REST API — GET-only crawl; --compare diffs two devices
 php artisan ase:map {device id|ip} [--seed=BeoZone/Zone/Video] [--compare=storage/app/ase-maps/other.json]
@@ -75,11 +75,8 @@ php artisan ase:map {device id|ip} [--seed=BeoZone/Zone/Video] [--compare=storag
 # Scan DLNA servers' libraries (triggered via UI or manually)
 php artisan library:scan [--server=192.168.1.20] [--root=Muziek]   # --root: start in a folder (title, object id or Muziek/Albums) so a server with films and series isn't crawled first
 
-# Queue MusicBrainz/lyrics/Spotify/Last.fm enrichment for tracks still missing a source (scheduled daily)
-php artisan library:enrich [--limit=200] [--dry-run]
-
-# Queue Spotify photos for artists without one (scheduled daily; artists with a Spotify id are fetched 50 per request, others looked up by exact name)
-php artisan library:artist-images [--limit=1000] [--dry-run]
+# Queue MusicBrainz/lyrics/Spotify/Last.fm/TheAudioDB/Discogs enrichment for tracks, artists and albums still missing a source, plus Spotify photos for artists without one (scheduled daily; artists with a Spotify id are fetched 50 per request, others looked up by exact name). --only=metadata|artist-images runs one part
+php artisan library:enrich [--only=metadata --only=artist-images] [--limit=200] [--dry-run]
 
 # Rebuild canonical genres from stored genre metadata (after changing GenreNormalizer)
 php artisan library:sync-genres
@@ -542,7 +539,7 @@ When a new track starts playing, `DispatchArtworkProcessing` dispatches the `Pro
 
 All JPEGs are encoded baseline (`JpegEncoder(progressive: false)`; Intervention's GD encoder calls `imageinterlace(false)`), regardless of the source image, because the ESP32's TJpgDec decoder can't read progressive JPEGs.
 
-`app/Domain/Artwork/ArtworkCache.php` provides static helpers for reading/writing the cache. `ArtworkCache::has()` is true only for **complete** entries (all `REQUIRED_KEYS`): an entry cached before a size was added is still served by `get()`, but is regenerated on next play, and `php artisan library:backfill-artwork` (scheduled daily) re-queues outdated entries for album covers as well as covers without colors. Artwork is absent on first play of a new URL (async), present on all subsequent plays.
+`app/Domain/Artwork/ArtworkCache.php` provides static helpers for reading/writing the cache. `ArtworkCache::has()` is true only for **complete** entries (all `REQUIRED_KEYS`): an entry cached before a size was added is still served by `get()`, but is regenerated on next play, and `php artisan artwork:backfill` (scheduled daily) re-queues outdated entries for album covers as well as covers without colors. Artwork is absent on first play of a new URL (async), present on all subsequent plays.
 
 **Recently played albums** (`app/Domain/Artwork/LibraryArtwork.php`): `albumsByRecency()` orders library albums by their last play in `plays` (newest first), then never-played albums by id; `recentCoverUrls()` gives the covers of the last `config('artwork.recent_albums')` (`ARTWORK_RECENT_ALBUMS`, default 500) distinct albums played. `php artisan artwork:prerender` (scheduled daily) queues `ProcessArtwork` for those whose entry isn't complete (`ArtworkCache::has()`), at most `artwork.prerender_max_jobs` (`ARTWORK_PRERENDER_MAX_JOBS`, default 100) per run, newest first, and doesn't re-queue a cover it queued in the last 12 hours — so a big backlog is worked off over several days without flooding the queue.
 
@@ -550,7 +547,7 @@ All JPEGs are encoded baseline (`JpegEncoder(progressive: false)`; Intervention'
 
 **Logos for playback without an image** (`app/Domain/Artwork/`): `NowPlayingArtwork` picks the image for a `NowPlaying` (cover → radio station `image_url` from `/radio` → generated logo) and adds `kind`; it is used by both `PublishNowPlayingToMqtt` and `DeviceDetailResource`. `SourceLogo` maps the source's `sourceType`/`name`/`connector`/`category` to a logo key (`spotify`, `radio`, `line_in`, `bluetooth`, `tv`, `cast`, `cd`, default `music`) and addresses it by a pseudo URL `remoment:logo/v{VERSION}/{key}`, so its hash is the same on every server. `LogoRenderer` draws the glyph (off-white line icon on a #181818 square, GD, 4× supersampled, deterministic); `ProcessArtwork` renders it instead of downloading. Missing logo entries are rendered synchronously (~0.2s, a handful of logos). Bump `SourceLogo::VERSION` when a glyph changes so clients' hash-keyed caches pick it up.
 
-**Playlist covers** (`app/Domain/Artwork/PlaylistArtwork.php`): a 2×2 mosaic of the covers of the 4 albums with the most tracks in the playlist (ties by playlist order; distinct cover URLs), drawn by `PlaylistCompositeRenderer` (1024² PNG from each cover's processed 512 proxy, else downloaded directly) and processed by `ProcessArtwork` like any cover under the pseudo URL `remoment:playlist/v{VERSION}/{md5 of the 4 cover URLs}`. The URL is a hash, so the job is dispatched with its 4 source URLs (`new ProcessArtwork($url, $sources)`; a composite without matching sources is skipped). 1–3 distinct covers → the first album's cover; none → the playlist's own image. The mosaic is used even when the playlist has its own image, for a consistent look. `artwork:prerender` queues missing playlist covers first (they share `--max-jobs`), `library:backfill-artwork` queues missing/outdated ones; a changed playlist gets a new URL, so a new composite. Bump `PlaylistArtwork::VERSION` when the layout changes.
+**Playlist covers** (`app/Domain/Artwork/PlaylistArtwork.php`): a 2×2 mosaic of the covers of the 4 albums with the most tracks in the playlist (ties by playlist order; distinct cover URLs), drawn by `PlaylistCompositeRenderer` (1024² PNG from each cover's processed 512 proxy, else downloaded directly) and processed by `ProcessArtwork` like any cover under the pseudo URL `remoment:playlist/v{VERSION}/{md5 of the 4 cover URLs}`. The URL is a hash, so the job is dispatched with its 4 source URLs (`new ProcessArtwork($url, $sources)`; a composite without matching sources is skipped). 1–3 distinct covers → the first album's cover; none → the playlist's own image. The mosaic is used even when the playlist has its own image, for a consistent look. `artwork:prerender` queues missing playlist covers first (they share `--max-jobs`), `artwork:backfill` queues missing/outdated ones; a changed playlist gets a new URL, so a new composite. Bump `PlaylistArtwork::VERSION` when the layout changes.
 
 Run `php artisan storage:link` once on new environments to create the `public/storage` symlink.
 
@@ -617,7 +614,7 @@ device_meta: key = 'spotify_connect_name', value = '<Spotify device name>'
 
 **JID-to-Device lookup:** `App\Domain\Device\MultiRoomPeers::devices()` queries `device_meta` where `key` is one of `config('devices.multiroom_meta_keys')` (`ase_jid`, `mozart_jid`, `sonos_uuid`) and `value IN ($peerIds)`, so ASE and Mozart (whose JIDs are mostly interchangeable) list each other. Add a new platform's key to that config.
 
-Populate JIDs for all B&O devices with: `php artisan devices:sync-sources`
+Populate JIDs for all B&O devices with: `php artisan device:sync-sources`
 
 ### Multiroom Presets
 

@@ -69,7 +69,7 @@ class DeviceSourceManager extends Component
     }
 
     /**
-     * Sources are stored by the weekly `devices:sync-sources`, so a device added since
+     * Sources are stored by the weekly `device:sync-sources`, so a device added since
      * (or one whose driver gained sources) has none yet: fetch them on first view.
      */
     private function syncWhenEmpty(): void

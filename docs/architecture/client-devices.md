@@ -120,7 +120,7 @@ Response: `{ registration_token, pairing_code, status }`
 4. On the first page (`cursor` 0) prepends the eight `SourceLogo` items (`NowPlayingArtwork::logo()` renders missing ones)
 5. Returns `{ data: [{kind, hash, proxy_320, proxy_120, proxy_bg, proxy_bg_320x480, proxy_bg_480x480}], next_cursor }`; `next_cursor` is `cursor + 200` when the page was full
 
-It never queues processing; `artwork:prerender` and `library:backfill-artwork` (both daily) do.
+It never queues processing; `artwork:prerender` and `artwork:backfill` (both daily) do.
 
 ### `resolveDevices(Client $client)` (private)
 

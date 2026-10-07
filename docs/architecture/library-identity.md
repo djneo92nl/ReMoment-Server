@@ -11,10 +11,10 @@ Before this, every creation path keyed on `source`, and the unique keys include 
 | Path | Created by | Source |
 |---|---|---|
 | DLNA scan (`library:scan`, `/settings/dlna`) | `DlnaLibraryScanner` | `dlna` |
-| Spotify import (`library:sync-spotify`, `/settings`) | `SpotifyLibraryImporter` | `spotify` |
+| Spotify import (`spotify:sync-library`, `/settings`) | `SpotifyLibraryImporter` | `spotify` |
 | Plays (`StorePlaybackHistory`, from `NowPlayingUpdated`) | B&O ASE, Sonos, Mozart: usually `null`; Spotify (and ASE playing Spotify): `spotify` | as reported |
 
-So the same artist existed once per source, and also once per spelling: Spotify says "The Beatles" and "Help! - Remastered 2009" on "Help! (Remastered)", file tags say "Beatles", "Help!" on "Help!", a speaker may send "BEATLES" or "Daft Punk feat. Pharrell Williams". Plays matched tracks by exact name + artist + source, so a play never counted for the scanned or imported track. Last.fm/MusicBrainz enrichment (`EnrichTrackMetadata`, `EnrichArtistLastfm`) and `library:backfill-*` only add metadata to existing rows; they never created records.
+So the same artist existed once per source, and also once per spelling: Spotify says "The Beatles" and "Help! - Remastered 2009" on "Help! (Remastered)", file tags say "Beatles", "Help!" on "Help!", a speaker may send "BEATLES" or "Daft Punk feat. Pharrell Williams". Plays matched tracks by exact name + artist + source, so a play never counted for the scanned or imported track. Last.fm/MusicBrainz enrichment (`EnrichTrackMetadata`, `EnrichArtistLastfm`) and `library:enrich` and `artwork:backfill` only add metadata to existing rows; they never created records.
 
 ## Keys (`Normalizer`)
 

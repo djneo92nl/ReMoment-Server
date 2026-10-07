@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Console\Commands\Artwork;
 
 use App\Domain\Artwork\ArtworkCache;
 use App\Domain\Artwork\LibraryArtwork;

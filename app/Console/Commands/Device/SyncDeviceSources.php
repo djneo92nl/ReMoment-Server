@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Console\Commands\Device;
 
 use App\Domain\Device\SourceSync;
 use App\Integrations\Contracts\MultiRoomInterface;
@@ -10,7 +10,7 @@ use Illuminate\Console\Command;
 
 class SyncDeviceSources extends Command
 {
-    protected $signature = 'devices:sync-sources';
+    protected $signature = 'device:sync-sources';
 
     protected $description = 'Sync available sources for all capable devices';
 

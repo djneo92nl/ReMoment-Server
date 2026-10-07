@@ -21,6 +21,25 @@ class NetworkDiscoveryService
      */
     public function discover(?array $discovererClasses = null, array $hosts = []): array
     {
+        $all = $this->discoverAll($discovererClasses, $hosts);
+
+        // Filter out IPs already stored in the database
+        $existingIps = Device::whereIn('ip_address', array_keys($all))->pluck('ip_address')->all();
+
+        return array_values(
+            array_filter($all, fn (DiscoveredDevice $d) => !in_array($d->ip_address, $existingIps))
+        );
+    }
+
+    /**
+     * Like discover(), but every device found, known or not (for refreshing stored devices).
+     *
+     * @param  string[]|null  $discovererClasses
+     * @param  string[]  $hosts
+     * @return array<string, DiscoveredDevice> by IP address
+     */
+    public function discoverAll(?array $discovererClasses = null, array $hosts = []): array
+    {
         $discovererClasses ??= config('devices.discoverers', []);
 
         $all = [];
@@ -43,11 +62,6 @@ class NetworkDiscoveryService
             }
         }
 
-        // Filter out IPs already stored in the database
-        $existingIps = Device::whereIn('ip_address', array_keys($all))->pluck('ip_address')->all();
-
-        return array_values(
-            array_filter($all, fn (DiscoveredDevice $d) => !in_array($d->ip_address, $existingIps))
-        );
+        return $all;
     }
 }

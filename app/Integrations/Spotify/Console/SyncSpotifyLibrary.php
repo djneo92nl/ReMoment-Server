@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Integrations\Spotify\Console;
 
 use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
 use App\Models\Setting;
@@ -9,7 +9,7 @@ use Illuminate\Console\Command;
 
 class SyncSpotifyLibrary extends Command
 {
-    protected $signature = 'library:sync-spotify {--tracks-only} {--playlists-only}';
+    protected $signature = 'spotify:sync-library {--tracks-only} {--playlists-only}';
 
     protected $description = 'Import saved tracks and playlists from the connected Spotify account';
 

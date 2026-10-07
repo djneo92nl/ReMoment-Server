@@ -118,10 +118,10 @@
         <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8">
             <h2 class="text-base font-medium text-gray-900 dark:text-gray-100 mb-5">Start all listeners</h2>
             <p class="text-sm text-gray-500 dark:text-gray-500 mb-5">
-                Run this command to start listeners for all ASE devices that don't already have one running. Safe to re-run — it skips already-active listeners.
+                Run this command to start listeners for all devices, whatever the brand. It keeps them running and restarts any that stop.
             </p>
             <div class="bg-gray-900 dark:bg-stone-950 rounded-2xl px-5 py-4 font-mono text-sm text-gray-300">
-                php artisan app:get-current-playing-media
+                php artisan device:listen
             </div>
         </div>
     </div>

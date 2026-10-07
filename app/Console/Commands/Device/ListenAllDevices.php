@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Console\Commands\Device;
 
 use App\Domain\Device\DeviceListeners;
 use App\Integrations\Spotify\SpotifyDevice;

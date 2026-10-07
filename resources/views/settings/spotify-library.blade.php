@@ -21,7 +21,7 @@
             <i class="fa-solid fa-circle-info mr-2"></i>
             Sync your saved tracks and playlists into the shared library. This also runs automatically once a day. You can
             trigger it manually from the command line with
-            <code class="font-mono bg-blue-100 dark:bg-blue-900 px-1 rounded">php artisan library:sync-spotify</code>.
+            <code class="font-mono bg-blue-100 dark:bg-blue-900 px-1 rounded">php artisan spotify:sync-library</code>.
         </div>
 
         @if(!$connected)

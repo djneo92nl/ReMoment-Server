@@ -62,7 +62,7 @@ Two assumptions are unverifiable without physical hardware and are `config('moza
 - **WebSocket port 9000** — the Mozart OpenAPI spec documents no connection info for real-time notifications at all; port 9000 is a community convention (B&O's official client libraries).
 - **SSDP/UPnP discovery** — no Mozart-specific discovery mechanism is documented; `MozartDiscovery` assumes Mozart devices are UPnP MediaRenderers like ASE devices.
 
-Console commands: `device:mozart-discovery`. Its listener (`Services/DeviceListener`, a `DeviceListenerInterface`) is registered under `listeners` in `config/devices.php` and run by `device:listen` / `device:listen-single {id}`.
+Discovery runs through `device:discover` (`MozartDiscovery` is registered under `discoverers`). Its listener (`Services/DeviceListener`, a `DeviceListenerInterface`) is registered under `listeners` in `config/devices.php` and run by `device:listen` / `device:listen-single {id}`.
 
 ### Sonos
 
@@ -87,6 +87,10 @@ Virtual device — implements `MediaControlsInterface`, `SeekInterface`, `QueueI
 - Modes: `HoldOwnModesWhileSpotifyRouted` (first `PlaybackModesUpdated` listener) keeps each device's own reports in `Modes::own()` and holds them back while Spotify is routed to it; the Spotify listener's `moveModesTo()` calls `restoreOwnModes()` for the previous speaker when routing ends or moves, and clears the Spotify device's modes when playback moves onto a speaker.
 
 The Spotify listener's per-poll logic is `DeviceListener::poll(int $spotifyDeviceId, SpotifyWebAPI $api)`, so it can be tested with a mocked API client (`tests/Feature/SpotifyRoutingTest.php`).
+
+## Where console commands live
+
+Generic commands sit under `app/Console/Commands/{Device,Library,Artwork,Easter}`, one folder per domain. A command that only makes sense for one brand lives in that driver (`app/Integrations/<Brand>/Console/`, e.g. `ase:map`, `spotify:sync-library`) and is registered by an `<Brand>ServiceProvider` (`$this->commands([...])` under `runningInConsole()`) listed in `bootstrap/providers.php`. Discovery is not a per-brand command: implement `DiscoveryInterface` and register it under `discoverers` in `config/devices.php`, and `device:discover` picks it up.
 
 ## Adding a New Driver
 

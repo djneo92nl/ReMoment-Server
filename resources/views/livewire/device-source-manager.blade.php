@@ -92,7 +92,7 @@
         @if(empty($sources))
             <div class="px-6 py-8 text-center">
                 <p class="text-sm text-gray-400 dark:text-gray-600 mb-1">No sources synced yet.</p>
-                <p class="text-xs text-gray-400 dark:text-gray-600 font-mono">php artisan devices:sync-sources</p>
+                <p class="text-xs text-gray-400 dark:text-gray-600 font-mono">php artisan device:sync-sources</p>
             </div>
         @else
             <ul class="px-3 py-3 space-y-0.5 max-h-[60vh] overflow-y-auto">

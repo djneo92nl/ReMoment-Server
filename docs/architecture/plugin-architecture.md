@@ -14,7 +14,7 @@ Extract device integrations into loadable plugins so ReMomentServer only pulls i
 bangolufsen/ase          (pure PHP, no framework)
     HTTP connector to the ASE REST API
     All 7 Connectors/ traits
-    AseDiscovery + MozartDiscoveryService
+    AseDiscovery
 
 remoment/ase-driver      (depends on bangolufsen/ase + remoment contracts)
     MusicPlayerDriver  — implements ReMoment interfaces
@@ -33,7 +33,6 @@ ReMomentServer's `composer.json` requires only the driver packages it needs. Con
 
 **What moves in:**
 - `app/Integrations/Common/HttpConnector.php`
-- `app/Integrations/BangOlufsen/Common/MozartDiscoveryService.php`
 - `app/Integrations/BangOlufsen/Ase/AseDiscovery.php`
 - `app/Integrations/BangOlufsen/Ase/Connectors/` (all 7 traits)
 

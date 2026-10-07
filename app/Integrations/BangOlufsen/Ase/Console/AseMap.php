@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Integrations\BangOlufsen\Ase\Console;
 
 use App\Integrations\BangOlufsen\Ase\Services\ApiMapper;
 use App\Models\Device;

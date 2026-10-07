@@ -193,12 +193,12 @@ class PlaylistArtworkTest extends TestCase
         $this->artisan('artwork:prerender')->assertSuccessful();
         Queue::assertPushed(ProcessArtwork::class, 1);
 
-        $this->artisan('library:backfill-artwork')->assertSuccessful();
+        $this->artisan('artwork:backfill')->assertSuccessful();
         Queue::assertPushed(ProcessArtwork::class, fn (ProcessArtwork $job) => $job->originalUrl === $url && $job->sources === $sources);
 
         $this->processed($url);
         Queue::fake();
-        $this->artisan('library:backfill-artwork')->assertSuccessful();
+        $this->artisan('artwork:backfill')->assertSuccessful();
         Queue::assertNotPushed(ProcessArtwork::class, fn (ProcessArtwork $job) => $job->originalUrl === $url);
     }
 

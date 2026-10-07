@@ -250,7 +250,7 @@ class ArtworkProcessingTest extends TestCase
         Queue::assertPushed(ProcessArtwork::class, fn (ProcessArtwork $job) => $job->originalUrl === self::URL);
 
         Album::create(['artist_id' => Artist::create(['name' => 'A', 'source' => 'dlna'])->id, 'name' => 'Old', 'source' => 'dlna', 'images' => [['url' => self::URL]], 'colors' => ['#111111']]);
-        $this->artisan('library:backfill-artwork')->assertSuccessful();
+        $this->artisan('artwork:backfill')->assertSuccessful();
         Queue::assertPushed(ProcessArtwork::class, 2);
 
         $this->fakeHttp();
@@ -276,7 +276,7 @@ class ArtworkProcessingTest extends TestCase
         ArtworkCache::put('https://x.test/outdated.jpg', ['proxy_512' => 'a', 'colors' => ['#111111']]);
         ArtworkCache::put('https://x.test/complete.jpg', $this->completeEntry());
 
-        $this->artisan('library:backfill-artwork')->assertSuccessful();
+        $this->artisan('artwork:backfill')->assertSuccessful();
 
         $queued = Queue::pushed(ProcessArtwork::class)->map(fn (ProcessArtwork $job) => $job->originalUrl)->sort()->values()->all();
         $this->assertSame(['https://x.test/no-colors.jpg', 'https://x.test/outdated.jpg'], $queued);

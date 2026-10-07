@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Console\Commands\Artwork;
 
 use App\Domain\Artwork\ArtworkBackgrounds;
 use App\Domain\Artwork\SdCardExport;

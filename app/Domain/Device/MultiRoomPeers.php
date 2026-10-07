@@ -37,7 +37,7 @@ class MultiRoomPeers
         $found = $find();
 
         // A peer ID nobody owns yet usually means that device's ID was never stored
-        // (devices:sync-sources not run): ask the multiroom devices without one, then look again.
+        // (device:sync-sources not run): ask the multiroom devices without one, then look again.
         if ($found->count() < count($ids) && self::storeMissingIds($keys, $exclude)) {
             $found = $find();
         }

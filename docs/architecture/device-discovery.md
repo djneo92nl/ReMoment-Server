@@ -2,31 +2,19 @@
 
 ReMomentServer can automatically discover devices on the local network via brand-specific `DiscoveryInterface` implementations. Discovery commands create or update `Device` records in the database; they never delete devices.
 
-## Discovery Commands
-
-### UPnP / SSDP (Bang & Olufsen ASE)
+## Discovery command
 
 ```bash
-php artisan device:discovery
+php artisan device:discover [--brand=sonos|ase|mozart ...] [--host=192.168.1.9 ...]
 ```
 
-Uses `AseDiscovery` to send an SSDP M-SEARCH multicast to `239.255.255.250:1900` for `urn:schemas-upnp-org:device:MediaRenderer:1`, fetches each responding device's UPnP XML descriptor, and resolves the driver from `config/devices.php` by manufacturer + model. Matches existing devices by the `upnp_uuid` key in `device_meta`; otherwise creates a new `Device`.
+One command for every brand. It runs the discoverers registered under `discoverers` in `config/devices.php` (`--brand` keeps those whose class name contains the given text), passes each `--host` to discoverers that implement `HostHintedDiscovery`, and stores everything found through `App\Domain\Device\DiscoveredDevicePersister`: a device is matched on any identifier in `DiscoveredDevice::$meta` (`upnp_uuid` for ASE and Mozart, `sonos_uuid` for Sonos), else on its IP **within the same brand** (DHCP reuses IPs, a new brand never takes over an old device); it is then updated (an IP change is written back) or created, and its meta keys are upserted. Devices are never deleted. Discoverer notes (e.g. "no multicast replies") are printed after the list. The web "Scan" page uses the same discoverers through `NetworkDiscoveryService`, only listing devices not yet stored.
 
-### Bang & Olufsen Mozart Platform
+A new brand needs a `DiscoveryInterface` implementation in `config('devices.discoverers')`, nothing else.
 
-```bash
-php artisan device:additional-bo-device-discovery
-```
-
-Uses `MozartDiscoveryService` (mDNS) to find newer B&O devices on the Mozart platform that don't appear in standard UPnP scans. Matches existing devices by the `jid` key in `device_meta`, falling back to IP address. Only adds/updates devices — it does not remove stale ones.
-
-### Sonos
-
-```bash
-php artisan device:sonos-discovery [--host=192.168.1.9 ...]
-```
-
-`SonosDiscovery` does not depend on multicast alone. Seeds are the `--host` / "Known device IPs" input, the IPs of Sonos devices already stored, and an SSDP search (`ZonePlayer:1`). The first seed that answers on port 1400 lists the whole household through `ZoneGroupTopology` (`SonosTopology`), so one reachable speaker finds the rest. Stereo-pair secondaries, satellites and Boost bridges are skipped. Devices match on `sonos_uuid`, then on IP; an IP change is written back. Notes on what failed (e.g. "no multicast replies") come back from `diagnostics()` and are shown on the CLI and in the Scan page.
+- **ASE** (`AseDiscovery`): SSDP M-SEARCH to `239.255.255.250:1900` for `urn:schemas-upnp-org:device:MediaRenderer:1`, fetches each responder's UPnP XML descriptor, resolves the driver from `config/devices.php` by manufacturer + model.
+- **Mozart** (`Remoment\MozartDriver\MozartDiscovery`): UPnP MediaRenderer discovery like ASE.
+- **Sonos** (`SonosDiscovery`): does not depend on multicast alone. Seeds are the `--host` / "Known device IPs" input, the IPs of Sonos devices already stored, and an SSDP search (`ZonePlayer:1`). The first seed that answers on port 1400 lists the whole household through `ZoneGroupTopology` (`SonosTopology`), so one reachable speaker finds the rest. Stereo-pair secondaries, satellites and Boost bridges are skipped.
 
 ## Docker and multicast
 
@@ -74,7 +62,7 @@ Beyond the core `devices` table columns, per-device identifiers are stored in `d
 | `sonos_uuid` | `MultiRoomInterface::getMultiRoomId()` | Sonos UUID used for multiroom peer lookup |
 | `spotify_connect_name` | Manual (Settings UI) | Maps a Spotify Connect speaker name to a local device |
 
-Run `php artisan devices:sync-sources` after discovery to populate sources and multiroom JIDs for all capable devices (see CLAUDE.md's "Multiroom / Device Joining" section).
+Run `php artisan device:sync-sources` after discovery to populate sources and multiroom JIDs for all capable devices (see CLAUDE.md's "Multiroom / Device Joining" section).
 
 ## Manual Device Registration
 

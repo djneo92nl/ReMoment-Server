@@ -53,8 +53,5 @@ Both are stored as `Metadata` rows (`metadatable_type` = Artist, `source` = `las
 
 ## Backfill
 
-```bash
-php artisan library:backfill-lastfm
-```
+`php artisan library:enrich` (scheduled daily) queues `EnrichArtistLastfm` — and the track and album jobs — for everything that has no `lastfm`-sourced `enriched_at` marker yet, so artists whose live enrichment never fired (e.g. no track of theirs has been played since this feature shipped) or failed are picked up. Idempotent — safe to re-run. Needs `LASTFM_API_KEY`; without it the Last.fm jobs are simply not queued.
 
-Queues `EnrichArtistLastfm` for every artist that doesn't yet have `lastfm`-sourced metadata. Idempotent — safe to re-run. Scheduled daily in `routes/console.php` alongside `library:backfill-artwork`, to pick up artists whose live enrichment never fired (e.g. no track of theirs has been played since this feature shipped) or failed.
