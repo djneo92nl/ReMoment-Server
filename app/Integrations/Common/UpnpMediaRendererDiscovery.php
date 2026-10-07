@@ -2,6 +2,7 @@
 
 namespace App\Integrations\Common;
 
+use App\Domain\Device\DeviceModels;
 use App\Domain\Device\DiscoveredDevice;
 use App\Integrations\Contracts\DiscoveryInterface;
 use App\Services\Discovery\SsdpClient;
@@ -20,7 +21,7 @@ abstract class UpnpMediaRendererDiscovery implements DiscoveryInterface
 
     public function discover(): array
     {
-        $models = config('devices', []);
+        $models = DeviceModels::all();
         $discovered = [];
 
         foreach ($this->ssdp->search('urn:schemas-upnp-org:device:MediaRenderer:1') as $info) {
@@ -37,9 +38,8 @@ abstract class UpnpMediaRendererDiscovery implements DiscoveryInterface
                 continue;
             }
 
-            // Not config("devices.{$manufacturer}.{$model}"): a model name may contain a dot.
             $driverConfig = $models[$manufacturer][$model] ?? null;
-            if (!is_array($driverConfig) || ($driverConfig['driver_name'] ?? null) !== $this->driverName()) {
+            if (($driverConfig['driver_name'] ?? null) !== $this->driverName()) {
                 continue;
             }
 

@@ -28,22 +28,6 @@ final class HardwareFeatures
 
     private static function has(Device $device, string $key, mixed $value): bool
     {
-        $product = mb_strtolower(trim((string) $device->device_product_type));
-        if ($product === '') {
-            return false;
-        }
-
-        foreach (config('devices', []) as $brand => $models) {
-            if ($brand === 'discoverers' || !is_array($models)) {
-                continue;
-            }
-            foreach ($models as $model => $definition) {
-                if (mb_strtolower($model) === $product && ($definition[$key] ?? null) === $value) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
+        return (DeviceModels::findByProduct($device->device_product_type)[$key] ?? null) === $value;
     }
 }

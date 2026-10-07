@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Domain\Device\DeviceModels;
 use App\Integrations\BangOlufsen\Ase\AseDiscovery;
 use App\Models\Device;
 use App\Models\DeviceMeta;
@@ -28,7 +29,7 @@ class DeviceDriverManager extends Component
     {
         $groups = [];
 
-        foreach (collect(config('devices'))->except('discoverers') as $brand => $products) {
+        foreach (DeviceModels::all() as $brand => $products) {
             foreach ($products as $product => $cfg) {
                 $groups[$cfg['driver_name']]['products'][] = [
                     'key' => "{$brand}|{$product}",

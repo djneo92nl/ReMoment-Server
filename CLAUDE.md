@@ -461,7 +461,7 @@ Device listeners (`app/Integrations/*/Services/DeviceListener.php`, each a `Devi
 
 ### Integration Driver Pattern
 
-`config/devices.php` maps device brands/models to driver classes. The `Device` Eloquent model (`app/Models/Device.php`) dynamically instantiates the correct driver via the service container:
+`config/devices.php` maps device brands/models to driver classes. The file also holds `discoverers`, `listeners` and `multiroom_meta_keys`, which are no brands: read the models through `App\Domain\Device\DeviceModels` (`all()`, `find()`, `findByProduct()`), never by iterating `config('devices')`. The `Device` Eloquent model (`app/Models/Device.php`) dynamically instantiates the correct driver via the service container:
 
 ```php
 app()->make($this->device_driver, ['device' => $this]);

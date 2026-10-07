@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\DeviceCapabilities;
+use App\Domain\Device\DeviceModels;
 use App\Domain\Device\MultiRoomGroups;
 use App\Domain\Device\SpotifyRouting;
 use App\Domain\Library\LibraryPlayback;
@@ -41,17 +42,14 @@ class DeviceController extends Controller
 
     public function create()
     {
-        $driverConfig = collect(config('devices'))->except(['discoverers', 'listeners'])->all();
+        $driverConfig = DeviceModels::all();
 
         return view('devices.create', compact('driverConfig'));
     }
 
     public function store(Request $request)
     {
-        $driverConfig = config('devices');
-        $brand = $request->input('device_brand_name', '');
-        $product = $request->input('device_product_type', '');
-        $isVirtual = ($driverConfig[$brand][$product]['virtual'] ?? false) === true;
+        $isVirtual = (DeviceModels::find($request->input('device_brand_name', ''), $request->input('device_product_type', ''))['virtual'] ?? false) === true;
 
         $validated = $request->validate([
             'device_name' => ['required', 'string', 'max:255'],
@@ -123,17 +121,14 @@ class DeviceController extends Controller
 
     public function edit(Device $device)
     {
-        $driverConfig = collect(config('devices'))->except(['discoverers', 'listeners'])->all();
+        $driverConfig = DeviceModels::all();
 
         return view('devices.edit', compact('device', 'driverConfig'));
     }
 
     public function update(Request $request, Device $device)
     {
-        $driverConfig = config('devices');
-        $brand = $request->input('device_brand_name', '');
-        $product = $request->input('device_product_type', '');
-        $isVirtual = ($driverConfig[$brand][$product]['virtual'] ?? false) === true;
+        $isVirtual = (DeviceModels::find($request->input('device_brand_name', ''), $request->input('device_product_type', ''))['virtual'] ?? false) === true;
 
         $validated = $request->validate([
             'device_name' => ['required', 'string', 'max:255'],
