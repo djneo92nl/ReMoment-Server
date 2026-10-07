@@ -18,6 +18,7 @@ use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
 use App\Integrations\Contracts\PowerInterface;
+use App\Integrations\Contracts\SessionHostInterface;
 use App\Integrations\Contracts\SleepTimerInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\SourcesInterface;
@@ -25,7 +26,7 @@ use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
 use Illuminate\Support\Facades\Cache;
 
-class VideoPlayerDriver implements DigitsInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, PowerInterface, SleepTimerInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
+class VideoPlayerDriver implements DigitsInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, PowerInterface, SessionHostInterface, SleepTimerInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
 {
     use ContentControls;
     use DeviceControls;

@@ -28,6 +28,7 @@ use App\Integrations\Contracts\MusicPlayerDriverInterface;
 use App\Integrations\Contracts\NetworkSettingsInterface;
 use App\Integrations\Contracts\PowerInterface;
 use App\Integrations\Contracts\RadioControlInterface;
+use App\Integrations\Contracts\SessionHostInterface;
 use App\Integrations\Contracts\SleepTimerInterface;
 use App\Integrations\Contracts\SoundAdjustmentInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
@@ -38,7 +39,7 @@ use App\Integrations\Contracts\WirelessSpeakersInterface;
 use App\Models\Device;
 use App\Models\RadioStation;
 
-class MusicPlayerDriver implements BluetoothInterface, DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, NetworkSettingsInterface, PowerInterface, RadioControlInterface, SleepTimerInterface, SoundAdjustmentInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface, WiredSpeakersInterface, WirelessSpeakersInterface
+class MusicPlayerDriver implements BluetoothInterface, DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, NetworkSettingsInterface, PowerInterface, RadioControlInterface, SessionHostInterface, SleepTimerInterface, SoundAdjustmentInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface, WiredSpeakersInterface, WirelessSpeakersInterface
 {
     use BluetoothControls;
     use ContentControls;

@@ -29,6 +29,7 @@ All contracts live in `app/Integrations/Contracts/`.
 | `SourcesInterface` | `getSources(): AvailableSource[]` | If device exposes a source list (ASE only) |
 | `SourceActivationInterface` | `activateSource(string $sourceId)` | If device supports switching sources (ASE only) |
 | `MultiRoomInterface` | `multiRoomMetaKey()`, `getMultiRoomId()`, `getJoinablePeerIds()`, `getCurrentPeerIds()`, `joinSession(Device $host)`, `leaveSession()` | If device supports multiroom grouping (ASE, Sonos) |
+| `SessionHostInterface` | `addListener(string $peerId)` — the host side of a multiroom join: expand this device's experience to the peer with that ID. A guest joins by asking its host to do this | If device can take listeners (ASE: POST on `primaryExperience`; Mozart: `beolink/expand/{jid}`) |
 | `LibraryPlaybackInterface` | `playLibraryTrack(Track $track)`, `playLibraryPlaylist(Playlist $playlist)` | If device can stream a local DLNA track/playlist |
 | `RadioControlInterface` | `radioPlatform(): string`, `canPlayRadioStation(RadioStation $station): bool`, `playRadioStation(RadioStation $station)` | If device can tune radio stations |
 | `DiscoveryInterface` | `discover(): DiscoveredDevice[]` | Implemented by a discovery service, not the driver itself |

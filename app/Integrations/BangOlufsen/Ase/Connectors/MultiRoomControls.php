@@ -2,7 +2,8 @@
 
 namespace App\Integrations\BangOlufsen\Ase\Connectors;
 
-use App\Integrations\Contracts\MultiRoomInterface;
+use App\Integrations\Common\UnsupportedOperationException;
+use App\Integrations\Contracts\SessionHostInterface;
 use App\Models\Device;
 use Illuminate\Support\Facades\Cache;
 
@@ -77,36 +78,22 @@ trait MultiRoomControls
     {
         $hostDriver = $hostDevice->driver;
 
-        // ASE joins by the host adding this device to its listener list: POSTing the host's JID to our own
-        // primaryExperience makes *us* the host of an (empty) experience and drops whatever was playing
-        // on the device we meant to join (confirmed on hardware).
-        if (method_exists($hostDriver, 'deviceApiClient')) {
-            $guestJid = $this->getMultiRoomId();
-
-            if (!$guestJid) {
-                return;
-            }
-
-            $hostDriver->deviceApiClient()->post('BeoZone/Zone/ActiveSources/primaryExperience', [
-                'listener' => ['jid' => $guestJid],
-            ]);
-
-            return;
+        // The host adds us to its listener list. POSTing the host's JID to our own primaryExperience makes *us*
+        // the host of an (empty) experience and drops whatever was playing on the device we meant to join
+        // (confirmed on hardware).
+        if (!($hostDriver instanceof SessionHostInterface)) {
+            throw new UnsupportedOperationException('The device to join cannot take listeners.');
         }
 
-        // Host on another platform (Mozart): we can only point ourselves at its JID. Unverified on hardware.
-        $hostJid = $hostDevice->meta()->where('key', 'mozart_jid')->value('value');
-
-        if (!$hostJid && $hostDriver instanceof MultiRoomInterface) {
-            $hostJid = $hostDriver->getMultiRoomId();
+        if ($guestJid = $this->getMultiRoomId()) {
+            $hostDriver->addListener($guestJid);
         }
+    }
 
-        if (!$hostJid) {
-            return;
-        }
-
+    public function addListener(string $peerId): void
+    {
         $this->deviceApiClient()->post('BeoZone/Zone/ActiveSources/primaryExperience', [
-            'listener' => ['jid' => $hostJid],
+            'listener' => ['jid' => $peerId],
         ]);
     }
 

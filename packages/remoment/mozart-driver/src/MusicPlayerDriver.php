@@ -26,6 +26,7 @@ use App\Integrations\Contracts\PowerInterface;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\RepeatInterface;
 use App\Integrations\Contracts\SeekInterface;
+use App\Integrations\Contracts\SessionHostInterface;
 use App\Integrations\Contracts\ShuffleInterface;
 use App\Integrations\Contracts\SoundAdjustmentInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
@@ -40,7 +41,7 @@ use Djneo92nl\BeoMozart\MozartClient;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
-class MusicPlayerDriver implements BatteryInterface, BluetoothInterface, DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, PowerInterface, RadioControlInterface, RepeatInterface, SeekInterface, ShuffleInterface, SoundAdjustmentInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
+class MusicPlayerDriver implements BatteryInterface, BluetoothInterface, DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, PowerInterface, RadioControlInterface, RepeatInterface, SeekInterface, SessionHostInterface, ShuffleInterface, SoundAdjustmentInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
 {
     use SettingsControls;
 
@@ -297,6 +298,11 @@ class MusicPlayerDriver implements BatteryInterface, BluetoothInterface, DeviceI
         $current = $this->getCurrentPeerIds();
 
         return array_values(array_diff($available, $current));
+    }
+
+    public function addListener(string $peerId): void
+    {
+        $this->client->beolink()->expand($peerId);
     }
 
     public function joinSession(Device $hostDevice): void

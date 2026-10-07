@@ -37,7 +37,7 @@ Connecting proves the REST client works; it says nothing about the notification 
 
 - [ ] The Mozart JID is read and stored in `device_meta` under `multiRoomMetaKey()`.
 - [ ] Mozart joins an active ASE device (`joinSession`): audio plays, `getCurrentPeerIds` shows the group.
-- [ ] An ASE device joins Mozart. This goes through ASE's `MultiRoomControls`; the JID-to-device lookup knows `ase_jid` and `sonos_uuid`, so confirm it also finds Mozart's meta key.
+- [ ] An ASE device joins Mozart. The ASE guest asks the Mozart host to `POST /api/v1/beolink/expand/{guest jid}` (`SessionHostInterface`; from the spec, unverified). Confirm the host keeps playing and the guest joins; peer lookup uses `config('devices.multiroom_meta_keys')`.
 - [ ] JIDs are mostly interchangeable between ASE and Mozart, but not for every source. Known: **Spotify cannot be multiroomed to a BeoSound Moment**. Test a join per source (Spotify, BeoRadio, DLNA, line-in, Bluetooth) in both directions and record which combinations fail.
 - [ ] A refused or impossible join is visible to the user. Mozart's `joinSession` is fire-and-forget (the result arrives later as `WebSocketEventBeolinkJoinResult`), and the web card's "same-brand" fallback offers devices that can't actually join, so check that nothing fails silently.
 - [ ] `leaveSession` works from both sides.
