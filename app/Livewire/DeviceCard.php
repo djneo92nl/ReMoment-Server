@@ -12,6 +12,7 @@ use App\Integrations\Contracts\SeekInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Livewire\Concerns\ManagesMultiroom;
+use App\Livewire\Concerns\ManagesTrackExtras;
 use App\Models\Device;
 use App\Models\Play;
 use App\Models\RadioStation;
@@ -20,6 +21,7 @@ use Livewire\Component;
 class DeviceCard extends Component
 {
     use ManagesMultiroom;
+    use ManagesTrackExtras;
 
     public Device $device;
 
@@ -104,7 +106,10 @@ class DeviceCard extends Component
     {
         $this->refresh();
 
-        return view('livewire.device-card');
+        // Lyrics and "Add to library" only on the single-device page, not for every card in the grid.
+        $canAdd = $this->standalone && $this->refreshTrackExtras(DeviceCache::getNowPlaying($this->device->id));
+
+        return view('livewire.device-card', ['canAdd' => $canAdd]);
     }
 
     public function play(): void
@@ -196,6 +201,11 @@ class DeviceCard extends Component
     }
 
     protected function multiroomDevice(): Device
+    {
+        return $this->device;
+    }
+
+    protected function trackExtrasDevice(): Device
     {
         return $this->device;
     }

@@ -676,8 +676,7 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 
 ### Livewire Components
 
-- `Nowplaying` (`app/Livewire/Nowplaying.php`) — full playback card with transport, volume, mute, and click-to-seek; refreshes on MQTT push (`liveDevice`)
-- `DeviceCard` (`app/Livewire/DeviceCard.php`) — device card with transport, volume, mute, and click-to-seek; refreshes on MQTT push; shows color gradient from `ArtworkCache`; includes Multiroom button for capable devices
+- `DeviceCard` (`app/Livewire/DeviceCard.php`) — device card with transport, volume, mute, and click-to-seek; on the single-device page (`standalone`) also lyrics and "Add to library" for the playing track (`Concerns/ManagesTrackExtras`); refreshes on MQTT push; shows color gradient from `ArtworkCache`; includes Multiroom button for capable devices
 - `DeviceQueue` (`app/Livewire/DeviceQueue.php`) — "Up Next" list on the device page for `queue`-capable devices, loaded lazily via `wire:init`
 - `SystemHealth` (`app/Livewire/SystemHealth.php`) — `/settings/health`: MQTT broker reachability, scheduler/queue-worker heartbeats, pending/failed jobs, per-device listener state and last seen
 - `DeviceSourceManager` (`app/Livewire/DeviceSourceManager.php`) — source list with hide/show toggle, drag-to-reorder, and activate button

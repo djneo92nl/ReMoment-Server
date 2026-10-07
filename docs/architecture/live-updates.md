@@ -54,7 +54,7 @@ Two Alpine components are registered for Livewire views:
 
 | Component | Where | Behavior |
 |---|---|---|
-| `liveDevice(deviceId, fallbackMs = 1000, safetyMs = 30000)` | Root element of `DeviceCard`, `Nowplaying`, `DeviceQueue` (replaces `wire:poll.1s`) | Debounced `$wire.$refresh()` on non-retained `state`/`data`/`volume`/`modes` messages for that device. Polls every `fallbackMs` while disconnected and every `safetyMs` while connected. |
+| `liveDevice(deviceId, fallbackMs = 1000, safetyMs = 30000)` | Root element of `DeviceCard`, `DeviceQueue` (replaces `wire:poll.1s`) | Debounced `$wire.$refresh()` on non-retained `state`/`data`/`volume`/`modes` messages for that device. Polls every `fallbackMs` while disconnected and every `safetyMs` while connected. |
 | `progressTicker(deviceId, position, duration, playing)` | `<x-progress-ticker>` | Advances the bar and elapsed time locally every second. Calls `$wire.$refresh()` when the pushed `progress` percentage differs from the local estimate by more than 3 (e.g. after a seek from another client). Click-to-seek calls `$wire.seek(seconds)` when `seekable`. |
 
 `<x-progress-ticker>` is `wire:key`ed on position and play state, so each fresh server render re-seeds the ticker.

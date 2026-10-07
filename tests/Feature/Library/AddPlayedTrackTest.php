@@ -9,7 +9,7 @@ use App\Domain\Media\ArtistData;
 use App\Domain\Media\NowPlaying as NowPlayingData;
 use App\Domain\Media\TrackData;
 use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
-use App\Livewire\Nowplaying;
+use App\Livewire\DeviceCard;
 use App\Livewire\PlayHistory;
 use App\Models\Device;
 use App\Models\Media\Artist;
@@ -35,6 +35,7 @@ class AddPlayedTrackTest extends TestCase
             'device_product_type' => 'Speaker', 'device_driver' => FakePlayerDriver::class, 'device_driver_name' => 'Fake',
         ]);
         DeviceCache::updateState($device->id, State::Playing);
+        cache()->put("listener_running_{$device->id}", true, 60);
 
         return $device;
     }
@@ -56,7 +57,7 @@ class AddPlayedTrackTest extends TestCase
         $this->playing($device);
         $play = Play::create(['device_id' => $device->id, 'track_name' => 'Stranger', 'artist_name' => 'Nobody', 'source_type' => 'spotify', 'played_at' => now()]);
 
-        Livewire::test(Nowplaying::class, ['device' => $device])
+        Livewire::test(DeviceCard::class, ['device' => $device, 'standalone' => true])
             ->assertSee('Add to library')
             ->call('addToLibrary')
             ->assertDontSee('Add to library')
@@ -75,7 +76,7 @@ class AddPlayedTrackTest extends TestCase
         $artist = Artist::create(['name' => 'Nobody', 'source' => 'dlna']);
         Track::create(['artist_id' => $artist->id, 'name' => 'Stranger', 'external_id' => '1:1', 'source' => 'dlna', 'duration' => 200]);
 
-        Livewire::test(Nowplaying::class, ['device' => $device])->assertDontSee('Add to library');
+        Livewire::test(DeviceCard::class, ['device' => $device, 'standalone' => true])->assertDontSee('Add to library');
     }
 
     public function test_history_matches_a_text_play_to_a_library_track(): void
@@ -160,7 +161,7 @@ class AddPlayedTrackTest extends TestCase
             $m->shouldReceive('makeApiClient')->andReturn($api);
         });
 
-        Livewire::test(Nowplaying::class, ['device' => $device])
+        Livewire::test(DeviceCard::class, ['device' => $device, 'standalone' => true])
             ->assertSee('Add to library')
             ->call('addToLibrary')
             ->assertSee('Added to the library');

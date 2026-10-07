@@ -9,7 +9,6 @@ use App\Domain\Media\NowPlaying as NowPlayingData;
 use App\Domain\Media\TrackData;
 use App\Livewire\DeviceCard;
 use App\Livewire\DeviceQueue;
-use App\Livewire\Nowplaying;
 use App\Livewire\SystemHealth;
 use App\Models\Device;
 use App\Models\User;
@@ -73,10 +72,6 @@ class LivewireControlsTest extends TestCase
             ->assertSeeHtml("progressTicker({$device->id}, 50, 200, true)")
             ->assertSeeHtml('@click.stop="seekTo($event)"')
             ->assertDontSeeHtml('wire:poll');
-
-        Livewire::test(Nowplaying::class, ['device' => $device])
-            ->assertSeeHtml("progressTicker({$device->id}, 50, 200, true)")
-            ->assertSeeHtml('toggleMute');
     }
 
     public function test_device_queue_loads_up_next_after_init(): void

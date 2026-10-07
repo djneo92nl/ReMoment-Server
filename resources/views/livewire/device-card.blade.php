@@ -193,6 +193,10 @@
                     </div>
                 </div>
 
+                @if($standalone)
+                    @include('livewire.partials.track-extras')
+                @endif
+
             @else
                 {{-- Playing but nothing cached yet --}}
                 <div class="h-36 bg-gray-50 dark:bg-stone-800/50 rounded-2xl flex items-center justify-center mb-5">
