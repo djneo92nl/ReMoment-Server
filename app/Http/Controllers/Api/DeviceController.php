@@ -19,7 +19,6 @@ use App\Http\Controllers\Api\Concerns\GuardsDeviceAccess;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\DeviceDetailResource;
 use App\Http\Resources\Api\DeviceListResource;
-use App\Integrations\Common\UnsupportedOperationException;
 use App\Integrations\Contracts\LikeInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
@@ -61,17 +60,7 @@ class DeviceController extends Controller
 
     public function action(Device $device, string $action): JsonResponse
     {
-        if ($error = $this->assertReachable($device)) {
-            return $error;
-        }
-
-        $driver = SpotifyRouting::driverFor($device, MediaControlsInterface::class);
-
-        if (!($driver instanceof MediaControlsInterface)) {
-            return $this->unsupported('media_controls');
-        }
-
-        try {
+        return $this->withDriver($device, MediaControlsInterface::class, 'media_controls', function (MediaControlsInterface $driver) use ($action) {
             match ($action) {
                 'play' => $driver->play(),
                 'pause' => $driver->pause(),
@@ -79,66 +68,32 @@ class DeviceController extends Controller
                 'next' => $driver->next(),
                 'previous' => $driver->previous(),
             };
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'driver_error',
-                'message' => 'The device did not respond: '.$e->getMessage(),
-            ], 502);
-        }
 
-        return response()->json(['status' => 'ok', 'action' => $action]);
+            return ['status' => 'ok', 'action' => $action];
+        });
     }
 
     public function seek(Request $request, Device $device): JsonResponse
     {
         $request->validate(['position' => ['required', 'integer', 'min:0']]);
 
-        if ($error = $this->assertReachable($device)) {
-            return $error;
-        }
-
-        $driver = SpotifyRouting::driverFor($device, SeekInterface::class);
-
-        if (!($driver instanceof SeekInterface)) {
-            return $this->unsupported('seek');
-        }
-
-        try {
+        return $this->withDriver($device, SeekInterface::class, 'seek', function (SeekInterface $driver) use ($request) {
             $driver->seek($request->integer('position'));
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'driver_error',
-                'message' => 'The device did not respond: '.$e->getMessage(),
-            ], 502);
-        }
 
-        return response()->json(['status' => 'ok', 'position' => $request->integer('position')]);
+            return ['status' => 'ok', 'position' => $request->integer('position')];
+        });
     }
 
     public function queue(Request $request, Device $device): JsonResponse
     {
         $request->validate(['limit' => ['nullable', 'integer', 'min:1', 'max:100']]);
 
-        if ($error = $this->assertReachable($device)) {
-            return $error;
-        }
-
-        $driver = SpotifyRouting::driverFor($device, QueueInterface::class);
-
-        if (!($driver instanceof QueueInterface)) {
-            return $this->unsupported('queue');
-        }
-
-        try {
-            $items = $driver->getUpNext($request->integer('limit', 20));
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'driver_error',
-                'message' => 'The device did not respond: '.$e->getMessage(),
-            ], 502);
-        }
-
-        return response()->json(['up_next' => array_map(fn ($item) => $item->toArray() + ['artwork' => LibraryItemArtwork::forUrl($item->image)], $items)]);
+        return $this->withDriver($device, QueueInterface::class, 'queue', fn (QueueInterface $driver) => [
+            'up_next' => array_map(
+                fn ($item) => $item->toArray() + ['artwork' => LibraryItemArtwork::forUrl($item->image)],
+                $driver->getUpNext($request->integer('limit', 20)),
+            ),
+        ]);
     }
 
     /** Plays the queue entry `position` places ahead (1 = the first of `up_next`). */
@@ -146,26 +101,11 @@ class DeviceController extends Controller
     {
         $request->validate(['position' => ['required', 'integer', 'min:1', 'max:100']]);
 
-        if ($error = $this->assertReachable($device)) {
-            return $error;
-        }
-
-        $driver = SpotifyRouting::driverFor($device, QueueJumpInterface::class);
-
-        if (!($driver instanceof QueueJumpInterface)) {
-            return $this->unsupported('queue_jump');
-        }
-
-        try {
+        return $this->withDriver($device, QueueJumpInterface::class, 'queue_jump', function (QueueJumpInterface $driver) use ($request) {
             $driver->skipToQueuePosition($request->integer('position'));
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'driver_error',
-                'message' => 'The device did not respond: '.$e->getMessage(),
-            ], 502);
-        }
 
-        return response()->json(['status' => 'ok', 'position' => $request->integer('position')]);
+            return ['status' => 'ok', 'position' => $request->integer('position')];
+        });
     }
 
     public function setShuffle(Request $request, Device $device): JsonResponse
@@ -209,28 +149,11 @@ class DeviceController extends Controller
         $request->validate(['on' => ['required', 'boolean']]);
         $on = $request->boolean('on');
 
-        if ($error = $this->assertReachable($device)) {
-            return $error;
-        }
-
-        $driver = $device->driver;
-
-        if (!($driver instanceof PowerInterface)) {
-            return $this->unsupported('power');
-        }
-
-        try {
+        return $this->withDriver($device, PowerInterface::class, 'power', function (PowerInterface $driver) use ($on) {
             $on ? $driver->powerOn() : $driver->standby();
-        } catch (UnsupportedOperationException $e) {
-            return response()->json(['error' => 'unsupported', 'message' => $e->getMessage()], 422);
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'driver_error',
-                'message' => 'The device did not respond: '.$e->getMessage(),
-            ], 502);
-        }
 
-        return response()->json(['on' => $on]);
+            return ['on' => $on];
+        });
     }
 
     /**
@@ -240,30 +163,15 @@ class DeviceController extends Controller
      */
     private function changeMode(Device $device, string $contract, string $capability, \Closure $apply, \Closure $update, array $response): JsonResponse
     {
-        if ($error = $this->assertReachable($device)) {
-            return $error;
-        }
-
-        $driver = SpotifyRouting::driverFor($device, $contract);
-
-        if (!($driver instanceof $contract)) {
-            return $this->unsupported($capability);
-        }
-
-        try {
+        return $this->withDriver($device, $contract, $capability, function ($driver) use ($device, $apply, $update, $response) {
             $apply($driver);
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'driver_error',
-                'message' => 'The device did not respond: '.$e->getMessage(),
-            ], 502);
-        }
 
-        // While Spotify is routed to a speaker, its modes are reported for the speaker.
-        $modesDeviceId = SpotifyRouting::modesDeviceId($device);
-        event(new PlaybackModesUpdated((string) $modesDeviceId, $update(Modes::get($modesDeviceId)), routed: SpotifyRouting::routedDeviceId() === $modesDeviceId));
+            // While Spotify is routed to a speaker, its modes are reported for the speaker.
+            $modesDeviceId = SpotifyRouting::modesDeviceId($device);
+            event(new PlaybackModesUpdated((string) $modesDeviceId, $update(Modes::get($modesDeviceId)), routed: SpotifyRouting::routedDeviceId() === $modesDeviceId));
 
-        return response()->json($response);
+            return $response;
+        });
     }
 
     public function favoriteRadio(Request $request, RadioStation $station): JsonResponse
@@ -279,266 +187,125 @@ class DeviceController extends Controller
         $request->validate(['client' => ['nullable', 'string', 'max:100']]);
         $client = $request->filled('client') ? Client::byApiToken((string) $request->query('client')) : null;
 
-        if ($error = $this->assertReachable($device)) {
-            return $error;
-        }
+        return $this->withDriver($device, RadioControlInterface::class, 'radio_control', function (RadioControlInterface $driver) use ($client) {
+            if (in_array('radio', LibrarySources::hiddenFor($client), true)) {
+                return ['stations' => []];
+            }
 
-        $driver = $device->driver;
-
-        if (!($driver instanceof RadioControlInterface)) {
-            return $this->unsupported('radio_control');
-        }
-
-        if (in_array('radio', LibrarySources::hiddenFor($client), true)) {
-            return response()->json(['stations' => []]);
-        }
-
-        $stations = RadioStation::query()
-            ->with('meta')
-            ->orderBy('name')
-            ->get()
-            ->filter(fn (RadioStation $station) => $driver->canPlayRadioStation($station))
-            ->map(fn (RadioStation $station) => [
-                'id' => $station->id,
-                'name' => $station->name,
-                // RadioStation has no genre yet; kept in the shape for clients.
-                'genre' => null,
-                'favorite' => $station->favorited_at !== null,
-                'artwork' => RadioStationArtwork::resolve($station),
-            ])
-            ->values();
-
-        return response()->json(['stations' => $stations]);
+            return ['stations' => RadioStation::query()
+                ->with('meta')
+                ->orderBy('name')
+                ->get()
+                ->filter(fn (RadioStation $station) => $driver->canPlayRadioStation($station))
+                ->map(fn (RadioStation $station) => [
+                    'id' => $station->id,
+                    'name' => $station->name,
+                    // RadioStation has no genre yet; kept in the shape for clients.
+                    'genre' => null,
+                    'favorite' => $station->favorited_at !== null,
+                    'artwork' => RadioStationArtwork::resolve($station),
+                ])
+                ->values()];
+        });
     }
 
     public function playRadio(Device $device, RadioStation $station): JsonResponse
     {
-        if ($error = $this->assertReachable($device)) {
-            return $error;
-        }
-
-        $driver = $device->driver;
-
-        if (!($driver instanceof RadioControlInterface)) {
-            return $this->unsupported('radio_control');
-        }
-
-        try {
+        return $this->withDriver($device, RadioControlInterface::class, 'radio_control', function (RadioControlInterface $driver) use ($station) {
             $driver->playRadioStation($station);
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'driver_error',
-                'message' => 'The device did not respond: '.$e->getMessage(),
-            ], 502);
-        }
 
-        return response()->json(['status' => 'ok', 'station' => $station->name]);
+            return ['status' => 'ok', 'station' => $station->name];
+        });
     }
 
     public function sources(Device $device): JsonResponse
     {
-        $driver = $device->driver;
-
-        if (!($driver instanceof SourcesInterface)) {
-            return $this->unsupported('source_control');
-        }
-
-        try {
+        return $this->withDriver($device, SourcesInterface::class, 'source_control', function (SourcesInterface $driver) use ($device) {
             $sources = $driver->getSources();
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'driver_error',
-                'message' => 'The device did not respond: '.$e->getMessage(),
-            ], 502);
-        }
+            SourceSync::store($device, $sources);
 
-        SourceSync::store($device, $sources);
-
-        return response()->json(['sources' => array_map(fn ($s) => $s->toArray(), $sources)]);
+            return ['sources' => array_map(fn ($s) => $s->toArray(), $sources)];
+        }, reachable: false);
     }
 
     public function activateSource(Request $request, Device $device): JsonResponse
     {
         $request->validate(['source_id' => ['required', 'string']]);
 
-        $driver = $device->driver;
-
-        if (!($driver instanceof SourceActivationInterface)) {
-            return $this->unsupported('source_activation');
-        }
-
-        try {
+        return $this->withDriver($device, SourceActivationInterface::class, 'source_activation', function (SourceActivationInterface $driver) use ($request) {
             $driver->activateSource($request->string('source_id'));
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'driver_error',
-                'message' => 'The device did not respond: '.$e->getMessage(),
-            ], 502);
-        }
 
-        return response()->json(['status' => 'ok', 'source_id' => $request->string('source_id')]);
+            return ['status' => 'ok', 'source_id' => $request->string('source_id')];
+        }, reachable: false);
     }
 
     public function getVolume(Device $device): JsonResponse
     {
-        if ($error = $this->assertReachable($device)) {
-            return $error;
-        }
-
-        $driver = $device->driver;
-
-        if (!($driver instanceof VolumeControlInterface)) {
-            return $this->unsupported('volume_control');
-        }
-
-        return response()->json(['volume' => $driver->getVolume()]);
+        return $this->withDriver($device, VolumeControlInterface::class, 'volume_control',
+            fn (VolumeControlInterface $driver) => ['volume' => $driver->getVolume()]);
     }
 
     public function setVolume(Request $request, Device $device): JsonResponse
     {
         $request->validate(['volume' => ['required', 'integer', 'min:0', 'max:100']]);
 
-        if ($error = $this->assertReachable($device)) {
-            return $error;
-        }
-
-        $driver = $device->driver;
-
-        if (!($driver instanceof VolumeControlInterface)) {
-            return $this->unsupported('volume_control');
-        }
-
-        try {
-            $actual = $driver->setVolume($request->integer('volume'));
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'driver_error',
-                'message' => 'The device did not respond: '.$e->getMessage(),
-            ], 502);
-        }
-
-        return response()->json(['volume' => $actual]);
+        return $this->withDriver($device, VolumeControlInterface::class, 'volume_control',
+            fn (VolumeControlInterface $driver) => ['volume' => $driver->setVolume($request->integer('volume'))]);
     }
 
     public function getMute(Device $device): JsonResponse
     {
-        if ($error = $this->assertReachable($device)) {
-            return $error;
-        }
-
-        $driver = $device->driver;
-
-        if (!($driver instanceof VolumeControlInterface)) {
-            return $this->unsupported('volume_control');
-        }
-
-        try {
-            $muted = $driver->isMuted();
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'driver_error',
-                'message' => 'The device did not respond: '.$e->getMessage(),
-            ], 502);
-        }
-
-        return response()->json(['muted' => $muted]);
+        return $this->withDriver($device, VolumeControlInterface::class, 'volume_control',
+            fn (VolumeControlInterface $driver) => ['muted' => $driver->isMuted()]);
     }
 
     public function setMute(Request $request, Device $device): JsonResponse
     {
         $request->validate(['muted' => ['required', 'boolean']]);
+        $muted = $request->boolean('muted');
 
-        if ($error = $this->assertReachable($device)) {
-            return $error;
-        }
+        return $this->withDriver($device, VolumeControlInterface::class, 'volume_control', function (VolumeControlInterface $driver) use ($muted) {
+            $muted ? $driver->mute() : $driver->unmute();
 
-        $driver = $device->driver;
-
-        if (!($driver instanceof VolumeControlInterface)) {
-            return $this->unsupported('volume_control');
-        }
-
-        try {
-            $request->boolean('muted') ? $driver->mute() : $driver->unmute();
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'driver_error',
-                'message' => 'The device did not respond: '.$e->getMessage(),
-            ], 502);
-        }
-
-        return response()->json(['muted' => $request->boolean('muted')]);
+            return ['muted' => $muted];
+        });
     }
 
     public function multiroom(Device $device): JsonResponse
     {
-        $driver = $device->driver;
-
-        if (!($driver instanceof MultiRoomInterface)) {
-            return $this->unsupported('multi_room');
-        }
-
-        try {
+        return $this->withDriver($device, MultiRoomInterface::class, 'multi_room', function (MultiRoomInterface $driver) use ($device) {
             $peerIds = $driver->getJoinablePeerIds();
             $listenerIds = $driver->getCurrentPeerIds();
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'driver_error',
-                'message' => 'The device did not respond: '.$e->getMessage(),
-            ], 502);
-        }
 
-        $joinable = $this->mapPeerIdsToDevices($peerIds, $device);
-        $listeners = $this->mapPeerIdsToDevices($listenerIds, $device);
+            $describe = fn ($d) => ['id' => $d->id, 'device_name' => $d->device_name, 'state' => $d->state?->value];
 
-        return response()->json([
-            'joinable' => $joinable->map(fn ($d) => ['id' => $d->id, 'device_name' => $d->device_name, 'state' => $d->state?->value])->values(),
-            'listeners' => $listeners->map(fn ($d) => ['id' => $d->id, 'device_name' => $d->device_name, 'state' => $d->state?->value])->values(),
-        ]);
+            return [
+                'joinable' => MultiRoomPeers::devices($peerIds, $device)->map($describe)->values(),
+                'listeners' => MultiRoomPeers::devices($listenerIds, $device)->map($describe)->values(),
+            ];
+        }, reachable: false);
     }
 
     public function multiroomJoin(Request $request, Device $device): JsonResponse
     {
         $request->validate(['host_device_id' => ['required', 'integer', 'exists:devices,id']]);
 
-        $driver = $device->driver;
-
-        if (!($driver instanceof MultiRoomInterface)) {
-            return $this->unsupported('multi_room');
-        }
-
         $hostDevice = Device::findOrFail($request->integer('host_device_id'));
 
-        try {
+        return $this->withDriver($device, MultiRoomInterface::class, 'multi_room', function (MultiRoomInterface $driver) use ($hostDevice) {
             $driver->joinSession($hostDevice);
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'driver_error',
-                'message' => 'The device did not respond: '.$e->getMessage(),
-            ], 502);
-        }
 
-        return response()->json(['status' => 'ok', 'joined' => $hostDevice->device_name]);
+            return ['status' => 'ok', 'joined' => $hostDevice->device_name];
+        }, reachable: false);
     }
 
     public function multiroomLeave(Device $device): JsonResponse
     {
-        $driver = $device->driver;
-
-        if (!($driver instanceof MultiRoomInterface)) {
-            return $this->unsupported('multi_room');
-        }
-
-        try {
+        return $this->withDriver($device, MultiRoomInterface::class, 'multi_room', function (MultiRoomInterface $driver) {
             $driver->leaveSession();
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'driver_error',
-                'message' => 'The device did not respond: '.$e->getMessage(),
-            ], 502);
-        }
 
-        return response()->json(['status' => 'ok']);
+            return ['status' => 'ok'];
+        }, reachable: false);
     }
 
     public function libraryPlay(Request $request, Device $device, LibraryPlayback $library): JsonResponse
@@ -632,10 +399,5 @@ class DeviceController extends Controller
         }
 
         return response()->json(['status' => 'ok'] + $response);
-    }
-
-    private function mapPeerIdsToDevices(array $ids, Device $exclude): \Illuminate\Support\Collection
-    {
-        return MultiRoomPeers::devices($ids, $exclude);
     }
 }

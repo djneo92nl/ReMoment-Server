@@ -298,6 +298,23 @@ class DeviceApiTest extends TestCase
             ->assertJsonPath('error', 'unsupported');
     }
 
+    public function test_driver_failures_map_to_the_same_errors_on_every_endpoint(): void
+    {
+        $device = $this->makeDevice();
+
+        FakePlayerDriver::$throw = new \App\Integrations\Common\UnsupportedOperationException('Cannot do that.');
+        $this->postJson("/api/devices/{$device->id}/play")
+            ->assertStatus(422)->assertJsonPath('error', 'unsupported')->assertJsonPath('message', 'Cannot do that.');
+
+        FakePlayerDriver::$throw = new \InvalidArgumentException('Bad value.');
+        $this->postJson("/api/devices/{$device->id}/pause")
+            ->assertStatus(422)->assertJsonPath('error', 'invalid');
+
+        FakePlayerDriver::$throw = new \RuntimeException('offline');
+        $this->postJson("/api/devices/{$device->id}/next")
+            ->assertStatus(502)->assertJsonPath('error', 'driver_error');
+    }
+
     // --- Sources ---
 
     public function test_sources_are_listed_and_synced(): void

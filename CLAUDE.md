@@ -213,6 +213,8 @@ Error responses:
 { "error": "driver_error", "message": "The device did not respond: …" }    // 502
 ```
 
+Every device endpoint answers through `GuardsDeviceAccess::withDriver()`: 503 unreachable (some, like sources and multiroom, skip that check), 422 `unsupported` (no such capability, or the driver can't do the operation, e.g. powering a Mozart on), 422 `invalid` (the driver rejected the value), 502 `driver_error` (anything else the device or driver threw).
+
 ### Volume
 
 ```
