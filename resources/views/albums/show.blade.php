@@ -239,37 +239,51 @@
                                     <span class="text-xs text-gray-400 dark:text-stone-500 text-right flex-shrink-0" style="width:2.5rem">
                                         @if(isset($track->plays_count) && $track->plays_count > 0){{ number_format($track->plays_count) }}×@endif
                                     </span>
-                                    <div style="{{ $slot }}">
-                                        @if($hasInfo)
-                                            <button type="button" @click="panel = panel === 'info' ? null : 'info'"
-                                                    :class="panel === 'info' ? 'text-blue-500 dark:text-blue-400' : 'text-gray-400'"
-                                                    class="{{ $btn }}" title="Track details">
-                                                <i class="fa-solid fa-circle-info text-xs"></i>
+                                    {{-- One options column instead of several optional icon columns, so rows never have gaps. Fixed position so the card's overflow can't clip the menu. --}}
+                                    @php
+                                        $removable = auth()->check() && $track->isRemovable();
+                                        $hasOptions = $trackDevices->isNotEmpty() || $hasInfo || $lyrics || $removable;
+                                        $item = 'w-full flex items-center gap-2.5 px-4 py-2 text-left text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-stone-700';
+                                    @endphp
+                                    <div style="{{ $slot }}"
+                                         x-data="{ open: false, top: 0, right: 0 }" @click.outside="open = false" @keydown.escape.window="open = false" @scroll.window="open = false">
+                                        @if($hasOptions)
+                                            <button type="button" class="{{ $btn }} text-gray-400" title="Options"
+                                                    :class="(panel || open) && 'text-blue-500 dark:text-blue-400'"
+                                                    @click="const r = $el.getBoundingClientRect(); top = r.bottom + 4; right = window.innerWidth - r.right; open = !open">
+                                                <i class="fa-solid fa-ellipsis text-xs"></i>
                                             </button>
-                                        @endif
-                                    </div>
-                                    <div style="{{ $slot }}">
-                                        @if($lyrics)
-                                            <button type="button" @click="panel = panel === 'lyrics' ? null : 'lyrics'"
-                                                    :class="panel === 'lyrics' ? 'text-blue-500 dark:text-blue-400' : 'text-gray-400'"
-                                                    class="{{ $btn }}" title="Lyrics">
-                                                <i class="fa-solid fa-align-left text-xs"></i>
-                                            </button>
-                                        @endif
-                                    </div>
-                                    @auth
-                                        <div style="{{ $slot }}">
-                                            @if($track->isRemovable())
-                                                <form method="POST" action="{{ route('tracks.destroy', $track) }}" class="w-full h-full" onsubmit="return confirm('Remove this track from the library? Your play history is kept.')">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" title="Remove from library" class="{{ $btn }} text-gray-400 hover:text-red-500">
-                                                        <i class="fa-solid fa-trash-can text-xs"></i>
+                                            <div x-show="open" x-cloak x-transition.opacity
+                                                 :style="`position:fixed;top:${top}px;right:${right}px;z-index:45`"
+                                                 class="min-w-52 py-1 rounded-xl bg-white dark:bg-stone-800 shadow-xl border border-gray-200 dark:border-stone-700 text-sm">
+                                                @if($trackDevices->isNotEmpty())
+                                                    <button type="button" class="{{ $item }}"
+                                                            @click="open = false; $dispatch('open-modal', 'play-track-{{ $track->id }}')">
+                                                        <i class="fa-solid fa-tv text-xs text-gray-400 w-4"></i>Play on device&hellip;
                                                     </button>
-                                                </form>
-                                            @endif
-                                        </div>
-                                    @endauth
+                                                @endif
+                                                @if($hasInfo)
+                                                    <button type="button" class="{{ $item }}" @click="open = false; panel = panel === 'info' ? null : 'info'">
+                                                        <i class="fa-solid fa-circle-info text-xs text-gray-400 w-4"></i>Track details
+                                                    </button>
+                                                @endif
+                                                @if($lyrics)
+                                                    <button type="button" class="{{ $item }}" @click="open = false; panel = panel === 'lyrics' ? null : 'lyrics'">
+                                                        <i class="fa-solid fa-align-left text-xs text-gray-400 w-4"></i>Lyrics
+                                                    </button>
+                                                @endif
+                                                @if($removable)
+                                                    <form method="POST" action="{{ route('tracks.destroy', $track) }}" onsubmit="return confirm('Remove this track from the library? Your play history is kept.')">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit" class="{{ $item }} hover:text-red-500">
+                                                            <i class="fa-solid fa-trash-can text-xs text-gray-400 w-4"></i>Remove from library
+                                                        </button>
+                                                    </form>
+                                                @endif
+                                            </div>
+                                        @endif
+                                    </div>
                                 </div>
                                 @if($hasInfo)
                                     <div x-show="panel === 'info'" x-cloak class="px-14 py-4 border-t border-gray-50 dark:border-stone-800/50 bg-gray-50/50 dark:bg-stone-800/20">

@@ -17,13 +17,17 @@ use App\Integrations\Contracts\RepeatInterface;
 use App\Integrations\Contracts\SeekInterface;
 use App\Integrations\Contracts\ShuffleInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
+use App\Livewire\Concerns\ManagesMultiroom;
 use App\Models\Device;
 use App\Support\SelectedDevice;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Component;
 
 /** The sticky bottom player: the pinned device's now playing, in the artwork's colors, with its controls. */
 class PlayerBar extends Component
 {
+    use ManagesMultiroom;
+
     public ?string $controlError = null;
 
     public function play(): void
@@ -107,6 +111,11 @@ class PlayerBar extends Component
         }
     }
 
+    protected function multiroomDevice(): Device
+    {
+        return $this->device() ?? throw new \LogicException('No player is pinned.');
+    }
+
     private function device(): ?Device
     {
         return app(SelectedDevice::class)->device();
@@ -151,10 +160,47 @@ class PlayerBar extends Component
             'artwork' => $nowPlaying ? NowPlayingArtwork::resolve($nowPlaying) : null,
             'capabilities' => $capabilities,
             'modes' => $modes,
-            'volume' => Volume::getVolume($device->id) ?: null,
+            'volume' => $this->volume($device, $capabilities, $state),
             'muted' => Volume::getMuted($device->id) ?? false,
             'group' => $this->multiroomGroup($device),
+            'supportsMultiRoom' => in_array('multi_room', $capabilities, true) && $state !== State::Unreachable,
         ]);
+    }
+
+    /**
+     * The device's volume: from the cache the listener keeps, else asked from the device once (the cache
+     * expires after a few minutes without a change). Null while unknown.
+     *
+     * @param  string[]  $capabilities
+     */
+    private function volume(Device $device, array $capabilities, State $state): ?int
+    {
+        $volume = Volume::getVolume($device->id);
+        if ($volume !== false || !in_array('volume_control', $capabilities, true) || $state === State::Unreachable) {
+            return $volume !== false ? (int) $volume : null;
+        }
+
+        $missKey = "player_bar_volume_miss_{$device->id}";
+        if (Cache::has($missKey)) {
+            return null;
+        }
+
+        try {
+            $driver = $device->driver;
+            $volume = $driver instanceof VolumeControlInterface ? (int) $driver->getVolume() : null;
+        } catch (\Throwable) {
+            $volume = null;
+        }
+
+        if ($volume === null) {
+            Cache::put($missKey, true, 30);
+
+            return null;
+        }
+
+        Volume::updateVolume($device->id, $volume);
+
+        return $volume;
     }
 
     /**

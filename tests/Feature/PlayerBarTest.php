@@ -105,6 +105,17 @@ class PlayerBarTest extends TestCase
             ->assertSee('Office + Kitchen');
     }
 
+    public function test_bar_has_the_multiroom_picker(): void
+    {
+        $device = $this->makeDevice('Kitchen');
+        cache()->put("listener_running_{$device->id}", true, 60);
+
+        $this->withCookie(SelectedDevice::COOKIE, (string) $device->id)
+            ->get(route('radio.index'))
+            ->assertOk()
+            ->assertSee('multiroom-'.$device->id, false);
+    }
+
     private function renderPlayButton($devices, Device $pinned): string
     {
         $this->app->instance('request', Request::create('/', 'GET', [], [SelectedDevice::COOKIE => (string) $pinned->id]));

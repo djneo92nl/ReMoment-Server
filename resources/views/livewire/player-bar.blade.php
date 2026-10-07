@@ -130,7 +130,7 @@
                         <div @if($seekable) @click.stop="seekTo($event)" @endif
                              style="flex:1;padding:.5rem 0;{{ $seekable ? 'cursor:pointer' : '' }}">
                             <div style="height:.25rem;border-radius:9999px;background:rgba(255,255,255,.28);overflow:hidden">
-                                <div :style="'width:' + pct + '%'" style="height:100%;background:#fff;border-radius:9999px;width:{{ min(100, (int) ($position / $duration * 100)) }}%"></div>
+                                <div :style="{ width: pct + '%' }" style="height:100%;background:#fff;border-radius:9999px;width:{{ min(100, (int) ($position / $duration * 100)) }}%"></div>
                             </div>
                         </div>
                         <span style="opacity:.75;min-width:2.2rem">{{ \App\Domain\Helpers\TimeHelper::secondsToMinutes($duration) }}</span>
@@ -146,24 +146,33 @@
 
             {{-- Volume + device --}}
             <div style="flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:flex-end;gap:.4rem">
-                @if($canVolume && $volume !== null)
-                    <div class="player-extra" x-data="{ vol: {{ (int) $volume }} }"
-                         style="display:flex;align-items:center;gap:.4rem;width:10rem">
+                @if($canVolume)
+                    <div class="player-extra" wire:key="bar-volume-{{ (int) $volume }}-{{ $muted ? 1 : 0 }}" x-data="{ vol: {{ (int) $volume }} }"
+                         style="display:flex;align-items:center;gap:.4rem;width:12rem">
                         <button type="button" wire:click="toggleMute" title="{{ $muted ? 'Unmute' : 'Mute' }}" style="{{ $icon }}">
-                            <i class="fa-solid {{ $muted ? 'fa-volume-xmark' : ($volume < 35 ? 'fa-volume-low' : 'fa-volume-high') }}" style="font-size:.85rem"></i>
+                            <i class="fa-solid {{ $muted ? 'fa-volume-xmark' : ((int) $volume < 35 ? 'fa-volume-low' : 'fa-volume-high') }}" style="font-size:.85rem"></i>
                         </button>
                         <div style="position:relative;flex:1;height:1.5rem;display:flex;align-items:center">
-                            <div style="width:100%;height:.25rem;border-radius:9999px;background:rgba(255,255,255,.28);overflow:hidden">
-                                <div :style="'width:' + vol + '%'" style="height:100%;background:#fff;width:{{ (int) $volume }}%"></div>
+                            <div style="width:100%;height:.3rem;border-radius:9999px;background:rgba(255,255,255,.3);overflow:hidden">
+                                <div :style="{ width: vol + '%' }" style="height:100%;background:#fff;width:{{ (int) $volume }}%"></div>
                             </div>
+                            {{-- knob, so the position is visible even at a low volume --}}
+                            <div :style="{ left: 'calc(' + vol + '% - ' + (vol / 100 * 10) + 'px)' }" style="position:absolute;top:50%;width:10px;height:10px;margin-top:-5px;border-radius:9999px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.4);pointer-events:none;left:calc({{ (int) $volume }}% - {{ (int) $volume / 100 * 10 }}px)"></div>
                             <input type="range" min="0" max="100" x-model="vol" @change="$wire.setVolume(parseInt(vol))"
-                                   style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer">
+                                   style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;margin:0">
                         </div>
+                        <span x-text="vol" style="min-width:1.4rem;text-align:right;font-size:.7rem;opacity:.75;font-variant-numeric:tabular-nums">{{ (int) $volume }}</span>
                     </div>
                 @endif
                 <a href="/receiver?device={{ $device->id }}" target="_blank" title="Open receiver" class="player-extra" style="{{ $icon }};text-decoration:none">
                     <i class="fa-solid fa-expand" style="font-size:.8rem"></i>
                 </a>
+                @if($supportsMultiRoom)
+                    <button type="button" @click="$wire.loadMultiRoomData(); $dispatch('open-modal', 'multiroom-{{ $device->id }}')" title="Multiroom"
+                            style="{{ $icon }};{{ count($group) > 1 ? 'background:#fbbf24;color:#1f2937' : '' }}">
+                        <i class="fa-solid fa-layer-group" style="font-size:.85rem"></i>
+                    </button>
+                @endif
                 <button type="button" @click="$dispatch('open-modal', 'select-player')" title="Change player" style="{{ $icon }}">
                     <i class="fa-solid fa-tv"></i>
                 </button>
@@ -180,5 +189,9 @@
         @if($controlError)
             <p style="position:relative;padding:0 1rem .4rem;font-size:.75rem;color:#fecaca">{{ $controlError }}</p>
         @endif
+
+    @if($supportsMultiRoom)
+        @include('livewire.partials.multiroom-modal')
+    @endif
     </div>
 @endif
