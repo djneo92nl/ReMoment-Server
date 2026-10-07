@@ -78,8 +78,8 @@ class PlayedTrackAdder
             Enrichment::queue($track);
         }
 
-        if ($album !== null && $externalId !== null && str_starts_with($externalId, 'spotify:track:')) {
-            ImportSpotifyAlbum::dispatch($album, substr($externalId, strlen('spotify:track:')));
+        if ($album !== null && ($spotifyId = SpotifyUri::trackId($externalId)) !== null) {
+            ImportSpotifyAlbum::dispatch($album, $spotifyId);
         }
 
         self::linkPlays($track, $name, $artistName);
@@ -143,20 +143,7 @@ class PlayedTrackAdder
             return $track->id;
         }
 
-        if ($track?->source !== 'spotify') {
-            return null;
-        }
-
-        // A speaker playing Spotify (B&O ASE) reports the URI only in its meta.
-        foreach ($track->meta ?? [] as $key => $entry) {
-            $value = is_array($entry) ? ($entry['spotifyId'] ?? null) : ($key === 'spotifyId' ? $entry : null);
-
-            if (is_string($value) && str_starts_with($value, 'spotify:track:')) {
-                return $value;
-            }
-        }
-
-        return null;
+        return SpotifyUri::fromMeta($track?->meta ?? [], $track?->source);
     }
 
     /** @return list<array{url: string}> */

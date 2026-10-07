@@ -7,6 +7,7 @@ use App\Domain\Library\LibraryIdentity;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\Normalizer;
 use App\Domain\Library\SpotifyCatalog;
+use App\Domain\Library\SpotifyUri;
 use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
 use App\Models\Device;
 use App\Models\Media\Album;
@@ -109,7 +110,7 @@ class AlbumMoreOnSpotify extends Component
             }
 
             // Only when no other track already holds this id (a duplicate elsewhere in the library).
-            $uri = 'spotify:track:'.$row['id'];
+            $uri = SpotifyUri::track($row['id']);
             if (LibraryPlayback::spotifyUri($track) === null && LibraryIdentity::findByExternalId($uri, 'spotify') === null) {
                 LibraryIdentity::addExternalId($track, $uri, 'spotify');
                 $track->save();

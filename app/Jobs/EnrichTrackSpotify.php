@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Domain\Library\Enrichment;
+use App\Domain\Library\SpotifyUri;
 use App\Jobs\Concerns\EnrichesFromSource;
 use App\Models\Media\Track;
 use App\Services\SpotifyTokenService;
@@ -31,11 +32,8 @@ class EnrichTrackSpotify implements ShouldBeUnique, ShouldQueue
 
         $api = $tokenService->makeApiClient();
 
-        $spotifyTrackId = null;
-        if ($track->external_id && str_starts_with($track->external_id, 'spotify:track:')) {
-            $parts = explode(':', $track->external_id);
-            $spotifyTrackId = end($parts) ?: null;
-        } else {
+        $spotifyTrackId = SpotifyUri::trackId($track->external_id);
+        if ($spotifyTrackId === null) {
             $results = $api->search(trim($track->name).' '.trim($track->artist->name), 'track', ['limit' => 1]);
             $spotifyTrackId = $results['tracks']['items'][0]['id'] ?? null;
         }

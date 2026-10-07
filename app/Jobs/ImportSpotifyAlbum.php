@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Domain\Library\SpotifyUri;
 use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
 use App\Jobs\Concerns\EnrichesFromSource;
 use App\Models\Media\Album;
@@ -46,8 +47,8 @@ class ImportSpotifyAlbum implements ShouldBeUnique, ShouldQueue
     private function spotifyAlbumId(SpotifyTokenService $tokenService): ?string
     {
         $stored = $this->album->metadata()->where('key', 'spotify_album_uri')->value('value');
-        if (is_string($stored) && str_starts_with($stored, 'spotify:album:')) {
-            return substr($stored, strlen('spotify:album:'));
+        if ($id = SpotifyUri::albumId($stored)) {
+            return $id;
         }
 
         return $tokenService->makeApiClient()->getTrack($this->spotifyTrackId)['album']['id'] ?? null;

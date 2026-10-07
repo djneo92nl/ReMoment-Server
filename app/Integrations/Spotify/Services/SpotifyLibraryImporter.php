@@ -6,6 +6,7 @@ use App\Domain\Artwork\ArtworkCache;
 use App\Domain\Library\Enrichment;
 use App\Domain\Library\LibraryIdentity;
 use App\Domain\Library\Normalizer;
+use App\Domain\Library\SpotifyUri;
 use App\Jobs\ProcessArtwork;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
@@ -89,15 +90,15 @@ class SpotifyLibraryImporter
     public function findAlbumId(Album $album): ?string
     {
         $stored = $album->metadata()->where('key', 'spotify_album_uri')->value('value');
-        if (is_string($stored) && str_starts_with($stored, 'spotify:album:')) {
-            return substr($stored, strlen('spotify:album:'));
+        if ($id = SpotifyUri::albumId($stored)) {
+            return $id;
         }
 
         $api = $this->tokenService->makeApiClient();
 
         $uri = $album->tracks()->where('source', 'spotify')->where('external_id', 'like', 'spotify:track:%')->value('external_id');
         if ($uri) {
-            $id = $api->getTrack(substr($uri, strlen('spotify:track:')))['album']['id'] ?? null;
+            $id = $api->getTrack(SpotifyUri::trackId($uri))['album']['id'] ?? null;
             if ($id) {
                 return $id;
             }
@@ -121,7 +122,7 @@ class SpotifyLibraryImporter
     private function importPlaylistItem(array $spotifyPlaylist, \SpotifyWebAPI\SpotifyWebAPI $api): void
     {
         $playlist = Playlist::updateOrCreate(
-            ['external_id' => 'spotify:playlist:'.$spotifyPlaylist['id'], 'source' => 'spotify'],
+            ['external_id' => SpotifyUri::playlist($spotifyPlaylist['id']), 'source' => 'spotify'],
             [
                 'name' => $spotifyPlaylist['name'] ?: 'Untitled Playlist',
                 'description' => $spotifyPlaylist['description'] ?: null,
@@ -184,7 +185,7 @@ class SpotifyLibraryImporter
             $artist,
             $album,
             $spotifyTrack['name'] ?: 'Unknown Track',
-            'spotify:track:'.$spotifyTrack['id'],
+            SpotifyUri::track($spotifyTrack['id']),
             'spotify',
             [
                 'duration' => isset($spotifyTrack['duration_ms']) ? (int) round($spotifyTrack['duration_ms'] / 1000) : null,

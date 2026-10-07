@@ -84,7 +84,7 @@ class LibraryPlayback
 
     private static function isSpotifyTrackUri(?string $id): bool
     {
-        return is_string($id) && str_starts_with($id, 'spotify:track:') && strlen($id) > strlen('spotify:track:');
+        return SpotifyUri::isTrack($id);
     }
 
     /** Whether the server has a stream for the track (any device), or one $device can play. */
@@ -176,7 +176,7 @@ class LibraryPlayback
     public function playPlaylist(Device $device, Playlist $playlist, ?Track $start = null, bool $shuffle = false): PlaybackResult
     {
         $tracks = self::playlistTracks($playlist);
-        $spotifyUri = str_starts_with((string) $playlist->external_id, 'spotify:playlist:') ? $playlist->external_id : null;
+        $spotifyUri = SpotifyUri::isPlaylist($playlist->external_id) ? $playlist->external_id : null;
 
         if ($spotifyUri !== null && self::canPlaySpotify($device)) {
             $spotifyTracks = $tracks->filter(fn (Track $t) => self::spotifyUri($t) !== null)->values();
@@ -320,7 +320,7 @@ class LibraryPlayback
             return null;
         }
 
-        if (!is_string($uri) || !str_starts_with($uri, 'spotify:album:')) {
+        if (!SpotifyUri::isAlbum($uri)) {
             return null;
         }
 

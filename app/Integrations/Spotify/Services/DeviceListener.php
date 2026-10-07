@@ -6,6 +6,7 @@ use App\Domain\Device\DeviceCache;
 use App\Domain\Device\PlaybackModes;
 use App\Domain\Device\SpotifyRouting;
 use App\Domain\Device\State;
+use App\Domain\Library\SpotifyUri;
 use App\Domain\Media\AlbumData;
 use App\Domain\Media\ArtistData;
 use App\Domain\Media\NowPlaying;
@@ -307,7 +308,7 @@ class DeviceListener implements DeviceListenerInterface
         $albumName = trim((string) ($item['album']['name'] ?? ''));
         $durationSeconds = (int) round(($item['duration_ms'] ?? 0) / 1000);
         $positionSeconds = (int) round(($playback['progress_ms'] ?? 0) / 1000);
-        $spotifyId = 'spotify:track:'.($item['id'] ?? '');
+        $spotifyId = SpotifyUri::track($item['id'] ?? '');
 
         // Pick largest artwork image
         $albumImages = $item['album']['images'] ?? [];

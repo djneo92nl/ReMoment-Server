@@ -8,6 +8,7 @@ use App\Domain\Device\MultiRoomGroups;
 use App\Domain\Device\SpotifyRouting;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\NotPlayableException;
+use App\Domain\Library\SpotifyUri;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
 use App\Models\Media\Track;
@@ -166,7 +167,7 @@ class DeviceController extends Controller
     public function playSpotifyTrack(string $spotifyTrackId, Device $device, LibraryPlayback $library)
     {
         try {
-            $library->playSpotifyUri($device, 'spotify:track:'.$spotifyTrackId);
+            $library->playSpotifyUri($device, SpotifyUri::track($spotifyTrackId));
         } catch (NotPlayableException) {
             return back()->with('error', "{$device->device_name} can't play that track.");
         } catch (\Throwable $e) {

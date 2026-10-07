@@ -7,6 +7,7 @@ use App\Domain\Library\Enrichment;
 use App\Domain\Library\LibraryIdentity;
 use App\Domain\Library\LibrarySettings;
 use App\Domain\Library\Normalizer;
+use App\Domain\Library\SpotifyUri;
 use App\Events\Device\NowPlayingUpdated;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Jobs\ImportSpotifyAlbum;
@@ -180,7 +181,7 @@ class StorePlaybackHistory implements ShouldQueue
                 $artistName,
                 $albumName,
                 $playedName,
-                $npTrack->id ?? $this->spotifyIdFromMeta($npTrack->meta ?? [], $npTrack->source),
+                $npTrack->id ?? SpotifyUri::fromMeta($npTrack->meta ?? [], $npTrack->source),
                 $npTrack->source ?? $event->sourceType ?? null,
                 $npTrack->duration,
             );
@@ -229,7 +230,7 @@ class StorePlaybackHistory implements ShouldQueue
             $artist,
             $album,
             $trackName,
-            $npTrack->id ?? $this->spotifyIdFromMeta($npTrack->meta ?? [], $npTrack->source),
+            $npTrack->id ?? SpotifyUri::fromMeta($npTrack->meta ?? [], $npTrack->source),
             $trackSource,
             [
                 'duration' => $npTrack->duration,
@@ -274,12 +275,11 @@ class StorePlaybackHistory implements ShouldQueue
         }
 
         // --- Add the rest of the album to the library ---
-        $spotifyTrackUri = $track->external_id && str_starts_with($track->external_id, 'spotify:track:')
-            ? $track->external_id
-            : $this->spotifyIdFromMeta($npTrack->meta ?? [], $npTrack->source);
+        $spotifyTrackId = SpotifyUri::trackId($track->external_id)
+            ?? SpotifyUri::trackId(SpotifyUri::fromMeta($npTrack->meta ?? [], $npTrack->source));
 
-        if ($album !== null && $spotifyTrackUri !== null) {
-            ImportSpotifyAlbum::dispatch($album, substr($spotifyTrackUri, strlen('spotify:track:')));
+        if ($album !== null && $spotifyTrackId !== null) {
+            ImportSpotifyAlbum::dispatch($album, $spotifyTrackId);
         }
     }
 
@@ -338,24 +338,6 @@ class StorePlaybackHistory implements ShouldQueue
         }
 
         return $normalized;
-    }
-
-    /** A speaker playing Spotify (B&O ASE) reports the URI only in its meta. */
-    private function spotifyIdFromMeta(array $meta, ?string $source): ?string
-    {
-        if ($source !== 'spotify') {
-            return null;
-        }
-
-        foreach ($meta as $key => $entry) {
-            $value = is_array($entry) ? ($entry['spotifyId'] ?? null) : ($key === 'spotifyId' ? $entry : null);
-
-            if (is_string($value) && str_starts_with($value, 'spotify:track:')) {
-                return $value;
-            }
-        }
-
-        return null;
     }
 
     private function enrichSpotifyAlbum(?Album $album, array $meta): void
