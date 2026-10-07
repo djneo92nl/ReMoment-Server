@@ -2,7 +2,7 @@
 
 namespace App\Services\Lastfm;
 
-use Illuminate\Support\Facades\Http;
+use App\Services\MetadataHttp;
 
 /** Read-only Last.fm calls (`*.getInfo`), which need only the API key. */
 class LastfmInfoClient
@@ -23,17 +23,12 @@ class LastfmInfoClient
      */
     public function get(string $method, array $params): ?array
     {
-        $response = Http::withHeaders(['User-Agent' => 'ReMoment/1.0 (remko@pionect.nl)'])
-            ->get('https://ws.audioscrobbler.com/2.0/', $params + [
-                'method' => $method,
-                'api_key' => config('lastfm.api_key'),
-                'format' => 'json',
-                'autocorrect' => 1,
-            ]);
-
-        if ($response->status() === 429 || $response->serverError()) {
-            $response->throw();
-        }
+        $response = MetadataHttp::get('https://ws.audioscrobbler.com/2.0/', $params + [
+            'method' => $method,
+            'api_key' => config('lastfm.api_key'),
+            'format' => 'json',
+            'autocorrect' => 1,
+        ]);
 
         $data = $response->json();
 

@@ -2,7 +2,7 @@
 
 namespace App\Services\MusicBrainz;
 
-use Illuminate\Support\Facades\Http;
+use App\Services\MetadataHttp;
 use Illuminate\Support\Sleep;
 
 /**
@@ -51,14 +51,7 @@ class MusicBrainzClient
         }
         $this->requested = true;
 
-        $response = Http::withHeaders([
-            'User-Agent' => 'ReMoment/1.0 (remko@pionect.nl)',
-            'Accept' => 'application/json',
-        ])->get("https://musicbrainz.org/ws/2/{$path}", $query + ['fmt' => 'json']);
-
-        if ($response->status() === 429 || $response->serverError()) {
-            $response->throw();
-        }
+        $response = MetadataHttp::get("https://musicbrainz.org/ws/2/{$path}", $query + ['fmt' => 'json'], ['Accept' => 'application/json']);
 
         return $response->ok() ? $response->json() : null;
     }

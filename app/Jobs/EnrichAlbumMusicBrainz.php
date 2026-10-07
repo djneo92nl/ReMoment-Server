@@ -7,12 +7,12 @@ use App\Domain\Library\Enrichment;
 use App\Domain\Library\ReleaseDate;
 use App\Jobs\Concerns\EnrichesFromSource;
 use App\Models\Media\Album;
+use App\Services\MetadataHttp;
 use App\Services\MusicBrainz\MusicBrainzClient;
 use App\Services\Wikipedia\WikipediaClient;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\Middleware\RateLimited;
-use Illuminate\Support\Facades\Http;
 
 /**
  * An album's MusicBrainz release details (label, catalog number, type, date, genres), its Wikipedia summary and,
@@ -108,12 +108,7 @@ class EnrichAlbumMusicBrainz implements ShouldBeUnique, ShouldQueue
     /** Uses the front cover from the Cover Art Archive for an album that has no image, and queues its processing. */
     private function fillCover(Album $album, string $releaseMbid): void
     {
-        $response = Http::withHeaders(['User-Agent' => 'ReMoment/1.0 (remko@pionect.nl)'])
-            ->get("https://coverartarchive.org/release/{$releaseMbid}");
-
-        if ($response->status() === 429 || $response->serverError()) {
-            $response->throw();
-        }
+        $response = MetadataHttp::get("https://coverartarchive.org/release/{$releaseMbid}");
 
         $front = collect($response->ok() ? $response->json('images', []) : [])->first(fn ($image) => $image['front'] ?? false);
         $url = $front['thumbnails']['1200'] ?? $front['thumbnails']['large'] ?? $front['image'] ?? null;

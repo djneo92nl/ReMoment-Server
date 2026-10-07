@@ -2,7 +2,7 @@
 
 namespace App\Services\Wikipedia;
 
-use Illuminate\Support\Facades\Http;
+use App\Services\MetadataHttp;
 
 /** English Wikipedia summaries, found through a Wikidata id (what MusicBrainz links to). */
 class WikipediaClient
@@ -34,11 +34,7 @@ class WikipediaClient
 
     private function get(string $url): ?\Illuminate\Http\Client\Response
     {
-        $response = Http::withHeaders(['User-Agent' => 'ReMoment/1.0 (remko@pionect.nl)'])->get($url);
-
-        if ($response->status() === 429 || $response->serverError()) {
-            $response->throw();
-        }
+        $response = MetadataHttp::get($url);
 
         return $response->ok() ? $response : null;
     }

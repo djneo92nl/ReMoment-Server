@@ -5,9 +5,9 @@ namespace App\Jobs;
 use App\Domain\Library\Enrichment;
 use App\Jobs\Concerns\EnrichesFromSource;
 use App\Models\Media\Track;
+use App\Services\MetadataHttp;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Support\Facades\Http;
 
 class EnrichTrackLyrics implements ShouldBeUnique, ShouldQueue
 {
@@ -40,18 +40,13 @@ class EnrichTrackLyrics implements ShouldBeUnique, ShouldQueue
             $params['duration'] = $track->duration;
         }
 
-        $response = Http::withHeaders(['User-Agent' => 'ReMoment/1.0 (remko@pionect.nl)'])
-            ->get('https://lrclib.net/api/get', $params);
+        // Rate limits and outages are retried (MetadataHttp); any other failure is treated like "nothing found".
+        $response = MetadataHttp::get('https://lrclib.net/api/get', $params);
 
         if ($response->status() === 404) {
             $this->none($track);
 
             return;
-        }
-
-        // Rate limits and outages are retried; any other failure is treated like "nothing found".
-        if ($response->status() === 429 || $response->serverError()) {
-            $response->throw();
         }
 
         if ($response->failed()) {

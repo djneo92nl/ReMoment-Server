@@ -2,7 +2,7 @@
 
 namespace App\Services\Discogs;
 
-use Illuminate\Support\Facades\Http;
+use App\Services\MetadataHttp;
 
 class DiscogsClient
 {
@@ -19,14 +19,9 @@ class DiscogsClient
      */
     public function get(string $path, array $query = []): ?array
     {
-        $response = Http::withHeaders([
-            'User-Agent' => 'ReMoment/1.0 (remko@pionect.nl)',
+        $response = MetadataHttp::get("https://api.discogs.com/{$path}", $query, [
             'Authorization' => 'Discogs token='.config('metadata.discogs_token'),
-        ])->get("https://api.discogs.com/{$path}", $query);
-
-        if ($response->status() === 429 || $response->serverError()) {
-            $response->throw();
-        }
+        ]);
 
         return $response->ok() ? $response->json() : null;
     }

@@ -2,7 +2,7 @@
 
 namespace App\Services\AudioDb;
 
-use Illuminate\Support\Facades\Http;
+use App\Services\MetadataHttp;
 
 class AudioDbClient
 {
@@ -14,12 +14,7 @@ class AudioDbClient
      */
     public function get(string $endpoint, string $mbid): ?array
     {
-        $response = Http::withHeaders(['User-Agent' => 'ReMoment/1.0 (remko@pionect.nl)'])
-            ->get('https://www.theaudiodb.com/api/v1/json/'.config('metadata.audiodb_key')."/{$endpoint}", ['i' => $mbid]);
-
-        if ($response->status() === 429 || $response->serverError()) {
-            $response->throw();
-        }
+        $response = MetadataHttp::get('https://www.theaudiodb.com/api/v1/json/'.config('metadata.audiodb_key')."/{$endpoint}", ['i' => $mbid]);
 
         return $response->ok() ? $response->json() : null;
     }

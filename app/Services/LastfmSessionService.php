@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\Setting;
-use Illuminate\Support\Facades\Http;
 
 class LastfmSessionService
 {
@@ -67,7 +66,7 @@ class LastfmSessionService
         $params['api_sig'] = $this->sign($params);
         $params['format'] = 'json';
 
-        $response = Http::withHeaders(['User-Agent' => 'ReMoment/1.0 (remko@pionect.nl)'])
+        $response = MetadataHttp::request()
             ->asForm()
             ->post(self::API_URL, $params);
 
