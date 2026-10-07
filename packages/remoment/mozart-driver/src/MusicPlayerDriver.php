@@ -14,6 +14,7 @@ use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\MultiRoomId;
 use App\Domain\Device\RepeatMode;
 use App\Domain\Device\State;
+use App\Integrations\Common\PlaysDlnaLibrary;
 use App\Integrations\Common\UnsupportedOperationException;
 use App\Integrations\Contracts\BatteryInterface;
 use App\Integrations\Contracts\BluetoothInterface;
@@ -33,15 +34,14 @@ use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\SourcesInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
-use App\Models\Media\Playlist;
 use App\Models\Media\Track;
 use App\Models\RadioStation;
 use Djneo92nl\BeoMozart\Enums\PlaybackCommand;
 use Djneo92nl\BeoMozart\MozartClient;
-use Illuminate\Support\Collection;
 
 class MusicPlayerDriver implements BatteryInterface, BluetoothInterface, DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, PowerInterface, RadioControlInterface, RepeatInterface, SeekInterface, SessionHostInterface, ShuffleInterface, SoundAdjustmentInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
 {
+    use PlaysDlnaLibrary;
     use SettingsControls;
 
     public MozartClient $client;
@@ -294,45 +294,14 @@ class MusicPlayerDriver implements BatteryInterface, BluetoothInterface, DeviceI
 
     // --- LibraryPlaybackInterface ---
 
-    public function playLibraryTrack(Track $track): void
+    protected function startDlna(string $url): void
     {
-        $url = $track->getDlnaUrl();
-
-        if (!$url) {
-            throw new \RuntimeException("Track {$track->id} has no DLNA URL.");
-        }
-
         $this->client->playback()->playUri($url);
     }
 
-    public function playLibraryTracks(Collection $tracks): void
+    protected function enqueueDlna(string $url): void
     {
-        $playable = $tracks->filter(fn (Track $track) => (bool) $track->getDlnaUrl())->values();
-
-        if ($playable->isEmpty()) {
-            throw new \RuntimeException('No tracks with a playable DLNA URL.');
-        }
-
-        foreach ($playable as $i => $track) {
-            $url = $track->getDlnaUrl();
-
-            if ($i === 0) {
-                $this->client->playback()->playUri($url);
-            } else {
-                $this->client->playback()->enqueue('track', 'dlna', $url);
-            }
-        }
-    }
-
-    public function playLibraryPlaylist(Playlist $playlist): void
-    {
-        $tracks = $playlist->tracks()->get();
-
-        if ($tracks->isEmpty()) {
-            throw new \RuntimeException("Playlist {$playlist->id} has no tracks.");
-        }
-
-        $this->playLibraryTracks($tracks);
+        $this->client->playback()->enqueue('track', 'dlna', $url);
     }
 
     // --- RadioControlInterface ---
