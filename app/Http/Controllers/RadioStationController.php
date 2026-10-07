@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Artwork\LibraryItemArtwork;
 use App\Domain\Artwork\RadioStationArtwork;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Models\Device;
@@ -21,20 +22,12 @@ class RadioStationController extends Controller
             ->get();
 
         $artwork = $stations->mapWithKeys(fn (RadioStation $station) => [
-            $station->id => $this->relative(RadioStationArtwork::resolve($station)['proxy_120'] ?? null),
+            $station->id => LibraryItemArtwork::webUrl(RadioStationArtwork::resolve($station)['proxy_120'] ?? null),
         ]);
 
         $devices = $this->radioCapableDevices();
 
         return view('radio.index', compact('stations', 'devices', 'artwork'));
-    }
-
-    /** Root-relative, so the image loads whatever host the page is opened on (APP_URL may differ). */
-    private function relative(?string $url): ?string
-    {
-        $pos = $url === null ? false : strpos($url, '/storage/');
-
-        return $pos === false ? $url : substr($url, $pos);
     }
 
     public function create()

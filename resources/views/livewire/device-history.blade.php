@@ -11,11 +11,7 @@
                 @foreach($plays as $play)
                     @php
                         $track = $play->track;
-                        $rawArt = ($track
-                            ? (\App\Domain\Artwork\LibraryArtwork::coverUrl($track->images)
-                                ?? \App\Domain\Artwork\LibraryArtwork::coverUrl($track->album?->images))
-                            : null) ?? $play->image_url;
-                        $artUrl = \App\Domain\Artwork\LibraryItemArtwork::forUrl($rawArt)['proxy_320'] ?? $rawArt;
+                        $artUrl = $play->artUrl(320);
                     @endphp
 
                     <div class="flex-shrink-0 w-28 group cursor-default">

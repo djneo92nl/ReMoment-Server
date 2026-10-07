@@ -32,10 +32,7 @@
         }
 
         // Artwork URLs are prefixed with APP_URL, which may not be the address this page is opened on: use the path.
-        $thumb = $artwork['proxy_120'] ?? $artwork['proxy_320'] ?? null;
-        if ($thumb && ($at = strpos($thumb, '/storage/')) !== false) {
-            $thumb = substr($thumb, $at);
-        }
+        $thumb = \App\Domain\Artwork\LibraryItemArtwork::webUrl($artwork['proxy_120'] ?? $artwork['proxy_320'] ?? null);
         $colors = $artwork['colors'] ?? [];
         $hasColors = count($colors) >= 2;
         $background = $hasColors

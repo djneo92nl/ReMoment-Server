@@ -142,14 +142,7 @@
                                     };
 
                                     // Art URL (tracks only)
-                                    $artUrl = null;
-                                    if ($play->isTrackPlay()) {
-                                        $rawArt = ($play->track
-                                            ? (\App\Domain\Artwork\LibraryArtwork::coverUrl($play->track->images)
-                                                ?? \App\Domain\Artwork\LibraryArtwork::coverUrl($play->track->album?->images))
-                                            : null) ?? $play->image_url;
-                                        $artUrl = \App\Domain\Artwork\LibraryItemArtwork::forUrl($rawArt)['proxy_120'] ?? $rawArt;
-                                    }
+                                    $artUrl = $play->isTrackPlay() ? $play->artUrl(120) : null;
                                 @endphp
 
                                 <div class="flex items-start gap-0">

@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Domain\Artwork\LibraryArtwork;
+use App\Domain\Artwork\LibraryItemArtwork;
 use App\Models\Media\Track;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -50,6 +52,16 @@ class Play extends Model
     }
 
     /** True for a track play (in the library or logged as text), false for radio and source plays. */
+    /** The play's cover: the library's processed proxy at this size, else the raw image. */
+    public function artUrl(int $size = 120): ?string
+    {
+        $raw = ($this->track
+            ? (LibraryArtwork::coverUrl($this->track->images) ?? LibraryArtwork::coverUrl($this->track->album?->images))
+            : null) ?? $this->image_url;
+
+        return LibraryItemArtwork::forUrl($raw)["proxy_{$size}"] ?? $raw;
+    }
+
     public function isTrackPlay(): bool
     {
         return $this->track_id !== null || $this->track_name !== null;

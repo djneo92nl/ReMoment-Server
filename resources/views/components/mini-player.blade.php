@@ -25,10 +25,7 @@
     $isPlaying = $state === \App\Domain\Device\State::Playing;
     $nowPlaying = \App\Domain\Device\DeviceCache::getNowPlaying($device->id);
     $artwork = $nowPlaying ? \App\Domain\Artwork\NowPlayingArtwork::resolve($nowPlaying) : null;
-    $thumb = $artwork['proxy_120'] ?? $artwork['proxy_320'] ?? null;
-    if ($thumb && ($at = strpos($thumb, '/storage/')) !== false) {
-        $thumb = substr($thumb, $at);
-    }
+    $thumb = \App\Domain\Artwork\LibraryItemArtwork::webUrl($artwork['proxy_120'] ?? $artwork['proxy_320'] ?? null);
     $track = $nowPlaying?->track;
     $radio = $nowPlaying?->radio;
     $title = $track?->name ?? $radio?->name ?? $nowPlaying?->source?->name ?? match ($state) {

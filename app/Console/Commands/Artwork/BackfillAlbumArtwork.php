@@ -3,6 +3,7 @@
 namespace App\Console\Commands\Artwork;
 
 use App\Domain\Artwork\ArtworkCache;
+use App\Domain\Artwork\LibraryArtwork;
 use App\Domain\Artwork\PlaylistArtwork;
 use App\Jobs\ProcessArtwork;
 use App\Models\Media\Album;
@@ -23,7 +24,7 @@ class BackfillAlbumArtwork extends Command
             ->whereNotNull('images')
             ->get(['images', 'colors'])
             ->map(fn (Album $album) => [
-                'url' => $this->coverUrl($album->images ?? []),
+                'url' => LibraryArtwork::coverUrl($album->images),
                 'has_colors' => !empty($album->colors),
             ])
             ->filter(fn (array $row) => $row['url'] !== null)
@@ -65,12 +66,5 @@ class BackfillAlbumArtwork extends Command
         $entry = ArtworkCache::get($url);
 
         return is_array($entry) && !ArtworkCache::isComplete($entry);
-    }
-
-    private function coverUrl(array $images): ?string
-    {
-        $first = $images[0] ?? null;
-
-        return (is_array($first) ? ($first['url'] ?? null) : $first) ?: null;
     }
 }
