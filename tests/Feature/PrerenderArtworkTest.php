@@ -12,11 +12,13 @@ use App\Models\Media\Track;
 use App\Models\Play;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Tests\Support\CachesArtwork;
 use Tests\TestCase;
 
 /** `artwork:prerender` and the "recently played albums" order it shares with the client pre-cache list and SD export. */
 class PrerenderArtworkTest extends TestCase
 {
+    use CachesArtwork;
     use RefreshDatabase;
 
     private Device $device;
@@ -40,11 +42,6 @@ class PrerenderArtworkTest extends TestCase
     {
         $track = Track::create(['album_id' => $album->id, 'artist_id' => $this->artist->id, 'name' => 'T', 'source' => 'spotify']);
         Play::create(['device_id' => $this->device->id, 'track_id' => $track->id, 'source_type' => 'spotify', 'played_at' => $at]);
-    }
-
-    private function completeEntry(): array
-    {
-        return array_merge(array_fill_keys(ArtworkCache::REQUIRED_KEYS, '/storage/x.jpg'), ['colors' => ['#111111'], 'safe_colors' => ['#999999']]);
     }
 
     public function test_recent_covers_are_distinct_albums_newest_play_first(): void
@@ -77,9 +74,9 @@ class PrerenderArtworkTest extends TestCase
             $this->play($this->album("https://x.test/{$name}.jpg"), '2026-09-0'.($i + 1).' 10:00:00');
         }
         $this->album('https://x.test/never-played.jpg');
-        ArtworkCache::put('https://x.test/complete.jpg', $this->completeEntry());
+        ArtworkCache::put('https://x.test/complete.jpg', $this->completeArtworkEntry());
         ArtworkCache::put('https://x.test/outdated.jpg', ['proxy_512' => 'a', 'proxy_320' => 'b', 'colors' => [], 'safe_colors' => []]);
-        $noPortrait = $this->completeEntry();
+        $noPortrait = $this->completeArtworkEntry();
         unset($noPortrait['proxy_bg_320x480']);
         ArtworkCache::put('https://x.test/no-portrait.jpg', $noPortrait);
 

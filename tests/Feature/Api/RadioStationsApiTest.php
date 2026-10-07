@@ -11,12 +11,14 @@ use App\Models\Device;
 use App\Models\RadioStation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Tests\Support\CachesArtwork;
 use Tests\Support\FakeBareDriver;
 use Tests\Support\FakeRadioDriver;
 use Tests\TestCase;
 
 class RadioStationsApiTest extends TestCase
 {
+    use CachesArtwork;
     use RefreshDatabase;
 
     private function makeDevice(string $driver = FakeRadioDriver::class, State $state = State::Standby): Device
@@ -102,10 +104,7 @@ class RadioStationsApiTest extends TestCase
         Queue::fake();
         $device = $this->makeDevice();
         $this->station('Alpha Radio', imageUrl: 'https://img.test/alpha.png');
-        ArtworkCache::put('https://img.test/alpha.png', array_merge(
-            array_fill_keys(ArtworkCache::REQUIRED_KEYS, '/storage/artwork/x/320.jpg'),
-            ['colors' => ['#111111'], 'safe_colors' => ['#999999']],
-        ));
+        $this->cacheProcessedArtwork('https://img.test/alpha.png', ['proxy_320' => '/storage/artwork/x/320.jpg']);
 
         $this->getJson("/api/devices/{$device->id}/radio")
             ->assertJsonPath('stations.0.artwork.kind', 'radio')

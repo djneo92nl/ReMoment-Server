@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Library;
 
-use App\Domain\Artwork\ArtworkCache;
 use App\Domain\Artwork\LibraryArtwork;
 use App\Domain\Library\LibraryPlayback;
 use App\Models\Device;
@@ -16,11 +15,13 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
+use Tests\Support\CachesArtwork;
 use Tests\Support\FakePlayerDriver;
 use Tests\TestCase;
 
 class MergeLibraryDuplicatesTest extends TestCase
 {
+    use CachesArtwork;
     use RefreshDatabase;
 
     private const SPOTIFY_COVER = 'https://i.scdn.co/image/help';
@@ -73,7 +74,7 @@ class MergeLibraryDuplicatesTest extends TestCase
         $this->meta($spotifyAlbum, 'spotify_album_uri', 'spotify:album:help', 'spotify');
         $this->meta($spotifyArtist, 'bio', 'From Liverpool.', 'lastfm');
 
-        ArtworkCache::put(self::SPOTIFY_COVER, array_merge(array_fill_keys(ArtworkCache::REQUIRED_KEYS, '/storage/x.jpg'), ['colors' => ['#112233'], 'safe_colors' => ['#99aabb']]));
+        $this->cacheProcessedArtwork(self::SPOTIFY_COVER, ['colors' => ['#112233'], 'safe_colors' => ['#99aabb']]);
 
         $playlist = Playlist::create(['name' => 'Mix', 'source' => 'local']);
         $playlist->tracks()->attach([$dlnaTrack->id => ['position' => 0], $spotifyTrack->id => ['position' => 1]]);

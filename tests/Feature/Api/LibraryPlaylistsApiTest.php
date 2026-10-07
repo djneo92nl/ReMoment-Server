@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Api;
 
-use App\Domain\Artwork\ArtworkCache;
 use App\Domain\Artwork\PlaylistArtwork;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
@@ -19,6 +18,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Mockery;
 use SpotifyWebAPI\SpotifyWebAPI;
+use Tests\Support\CachesArtwork;
 use Tests\Support\FakeBareDriver;
 use Tests\Support\FakeLibraryPlaybackDriver;
 use Tests\TestCase;
@@ -26,6 +26,7 @@ use Tests\TestCase;
 /** Contract tests for /api/library/playlists* and play-playlist (docs/api/library.md). */
 class LibraryPlaylistsApiTest extends TestCase
 {
+    use CachesArtwork;
     use RefreshDatabase;
 
     private Artist $artist;
@@ -90,7 +91,7 @@ class LibraryPlaylistsApiTest extends TestCase
 
     private function processed(string $url): void
     {
-        ArtworkCache::put($url, ['proxy_320' => '/storage/a/320.jpg', 'proxy_120' => '/storage/a/120.jpg'] + array_fill_keys(ArtworkCache::REQUIRED_KEYS, '/storage/x.jpg'));
+        $this->cacheProcessedArtwork($url, ['proxy_320' => '/storage/a/320.jpg', 'proxy_120' => '/storage/a/120.jpg']);
     }
 
     private function spotifyApi(): Mockery\MockInterface

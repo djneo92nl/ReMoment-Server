@@ -15,12 +15,14 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Tests\Support\CachesArtwork;
 use Tests\TestCase;
 use ZipArchive;
 
 /** The SD card artwork zip (docs/architecture/sd-card-export.md). */
 class SdCardExportTest extends TestCase
 {
+    use CachesArtwork;
     use RefreshDatabase;
 
     private Device $device;
@@ -48,7 +50,7 @@ class SdCardExportTest extends TestCase
         foreach (['320.jpg', '120.jpg', '512.jpg', 'bg_1024x600.jpg', 'bg_320x480.jpg', 'bg_480x480.jpg'] as $file) {
             Storage::disk('public')->put("artwork/{$hash}/{$file}", "{$file} of {$url}");
         }
-        ArtworkCache::put($url, array_merge(array_fill_keys(ArtworkCache::REQUIRED_KEYS, '/storage/x.jpg'), ['colors' => ['#111111'], 'safe_colors' => ['#999999']]));
+        $this->cacheProcessedArtwork($url);
 
         return $hash;
     }

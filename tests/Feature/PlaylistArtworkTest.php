@@ -16,11 +16,13 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Tests\Support\CachesArtwork;
 use Tests\TestCase;
 
 /** Generated playlist covers: a 2×2 mosaic of the playlist's top 4 album covers (PlaylistArtwork). */
 class PlaylistArtworkTest extends TestCase
 {
+    use CachesArtwork;
     use RefreshDatabase;
 
     private Artist $artist;
@@ -58,7 +60,7 @@ class PlaylistArtworkTest extends TestCase
 
     private function processed(string $url): void
     {
-        ArtworkCache::put($url, array_fill_keys(ArtworkCache::REQUIRED_KEYS, '/storage/x.jpg'));
+        $this->cacheProcessedArtwork($url);
     }
 
     private function jpeg(array $rgb): string

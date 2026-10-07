@@ -22,6 +22,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Tests\Support\CachesArtwork;
 use Tests\TestCase;
 
 /**
@@ -30,6 +31,7 @@ use Tests\TestCase;
  */
 class ArtworkProcessingTest extends TestCase
 {
+    use CachesArtwork;
     use RefreshDatabase;
 
     private const URL = 'https://images.example.test/cover.jpg';
@@ -57,14 +59,6 @@ class ArtworkProcessingTest extends TestCase
     private function fakeHttp(bool $progressive = false): void
     {
         Http::fake([self::URL => Http::response($this->fakeCover($progressive), 200, ['Content-Type' => 'image/jpeg'])]);
-    }
-
-    private function completeEntry(): array
-    {
-        return array_merge(array_fill_keys(ArtworkCache::REQUIRED_KEYS, '/storage/x.jpg'), [
-            'colors' => ['#111111'],
-            'safe_colors' => ['#999999'],
-        ]);
     }
 
     private function dirFor(string $url): string
@@ -151,7 +145,7 @@ class ArtworkProcessingTest extends TestCase
     public function test_a_complete_cache_entry_is_not_reprocessed(): void
     {
         Http::fake();
-        ArtworkCache::put(self::URL, $this->completeEntry());
+        ArtworkCache::put(self::URL, $this->completeArtworkEntry());
 
         (new ProcessArtwork(self::URL))->handle();
 
@@ -242,7 +236,7 @@ class ArtworkProcessingTest extends TestCase
     public function test_entries_from_before_the_portrait_background_are_regenerated(): void
     {
         Queue::fake();
-        $old = Arr::except($this->completeEntry(), 'proxy_bg_320x480');
+        $old = Arr::except($this->completeArtworkEntry(), 'proxy_bg_320x480');
         ArtworkCache::put(self::URL, $old);
         $this->assertFalse(ArtworkCache::has(self::URL));
 
@@ -274,7 +268,7 @@ class ArtworkProcessingTest extends TestCase
         $album('https://x.test/complete.jpg', ['#111111']);
         $album('https://x.test/expired.jpg', ['#111111']);
         ArtworkCache::put('https://x.test/outdated.jpg', ['proxy_512' => 'a', 'colors' => ['#111111']]);
-        ArtworkCache::put('https://x.test/complete.jpg', $this->completeEntry());
+        ArtworkCache::put('https://x.test/complete.jpg', $this->completeArtworkEntry());
 
         $this->artisan('artwork:backfill')->assertSuccessful();
 
