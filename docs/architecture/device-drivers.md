@@ -99,7 +99,6 @@ Generic commands sit under `app/Console/Commands/{Device,Library,Artwork,Easter}
 ```php
 namespace App\Integrations\YourBrand;
 
-use App\Domain\Device\DeviceCache;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
