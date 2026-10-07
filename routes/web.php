@@ -8,6 +8,7 @@ use App\Http\Controllers\GenreController;
 use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\LastfmAuthController;
 use App\Http\Controllers\LibraryController;
+use App\Http\Controllers\PlayerController;
 use App\Http\Controllers\PlaylistController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RadioStationController;
@@ -51,6 +52,9 @@ Route::post('/playlists', [PlaylistController::class, 'store'])->name('playlists
 Route::get('/playlists/{playlist}', [PlaylistController::class, 'show'])->name('playlists.show');
 Route::delete('/playlists/{playlist}', [PlaylistController::class, 'destroy'])->name('playlists.destroy');
 Route::post('/playlists/{playlist}/play/{device}', [PlaylistController::class, 'play'])->name('playlists.play');
+
+Route::post('/player/select/{device}', [PlayerController::class, 'select'])->name('player.select');
+Route::delete('/player', [PlayerController::class, 'clear'])->name('player.clear');
 
 Route::get('/dashboard', function () {
     return redirect()->route('devices.index');

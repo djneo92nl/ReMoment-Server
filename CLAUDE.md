@@ -40,6 +40,7 @@ docs/
     setup-wizard.md          First-time setup wizard: steps, Setting flags, auto-redirect middleware
   frontend/
     receiver.md             /receiver view: JS globals, DOM structure, browser targets
+    player-bar.md           Sticky bottom player: pinned device cookie, <x-play-button> default play target
 ```
 
 When adding a significant feature, add a matching doc in the relevant subfolder (`api/` for new REST endpoints, `architecture/` for server-side systems, `frontend/` for complex UI pages).
@@ -684,6 +685,7 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 - `SetupWizard` (`app/Livewire/SetupWizard.php`) — first-time setup checklist: add devices, client devices, library source (see `docs/architecture/setup-wizard.md`)
 
 ### Web Pages
+- `PlayerBar` (`app/Livewire/PlayerBar.php`) — sticky bottom player for the device pinned in this browser (cookie, `SelectedDevice`); library play buttons (`<x-play-button>`) play on it directly (see `docs/frontend/player-bar.md`)
 
 - `/setup` — first-time setup wizard (see `docs/architecture/setup-wizard.md`); auto-redirected here for a logged-in admin while zero devices exist
 - `/devices` — responsive device grid dashboard (playing devices get wide card, others get compact)

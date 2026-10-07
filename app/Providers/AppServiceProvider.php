@@ -38,6 +38,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(MqttService::class);
     }
 
+        $this->app->scoped(\App\Support\SelectedDevice::class);
     /**
      * Bootstrap any application services.
      */

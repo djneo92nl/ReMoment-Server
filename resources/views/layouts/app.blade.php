@@ -166,5 +166,26 @@
     </main>
 </div>
 
+<!-- Sticky player: the pinned device, and the default target of every play button. Sticky (not fixed) at the end of the page, so content ends above it instead of hiding behind it. -->
+<style>
+    /* Narrow screens keep the essentials: art, title, transport. Geometry is inline/plain CSS on purpose (lazy Tailwind classes). */
+    @media (max-width: 767px) {
+        .player-extra { display: none !important; }
+        .player-center { flex: 0 0 auto !important; }
+        .player-progress { display: none !important; }
+    }
+</style>
+<div style="position:sticky;bottom:0;z-index:40;box-shadow:0 -4px 20px rgba(0,0,0,.2)" class="bg-white dark:bg-stone-900">
+    <livewire:player-bar />
+</div>
+<x-device-picker
+    name="select-player"
+    title="Choose a player"
+    description="Play buttons in the library play on this device."
+    :devices="\App\Models\Device::where('hidden', false)->orderBy('device_name')->get()"
+    :action-template="url('player/select').'/{id}'"
+    :selected-id="app(\App\Support\SelectedDevice::class)->device()?->id"
+/>
+
 </body>
 </html>

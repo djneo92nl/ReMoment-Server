@@ -87,21 +87,17 @@
 
                     {{-- Play on device --}}
                     @if($playableDevices->isNotEmpty())
-                        <button
-                            type="button"
-                            @click="$dispatch('open-modal', 'play-{{ $station->id }}')"
-                            class="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gray-50 dark:bg-stone-800 text-gray-600 dark:text-gray-400 text-sm font-medium hover:bg-gray-100 dark:hover:bg-stone-700 transition-colors"
-                        >
-                            <i class="fa-solid fa-play text-xs"></i>
-                            Play on&hellip;
-                        </button>
-                        <x-device-picker
+                        <x-play-button
                             name="play-{{ $station->id }}"
                             title="Play on device"
                             :description="$station->name"
                             :devices="$playableDevices"
                             :action-template="url('radio/' . $station->id . '/play') . '/{id}'"
-                        />
+                            wrapper-class="w-full"
+                            class="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gray-50 dark:bg-stone-800 text-gray-600 dark:text-gray-400 text-sm font-medium hover:bg-gray-100 dark:hover:bg-stone-700 transition-colors">
+                            <i class="fa-solid fa-play text-xs"></i>
+                            Play
+                        </x-play-button>
                     @else
                         <p class="text-xs text-center text-gray-400 dark:text-gray-600">
                             No compatible devices — add a platform identifier to enable playback

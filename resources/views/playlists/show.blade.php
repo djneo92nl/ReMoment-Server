@@ -77,19 +77,17 @@
                         @endif
                     </p>
                 @else
-                    <button type="button"
-                            @click="$dispatch('open-modal', 'play-playlist-{{ $playlist->id }}')"
-                            class="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors">
-                        <i class="fa-solid fa-play text-xs"></i>
-                        Play on&hellip;
-                    </button>
-                    <x-device-picker
+                    <x-play-button
                         name="play-playlist-{{ $playlist->id }}"
                         title="Play on device"
                         :description="$playlist->name"
                         :devices="$devices"
                         :action-template="url('playlists/'.$playlist->id.'/play').'/{id}'"
-                    />
+                        wrapper-class="w-full"
+                        class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors">
+                        <i class="fa-solid fa-play text-xs"></i>
+                        Play
+                    </x-play-button>
                 @endif
             </div>
 

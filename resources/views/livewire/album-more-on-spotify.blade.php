@@ -40,18 +40,16 @@
                                     : $devices->filter(fn ($d) => \App\Domain\Library\LibraryPlayback::canPlaySpotify($d))->values();
                             @endphp
                             @if($rowDevices->isNotEmpty())
-                                <button type="button" @click="$dispatch('open-modal', 'spotify-row-{{ $row['id'] }}')"
-                                        class="w-7 h-7 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-stone-700 flex-shrink-0"
-                                        title="Play on device">
-                                    <i class="fa-solid fa-play text-xs"></i>
-                                </button>
-                                <x-device-picker
+                                <x-play-button
                                     name="spotify-row-{{ $row['id'] }}"
                                     title="Play track"
                                     :description="$row['name']"
                                     :devices="$rowDevices"
                                     :action-template="$viaLibrary ? url('tracks/'.$row['local']->id.'/play').'/{id}' : url('spotify/tracks/'.$row['id'].'/play').'/{id}'"
-                                />
+                                    :elsewhere="false"
+                                    class="w-7 h-7 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-stone-700 flex-shrink-0">
+                                    <i class="fa-solid fa-play text-xs"></i>
+                                </x-play-button>
                             @endif
                         </div>
                     @endforeach
