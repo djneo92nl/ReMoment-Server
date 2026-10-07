@@ -18,7 +18,6 @@ use App\Models\Media\Artist;
 use App\Models\Media\Track;
 use App\Models\Play;
 use App\Services\Dlna\DlnaLibraryScanner;
-use App\Services\SpotifyTokenService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -26,10 +25,12 @@ use Illuminate\Support\Facades\Queue;
 use Mockery;
 use SpotifyWebAPI\SpotifyWebAPI;
 use Tests\Support\FakePlayerDriver;
+use Tests\Support\FakesSpotify;
 use Tests\TestCase;
 
 class LibraryIdentityTest extends TestCase
 {
+    use FakesSpotify;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -152,10 +153,7 @@ class LibraryIdentityTest extends TestCase
             'total' => count($savedTracks),
         ]);
 
-        $this->mock(SpotifyTokenService::class, function ($mock) use ($api) {
-            $mock->shouldReceive('makeApiClient')->andReturn($api);
-            $mock->shouldReceive('isConnected')->andReturn(true);
-        });
+        $this->connectSpotify($api);
 
         app(SpotifyLibraryImporter::class)->importSavedTracks();
     }

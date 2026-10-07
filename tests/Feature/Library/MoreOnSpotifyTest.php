@@ -10,31 +10,24 @@ use App\Models\Media\Album;
 use App\Models\Media\Artist;
 use App\Models\Media\Metadata;
 use App\Models\Media\Track;
-use App\Services\SpotifyTokenService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Mockery;
 use SpotifyWebAPI\SpotifyWebAPI;
+use Tests\Support\FakesSpotify;
 use Tests\TestCase;
 
 class MoreOnSpotifyTest extends TestCase
 {
+    use FakesSpotify;
     use RefreshDatabase;
 
     protected function setUp(): void
     {
         parent::setUp();
         Cache::flush();
-    }
-
-    private function connect(SpotifyWebAPI $api): void
-    {
-        $this->mock(SpotifyTokenService::class, function ($mock) use ($api) {
-            $mock->shouldReceive('makeApiClient')->andReturn($api);
-            $mock->shouldReceive('isConnected')->andReturn(true);
-        });
     }
 
     private function localAlbum(): Album
@@ -57,7 +50,7 @@ class MoreOnSpotifyTest extends TestCase
             ['id' => 'a1', 'name' => 'Help! (Remastered 2009)', 'release_date' => '1965-08-06', 'artists' => [['name' => 'The Beatles']], 'images' => []],
             ['id' => 'a2', 'name' => 'Abbey Road', 'release_date' => '1969-09-26', 'artists' => [['name' => 'The Beatles']], 'images' => []],
         ], 'next' => null]);
-        $this->connect($api);
+        $this->connectSpotify($api);
 
         Livewire::test(ArtistMoreOnSpotify::class, ['artist' => $album->artist])
             ->call('load')
@@ -81,7 +74,7 @@ class MoreOnSpotifyTest extends TestCase
             ['id' => 't1', 'name' => 'Help!', 'track_number' => 1, 'duration_ms' => 138000],
             ['id' => 't2', 'name' => 'Bonus Demo', 'track_number' => 2, 'duration_ms' => 120000],
         ], 'next' => null]);
-        $this->connect($api);
+        $this->connectSpotify($api);
 
         Livewire::test(AlbumMoreOnSpotify::class, ['album' => $album])
             ->call('load') // records the Spotify id of the track we have and reloads the page once
@@ -105,7 +98,7 @@ class MoreOnSpotifyTest extends TestCase
                 ['id' => 'a2', 'name' => 'Abbey Road', 'release_date' => '1969', 'artists' => [['name' => 'The Beatles']], 'images' => []],
             ]],
         ]);
-        $this->connect($api);
+        $this->connectSpotify($api);
 
         Livewire::test(GlobalSearch::class)
             ->set('query', 'beatles')
@@ -120,7 +113,7 @@ class MoreOnSpotifyTest extends TestCase
 
     public function test_global_search_without_spotify_is_unchanged(): void
     {
-        $this->mock(SpotifyTokenService::class, fn ($m) => $m->shouldReceive('isConnected')->andReturn(false));
+        $this->disconnectSpotify();
         $this->localAlbum();
 
         Livewire::test(GlobalSearch::class)->set('query', 'beatles')->assertSee('Beatles')->assertDontSee('From Spotify');
@@ -138,7 +131,7 @@ class MoreOnSpotifyTest extends TestCase
             ['id' => 't3', 'name' => "Stacy's Mom", 'track_number' => 3, 'disc_number' => 1, 'duration_ms' => 1000],
             ['id' => 't2', 'name' => 'Bright Future In Sales', 'track_number' => 2, 'disc_number' => 1, 'duration_ms' => 1000],
         ], 'next' => null]);
-        $this->connect($api);
+        $this->connectSpotify($api);
 
         $component = Livewire::test(AlbumMoreOnSpotify::class, ['album' => $album])
             ->call('load')
@@ -152,7 +145,7 @@ class MoreOnSpotifyTest extends TestCase
 
     public function test_playing_a_spotify_row_on_a_device_that_cannot_play_spotify_reports_it(): void
     {
-        $this->connect(Mockery::mock(SpotifyWebAPI::class));
+        $this->connectSpotify(Mockery::mock(SpotifyWebAPI::class));
         $device = \App\Models\Device::factory()->create([
             'ip_address' => '10.0.0.1',
             'device_name' => 'Speaker',

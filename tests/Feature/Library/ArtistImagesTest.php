@@ -10,19 +10,13 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Mockery;
 use SpotifyWebAPI\SpotifyWebAPI;
+use Tests\Support\FakesSpotify;
 use Tests\TestCase;
 
 class ArtistImagesTest extends TestCase
 {
+    use FakesSpotify;
     use RefreshDatabase;
-
-    private function connect(SpotifyWebAPI $api): void
-    {
-        $this->mock(SpotifyTokenService::class, function ($mock) use ($api) {
-            $mock->shouldReceive('makeApiClient')->andReturn($api);
-            $mock->shouldReceive('isConnected')->andReturn(true);
-        });
-    }
 
     private function artist(string $name, ?string $spotifyId = null): Artist
     {
@@ -49,7 +43,7 @@ class ArtistImagesTest extends TestCase
             ['id' => 'm1', 'images' => [['url' => 'big', 'width' => 640], ['url' => 'mid', 'width' => 320], ['url' => 'tiny', 'width' => 160]]],
             ['id' => 'c1', 'images' => []],
         ]]);
-        $this->connect($api);
+        $this->connectSpotify($api);
 
         (new FetchSpotifyArtistImages([$known->id, $unknown->id, $nothing->id]))->handle(app(SpotifyTokenService::class));
 
@@ -72,7 +66,7 @@ class ArtistImagesTest extends TestCase
             \App\Models\Media\Album::create(['artist_id' => $a->id, 'name' => 'X', 'source' => 'spotify']);
         }
         Metadata::create(['metadatable_type' => Artist::class, 'metadatable_id' => $done->id, 'key' => 'spotify_image', 'value' => 'u', 'type' => 'url', 'source' => 'spotify']);
-        $this->connect(Mockery::mock(SpotifyWebAPI::class));
+        $this->connectSpotify(Mockery::mock(SpotifyWebAPI::class));
 
         $this->artisan('library:enrich --only=artist-images')->assertSuccessful();
 

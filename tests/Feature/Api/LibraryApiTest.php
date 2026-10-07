@@ -14,18 +14,18 @@ use App\Models\Media\Artist;
 use App\Models\Media\Metadata;
 use App\Models\Media\Track;
 use App\Models\Play;
-use App\Services\SpotifyTokenService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Mockery;
-use SpotifyWebAPI\SpotifyWebAPI;
 use Tests\Support\FakeBareDriver;
 use Tests\Support\FakeLibraryPlaybackDriver;
+use Tests\Support\FakesSpotify;
 use Tests\TestCase;
 
 /** Contract tests for /api/library/* and playing albums/artists on a device (docs/api/library.md). */
 class LibraryApiTest extends TestCase
 {
+    use FakesSpotify;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -99,13 +99,7 @@ class LibraryApiTest extends TestCase
     /** Spotify connected, with a mocked Web API client. */
     private function spotifyApi(): Mockery\MockInterface
     {
-        $api = Mockery::mock(SpotifyWebAPI::class);
-        $this->mock(SpotifyTokenService::class, function ($mock) use ($api) {
-            $mock->shouldReceive('isConnected')->andReturn(true);
-            $mock->shouldReceive('makeApiClient')->andReturn($api);
-        });
-
-        return $api;
+        return $this->connectSpotify();
     }
 
     // --- Browse ---

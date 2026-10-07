@@ -15,16 +15,17 @@ use App\Models\Device;
 use App\Models\Media\Artist;
 use App\Models\Media\Track;
 use App\Models\Play;
-use App\Services\SpotifyTokenService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Mockery;
 use SpotifyWebAPI\SpotifyWebAPI;
+use Tests\Support\FakesSpotify;
 use Tests\TestCase;
 
 class AddPlayedTrackTest extends TestCase
 {
+    use FakesSpotify;
     use RefreshDatabase;
 
     private function device(): Device
@@ -83,7 +84,7 @@ class AddPlayedTrackTest extends TestCase
         $a = Play::create(['device_id' => $device->id, 'track_name' => 'Stranger', 'artist_name' => 'Nobody', 'source_type' => 'radio', 'played_at' => now()]);
         $b = Play::create(['device_id' => $device->id, 'track_name' => 'Stranger', 'artist_name' => 'Nobody', 'source_type' => 'radio', 'played_at' => now()->subHour()]);
 
-        $this->mock(SpotifyTokenService::class, fn ($m) => $m->shouldReceive('isConnected')->andReturn(false));
+        $this->disconnectSpotify();
 
         Livewire::test(PlayHistory::class)
             ->assertSee('Match')
@@ -111,10 +112,7 @@ class AddPlayedTrackTest extends TestCase
             'id' => 'sp1', 'name' => 'Stranger', 'artists' => [['name' => 'Nobody']], 'duration_ms' => 200000,
             'album' => ['name' => 'Elsewhere', 'images' => [], 'release_date' => '2020-01-01'],
         ]);
-        $this->mock(SpotifyTokenService::class, function ($m) use ($api) {
-            $m->shouldReceive('isConnected')->andReturn(true);
-            $m->shouldReceive('makeApiClient')->andReturn($api);
-        });
+        $this->connectSpotify($api);
 
         Livewire::test(PlayHistory::class)
             ->call('openMatch', $play->id)
@@ -152,10 +150,7 @@ class AddPlayedTrackTest extends TestCase
             'id' => 'sp1', 'name' => 'Stranger', 'artists' => [['name' => 'Nobody']], 'duration_ms' => 200000,
             'album' => ['name' => 'Elsewhere', 'images' => [['url' => 'https://img.test/real.jpg']], 'release_date' => '2020-01-01'],
         ]);
-        $this->mock(SpotifyTokenService::class, function ($m) use ($api) {
-            $m->shouldReceive('isConnected')->andReturn(true);
-            $m->shouldReceive('makeApiClient')->andReturn($api);
-        });
+        $this->connectSpotify($api);
 
         Livewire::test(DeviceCard::class, ['device' => $device, 'standalone' => true])
             ->assertSee('Add to library')
@@ -179,7 +174,7 @@ class AddPlayedTrackTest extends TestCase
         [$stub, $play] = $this->radioStub($device);
         $artist = Artist::where('name', 'Nobody')->first();
         $real = Track::create(['artist_id' => $artist->id, 'name' => 'Stranger', 'external_id' => '1:1', 'source' => 'dlna', 'duration' => 200]);
-        $this->mock(SpotifyTokenService::class, fn ($m) => $m->shouldReceive('isConnected')->andReturn(false));
+        $this->disconnectSpotify();
 
         Livewire::test(PlayHistory::class)
             ->assertSee('Match')

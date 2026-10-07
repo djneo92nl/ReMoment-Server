@@ -6,24 +6,17 @@ use App\Models\Media\Album;
 use App\Models\Media\Artist;
 use App\Models\Media\Metadata;
 use App\Models\Media\Track;
-use App\Services\SpotifyTokenService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Mockery;
 use SpotifyWebAPI\SpotifyWebAPI;
+use Tests\Support\FakesSpotify;
 use Tests\TestCase;
 
 class FillFromSpotifyTest extends TestCase
 {
+    use FakesSpotify;
     use RefreshDatabase;
-
-    private function connectSpotify(SpotifyWebAPI $api): void
-    {
-        $this->mock(SpotifyTokenService::class, function ($mock) use ($api) {
-            $mock->shouldReceive('makeApiClient')->andReturn($api);
-            $mock->shouldReceive('isConnected')->andReturn(true);
-        });
-    }
 
     private function dlnaAlbum(): Album
     {
