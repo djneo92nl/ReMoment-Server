@@ -5,6 +5,7 @@ namespace App\Domain\Device;
 use App\Integrations\Contracts\BatteryInterface;
 use App\Integrations\Contracts\BluetoothInterface;
 use App\Integrations\Contracts\DeviceInfoInterface;
+use App\Integrations\Contracts\DigitsInterface;
 use App\Integrations\Contracts\LibraryPlaybackInterface;
 use App\Integrations\Contracts\LikeInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
@@ -17,6 +18,7 @@ use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\RepeatInterface;
 use App\Integrations\Contracts\SeekInterface;
 use App\Integrations\Contracts\ShuffleInterface;
+use App\Integrations\Contracts\SleepTimerInterface;
 use App\Integrations\Contracts\SoundAdjustmentInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\SourcesInterface;
@@ -53,6 +55,8 @@ final class Capabilities
         'network_settings' => NetworkSettingsInterface::class,
         'wireless_speakers' => WirelessSpeakersInterface::class,
         'wired_speakers' => WiredSpeakersInterface::class,
+        'sleep_timer' => SleepTimerInterface::class,
+        'digits' => DigitsInterface::class,
     ];
 
     /** Not a driver contract: reported while the active source has controls (see SourceControls). */

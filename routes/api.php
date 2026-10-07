@@ -46,6 +46,9 @@ Route::get('/devices/{device}/wireless-speakers', [DeviceSettingsController::cla
 Route::post('/devices/{device}/wireless-speakers/scan', [DeviceSettingsController::class, 'scanWirelessSpeakers']);
 Route::get('/devices/{device}/info', [DeviceSettingsController::class, 'getInfo']);
 Route::put('/devices/{device}/info', [DeviceSettingsController::class, 'setInfo']);
+Route::get('/devices/{device}/sleep-timer', [DeviceSettingsController::class, 'getSleepTimer']);
+Route::put('/devices/{device}/sleep-timer', [DeviceSettingsController::class, 'setSleepTimer']);
+Route::post('/devices/{device}/digits', [DeviceSettingsController::class, 'sendDigits']);
 
 Route::get('/devices/{device}/sources', [DeviceController::class, 'sources']);
 Route::post('/devices/{device}/sources/activate', [DeviceController::class, 'activateSource']);

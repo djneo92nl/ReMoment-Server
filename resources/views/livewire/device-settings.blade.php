@@ -75,6 +75,55 @@
         </section>
     @endif
 
+    {{-- Sleep timer --}}
+    @if(in_array('sleep_timer', $capabilities))
+        <section class="{{ $card }}">
+            <h2 class="{{ $heading }}">Sleep timer</h2>
+            @include('livewire.partials.settings-messages', ['section' => 'sleep_timer', 'problems' => $problems, 'notices' => $notices])
+            @if(!$ready)
+                {!! $skeleton !!}
+            @elseif($sleepTimer)
+                @php
+                    $current = $sleepTimer['value'];
+                    $choices = collect([0, 15, 30, 45, 60, $current])
+                        ->filter(fn ($m) => $m >= $sleepTimer['min'] && $m <= $sleepTimer['max'])->unique()->sort()->values();
+                @endphp
+                <div class="{{ $row }}">
+                    <div>
+                        <div class="text-sm text-gray-700 dark:text-gray-300">Go to standby after</div>
+                        <div class="text-xs text-gray-400 dark:text-gray-600">{{ $current > 0 ? $current.' min left' : 'Off' }}</div>
+                    </div>
+                    @if($sleepTimer['writable'])
+                        <x-select aria-label="Sleep timer" wire:change="setSleepTimer($event.target.value)">
+                            @foreach($choices as $minutes)
+                                <option value="{{ $minutes }}" @selected($minutes === $current)>{{ $minutes === 0 ? 'Off' : $minutes.' min' }}</option>
+                            @endforeach
+                        </x-select>
+                    @else
+                        <span class="{{ $muted }}">This device can't set it remotely.</span>
+                    @endif
+                </div>
+            @endif
+        </section>
+    @endif
+
+    {{-- Number keys for the active TV / set-top box source --}}
+    @if(in_array('digits', $capabilities))
+        <section class="{{ $card }}">
+            <h2 class="{{ $heading }}">Number keys</h2>
+            @include('livewire.partials.settings-messages', ['section' => 'digits', 'problems' => $problems, 'notices' => $notices])
+            <p class="{{ $muted }} mb-4">Sent to the active TV or set-top box source, e.g. to pick a channel.</p>
+            <div class="grid grid-cols-3 gap-3 max-w-xs">
+                @foreach([1, 2, 3, 4, 5, 6, 7, 8, 9] as $digit)
+                    <button type="button" wire:click="pressDigit({{ $digit }})" wire:loading.attr="disabled" wire:target="pressDigit"
+                            class="py-3 bg-gray-100 dark:bg-stone-800 hover:bg-gray-200 dark:hover:bg-stone-700 text-gray-800 dark:text-gray-200 rounded-xl text-lg font-medium disabled:opacity-50">{{ $digit }}</button>
+                @endforeach
+                <button type="button" wire:click="pressDigit(0)" wire:loading.attr="disabled" wire:target="pressDigit"
+                        class="col-start-2 py-3 bg-gray-100 dark:bg-stone-800 hover:bg-gray-200 dark:hover:bg-stone-700 text-gray-800 dark:text-gray-200 rounded-xl text-lg font-medium disabled:opacity-50">0</button>
+            </div>
+        </section>
+    @endif
+
     {{-- Wired speakers: only models with external speakers (Essence, Moment) --}}
     @if(in_array('wired_speakers', $capabilities))
         <section class="{{ $card }}">

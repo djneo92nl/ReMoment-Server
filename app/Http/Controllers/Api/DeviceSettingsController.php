@@ -8,7 +8,9 @@ use App\Http\Controllers\Controller;
 use App\Integrations\Common\UnsupportedOperationException;
 use App\Integrations\Contracts\BluetoothInterface;
 use App\Integrations\Contracts\DeviceInfoInterface;
+use App\Integrations\Contracts\DigitsInterface;
 use App\Integrations\Contracts\NetworkSettingsInterface;
+use App\Integrations\Contracts\SleepTimerInterface;
 use App\Integrations\Contracts\SoundAdjustmentInterface;
 use App\Integrations\Contracts\WiredSpeakersInterface;
 use App\Integrations\Contracts\WirelessSpeakersInterface;
@@ -18,7 +20,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 /**
- * Device settings (sound adjustment, Bluetooth, device info) for every
+ * Device settings (sound adjustment, Bluetooth, device info, sleep timer) and the TV number keys for every
  * platform that implements the matching contract. Settings use the device's
  * own driver, never Spotify routing.
  */
@@ -94,6 +96,37 @@ class DeviceSettingsController extends Controller
             $device->update(['device_name' => $data['name']]);
 
             return $driver->getDeviceInfo()->toArray();
+        });
+    }
+
+    public function getSleepTimer(Device $device): JsonResponse
+    {
+        return $this->withDriver($device, SleepTimerInterface::class, 'sleep_timer',
+            fn (SleepTimerInterface $driver) => $driver->getSleepTimer()->toArray());
+    }
+
+    public function setSleepTimer(Request $request, Device $device): JsonResponse
+    {
+        $data = $request->validate(['minutes' => ['required', 'integer']]);
+
+        return $this->withDriver($device, SleepTimerInterface::class, 'sleep_timer', function (SleepTimerInterface $driver) use ($data) {
+            $driver->setSleepTimer((int) $data['minutes']);
+
+            return $driver->getSleepTimer()->toArray();
+        });
+    }
+
+    /** Number keys for the active TV / set-top box source, pressed in order. */
+    public function sendDigits(Request $request, Device $device): JsonResponse
+    {
+        $data = $request->validate(['digits' => ['required', 'string', 'regex:/^[0-9]{1,8}$/']]);
+
+        return $this->withDriver($device, DigitsInterface::class, 'digits', function (DigitsInterface $driver) use ($data) {
+            foreach (str_split($data['digits']) as $digit) {
+                $driver->sendDigit((int) $digit);
+            }
+
+            return ['status' => 'ok', 'digits' => $data['digits']];
         });
     }
 

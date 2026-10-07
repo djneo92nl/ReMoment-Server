@@ -81,14 +81,16 @@ Mapped over wired Ethernet. The product type the device reports is `BEOSOUND_MOM
 - **Deezer** appears as `BeoContent/music/deezerProfile/…` (charts, genres, albums) whether or not an account is set up: it is a built-in content profile, not a sign of a login. A crawl of it is huge (3000+ list members), so the mapper collapses any all-digit path segment to `{id}`.
 - Missing compared to the Essence: `remoteControlPairing`, the per-service `credentials/credential/*` entries, `List/Repeat`, `List/Shuffle`, `BeoHome`-less radio favourites paths (`netRadioProfile/favoriteList/…`).
 
-### BeoPlay V1 (mapped in standby)
-Mapped while in standby, so `Sound`, `Stream` and `List` answered 500: their feature lists and children are **not yet seen** (that is probably where the extra TV commands live). Re-map with the V1 awake.
+### BeoPlay V1 (mapped in standby and again powered on)
+Re-mapped with `powerState: on` (HDMI "SET-TOP BOX" the active source): the map is **identical** to the standby one, still 29 endpoints. So `Sound`, `Stream` and `List` are not a standby effect: they answer `500 basic_string::substr` (a firmware bug, presumably on a missing path/parameter), and `hdmi_5/stbProfile/favoriteList` answers `500 PUC favourite channel lists not available`. The V1 offers nothing for sound adjustment, speaker setup or queue/shuffle/repeat on this firmware (1.0.11).
+
+Readable but not used by the driver: `powerManagement/sleepTimer` (`{ duration: 0 }`, read-only: the write answers `404 Not implemented`; on newer devices it is editable, 0–60, and an out-of-range write is ignored with 200), `regionalSettings` (date/time, time zone, country, language), `dvbProfile/channel` and `favoriteList` (empty, no tuner configured), `Zone/Snapshot` (empty list).
 
 Missing compared to the Essence: Bluetooth, `factoryReset`, `softwareUpdate`, `lineInSettings`, `credentials`, `BeoHome`, `remoteControlPairing`, wired network write, `regionalSettings` sub-resources, sound adjustment/mode/speaker setup. `networkSettings` is read-only and `productFriendlyName` is write-only (405 on GET).
 
 Extra on the V1:
 - `BeoContent/tv/dvbProfile/{channel,favoriteList}` (DVB channel list, favourites; empty when mapped) and `BeoContent/hdmi_5/stbProfile/favoriteList` (set-top box; 500 in standby).
-- `BeoZone/Zone/Digits` — write-only (405 on GET), presumably digit key presses.
+- `BeoZone/Zone/Digits` — write-only (405 on GET, `Allow: POST`). Verified on the V1: `POST {"digits": N}` with N an integer 0–9 answers `200` with an empty body (one digit per call); 10+ gives `400 INVALID_ARGUMENT "Digit is out of range"`, a string or negative gives `400 CONVERSION_ERROR "An integer was expected. Key: digits"`. The effect on a set-top box source wasn't observed (no signal sensed); a channel number is presumably sent as consecutive digits.
 - Sources carry `recommendedIrMapping`, `signalSensed`, `linkable`, `contentProtection`; the source name is `tv:{jid}` / `hdmi_5:{jid}`.
 - `BeoZone/System/Products`: every product the V1 knows, each with editable `integrate`, `borrowSource`, `irReroute` and modify/delete links.
 

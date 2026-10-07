@@ -11,6 +11,8 @@ Errors, as for the controls: `503 unreachable`, `422 unsupported` (device lacks 
 | `sound_adjustment` | bass/treble ±10, loudness | bass/treble/loudness; ranges from `sound/features` | bass/treble ±10, loudness | – |
 | `bluetooth` | pairing mode, reconnect mode, paired list, remove | paired list only (`writable: false`) | – | – |
 | `device_info` | name, model, firmware, MAC; rename | model, firmware (`softwareupdate`); rename. The API can't read the name back, so ReMoment's own is shown | room name, model, firmware, MAC; **no rename** (`renamable: false`) | – |
+| `sleep_timer` | 0–60 min | – | – | – |
+| `digits` | – (**BeoPlay V1** only: `VideoPlayerDriver`) | – | – | – |
 | `network_settings` | wired/Wi-Fi status, switch interface, wired DHCP/static, join Wi-Fi | – | – | – |
 | `wireless_speakers` | WiSA scan — **BeoSound Moment only** (see below) | – | – | – |
 | `wired_speakers` | speaker type per wired output — **Essence and Moment** (models with external speakers) | – | – | – |
@@ -49,6 +51,25 @@ DELETE /api/devices/{id}/bluetooth/devices/{deviceId}     → the new state
 To pair a phone: `PUT { "discoverable": true }`, pair from the phone, poll `GET` until it appears in `devices`, then `PUT { "discoverable": false }` (the device does not switch it off by itself). `reconnect_modes` is empty and `writable` false when the platform can only list devices.
 
 A paired device's `id` is URL-encoded by the device (`FC%3aB2%3a14%3a…`); `DELETE` accepts it encoded or decoded. Verified on an Essence Mk2: the list shape (`id`, `deviceName`, `deviceAddress`, `connected`, `paired`; entries with `paired: false` are left out), toggling `discoverable`, pairing a device, and removing one through the item's own `_links./relation/delete`. The device answers the `DELETE` before it has applied it, so the driver waits (up to about 4 s) until the device is gone from the list and answers `502` if it never is. Not yet exercised on hardware: `reconnect_mode` changes.
+
+## Sleep timer — `sleep_timer`
+
+```
+GET /api/devices/{id}/sleep-timer          → { "value": 0, "min": 0, "max": 60, "step": 1, "writable": true }
+PUT /api/devices/{id}/sleep-timer          body: { "minutes": 30 }     (0 cancels)
+→ the new state
+```
+
+`value` is the minutes set; the device goes to standby when it runs out. The BeoPlay V1 reports the timer but is `writable: false` (its `PUT` answers `404 Not implemented`), so `PUT` gives `422 unsupported`. The device ignores an out-of-range value and still answers 200, so the server checks the range (`422 invalid`) and reads the value back (`502` if not applied). Verified on an Essence Mk2 (read, same-value write, rejection of 61); a real change was not tried.
+
+## Number keys — `digits`
+
+```
+POST /api/devices/{id}/digits              body: { "digits": "105" }   (1–8 characters, 0–9)
+→ { "status": "ok", "digits": "105" }
+```
+
+Presses the keys in order on the active TV / set-top box source, e.g. a channel number. Calls `POST BeoZone/Zone/Digits {"digits": N}` once per digit on the BeoPlay V1 (the only model with it). Verified to answer `200`; the effect on a set-top box was not observed.
 
 ## Device info — `device_info`
 

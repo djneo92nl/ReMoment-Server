@@ -58,6 +58,11 @@ class HttpConnector
         return $this->strict('GET', $query ? $url.'?'.http_build_query($query) : $url);
     }
 
+    public function postStrict(string $path, array $data = []): array
+    {
+        return $this->strict('POST', $this->baseUrl.'/'.ltrim($path, '/'), $data);
+    }
+
     public function putStrict(string $path, array $data = []): array
     {
         return $this->strict('PUT', $this->baseUrl.'/'.ltrim($path, '/'), $data);

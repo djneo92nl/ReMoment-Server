@@ -6,7 +6,9 @@ use App\Domain\Device\DeviceCapabilities;
 use App\Domain\Device\State;
 use App\Integrations\Contracts\BluetoothInterface;
 use App\Integrations\Contracts\DeviceInfoInterface;
+use App\Integrations\Contracts\DigitsInterface;
 use App\Integrations\Contracts\NetworkSettingsInterface;
+use App\Integrations\Contracts\SleepTimerInterface;
 use App\Integrations\Contracts\SoundAdjustmentInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\WiredSpeakersInterface;
@@ -17,7 +19,7 @@ use Livewire\Component;
 
 /**
  * The settings of one device, section by section for whatever capabilities
- * its driver and hardware have (sound, Bluetooth, device info, network, wireless speakers). A section that
+ * its driver and hardware have (sound, Bluetooth, device info, sleep timer, number keys, network, wireless speakers). A section that
  * fails shows its own error and leaves the others working. Admin only: the
  * page sits behind the login, and every action checks it again.
  */
@@ -25,7 +27,7 @@ class DeviceSettings extends Component
 {
     private const NETWORK_APPLIED = 'Applied. The device may take a moment and may come back on a new address; use Refresh once it is up.';
 
-    public const SECTIONS = ['sound_adjustment', 'wired_speakers', 'bluetooth', 'device_info', 'network_settings', 'wireless_speakers', 'source_activation'];
+    public const SECTIONS = ['sound_adjustment', 'wired_speakers', 'bluetooth', 'device_info', 'network_settings', 'wireless_speakers', 'source_activation', 'sleep_timer', 'digits'];
 
     public Device $device;
 
@@ -39,6 +41,8 @@ class DeviceSettings extends Component
     public ?array $bluetooth = null;
 
     public ?array $info = null;
+
+    public ?array $sleepTimer = null;
 
     /** @var array<int, array{source_id: string, friendly_name: string, in_use: bool, shared_from: ?string}> */
     public array $inputs = [];
@@ -80,7 +84,7 @@ class DeviceSettings extends Component
     {
         $this->ready = true;
 
-        foreach ($this->capabilities as $section) {
+        foreach (array_diff($this->capabilities, ['digits']) as $section) {
             $this->read($section);
         }
     }
@@ -96,6 +100,18 @@ class DeviceSettings extends Component
     public function setLoudness(bool $on): void
     {
         $this->run('sound_adjustment', fn (SoundAdjustmentInterface $driver) => $driver->setSoundAdjustment(loudness: $on));
+    }
+
+    public function setSleepTimer(int|string $minutes): void
+    {
+        $this->run('sleep_timer', fn (SleepTimerInterface $driver) => $driver->setSleepTimer((int) $minutes),
+            (int) $minutes === 0 ? 'Sleep timer off.' : "Going to standby in {$minutes} minutes.");
+    }
+
+    /** One number key on the active TV / set-top box source; nothing to read back. */
+    public function pressDigit(int|string $digit): void
+    {
+        $this->run('digits', fn (DigitsInterface $driver) => $driver->sendDigit((int) $digit), reread: false);
     }
 
     public function setDiscoverable(bool $on): void
@@ -243,6 +259,7 @@ class DeviceSettings extends Component
                 'network_settings' => $this->fillNetwork($driver->getNetwork()->toArray()),
                 'wireless_speakers' => $this->wirelessSpeakers = $driver->getWirelessSpeakers()->toArray(),
                 'wired_speakers' => $this->wiredSpeakers = $driver->getWiredSpeakers()->toArray(),
+                'sleep_timer' => $this->sleepTimer = $driver->getSleepTimer()->toArray(),
             };
         } catch (\Throwable $e) {
             $this->problems[$section] ??= 'Could not read this from the device: '.$e->getMessage();
@@ -292,6 +309,8 @@ class DeviceSettings extends Component
             'wireless_speakers' => WirelessSpeakersInterface::class,
             'wired_speakers' => WiredSpeakersInterface::class,
             'source_activation' => SourceActivationInterface::class,
+            'sleep_timer' => SleepTimerInterface::class,
+            'digits' => DigitsInterface::class,
         ][$section];
 
         $driver = $this->device->driver;

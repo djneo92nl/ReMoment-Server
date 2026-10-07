@@ -12,6 +12,7 @@ use App\Integrations\BangOlufsen\Ase\Connectors\LibraryPlayback;
 use App\Integrations\BangOlufsen\Ase\Connectors\MediaControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\MultiRoomControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\NetworkControls;
+use App\Integrations\BangOlufsen\Ase\Connectors\SleepTimerControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\SoundAdjustmentControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\SourceControls;
 use App\Integrations\BangOlufsen\Ase\Connectors\VolumeControls;
@@ -27,6 +28,7 @@ use App\Integrations\Contracts\MusicPlayerDriverInterface;
 use App\Integrations\Contracts\NetworkSettingsInterface;
 use App\Integrations\Contracts\PowerInterface;
 use App\Integrations\Contracts\RadioControlInterface;
+use App\Integrations\Contracts\SleepTimerInterface;
 use App\Integrations\Contracts\SoundAdjustmentInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\SourcesInterface;
@@ -36,7 +38,7 @@ use App\Integrations\Contracts\WirelessSpeakersInterface;
 use App\Models\Device;
 use App\Models\RadioStation;
 
-class MusicPlayerDriver implements BluetoothInterface, DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, NetworkSettingsInterface, PowerInterface, RadioControlInterface, SoundAdjustmentInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface, WiredSpeakersInterface, WirelessSpeakersInterface
+class MusicPlayerDriver implements BluetoothInterface, DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, NetworkSettingsInterface, PowerInterface, RadioControlInterface, SleepTimerInterface, SoundAdjustmentInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface, WiredSpeakersInterface, WirelessSpeakersInterface
 {
     use BluetoothControls;
     use ContentControls;
@@ -46,6 +48,7 @@ class MusicPlayerDriver implements BluetoothInterface, DeviceInfoInterface, Libr
     use MediaControls;
     use MultiRoomControls;
     use NetworkControls;
+    use SleepTimerControls;
     use SoundAdjustmentControls;
     use SourceControls;
     use VolumeControls;

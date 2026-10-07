@@ -325,6 +325,70 @@ paths:
                   on: { type: boolean }
         "422": { $ref: "#/components/responses/DeviceError" }
 
+  /devices/{device}/sleep-timer:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    get:
+      tags: [Playback]
+      summary: Sleep timer in minutes (capability sleep_timer); writable false on the BeoPlay V1
+      operationId: getSleepTimer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  value: { type: integer, description: "Minutes left, 0 = no timer" }
+                  min: { type: integer }
+                  max: { type: integer }
+                  step: { type: integer }
+                  writable: { type: boolean }
+        "422": { $ref: "#/components/responses/DeviceError" }
+    put:
+      tags: [Playback]
+      summary: Set the sleep timer; 0 cancels it. Answers the new state like GET.
+      operationId: setSleepTimer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [minutes]
+              properties:
+                minutes: { type: integer, minimum: 0, maximum: 60 }
+      responses:
+        "200": { description: OK }
+        "422": { $ref: "#/components/responses/DeviceError" }
+
+  /devices/{device}/digits:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    post:
+      tags: [Playback]
+      summary: Press number keys on the active TV / set-top box source (capability digits; BeoPlay V1)
+      operationId: sendDigits
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [digits]
+              properties:
+                digits: { type: string, pattern: "^[0-9]{1,8}$", example: "105" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  digits: { type: string }
+        "422": { $ref: "#/components/responses/DeviceError" }
+
   /devices/{device}/sources:
     parameters: [{ $ref: "#/components/parameters/device" }]
     get:
@@ -1124,7 +1188,7 @@ components:
       enum: [off, all, one]
     Capability:
       type: string
-      enum: [media_controls, volume_control, radio_control, source_control, source_activation, multi_room, library_playback, seek, queue, queue_jump, shuffle, repeat, like, power, sound_adjustment, bluetooth, device_info, battery, network_settings, wireless_speakers, wired_speakers, source_controls]
+      enum: [media_controls, volume_control, radio_control, source_control, source_activation, multi_room, library_playback, seek, queue, queue_jump, shuffle, repeat, like, power, sound_adjustment, bluetooth, device_info, battery, network_settings, wireless_speakers, wired_speakers, sleep_timer, digits, source_controls]
     Battery:
       type: object
       nullable: true

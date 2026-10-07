@@ -131,7 +131,7 @@ Response: `{ "data": DeviceDetailResource }`
 
 `state` values: `playing` | `standby` | `paused` | `unreachable`
 
-`capabilities` values: `media_controls` | `volume_control` | `radio_control` | `source_control` | `source_activation` | `multi_room` | `library_playback` | `seek` | `queue` | `queue_jump` | `shuffle` | `repeat` | `like` | `power` | `sound_adjustment` | `bluetooth` | `device_info` | `battery` | `network_settings` | `wireless_speakers` | `wired_speakers` | `source_controls`
+`capabilities` values: `media_controls` | `volume_control` | `radio_control` | `source_control` | `source_activation` | `multi_room` | `library_playback` | `seek` | `queue` | `queue_jump` | `shuffle` | `repeat` | `like` | `power` | `sound_adjustment` | `bluetooth` | `device_info` | `battery` | `network_settings` | `wireless_speakers` | `wired_speakers` | `sleep_timer` | `digits` | `source_controls`
 
 `battery` is `{ "level": 0-100, "charging": bool }` or `null` on every device (list and detail), and the `battery` capability is listed only once the device's listener has reported a battery (Mozart, portable Sonos; never ASE or Spotify) — a driver also covers mains-powered models.
 
@@ -277,6 +277,8 @@ GET|PUT  /api/devices/{id}/info               → { name, product_type, firmware
 The web page `/devices/{id}/settings` (admin login, `App\Livewire\DeviceSettings`) shows one card per capability the device has.
 
 ```
+GET|PUT  /api/devices/{id}/sleep-timer   → { value, min, max, step, writable }   PUT { minutes } (0 cancels; 0–60)   (capability `sleep_timer`; ASE — the BeoPlay V1 lists it but is `writable: false`)
+POST     /api/devices/{id}/digits   body { digits: "105" } → { status, digits }   number keys for the active TV / set-top box source, sent in order (capability `digits`; ASE VideoPlayerDriver = BeoPlay V1)
 GET      /api/devices/{id}/network   → active interface, wired/wireless status and addresses, known Wi-Fi networks (never a passphrase)   (capability `network_settings`; ASE)
 PUT      /api/devices/{id}/network/interface | /network/wired | /network/wifi   → { status: "ok" } — not read back, the device may change address
 GET      /api/devices/{id}/wireless-speakers   POST …/wireless-speakers/scan { action: start|stop }   (capability `wireless_speakers`; WiSA: **only the BeoSound Moment**, via `wisa => true` in config/devices.php / `HardwareFeatures`)
@@ -477,6 +479,7 @@ All drivers implement interfaces from `app/Integrations/Contracts/`:
 - `WiredSpeakersInterface` – speaker type per wired output (ASE; `HardwareFeatures` limits it to models with `speaker => 'external'`)
 - `BatteryInterface` – `getBattery(): ?BatteryStatus`, null when the model has no battery (Mozart, Sonos). The listeners, not the driver, feed the cache the UI and API read.
 - `SoundAdjustmentInterface` / `BluetoothInterface` / `DeviceInfoInterface` – bass/treble/loudness, Bluetooth pairing mode and paired devices, device name and firmware (ASE; Mozart and Sonos for sound adjustment and device info, Mozart lists Bluetooth; value objects in `app/Domain/Device/Settings/`; reads and writes use `HttpConnector::getStrict/putStrict` so an unreachable or rejecting device is never read as "empty")
+- `SleepTimerInterface` / `DigitsInterface` – sleep timer minutes (ASE; `SleepTimer` value object, V1 read-only) and number key presses (ASE `VideoPlayerDriver` only, `POST BeoZone/Zone/Digits {digits: 0-9}`)
 - `PowerInterface` – wake / standby (ASE, Mozart; Mozart can't be woken and throws `UnsupportedOperationException`, answered with 422)
 
 `App\Domain\Device\Capabilities::forDriver()` maps these contracts to the API capability strings from the driver class name, without instantiating the driver. What a device reports is `App\Domain\Device\DeviceCapabilities::for()`: that, plus Spotify's playback capabilities while Spotify is routed to it, plus `library_playback` when Spotify can play the library on it.

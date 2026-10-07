@@ -12,6 +12,7 @@ use Livewire\Livewire;
 use Tests\Support\FakeBareDriver;
 use Tests\Support\FakeNetworkDriver;
 use Tests\Support\FakeSettingsDriver;
+use Tests\Support\FakeSleepDigitsDriver;
 use Tests\Support\FakeSourceDriver;
 use Tests\Support\FakeWiredSpeakersDriver;
 use Tests\TestCase;
@@ -204,6 +205,64 @@ class DeviceSettingsPageTest extends TestCase
             ->call('load')
             ->assertSet('problems.bluetooth', 'The device is not reachable.')
             ->assertSet('bluetooth', null);
+    }
+
+    public function test_sets_the_sleep_timer_and_shows_what_the_device_reports(): void
+    {
+        FakeSleepDigitsDriver::reset();
+        $device = $this->makeDevice(FakeSleepDigitsDriver::class);
+
+        $this->admin();
+        Livewire::test(DeviceSettings::class, ['device' => $device])
+            ->call('load')
+            ->assertSee('Sleep timer')
+            ->call('setSleepTimer', 30)
+            ->assertSet('sleepTimer.value', 30)
+            ->assertSee('30 min left');
+
+        $this->assertSame(30, FakeSleepDigitsDriver::$minutes);
+    }
+
+    public function test_a_read_only_sleep_timer_is_not_offered_for_change(): void
+    {
+        FakeSleepDigitsDriver::reset();
+        FakeSleepDigitsDriver::$writable = false;
+        $device = $this->makeDevice(FakeSleepDigitsDriver::class);
+
+        $this->admin();
+        Livewire::test(DeviceSettings::class, ['device' => $device])
+            ->call('load')
+            ->assertSee('set it remotely')
+            ->call('setSleepTimer', 10)
+            ->assertSet('problems.sleep_timer', 'This device cannot set a sleep timer.');
+    }
+
+    public function test_the_number_keys_are_sent_to_the_device(): void
+    {
+        FakeSleepDigitsDriver::reset();
+        $device = $this->makeDevice(FakeSleepDigitsDriver::class);
+
+        $this->admin();
+        Livewire::test(DeviceSettings::class, ['device' => $device])
+            ->call('load')
+            ->assertSee('Number keys')
+            ->call('pressDigit', 4)
+            ->call('pressDigit', 0)
+            ->assertSet('problems', []);
+
+        $this->assertSame([4, 0], FakeSleepDigitsDriver::$digits);
+    }
+
+    public function test_guests_cannot_press_number_keys(): void
+    {
+        FakeSleepDigitsDriver::reset();
+        $device = $this->makeDevice(FakeSleepDigitsDriver::class);
+
+        Livewire::test(DeviceSettings::class, ['device' => $device])
+            ->call('pressDigit', 1)
+            ->assertStatus(403);
+
+        $this->assertSame([], FakeSleepDigitsDriver::$digits);
     }
 
     public function test_guests_cannot_run_actions(): void
