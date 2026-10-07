@@ -163,3 +163,15 @@ It sets `Content-Type: application/json`, decodes JSON responses, and has a 10s 
 ### Default input on wake
 
 `device_meta` `default_source` (set on `/devices/{id}/settings`, "Input") names a source id. `Listeners\Device\SwitchToDefaultSource` (queued, on `DeviceStateChanged`) activates it when a device wakes (standby/unreachable to playing/paused) while no track or radio station is playing, and skips Sonos when it already plays that input. Playback someone started is never overridden.
+
+## Shared building blocks
+
+What the drivers and listeners share instead of each carrying a copy:
+
+- `App\Integrations\Common\ListenerBackoff` (reconnect pause: 1 s, doubling per failure up to 30 s) and `DeviceCache::markListenerAlive()` / `forgetListener()` (the `listener_running_{id}` heartbeat the UI reads) — all four listeners.
+- `Common\PlaysDlnaLibrary` — `LibraryPlaybackInterface` for ASE and Mozart: the driver implements `startDlna($url)` and `enqueueDlna($url)`. Sonos replaces its queue wholesale and keeps its own.
+- `Common\UpnpMediaRendererDiscovery` — SSDP discovery for ASE and Mozart, each reporting only the models of its `driver_name`.
+- `Cache\Volume::remember()` (cached volume, else read once from the device) and `MultiRoomId::remember()` (peer id cached a week and kept in `device_meta`).
+- `Settings\SoundAdjustment::assertCanSet()` / `AdjustmentRange::assertAccepts()` — the 422 `unsupported` / `invalid` checks of a bass/treble/loudness change.
+- `Capabilities::contractFor($capability)` (the contract behind a capability string) and `DeviceModels` (the brands and models of `config/devices.php`, without its non-brand settings).
+

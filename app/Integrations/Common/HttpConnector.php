@@ -8,6 +8,11 @@ class HttpConnector
 
     protected array $defaultHeaders;
 
+    private function url(string $path): string
+    {
+        return $this->baseUrl.'/'.ltrim($path, '/');
+    }
+
     public function __construct(string $baseUrl, array $defaultHeaders = [])
     {
         $this->baseUrl = rtrim($baseUrl, '/');
@@ -16,7 +21,7 @@ class HttpConnector
 
     public function get(string $path, array $query = []): mixed
     {
-        $url = $this->baseUrl.'/'.ltrim($path, '/');
+        $url = $this->url($path);
         if (!empty($query)) {
             $url .= '?'.http_build_query($query);
         }
@@ -32,17 +37,17 @@ class HttpConnector
 
     public function post(string $path, array $data = []): mixed
     {
-        return $this->request('POST', $this->baseUrl.'/'.ltrim($path, '/'), $data);
+        return $this->request('POST', $this->url($path), $data);
     }
 
     public function put(string $path, array $data = []): mixed
     {
-        return $this->request('PUT', $this->baseUrl.'/'.ltrim($path, '/'), $data);
+        return $this->request('PUT', $this->url($path), $data);
     }
 
     public function delete(string $path, array $data = []): mixed
     {
-        return $this->request('DELETE', $this->baseUrl.'/'.ltrim($path, '/'), $data);
+        return $this->request('DELETE', $this->url($path), $data);
     }
 
     /**
@@ -53,24 +58,24 @@ class HttpConnector
      */
     public function getStrict(string $path, array $query = []): array
     {
-        $url = $this->baseUrl.'/'.ltrim($path, '/');
+        $url = $this->url($path);
 
         return $this->strict('GET', $query ? $url.'?'.http_build_query($query) : $url);
     }
 
     public function postStrict(string $path, array $data = []): array
     {
-        return $this->strict('POST', $this->baseUrl.'/'.ltrim($path, '/'), $data);
+        return $this->strict('POST', $this->url($path), $data);
     }
 
     public function putStrict(string $path, array $data = []): array
     {
-        return $this->strict('PUT', $this->baseUrl.'/'.ltrim($path, '/'), $data);
+        return $this->strict('PUT', $this->url($path), $data);
     }
 
     public function deleteStrict(string $path, array $data = []): array
     {
-        return $this->strict('DELETE', $this->baseUrl.'/'.ltrim($path, '/'), $data);
+        return $this->strict('DELETE', $this->url($path), $data);
     }
 
     protected function strict(string $method, string $url, array $data = []): array
