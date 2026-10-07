@@ -21,6 +21,7 @@ services:
             SUPERVISOR_PHP_ALT_PORT: '${APP_PORT_ALT:-8080}'
         volumes:
             - '.:/var/www/html'
+            - './docker/8.4/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf'
         networks:
             - sail
         depends_on:
