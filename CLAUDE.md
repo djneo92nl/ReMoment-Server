@@ -607,7 +607,7 @@ device_meta: key = 'spotify_connect_name', value = '<Spotify device name>'
 **ASE implementation** (`app/Integrations/BangOlufsen/Ase/Connectors/MultiRoomControls.php`):
 - `getMultiRoomId()` – fetches the B&O JID (`activeSources.primaryJid`) from the device; cached in Redis and stored in `device_meta` as key `ase_jid`
 - `getJoinablePeerIds()` – returns JIDs from `primaryExperience.listenerList._capabilities.value["listener.jid"]` (literal dot in key — use direct array access, not `data_get`)
-- `joinSession(Device $host)` – `POST {ip}:8080/BeoZone/Zone/ActiveSources/primaryExperience` with host JID
+- `joinSession(Device $host)` – the **host** adds this device: `POST {host ip}:8080/BeoZone/Zone/ActiveSources/primaryExperience` with this device's JID as `listener.jid`. (POSTing the host's JID to our own endpoint makes us the host of an empty experience and stops the playback we meant to join — confirmed on hardware.) A non-ASE host (Mozart) falls back to posting its JID to our own endpoint, unverified.
 - `leaveSession()` – `DELETE {ip}:8080/BeoZone/Zone/ActiveSources/primaryExperience`
 
 **Sonos implementation** (`app/Integrations/Sonos/Connectors/MultiRoomControls.php`):

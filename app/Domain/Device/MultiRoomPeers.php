@@ -30,8 +30,41 @@ class MultiRoomPeers
             ...config('devices.multiroom_meta_keys', []),
         ]));
 
-        return Device::whereHas('meta', function ($q) use ($ids, $keys) {
+        $find = fn () => Device::whereHas('meta', function ($q) use ($ids, $keys) {
             $q->whereIn('key', $keys)->whereIn('value', $ids);
         })->where('id', '!=', $exclude->id)->get();
+
+        $found = $find();
+
+        // A peer ID nobody owns yet usually means that device's ID was never stored
+        // (devices:sync-sources not run): ask the multiroom devices without one, then look again.
+        if ($found->count() < count($ids) && self::storeMissingIds($keys, $exclude)) {
+            $found = $find();
+        }
+
+        return $found;
+    }
+
+    /** Reads and stores the peer ID of every other multiroom device that has none. */
+    private static function storeMissingIds(array $keys, Device $exclude): bool
+    {
+        $stored = false;
+
+        $candidates = Device::where('id', '!=', $exclude->id)
+            ->whereDoesntHave('meta', fn ($q) => $q->whereIn('key', $keys))
+            ->get();
+
+        foreach ($candidates as $candidate) {
+            try {
+                $driver = $candidate->driver;
+                if ($driver instanceof MultiRoomInterface && $driver->getMultiRoomId()) {
+                    $stored = true;
+                }
+            } catch (\Throwable) {
+                // Unreachable or not a multiroom device: nothing to store.
+            }
+        }
+
+        return $stored;
     }
 }

@@ -22,7 +22,7 @@ trait MultiRoomControls
         }
 
         $data = $this->getActiveSources();
-        $jid = $data['activeSources']['primaryJid'] ?? null;
+        $jid = ($data['activeSources']['primaryJid'] ?? '') ?: $this->jidFromProductId();
 
         if ($jid) {
             Cache::put($cacheKey, $jid, 86400 * 7);
@@ -33,6 +33,21 @@ trait MultiRoomControls
         }
 
         return $jid;
+    }
+
+    /**
+     * An idle device reports an empty primaryJid, but its JID is always
+     * {typeNumber}.{itemNumber}.{serialNumber}@products.bang-olufsen.com (as listed in BeoZone/System/Products).
+     */
+    private function jidFromProductId(): ?string
+    {
+        $id = $this->deviceApiClient()->get('BeoDevice')['beoDevice']['productId'] ?? [];
+
+        if (!isset($id['typeNumber'], $id['itemNumber'], $id['serialNumber'])) {
+            return null;
+        }
+
+        return "{$id['typeNumber']}.{$id['itemNumber']}.{$id['serialNumber']}@products.bang-olufsen.com";
     }
 
     public function getJoinablePeerIds(): array
@@ -60,10 +75,30 @@ trait MultiRoomControls
 
     public function joinSession(Device $hostDevice): void
     {
-        $hostJid = $hostDevice->meta()->where('key', 'ase_jid')->value('value');
+        $hostDriver = $hostDevice->driver;
 
-        if (!$hostJid && $hostDevice->driver instanceof MultiRoomInterface) {
-            $hostJid = $hostDevice->driver->getMultiRoomId();
+        // ASE joins by the host adding this device to its listener list: POSTing the host's JID to our own
+        // primaryExperience makes *us* the host of an (empty) experience and drops whatever was playing
+        // on the device we meant to join (confirmed on hardware).
+        if (method_exists($hostDriver, 'deviceApiClient')) {
+            $guestJid = $this->getMultiRoomId();
+
+            if (!$guestJid) {
+                return;
+            }
+
+            $hostDriver->deviceApiClient()->post('BeoZone/Zone/ActiveSources/primaryExperience', [
+                'listener' => ['jid' => $guestJid],
+            ]);
+
+            return;
+        }
+
+        // Host on another platform (Mozart): we can only point ourselves at its JID. Unverified on hardware.
+        $hostJid = $hostDevice->meta()->where('key', 'mozart_jid')->value('value');
+
+        if (!$hostJid && $hostDriver instanceof MultiRoomInterface) {
+            $hostJid = $hostDriver->getMultiRoomId();
         }
 
         if (!$hostJid) {

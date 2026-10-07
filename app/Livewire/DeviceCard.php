@@ -235,12 +235,10 @@ class DeviceCard extends Component
                 $listenerIds = $driver->getCurrentPeerIds();
                 $this->currentListeners = $this->mapPeerIdsToDevices($listenerIds);
 
-                $joinableIds = $driver->getJoinablePeerIds();
+                // Pre-validated list from device API; empty when the device lists none or we know none of them
+                $this->invitableDevices = $this->mapPeerIdsToDevices($driver->getJoinablePeerIds());
 
-                if (!empty($joinableIds)) {
-                    // Pre-validated list from device API
-                    $this->invitableDevices = $this->mapPeerIdsToDevices($joinableIds);
-                } else {
+                if (empty($this->invitableDevices)) {
                     // Optimistic fallback: all same-brand non-playing devices
                     $currentListenerDeviceIds = array_column($this->currentListeners, 'id');
                     $this->invitableDevices = Device::where('id', '!=', $this->device->id)
