@@ -76,6 +76,32 @@ class Enrichment
         }
     }
 
+    /**
+     * A writer for one record and source: `$save($key, $value, $type = 'string')` stores the trimmed value
+     * and skips null and blank ones, so a job can list its fields without a check for each.
+     */
+    public static function saver(Model $model, string $source): \Closure
+    {
+        return fn (string $key, ?string $value, string $type = 'string') => $value !== null && trim($value) !== ''
+            ? self::save($model, $key, trim($value), $type, $source) : null;
+    }
+
+    /** The MusicBrainz id stored for an artist or album, if it has been matched. */
+    public static function mbid(Model $model): ?string
+    {
+        return $model->metadata()->where('key', 'mbid')->where('source', self::MUSICBRAINZ)->value('value');
+    }
+
+    /** A Wikipedia summary (`extract`, `url`) as the record's `wikipedia_*` metadata. */
+    public static function saveWikipedia(Model $model, array $summary): void
+    {
+        self::save($model, 'wikipedia_extract', $summary['extract'], 'string', 'wikipedia');
+
+        if (!empty($summary['url'])) {
+            self::save($model, 'wikipedia_url', $summary['url'], 'string', 'wikipedia');
+        }
+    }
+
     public static function markDone(Model $model, string $source): void
     {
         self::save($model, 'enriched_at', now()->toIso8601String(), 'string', $source);

@@ -37,7 +37,7 @@ class EnrichAlbumMusicBrainz implements ShouldBeUnique, ShouldQueue
     public function handle(WikipediaClient $wikipedia): void
     {
         $album = $this->album;
-        $mbid = $album->metadata()->where('key', 'mbid')->where('source', Enrichment::MUSICBRAINZ)->value('value');
+        $mbid = Enrichment::mbid($album);
 
         if (!$mbid || Enrichment::isDone($album, Enrichment::MUSICBRAINZ)) {
             return;
@@ -61,8 +61,7 @@ class EnrichAlbumMusicBrainz implements ShouldBeUnique, ShouldQueue
 
     private function storeRelease(Album $album, array $release, MusicBrainzClient $mb, WikipediaClient $wikipedia): void
     {
-        $save = fn (string $key, ?string $value, string $type = 'string') => $value !== null && $value !== ''
-            ? Enrichment::save($album, $key, $value, $type, Enrichment::MUSICBRAINZ) : null;
+        $save = Enrichment::saver($album, Enrichment::MUSICBRAINZ);
 
         $labelInfo = collect($release['label-info'] ?? []);
         $save('label', $labelInfo->pluck('label.name')->filter()->first());
@@ -96,10 +95,7 @@ class EnrichAlbumMusicBrainz implements ShouldBeUnique, ShouldQueue
 
             $links = MusicBrainzClient::links($groupData['relations'] ?? []);
             if (($qid = MusicBrainzClient::wikidataId($links)) && ($summary = $wikipedia->summaryForWikidata($qid))) {
-                Enrichment::save($album, 'wikipedia_extract', $summary['extract'], 'string', 'wikipedia');
-                if ($summary['url']) {
-                    Enrichment::save($album, 'wikipedia_url', $summary['url'], 'string', 'wikipedia');
-                }
+                Enrichment::saveWikipedia($album, $summary);
             }
         }
 

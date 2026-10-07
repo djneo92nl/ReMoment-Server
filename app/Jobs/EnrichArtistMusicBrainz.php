@@ -31,7 +31,7 @@ class EnrichArtistMusicBrainz implements ShouldBeUnique, ShouldQueue
     public function handle(WikipediaClient $wikipedia): void
     {
         $artist = $this->artist;
-        $mbid = $artist->metadata()->where('key', 'mbid')->where('source', Enrichment::MUSICBRAINZ)->value('value');
+        $mbid = Enrichment::mbid($artist);
 
         if (!$mbid || Enrichment::isDone($artist, Enrichment::MUSICBRAINZ)) {
             return;
@@ -48,8 +48,7 @@ class EnrichArtistMusicBrainz implements ShouldBeUnique, ShouldQueue
 
     private function store(Artist $artist, array $data, WikipediaClient $wikipedia): void
     {
-        $save = fn (string $key, ?string $value, string $type = 'string') => $value !== null && $value !== ''
-            ? Enrichment::save($artist, $key, $value, $type, Enrichment::MUSICBRAINZ) : null;
+        $save = Enrichment::saver($artist, Enrichment::MUSICBRAINZ);
 
         // Curated genres first; the free-form tags only when there are none.
         $names = collect($data['genres'] ?? [])->sortByDesc('count')->pluck('name');
@@ -73,10 +72,7 @@ class EnrichArtistMusicBrainz implements ShouldBeUnique, ShouldQueue
 
         if (($qid = MusicBrainzClient::wikidataId($links)) && ($summary = $wikipedia->summaryForWikidata($qid))) {
             Enrichment::save($artist, 'wikidata_id', $qid, 'string', 'wikipedia');
-            Enrichment::save($artist, 'wikipedia_extract', $summary['extract'], 'string', 'wikipedia');
-            if ($summary['url']) {
-                Enrichment::save($artist, 'wikipedia_url', $summary['url'], 'string', 'wikipedia');
-            }
+            Enrichment::saveWikipedia($artist, $summary);
         }
     }
 }

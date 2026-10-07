@@ -74,8 +74,7 @@ class EnrichAlbumDiscogs implements ShouldBeUnique, ShouldQueue
 
     private function store(Album $album, array $release): void
     {
-        $save = fn (string $key, ?string $value, string $type = 'string') => $value !== null && $value !== ''
-            ? Enrichment::save($album, $key, $value, $type, Enrichment::DISCOGS) : null;
+        $save = Enrichment::saver($album, Enrichment::DISCOGS);
 
         $save('discogs_id', (string) $release['id']);
         $save('discogs_url', $release['uri'] ?? null);

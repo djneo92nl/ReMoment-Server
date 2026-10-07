@@ -30,7 +30,7 @@ class EnrichArtistAudioDb implements ShouldBeUnique, ShouldQueue
     public function handle(AudioDbClient $audioDb): void
     {
         $artist = $this->artist;
-        $mbid = $artist->metadata()->where('key', 'mbid')->where('source', Enrichment::MUSICBRAINZ)->value('value');
+        $mbid = Enrichment::mbid($artist);
 
         if (!$mbid || Enrichment::isDone($artist, Enrichment::AUDIODB)) {
             return;
@@ -39,8 +39,7 @@ class EnrichArtistAudioDb implements ShouldBeUnique, ShouldQueue
         $data = $audioDb->get('artist-mb.php', $mbid)['artists'][0] ?? null;
 
         if ($data !== null) {
-            $save = fn (string $key, ?string $value, string $type = 'string') => $value !== null && trim($value) !== ''
-                ? Enrichment::save($artist, $key, trim($value), $type, Enrichment::AUDIODB) : null;
+            $save = Enrichment::saver($artist, Enrichment::AUDIODB);
 
             $save('audiodb_id', $data['idArtist'] ?? null);
             $save('mood', $data['strMood'] ?? null);

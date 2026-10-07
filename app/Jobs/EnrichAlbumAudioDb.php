@@ -39,8 +39,7 @@ class EnrichAlbumAudioDb implements ShouldBeUnique, ShouldQueue
         $data = $audioDb->get('album-mb.php', $groupMbid)['album'][0] ?? null;
 
         if ($data !== null) {
-            $save = fn (string $key, ?string $value, string $type = 'string') => $value !== null && trim($value) !== ''
-                ? Enrichment::save($album, $key, trim($value), $type, Enrichment::AUDIODB) : null;
+            $save = Enrichment::saver($album, Enrichment::AUDIODB);
 
             $save('audiodb_id', $data['idAlbum'] ?? null);
             $save('mood', $data['strMood'] ?? null);
