@@ -4,7 +4,6 @@ namespace App\Integrations\BangOlufsen\Ase\Connectors;
 
 use App\Domain\Device\Settings\AdjustmentRange;
 use App\Domain\Device\Settings\SoundAdjustment;
-use App\Integrations\Common\UnsupportedOperationException;
 
 trait SoundAdjustmentControls
 {
@@ -34,27 +33,14 @@ trait SoundAdjustmentControls
     public function setSoundAdjustment(?int $bass = null, ?int $treble = null, ?bool $loudness = null): void
     {
         $current = $this->getSoundAdjustment();
+        $current->assertCanSet($bass, $treble, $loudness);
 
-        $wanted = ['bass' => $bass, 'treble' => $treble];
+        // The device wants every part it has, so the ones not changed are sent as they are.
         $body = [];
-
-        foreach ($wanted as $part => $value) {
-            $range = $current->{$part};
-            if ($range === null) {
-                if ($value !== null) {
-                    throw new UnsupportedOperationException("This device has no {$part} adjustment.");
-                }
-
-                continue;
+        foreach (['bass' => $bass, 'treble' => $treble] as $part => $value) {
+            if ($current->{$part} !== null) {
+                $body[$part] = $value ?? $current->{$part}->value;
             }
-            if ($value !== null && !$range->accepts($value)) {
-                throw new \InvalidArgumentException("{$part} must be between {$range->min} and {$range->max} (step {$range->step}).");
-            }
-            $body[$part] = $value ?? $range->value;
-        }
-
-        if ($current->loudness === null && $loudness !== null) {
-            throw new UnsupportedOperationException('This device has no loudness adjustment.');
         }
         if ($current->loudness !== null) {
             $body['loudness'] = $loudness ?? $current->loudness;

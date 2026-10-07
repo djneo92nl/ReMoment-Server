@@ -31,9 +31,10 @@ trait SettingsControls
 
     public function setSoundAdjustment(?int $bass = null, ?int $treble = null, ?bool $loudness = null): void
     {
+        $range = new AdjustmentRange(0, self::SONOS_EQ_MIN, self::SONOS_EQ_MAX);
         foreach (['bass' => $bass, 'treble' => $treble] as $part => $value) {
-            if ($value !== null && ($value < self::SONOS_EQ_MIN || $value > self::SONOS_EQ_MAX)) {
-                throw new \InvalidArgumentException("{$part} must be between ".self::SONOS_EQ_MIN.' and '.self::SONOS_EQ_MAX.' (step 1).');
+            if ($value !== null) {
+                $range->assertAccepts($part, $value);
             }
         }
 

@@ -39,20 +39,7 @@ trait SettingsControls
 
     public function setSoundAdjustment(?int $bass = null, ?int $treble = null, ?bool $loudness = null): void
     {
-        $current = $this->getSoundAdjustment();
-
-        foreach (['bass' => $bass, 'treble' => $treble] as $part => $value) {
-            if ($value === null) {
-                continue;
-            }
-            $range = $current->{$part} ?? throw new UnsupportedOperationException("This device has no {$part} adjustment.");
-            if (!$range->accepts($value)) {
-                throw new \InvalidArgumentException("{$part} must be between {$range->min} and {$range->max} (step {$range->step}).");
-            }
-        }
-        if ($loudness !== null && $current->loudness === null) {
-            throw new UnsupportedOperationException('This device has no loudness adjustment.');
-        }
+        $this->getSoundAdjustment()->assertCanSet($bass, $treble, $loudness);
 
         $sound = $this->client->sound();
         if ($bass !== null) {

@@ -17,6 +17,14 @@ final readonly class AdjustmentRange
         return $value >= $this->min && $value <= $this->max && ($value - $this->min) % max($this->step, 1) === 0;
     }
 
+    /** @throws \InvalidArgumentException when the device would not accept $value for $part */
+    public function assertAccepts(string $part, int $value): void
+    {
+        if (!$this->accepts($value)) {
+            throw new \InvalidArgumentException("{$part} must be between {$this->min} and {$this->max} (step {$this->step}).");
+        }
+    }
+
     public function toArray(): array
     {
         return ['value' => $this->value, 'min' => $this->min, 'max' => $this->max, 'step' => $this->step];
