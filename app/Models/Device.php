@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Library\LibraryPlayback;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
@@ -16,6 +17,8 @@ use Illuminate\Support\Collection;
  */
 class Device extends Model
 {
+    use HasFactory;
+
     protected $driver = null;
 
     public $fillable = [

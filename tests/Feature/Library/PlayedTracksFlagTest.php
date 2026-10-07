@@ -117,9 +117,9 @@ class PlayedTracksFlagTest extends TestCase
 
     public function test_a_radio_play_with_artist_and_title_keeps_its_station_when_unmatched(): void
     {
-        $device = Device::create([
-            'ip_address' => '10.0.0.2', 'device_name' => 'Radio', 'device_brand_name' => 'Test', 'device_product_type' => 'Speaker',
-            'device_driver' => FakePlayerDriver::class, 'device_driver_name' => 'Fake',
+        $device = Device::factory()->create([
+            'ip_address' => '10.0.0.2',
+            'device_name' => 'Radio',
         ]);
         $artistData = new ArtistData(name: 'Nobody');
         $nowPlaying = new NowPlaying(

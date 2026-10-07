@@ -153,9 +153,9 @@ class MoreOnSpotifyTest extends TestCase
     public function test_playing_a_spotify_row_on_a_device_that_cannot_play_spotify_reports_it(): void
     {
         $this->connect(Mockery::mock(SpotifyWebAPI::class));
-        $device = \App\Models\Device::create([
-            'ip_address' => '10.0.0.1', 'device_name' => 'Speaker', 'device_brand_name' => 'Test', 'device_product_type' => 'Speaker',
-            'device_driver' => \Tests\Support\FakePlayerDriver::class, 'device_driver_name' => 'Fake',
+        $device = \App\Models\Device::factory()->create([
+            'ip_address' => '10.0.0.1',
+            'device_name' => 'Speaker',
         ]);
 
         $this->post(route('spotify.tracks.play', ['spotifyTrackId' => 'abc123', 'device' => $device]))

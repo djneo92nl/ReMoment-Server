@@ -57,11 +57,8 @@ class SpotifyRoutingTest extends TestCase
 
     private function makeDevice(string $name, string $driver, string $driverName = 'Fake'): Device
     {
-        $device = Device::create([
-            'ip_address' => '10.0.0.10',
+        $device = Device::factory()->create([
             'device_name' => $name,
-            'device_brand_name' => 'Test',
-            'device_product_type' => 'Speaker',
             'device_driver' => $driver,
             'device_driver_name' => $driverName,
         ]);

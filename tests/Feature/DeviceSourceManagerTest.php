@@ -15,13 +15,11 @@ class DeviceSourceManagerTest extends TestCase
 
     private function device(): Device
     {
-        return Device::create([
-            'ip_address' => '10.0.0.10',
+        return Device::factory()->create([
             'device_name' => 'Ray',
             'device_brand_name' => 'Sonos',
             'device_product_type' => 'Sonos Ray',
             'device_driver' => FakeSourceDriver::class,
-            'device_driver_name' => 'Fake',
         ]);
     }
 

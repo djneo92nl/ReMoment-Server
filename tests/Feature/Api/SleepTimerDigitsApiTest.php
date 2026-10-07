@@ -23,13 +23,10 @@ class SleepTimerDigitsApiTest extends TestCase
 
     private function makeDevice(string $driver = FakeSleepDigitsDriver::class, State $state = State::Playing): Device
     {
-        $device = Device::create([
-            'ip_address' => '10.0.0.10',
+        $device = Device::factory()->create([
             'device_name' => 'TV',
-            'device_brand_name' => 'Test',
             'device_product_type' => 'TV',
             'device_driver' => $driver,
-            'device_driver_name' => 'Fake',
         ]);
 
         DeviceCache::updateState($device->id, $state);

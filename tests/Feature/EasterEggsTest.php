@@ -9,7 +9,6 @@ use App\Domain\Media\NowPlaying;
 use App\Domain\Media\TrackData;
 use App\Models\Device;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\Support\FakePlayerDriver;
 use Tests\TestCase;
 
 class EasterEggsTest extends TestCase
@@ -18,14 +17,7 @@ class EasterEggsTest extends TestCase
 
     private function playSomething(): void
     {
-        $device = Device::create([
-            'ip_address' => '10.0.0.10',
-            'device_name' => 'Living Room',
-            'device_brand_name' => 'Test',
-            'device_product_type' => 'Speaker',
-            'device_driver' => FakePlayerDriver::class,
-            'device_driver_name' => 'Fake',
-        ]);
+        $device = Device::factory()->create();
 
         DeviceCache::updateState($device->id, State::Playing);
         DeviceCache::updateNowPlaying($device->id, new NowPlaying(

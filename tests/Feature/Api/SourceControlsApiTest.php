@@ -28,13 +28,10 @@ class SourceControlsApiTest extends TestCase
     {
         config(['control-profiles.transports' => $withTransport ? [FakeControlTransport::class] : []]);
 
-        $device = Device::create([
+        $device = Device::factory()->create([
             'ip_address' => '10.0.0.20',
             'device_name' => 'Beocenter',
-            'device_brand_name' => 'Test',
-            'device_product_type' => 'Speaker',
             'device_driver' => FakeBareDriver::class,
-            'device_driver_name' => 'Fake',
         ]);
 
         DeviceCache::updateState($device->id, State::Playing);

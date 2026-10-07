@@ -30,14 +30,7 @@ class LivewireControlsTest extends TestCase
 
     private function makeDevice(State $state = State::Playing): Device
     {
-        $device = Device::create([
-            'ip_address' => '10.0.0.10',
-            'device_name' => 'Living Room',
-            'device_brand_name' => 'Test',
-            'device_product_type' => 'Speaker',
-            'device_driver' => FakePlayerDriver::class,
-            'device_driver_name' => 'Fake',
-        ]);
+        $device = Device::factory()->create();
         DeviceCache::updateState($device->id, $state);
 
         return $device;

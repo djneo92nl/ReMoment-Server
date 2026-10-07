@@ -22,7 +22,7 @@ class AseLibraryPlaybackTest extends TestCase
 
     private function driver(?FakeAseConnector &$api = null): MusicPlayerDriver
     {
-        $device = Device::create([
+        $device = Device::factory()->create([
             'ip_address' => '10.0.0.20',
             'device_name' => 'Essence',
             'device_brand_name' => 'Bang & Olufsen',

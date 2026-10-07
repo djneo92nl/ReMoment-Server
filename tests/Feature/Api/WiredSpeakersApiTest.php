@@ -23,13 +23,10 @@ class WiredSpeakersApiTest extends TestCase
 
     private function makeDevice(string $product = 'BeoSound Moment', string $driver = FakeWiredSpeakersDriver::class, State $state = State::Standby): Device
     {
-        $device = Device::create([
-            'ip_address' => '10.0.0.10',
-            'device_name' => 'Living Room',
+        $device = Device::factory()->create([
             'device_brand_name' => 'Bang & Olufsen',
             'device_product_type' => $product,
             'device_driver' => $driver,
-            'device_driver_name' => 'Fake',
         ]);
 
         DeviceCache::updateState($device->id, $state);

@@ -30,13 +30,8 @@ class DeviceSettingsPageTest extends TestCase
 
     private function makeDevice(string $driver = FakeSettingsDriver::class, State $state = State::Standby): Device
     {
-        $device = Device::create([
-            'ip_address' => '10.0.0.10',
-            'device_name' => 'Living Room',
-            'device_brand_name' => 'Test',
-            'device_product_type' => 'Speaker',
+        $device = Device::factory()->create([
             'device_driver' => $driver,
-            'device_driver_name' => 'Fake',
         ]);
 
         DeviceCache::updateState($device->id, $state);
@@ -281,13 +276,12 @@ class DeviceSettingsPageTest extends TestCase
     {
         FakeNetworkDriver::reset();
 
-        $device = Device::create([
+        $device = Device::factory()->create([
             'ip_address' => '10.0.0.11',
             'device_name' => 'Speaker',
             'device_brand_name' => 'Bang & Olufsen',
             'device_product_type' => $product,
             'device_driver' => FakeNetworkDriver::class,
-            'device_driver_name' => 'Fake',
         ]);
         DeviceCache::updateState($device->id, State::Standby);
 
@@ -390,13 +384,12 @@ class DeviceSettingsPageTest extends TestCase
     {
         FakeWiredSpeakersDriver::reset();
 
-        $device = Device::create([
+        $device = Device::factory()->create([
             'ip_address' => '10.0.0.12',
             'device_name' => 'Speaker',
             'device_brand_name' => 'Bang & Olufsen',
             'device_product_type' => $product,
             'device_driver' => FakeWiredSpeakersDriver::class,
-            'device_driver_name' => 'Fake',
         ]);
         DeviceCache::updateState($device->id, State::Standby);
 

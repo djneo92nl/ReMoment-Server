@@ -79,9 +79,9 @@ class LibraryPlaylistsApiTest extends TestCase
 
     private function device(string $driver = FakeLibraryPlaybackDriver::class, State $state = State::Standby): Device
     {
-        $device = Device::create([
-            'ip_address' => '10.0.0.1', 'device_name' => 'Living Room', 'device_brand_name' => 'Test',
-            'device_product_type' => 'Speaker', 'device_driver' => $driver, 'device_driver_name' => 'Fake',
+        $device = Device::factory()->create([
+            'ip_address' => '10.0.0.1',
+            'device_driver' => $driver,
         ]);
         DeviceCache::updateState($device->id, $state);
 

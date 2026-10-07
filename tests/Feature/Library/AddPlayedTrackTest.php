@@ -21,7 +21,6 @@ use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Mockery;
 use SpotifyWebAPI\SpotifyWebAPI;
-use Tests\Support\FakePlayerDriver;
 use Tests\TestCase;
 
 class AddPlayedTrackTest extends TestCase
@@ -30,10 +29,7 @@ class AddPlayedTrackTest extends TestCase
 
     private function device(): Device
     {
-        $device = Device::create([
-            'ip_address' => '10.0.0.10', 'device_name' => 'Living Room', 'device_brand_name' => 'Test',
-            'device_product_type' => 'Speaker', 'device_driver' => FakePlayerDriver::class, 'device_driver_name' => 'Fake',
-        ]);
+        $device = Device::factory()->create();
         DeviceCache::updateState($device->id, State::Playing);
         cache()->put("listener_running_{$device->id}", true, 60);
 

@@ -12,7 +12,6 @@ use App\Models\Media\Track;
 use App\Models\Play;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
-use Tests\Support\FakePlayerDriver;
 use Tests\TestCase;
 
 /** `artwork:prerender` and the "recently played albums" order it shares with the client pre-cache list and SD export. */
@@ -28,10 +27,7 @@ class PrerenderArtworkTest extends TestCase
     {
         parent::setUp();
 
-        $this->device = Device::create([
-            'ip_address' => '10.0.0.10', 'device_name' => 'Living Room', 'device_brand_name' => 'Test',
-            'device_product_type' => 'Speaker', 'device_driver' => FakePlayerDriver::class, 'device_driver_name' => 'Fake',
-        ]);
+        $this->device = Device::factory()->create();
         $this->artist = Artist::create(['name' => 'A', 'source' => 'spotify']);
     }
 

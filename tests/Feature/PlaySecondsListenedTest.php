@@ -14,9 +14,12 @@ class PlaySecondsListenedTest extends TestCase
 
     public function test_it_sums_finished_plays_in_sql(): void
     {
-        $device = Device::create([
-            'ip_address' => '10.0.0.1', 'device_name' => 'A', 'device_brand_name' => 'T',
-            'device_product_type' => 'S', 'device_driver' => FakeBareDriver::class, 'device_driver_name' => 'Fake',
+        $device = Device::factory()->create([
+            'ip_address' => '10.0.0.1',
+            'device_name' => 'A',
+            'device_brand_name' => 'T',
+            'device_product_type' => 'S',
+            'device_driver' => FakeBareDriver::class,
         ]);
         $start = now()->subHour()->startOfSecond();
         Play::create(['device_id' => $device->id, 'track_name' => 'a', 'played_at' => $start, 'ended_at' => $start->copy()->addSeconds(200)]);

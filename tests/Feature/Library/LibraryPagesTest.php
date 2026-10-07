@@ -73,9 +73,9 @@ class LibraryPagesTest extends TestCase
     {
         $album = $this->release('Coldplay', 'Parachutes');
         $track = $album->tracks()->first();
-        $device = \App\Models\Device::create([
-            'device_name' => 'Speaker', 'device_brand_name' => 'Test', 'device_product_type' => 'Speaker',
-            'ip_address' => '10.0.0.1', 'device_driver' => \Tests\Support\FakePlayerDriver::class, 'device_driver_name' => 'Fake',
+        $device = \App\Models\Device::factory()->create([
+            'device_name' => 'Speaker',
+            'ip_address' => '10.0.0.1',
         ]);
         \App\Models\Play::create(['device_id' => $device->id, 'track_id' => $track->id, 'source_type' => 'dlna', 'played_at' => now()]);
 
@@ -86,9 +86,9 @@ class LibraryPagesTest extends TestCase
 
     public function test_recently_played_includes_plays_of_tracks_not_in_the_library(): void
     {
-        $device = \App\Models\Device::create([
-            'device_name' => 'Speaker', 'device_brand_name' => 'Test', 'device_product_type' => 'Speaker',
-            'ip_address' => '10.0.0.1', 'device_driver' => \Tests\Support\FakePlayerDriver::class, 'device_driver_name' => 'Fake',
+        $device = \App\Models\Device::factory()->create([
+            'device_name' => 'Speaker',
+            'ip_address' => '10.0.0.1',
         ]);
         \App\Models\Play::create([
             'device_id' => $device->id, 'track_name' => 'Stranger', 'artist_name' => 'Nobody',

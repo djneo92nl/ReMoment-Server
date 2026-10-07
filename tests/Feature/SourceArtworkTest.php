@@ -228,10 +228,7 @@ class SourceArtworkTest extends TestCase
     public function test_api_now_playing_carries_the_logo_artwork_with_its_kind(): void
     {
         FakePlayerDriver::reset();
-        $device = Device::create([
-            'ip_address' => '10.0.0.10', 'device_name' => 'Living Room', 'device_brand_name' => 'Test',
-            'device_product_type' => 'Speaker', 'device_driver' => FakePlayerDriver::class, 'device_driver_name' => 'Fake',
-        ]);
+        $device = Device::factory()->create();
         DeviceCache::updateState($device->id, State::Playing);
         DeviceCache::updateNowPlaying($device->id, $this->lineIn());
 

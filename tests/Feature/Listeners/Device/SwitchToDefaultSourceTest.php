@@ -26,13 +26,10 @@ class SwitchToDefaultSourceTest extends TestCase
 
     private function device(?string $default = 'tv'): Device
     {
-        $device = Device::create([
-            'ip_address' => '10.0.0.10',
+        $device = Device::factory()->create([
             'device_name' => 'TV',
-            'device_brand_name' => 'Test',
             'device_product_type' => 'Soundbar',
             'device_driver' => FakeSourceDriver::class,
-            'device_driver_name' => 'Fake',
         ]);
 
         if ($default) {

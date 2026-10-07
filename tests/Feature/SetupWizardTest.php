@@ -21,13 +21,10 @@ class SetupWizardTest extends TestCase
 
     public function test_devices_step_completes_once_a_device_exists(): void
     {
-        Device::create([
+        Device::factory()->create([
             'ip_address' => '10.0.0.1',
             'device_name' => 'Test Speaker',
-            'device_brand_name' => 'Test',
-            'device_product_type' => 'Speaker',
             'device_driver' => \App\Integrations\Spotify\MusicPlayerDriver::class,
-            'device_driver_name' => 'Fake',
         ]);
 
         Livewire::test(SetupWizard::class)
@@ -60,13 +57,10 @@ class SetupWizardTest extends TestCase
             ->assertSee("Skip setup, I'll do this later")
             ->assertDontSee('Finish');
 
-        Device::create([
+        Device::factory()->create([
             'ip_address' => '10.0.0.1',
             'device_name' => 'Test Speaker',
-            'device_brand_name' => 'Test',
-            'device_product_type' => 'Speaker',
             'device_driver' => \App\Integrations\Spotify\MusicPlayerDriver::class,
-            'device_driver_name' => 'Fake',
         ]);
 
         Livewire::test(SetupWizard::class)

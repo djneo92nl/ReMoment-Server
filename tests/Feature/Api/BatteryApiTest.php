@@ -19,13 +19,9 @@ class BatteryApiTest extends TestCase
 
     private function makeDevice(): Device
     {
-        $device = Device::create([
-            'ip_address' => '10.0.0.10',
+        $device = Device::factory()->create([
             'device_name' => 'Roam',
-            'device_brand_name' => 'Test',
-            'device_product_type' => 'Speaker',
             'device_driver' => FakeBatteryDriver::class,
-            'device_driver_name' => 'Fake',
         ]);
 
         DeviceCache::updateState($device->id, State::Standby);

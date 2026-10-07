@@ -38,13 +38,10 @@ class ScrobbleToLastfmTest extends TestCase
             'source' => 'dlna',
             'duration' => 200,
         ]);
-        $this->device = Device::create([
+        $this->device = Device::factory()->create([
             'ip_address' => '10.0.0.1',
             'device_name' => 'Test Speaker',
-            'device_brand_name' => 'Test',
-            'device_product_type' => 'Speaker',
             'device_driver' => \App\Integrations\Spotify\MusicPlayerDriver::class,
-            'device_driver_name' => 'Fake',
         ]);
     }
 

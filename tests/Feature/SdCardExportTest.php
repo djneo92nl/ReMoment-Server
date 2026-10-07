@@ -15,7 +15,6 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
-use Tests\Support\FakePlayerDriver;
 use Tests\TestCase;
 use ZipArchive;
 
@@ -33,10 +32,7 @@ class SdCardExportTest extends TestCase
         parent::setUp();
 
         Storage::fake('local');
-        $this->device = Device::create([
-            'ip_address' => '10.0.0.10', 'device_name' => 'Living Room', 'device_brand_name' => 'Test',
-            'device_product_type' => 'Speaker', 'device_driver' => FakePlayerDriver::class, 'device_driver_name' => 'Fake',
-        ]);
+        $this->device = Device::factory()->create();
         $this->artist = Artist::create(['name' => 'A', 'source' => 'spotify']);
 
         // Logos are rendered for real in one test; elsewhere stub their files to keep tests quick.

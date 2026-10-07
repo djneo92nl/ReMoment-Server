@@ -7,7 +7,6 @@ use App\Models\Client;
 use App\Models\Device;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
-use Tests\Support\FakePlayerDriver;
 use Tests\TestCase;
 
 /** Contract tests for the client-device API (see docs/api/client-devices.md). */
@@ -17,13 +16,8 @@ class ClientApiTest extends TestCase
 
     private function makeDevice(string $name): Device
     {
-        return Device::create([
-            'ip_address' => '10.0.0.10',
+        return Device::factory()->create([
             'device_name' => $name,
-            'device_brand_name' => 'Test',
-            'device_product_type' => 'Speaker',
-            'device_driver' => FakePlayerDriver::class,
-            'device_driver_name' => 'Fake',
         ]);
     }
 

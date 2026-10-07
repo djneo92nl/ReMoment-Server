@@ -21,13 +21,8 @@ class MultiRoomGroupsTest extends TestCase
 
     private function makeDevice(string $name, string $jid): Device
     {
-        $device = Device::create([
-            'ip_address' => '10.0.0.10',
+        $device = Device::factory()->create([
             'device_name' => $name,
-            'device_brand_name' => 'Test',
-            'device_product_type' => 'Speaker',
-            'device_driver' => FakePlayerDriver::class,
-            'device_driver_name' => 'Fake',
         ]);
         $device->meta()->create(['key' => 'fake_id', 'value' => $jid]);
 

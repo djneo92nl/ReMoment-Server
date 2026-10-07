@@ -21,13 +21,9 @@ class RadioStationsApiTest extends TestCase
 
     private function makeDevice(string $driver = FakeRadioDriver::class, State $state = State::Standby): Device
     {
-        $device = Device::create([
-            'ip_address' => '10.0.0.10',
+        $device = Device::factory()->create([
             'device_name' => 'Kitchen',
-            'device_brand_name' => 'Test',
-            'device_product_type' => 'Speaker',
             'device_driver' => $driver,
-            'device_driver_name' => 'Fake',
         ]);
 
         DeviceCache::updateState($device->id, $state);
