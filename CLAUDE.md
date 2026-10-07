@@ -685,10 +685,10 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 - `DeviceHistory` (`app/Livewire/DeviceHistory.php`) — last 10 unique tracks for a device
 - `PlayHistory` (`app/Livewire/PlayHistory.php`) — paginated play history with device/source filters
 - `ClientManager` (`app/Livewire/ClientManager.php`) — approve/reject pending registrations, edit client name/type/device assignment, regenerate tokens
+- `PlayerBar` (`app/Livewire/PlayerBar.php`) — sticky bottom player for the device pinned in this browser (cookie, `SelectedDevice`); library play buttons (`<x-play-button>`) play on it directly (see `docs/frontend/player-bar.md`)
 - `SetupWizard` (`app/Livewire/SetupWizard.php`) — first-time setup checklist: add devices, client devices, library source (see `docs/architecture/setup-wizard.md`)
 
 ### Web Pages
-- `PlayerBar` (`app/Livewire/PlayerBar.php`) — sticky bottom player for the device pinned in this browser (cookie, `SelectedDevice`); library play buttons (`<x-play-button>`) play on it directly (see `docs/frontend/player-bar.md`)
 
 - `/setup` — first-time setup wizard (see `docs/architecture/setup-wizard.md`); auto-redirected here for a logged-in admin while zero devices exist
 - `/devices` — responsive device grid dashboard (playing devices get wide card, others get compact)

@@ -38,9 +38,9 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(MqttService::class);
+        $this->app->scoped(\App\Support\SelectedDevice::class);
     }
 
-        $this->app->scoped(\App\Support\SelectedDevice::class);
     /**
      * Bootstrap any application services.
      */
