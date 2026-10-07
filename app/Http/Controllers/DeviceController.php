@@ -8,10 +8,8 @@ use App\Domain\Device\MultiRoomGroups;
 use App\Domain\Device\SpotifyRouting;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\NotPlayableException;
-use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
-use App\Models\DeviceSource;
 use App\Models\Media\Track;
 use App\Models\Play;
 use Illuminate\Http\Request;
@@ -149,25 +147,6 @@ class DeviceController extends Controller
         $device->update($validated);
 
         return redirect()->route('devices.show', $device)->with('success', 'Device updated.');
-    }
-
-    public function activateSource(Device $device, DeviceSource $deviceSource)
-    {
-        abort_if($deviceSource->device_id !== $device->id, 403);
-
-        try {
-            $driver = $device->driver;
-
-            if (!($driver instanceof SourceActivationInterface)) {
-                return back()->with('error', "{$device->device_name} does not support source activation.");
-            }
-
-            $driver->activateSource($deviceSource->source_id);
-        } catch (\Throwable $e) {
-            return back()->with('error', "Could not reach {$device->device_name}: {$e->getMessage()}");
-        }
-
-        return back()->with('success', "Switched to {$deviceSource->friendly_name}.");
     }
 
     public function playTrack(Track $track, Device $device, LibraryPlayback $library)

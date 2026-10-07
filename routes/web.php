@@ -25,7 +25,6 @@ Route::get('/devices/discover', fn () => view('devices.discover'))->name('device
 Route::resource('devices', DeviceController::class);
 Route::post('/devices/{device}/standby', [DeviceController::class, 'standby'])->name('devices.standby');
 Route::post('/devices/{device}/hidden', [DeviceController::class, 'toggleHidden'])->name('devices.toggle-hidden');
-Route::post('/devices/{device}/sources/{deviceSource}/activate', [DeviceController::class, 'activateSource'])->name('devices.sources.activate');
 Route::get('/history', [HistoryController::class, 'index'])->name('history.index');
 Route::get('/stats', [StatsController::class, 'index'])->name('stats.index');
 Route::get('/multiroom', fn () => view('multiroom.index'))->name('multiroom.index');
