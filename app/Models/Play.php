@@ -68,7 +68,7 @@ class Play extends Model
     public static function secondsListened(?Builder $plays = null): int
     {
         $seconds = DB::getDriverName() === 'sqlite'
-            ? 'CAST((julianday(ended_at) - julianday(played_at)) * 86400 AS INTEGER)'
+            ? 'CAST(ROUND((julianday(ended_at) - julianday(played_at)) * 86400) AS INTEGER)'
             : 'TIMESTAMPDIFF(SECOND, played_at, ended_at)';
 
         return (int) ($plays ?? static::query())
