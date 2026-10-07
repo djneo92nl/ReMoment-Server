@@ -78,7 +78,7 @@ class StatsController extends Controller
         }
 
         // Source distribution
-        $nullLabel = $isSqlite ? "COALESCE(source_type, 'unknown')" : "COALESCE(source_type, 'unknown')";
+        $nullLabel = "COALESCE(source_type, 'unknown')";
         $sourceDistribution = DB::table('plays')
             ->selectRaw("$nullLabel as source_type, COUNT(*) as count")
             ->groupBy('source_type')
@@ -86,14 +86,7 @@ class StatsController extends Controller
             ->get();
 
         // Total listening time in seconds
-        $secondsExpr = $isSqlite
-            ? 'CAST((julianday(ended_at) - julianday(played_at)) * 86400 AS INTEGER)'
-            : 'TIMESTAMPDIFF(SECOND, played_at, ended_at)';
-        $listeningSeconds = (int) DB::table('plays')
-            ->whereNotNull('ended_at')
-            ->whereRaw('ended_at > played_at')
-            ->selectRaw("SUM($secondsExpr) as seconds")
-            ->value('seconds');
+        $listeningSeconds = Play::secondsListened();
 
         $totalPlays = Play::count();
         $totalTracks = Track::count();

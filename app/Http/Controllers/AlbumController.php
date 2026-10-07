@@ -64,10 +64,7 @@ class AlbumController extends Controller
 
         $totalPlays = $album->plays()->count();
 
-        $totalSeconds = Play::whereHas('track', fn ($q) => $q->where('album_id', $album->id))
-            ->whereNotNull('ended_at')
-            ->get(['played_at', 'ended_at'])
-            ->sum(fn ($p) => $p->played_at->diffInSeconds($p->ended_at));
+        $totalSeconds = Play::secondsListened(Play::whereHas('track', fn ($q) => $q->where('album_id', $album->id)));
 
         $recentPlays = Play::whereHas('track', fn ($q) => $q->where('album_id', $album->id))
             ->with(['track', 'device', 'radioStation'])

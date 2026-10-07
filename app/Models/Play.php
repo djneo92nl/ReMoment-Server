@@ -5,8 +5,10 @@ namespace App\Models;
 use App\Domain\Artwork\LibraryArtwork;
 use App\Domain\Artwork\LibraryItemArtwork;
 use App\Models\Media\Track;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\DB;
 
 class Play extends Model
 {
@@ -60,6 +62,20 @@ class Play extends Model
             : null) ?? $this->image_url;
 
         return LibraryItemArtwork::proxy($raw, $size);
+    }
+
+    /** Seconds listened over the given plays (all plays by default): finished plays only, summed in SQL. */
+    public static function secondsListened(?Builder $plays = null): int
+    {
+        $seconds = DB::getDriverName() === 'sqlite'
+            ? 'CAST((julianday(ended_at) - julianday(played_at)) * 86400 AS INTEGER)'
+            : 'TIMESTAMPDIFF(SECOND, played_at, ended_at)';
+
+        return (int) ($plays ?? static::query())
+            ->whereNotNull('ended_at')
+            ->whereRaw('ended_at > played_at')
+            ->selectRaw("SUM($seconds) as seconds")
+            ->value('seconds');
     }
 
     public function isTrackPlay(): bool

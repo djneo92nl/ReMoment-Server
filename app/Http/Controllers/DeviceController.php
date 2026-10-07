@@ -93,10 +93,7 @@ class DeviceController extends Controller
         $mqttTopic = "remoment/player/{$device->id}";
         $sources = $device->deviceSources()->orderBy('category')->orderBy('friendly_name')->get();
 
-        $totalSeconds = Play::where('device_id', $device->id)
-            ->whereNotNull('ended_at')
-            ->get(['played_at', 'ended_at'])
-            ->sum(fn ($p) => $p->played_at->diffInSeconds($p->ended_at));
+        $totalSeconds = Play::secondsListened(Play::where('device_id', $device->id));
 
         $stats = [
             'total_plays' => Play::where('device_id', $device->id)->count(),
