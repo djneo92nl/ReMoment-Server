@@ -2,11 +2,11 @@
 
 namespace App\Integrations\BangOlufsen\Ase\Connectors;
 
+use App\Domain\Device\MultiRoomId;
 use App\Domain\Device\MultiRoomStatus;
 use App\Integrations\Common\UnsupportedOperationException;
 use App\Integrations\Contracts\SessionHostInterface;
 use App\Models\Device;
-use Illuminate\Support\Facades\Cache;
 
 trait MultiRoomControls
 {
@@ -17,24 +17,11 @@ trait MultiRoomControls
 
     public function getMultiRoomId(): ?string
     {
-        $cacheKey = "device:{$this->device->id}:ase_jid";
-        $cached = Cache::get($cacheKey);
-        if ($cached) {
-            return $cached;
-        }
+        return MultiRoomId::remember($this->device, 'ase_jid', function () {
+            $data = $this->getActiveSources();
 
-        $data = $this->getActiveSources();
-        $jid = ($data['activeSources']['primaryJid'] ?? '') ?: $this->jidFromProductId();
-
-        if ($jid) {
-            Cache::put($cacheKey, $jid, 86400 * 7);
-            $this->device->meta()->updateOrCreate(
-                ['key' => 'ase_jid'],
-                ['value' => $jid]
-            );
-        }
-
-        return $jid;
+            return ($data['activeSources']['primaryJid'] ?? '') ?: $this->jidFromProductId();
+        });
     }
 
     /**

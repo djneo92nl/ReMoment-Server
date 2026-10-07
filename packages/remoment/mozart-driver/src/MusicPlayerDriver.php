@@ -11,6 +11,7 @@ namespace Remoment\MozartDriver;
 use App\Domain\Device\AvailableSource;
 use App\Domain\Device\BatteryStatus;
 use App\Domain\Device\Cache\Volume;
+use App\Domain\Device\MultiRoomId;
 use App\Domain\Device\RepeatMode;
 use App\Domain\Device\State;
 use App\Integrations\Common\UnsupportedOperationException;
@@ -38,7 +39,6 @@ use App\Models\RadioStation;
 use Djneo92nl\BeoMozart\Enums\PlaybackCommand;
 use Djneo92nl\BeoMozart\MozartClient;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
 
 class MusicPlayerDriver implements BatteryInterface, BluetoothInterface, DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, PowerInterface, RadioControlInterface, RepeatInterface, SeekInterface, SessionHostInterface, ShuffleInterface, SoundAdjustmentInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
 {
@@ -169,20 +169,11 @@ class MusicPlayerDriver implements BatteryInterface, BluetoothInterface, DeviceI
 
     public function getVolume(): int
     {
-        $volume = Volume::getVolume($this->device->id);
-        if ($volume !== false) {
-            return (int) $volume;
-        }
+        return Volume::remember($this->device->id, function () {
+            $level = $this->client->volume()->getState()['level']['level'] ?? null;
 
-        $level = $this->client->volume()->getState()['level']['level'] ?? null;
-
-        if ($level === null) {
-            return 0;
-        }
-
-        Volume::updateVolume($this->device->id, (int) $level);
-
-        return (int) $level;
+            return $level === null ? null : (int) $level;
+        });
     }
 
     public function incrementVolume(): void
@@ -258,23 +249,7 @@ class MusicPlayerDriver implements BatteryInterface, BluetoothInterface, DeviceI
 
     public function getMultiRoomId(): ?string
     {
-        $cacheKey = "device:{$this->device->id}:mozart_jid";
-        $cached = Cache::get($cacheKey);
-        if ($cached) {
-            return $cached;
-        }
-
-        $jid = $this->client->beolink()->self()['jid'] ?? null;
-
-        if ($jid) {
-            Cache::put($cacheKey, $jid, 86400 * 7);
-            $this->device->meta()->updateOrCreate(
-                ['key' => 'mozart_jid'],
-                ['value' => $jid]
-            );
-        }
-
-        return $jid;
+        return MultiRoomId::remember($this->device, 'mozart_jid', fn () => $this->client->beolink()->self()['jid'] ?? null);
     }
 
     public function getCurrentPeerIds(): array

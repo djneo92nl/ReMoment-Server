@@ -21,7 +21,31 @@ final class Volume
     {
         $value = Cache::get(self::volumeKey($deviceId));
 
-        return $value ?: false;
+        // A cached 0 is a real level (muted by volume), not a miss.
+        return $value === null ? false : (int) $value;
+    }
+
+    /**
+     * The device's volume from the cache (kept current by its listener), else read from the device
+     * with `$read` (null when it reports none, answered as 0) and cached.
+     *
+     * @param  \Closure(): ?int  $read
+     */
+    public static function remember(int $deviceId, \Closure $read): int
+    {
+        $cached = self::getVolume($deviceId);
+        if ($cached !== false) {
+            return $cached;
+        }
+
+        $level = $read();
+        if ($level === null) {
+            return 0;
+        }
+
+        self::updateVolume($deviceId, $level);
+
+        return $level;
     }
 
     public static function updateMuted(int $deviceId, bool $muted): void

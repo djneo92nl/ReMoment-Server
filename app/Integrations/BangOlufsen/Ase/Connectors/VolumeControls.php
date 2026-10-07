@@ -17,19 +17,11 @@ trait VolumeControls
 
     public function getVolume(): int
     {
-        $volume = Volume::getVolume($this->device->id);
-        if ($volume === false) {
+        return Volume::remember($this->device->id, function () {
             $response = $this->deviceApiClient()->get('BeoZone/Zone/Sound/Volume/Speaker/Level');
-            if (array_key_exists('level', $response)) {
-                Volume::updateVolume($this->device->id, (int) $response['level']);
 
-                return (int) $response['level'];
-            }
-
-            return 0;
-        }
-
-        return (int) $volume;
+            return array_key_exists('level', $response) ? (int) $response['level'] : null;
+        });
     }
 
     public function setMaxVolume(int $minimum, int $maximum): void
