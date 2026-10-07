@@ -64,7 +64,7 @@ class LivewireControlsTest extends TestCase
     {
         $device = $this->makeDevice();
         $nowPlaying = new NowPlayingData(track: new TrackData(id: 't1', name: 'Song', duration: 200), state: 'playing', position: 50, type: 'music');
-        (new DeviceCache)->updateNowPlaying($device->id, $nowPlaying);
+        DeviceCache::updateNowPlaying($device->id, $nowPlaying);
         cache()->put("listener_running_{$device->id}", true, 10);
 
         Livewire::test(DeviceCard::class, ['device' => $device])

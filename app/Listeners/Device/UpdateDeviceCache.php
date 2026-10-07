@@ -40,7 +40,7 @@ class UpdateDeviceCache
 
         if ($event instanceof NowPlayingUpdated) {
             // Now-playing first: a state transition republishes it to MQTT /data.
-            (new DeviceCache)->updateNowPlaying($deviceId, $event->nowPlaying);
+            DeviceCache::updateNowPlaying($deviceId, $event->nowPlaying);
 
             DeviceCache::updateState($deviceId, State::Playing);
 
@@ -54,7 +54,7 @@ class UpdateDeviceCache
 
             if ($nowPlaying instanceof NowPlaying) {
                 $nowPlaying->position = $event->progress;
-                (new DeviceCache)->updateNowPlaying($deviceId, $nowPlaying);
+                DeviceCache::updateNowPlaying($deviceId, $nowPlaying);
             }
 
             return;

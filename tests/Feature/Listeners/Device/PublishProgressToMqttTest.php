@@ -23,7 +23,7 @@ class PublishProgressToMqttTest extends TestCase
         $track = new TrackData(duration: $duration);
         $nowPlaying = new NowPlaying(track: $track);
 
-        (new DeviceCache)->updateNowPlaying($deviceId, $nowPlaying);
+        DeviceCache::updateNowPlaying($deviceId, $nowPlaying);
 
         $this->mock(MqttService::class, function (MockInterface $mock) use ($deviceId) {
             $mock->shouldReceive('publish')

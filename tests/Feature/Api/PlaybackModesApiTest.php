@@ -45,7 +45,7 @@ class PlaybackModesApiTest extends TestCase
 
     private function playSomething(Device $device): void
     {
-        (new DeviceCache)->updateNowPlaying($device->id, new NowPlaying(
+        DeviceCache::updateNowPlaying($device->id, new NowPlaying(
             track: new TrackData(name: 'Song', duration: 200),
             type: 'music',
             platform: 'media',

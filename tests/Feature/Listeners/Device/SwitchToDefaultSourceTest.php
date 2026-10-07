@@ -79,7 +79,7 @@ class SwitchToDefaultSourceTest extends TestCase
     public function test_a_track_that_started_the_wake_is_left_alone(): void
     {
         $device = $this->device();
-        (new DeviceCache)->updateNowPlaying($device->id, new NowPlaying(track: new TrackData(name: 'Song')));
+        DeviceCache::updateNowPlaying($device->id, new NowPlaying(track: new TrackData(name: 'Song')));
 
         $this->wake($device);
 

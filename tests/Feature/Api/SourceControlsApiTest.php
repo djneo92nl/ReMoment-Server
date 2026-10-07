@@ -39,7 +39,7 @@ class SourceControlsApiTest extends TestCase
 
         DeviceCache::updateState($device->id, State::Playing);
         if ($source) {
-            (new DeviceCache)->updateNowPlaying($device->id, new NowPlaying(source: $source, state: 'playing'));
+            DeviceCache::updateNowPlaying($device->id, new NowPlaying(source: $source, state: 'playing'));
         }
 
         return $device;

@@ -233,7 +233,7 @@ class SourceArtworkTest extends TestCase
             'device_product_type' => 'Speaker', 'device_driver' => FakePlayerDriver::class, 'device_driver_name' => 'Fake',
         ]);
         DeviceCache::updateState($device->id, State::Playing);
-        (new DeviceCache)->updateNowPlaying($device->id, $this->lineIn());
+        DeviceCache::updateNowPlaying($device->id, $this->lineIn());
 
         $this->getJson("/api/devices/{$device->id}")
             ->assertOk()

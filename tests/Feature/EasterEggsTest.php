@@ -28,7 +28,7 @@ class EasterEggsTest extends TestCase
         ]);
 
         DeviceCache::updateState($device->id, State::Playing);
-        (new DeviceCache)->updateNowPlaying($device->id, new NowPlaying(
+        DeviceCache::updateNowPlaying($device->id, new NowPlaying(
             track: new TrackData(name: 'Café del Mar', artist: new ArtistData(name: 'Energy 52')),
             state: 'playing',
         ));

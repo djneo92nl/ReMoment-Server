@@ -43,7 +43,7 @@ class AddPlayedTrackTest extends TestCase
     private function playing(Device $device): void
     {
         $artist = new ArtistData(name: 'Nobody');
-        (new DeviceCache)->updateNowPlaying($device->id, new NowPlayingData(
+        DeviceCache::updateNowPlaying($device->id, new NowPlayingData(
             track: new TrackData(id: 'spotify:track:abc', name: 'Stranger', source: 'spotify', artist: $artist, duration: 200),
             album: new AlbumData(name: 'Elsewhere', artist: $artist),
             state: 'playing', position: 5, type: 'music',
@@ -143,7 +143,7 @@ class AddPlayedTrackTest extends TestCase
         Queue::fake();
         $device = $this->device();
         [$stub, $play] = $this->radioStub($device);
-        (new DeviceCache)->updateNowPlaying($device->id, new NowPlayingData(
+        DeviceCache::updateNowPlaying($device->id, new NowPlayingData(
             track: new TrackData(id: null, name: 'Stranger', artist: new ArtistData(name: 'Nobody')),
             state: 'playing', position: 5, type: 'music',
         ));

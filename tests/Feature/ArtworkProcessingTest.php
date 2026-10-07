@@ -199,7 +199,7 @@ class ArtworkProcessingTest extends TestCase
         $this->fakeHttp();
         $playing = Device::create(['device_name' => 'Kitchen', 'device_brand_name' => 'Test', 'device_product_type' => 'Test', 'device_driver_name' => 'Test', 'ip_address' => '10.0.0.1']);
         $other = Device::create(['device_name' => 'Bedroom', 'device_brand_name' => 'Test', 'device_product_type' => 'Test', 'device_driver_name' => 'Test', 'ip_address' => '10.0.0.2']);
-        (new DeviceCache)->updateNowPlaying($playing->id, $this->nowPlaying());
+        DeviceCache::updateNowPlaying($playing->id, $this->nowPlaying());
 
         (new ProcessArtwork(self::URL))->handle();
 

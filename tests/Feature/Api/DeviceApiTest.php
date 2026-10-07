@@ -100,7 +100,7 @@ class DeviceApiTest extends TestCase
     public function test_show_includes_now_playing_when_playing(): void
     {
         $device = $this->makeDevice(state: State::Playing);
-        (new DeviceCache)->updateNowPlaying($device->id, new NowPlaying(
+        DeviceCache::updateNowPlaying($device->id, new NowPlaying(
             track: new TrackData(id: 'spotify:track:abc', name: 'Song Title', source: 'spotify', artist: new ArtistData(name: 'Artist Name'), duration: 213),
             state: 'playing',
             position: 42,

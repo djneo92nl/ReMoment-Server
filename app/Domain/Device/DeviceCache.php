@@ -37,7 +37,7 @@ final class DeviceCache
         Cache::forget(self::nowPlayingKey($deviceId));
     }
 
-    public function updateNowPlaying(int $deviceId, NowPlaying $nowPlaying): void
+    public static function updateNowPlaying(int $deviceId, NowPlaying $nowPlaying): void
     {
         Cache::put(
             self::nowPlayingKey($deviceId),
