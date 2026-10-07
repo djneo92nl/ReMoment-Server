@@ -151,7 +151,7 @@
                     <div class="space-y-1">
                         @foreach($topTracks as $i => $track)
                             @php
-                                $artUrl = $track->images[0]['url'] ?? $track->album?->images[0]['url'] ?? null;
+                                $artUrl = \App\Domain\Artwork\LibraryItemArtwork::proxy(\App\Domain\Artwork\LibraryArtwork::coverUrl($track->images) ?? \App\Domain\Artwork\LibraryArtwork::coverUrl($track->album?->images), 120);
                             @endphp
                             <div class="flex items-center gap-4 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-stone-800/50 transition-colors group">
                                 <span class="w-5 text-center text-xs text-gray-300 dark:text-stone-600 flex-shrink-0">{{ $i + 1 }}</span>

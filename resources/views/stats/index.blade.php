@@ -103,7 +103,7 @@
                 @php $maxPlays = $topAlbums->first()->plays_count; @endphp
                 <div class="space-y-3">
                     @foreach($topAlbums as $i => $album)
-                        @php $artUrl = $album->images[0]['url'] ?? null; $colors = $album->colors ?? []; @endphp
+                        @php $artUrl = \App\Domain\Artwork\LibraryItemArtwork::proxy(\App\Domain\Artwork\LibraryArtwork::coverUrl($album->images), 120); $colors = $album->colors ?? []; @endphp
                         <div class="flex items-center gap-3">
                             <span class="w-5 text-center text-xs text-gray-300 dark:text-stone-600 flex-shrink-0">{{ $i + 1 }}</span>
                             <div class="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 shadow-sm"

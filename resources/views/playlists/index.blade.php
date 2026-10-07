@@ -27,8 +27,8 @@
                    class="bg-white dark:bg-stone-900 rounded-2xl border border-gray-200/70 dark:border-stone-800/80 shadow-sm p-5 hover:border-gray-300 dark:hover:border-stone-700 hover:shadow-md transition-all group">
                     <div class="flex items-center gap-4">
                         <div class="w-12 h-12 rounded-xl bg-gray-100 dark:bg-stone-800 flex items-center justify-center flex-shrink-0 overflow-hidden group-hover:bg-gray-200 dark:group-hover:bg-stone-700 transition-colors">
-                            @if($playlist->images[0]['url'] ?? null)
-                                <img src="{{ $playlist->images[0]['url'] }}" alt="{{ $playlist->name }}" class="w-full h-full object-cover">
+                            @if($cover = \App\Domain\Artwork\LibraryItemArtwork::proxy(\App\Domain\Artwork\LibraryArtwork::coverUrl($playlist->images)))
+                                <img src="{{ $cover }}" alt="{{ $playlist->name }}" class="w-full h-full object-cover">
                             @else
                                 <i class="fa-solid fa-list-ul text-gray-400 dark:text-gray-500"></i>
                             @endif

@@ -1,8 +1,7 @@
 @props(['album', 'showPlays' => false])
 
 @php
-    $rawCover = \App\Domain\Artwork\LibraryArtwork::coverUrl($album->images);
-    $cover = \App\Domain\Artwork\LibraryItemArtwork::webUrl(\App\Domain\Artwork\LibraryItemArtwork::forUrl($rawCover)['proxy_320'] ?? null) ?? $rawCover;
+    $cover = \App\Domain\Artwork\LibraryItemArtwork::proxy(\App\Domain\Artwork\LibraryArtwork::coverUrl($album->images));
     $meta = collect([
         $album->released_at?->format('Y'),
         $showPlays && ($album->plays_count ?? 0) > 0 ? number_format($album->plays_count).' '.Str::plural('play', $album->plays_count) : null,

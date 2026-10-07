@@ -95,6 +95,6 @@ class LibraryPagesTest extends TestCase
             'image_url' => 'https://img.test/c.jpg', 'source_type' => 'spotify', 'played_at' => now(),
         ]);
 
-        $this->get('/library')->assertSee('Stranger')->assertSee('Nobody')->assertSee('https://img.test/c.jpg', false);
+        $this->get('/library')->assertSee('Stranger')->assertSee('Nobody')->assertDontSee('https://img.test/c.jpg', false);
     }
 }

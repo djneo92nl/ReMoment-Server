@@ -52,14 +52,14 @@ class Play extends Model
     }
 
     /** True for a track play (in the library or logged as text), false for radio and source plays. */
-    /** The play's cover: the library's processed proxy at this size, else the raw image. */
+    /** The play's cover as our processed proxy at this size (null until processed), never the original image. */
     public function artUrl(int $size = 120): ?string
     {
         $raw = ($this->track
             ? (LibraryArtwork::coverUrl($this->track->images) ?? LibraryArtwork::coverUrl($this->track->album?->images))
             : null) ?? $this->image_url;
 
-        return LibraryItemArtwork::forUrl($raw)["proxy_{$size}"] ?? $raw;
+        return LibraryItemArtwork::proxy($raw, $size);
     }
 
     public function isTrackPlay(): bool

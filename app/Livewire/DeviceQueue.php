@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Domain\Artwork\LibraryItemArtwork;
 use App\Domain\Device\SpotifyRouting;
 use App\Domain\Device\State;
 use App\Integrations\Contracts\QueueInterface;
@@ -31,7 +32,12 @@ class DeviceQueue extends Component
             try {
                 $driver = SpotifyRouting::driverFor($this->device, QueueInterface::class);
                 if ($driver instanceof QueueInterface) {
-                    $items = array_map(fn ($item) => $item->toArray(), $driver->getUpNext($this->limit));
+                    $items = array_map(function ($item) {
+                        $row = $item->toArray();
+                        $row['image'] = LibraryItemArtwork::proxy($row['image'], 120);
+
+                        return $row;
+                    }, $driver->getUpNext($this->limit));
                 }
             } catch (\Throwable) {
                 $error = 'Could not read the queue from the device.';

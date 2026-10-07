@@ -227,7 +227,7 @@ class ExtraSourcesEnrichmentTest extends TestCase
         Enrichment::save($track, 'lastfm_playcount', '20', 'int', Enrichment::LASTFM);
 
         $this->get("/artists/{$artist->id}")->assertOk()
-            ->assertSee('https://img.test/thumb.jpg', false)->assertSee('Dreamy')->assertSee('1,200 listeners · 99,000 scrobbles');
+            ->assertDontSee('https://img.test/thumb.jpg', false)->assertSee('Dreamy')->assertSee('1,200 listeners · 99,000 scrobbles');
         $this->get("/albums/{$album->id}")->assertOk()
             ->assertSee('Vinyl, LP')->assertSee('★ 8.7 / 10')->assertSeeInOrder(['Credits', 'Producer', 'Pro Ducer'])
             ->assertSee('10 listeners · 20 plays');

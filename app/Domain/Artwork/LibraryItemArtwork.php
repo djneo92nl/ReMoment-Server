@@ -26,7 +26,12 @@ final class LibraryItemArtwork
         }
 
         if (!ArtworkCache::has($url) && Cache::add('artwork:library-queued:'.md5($url), true, now()->addHour())) {
-            ProcessArtwork::dispatch($url, $sources);
+            try {
+                ProcessArtwork::dispatch($url, $sources);
+            } catch (\Throwable $e) {
+                // A cover that cannot be processed (queue down, unreachable image) must not break the page: it shows its placeholder.
+                report($e);
+            }
         }
 
         $entry = ArtworkCache::get($url);
@@ -45,6 +50,16 @@ final class LibraryItemArtwork
         }
 
         return $item;
+    }
+
+    /**
+     * The web UI's URL for an original image from DLNA, Spotify, a radio station and so on: always
+     * our processed proxy at this size (120 or 320), never the original. Null until it is processed
+     * (it is queued meanwhile), so callers show their placeholder.
+     */
+    public static function proxy(?string $url, int $size = 320): ?string
+    {
+        return self::webUrl(self::forUrl($url)["proxy_{$size}"] ?? null);
     }
 
     /** @return array{hash: string, proxy_120: string, proxy_320: string}|null */

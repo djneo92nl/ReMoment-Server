@@ -4,7 +4,7 @@
     // The artist's own photo (TheAudioDB or Spotify) when known, else the cover of their most played album.
     $cover = $artist->coverAlbum();
     $raw = $artist->photoUrl() ?? \App\Domain\Artwork\LibraryArtwork::coverUrl($cover?->images);
-    $src = \App\Domain\Artwork\LibraryItemArtwork::webUrl(\App\Domain\Artwork\LibraryItemArtwork::forUrl($raw)['proxy_320'] ?? null) ?? $raw;
+    $src = \App\Domain\Artwork\LibraryItemArtwork::proxy($raw);
     $meta = $artist->albums_count.' '.Str::plural('album', $artist->albums_count)
         .($artist->plays_count > 0 ? ' · '.number_format($artist->plays_count).' '.Str::plural('play', $artist->plays_count) : '');
 @endphp

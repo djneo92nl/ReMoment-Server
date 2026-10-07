@@ -950,12 +950,6 @@ function updateUI(d) {
 
   document.getElementById('platform').textContent = np.platform || (np.source && np.source.name) || '—';
 
-  function extractImgUrl(arr) {
-    if (!arr || !arr.length) return '';
-    const item = arr[0];
-    return typeof item === 'string' ? item : ((item && item.url) || '');
-  }
-
   const isTrack = np.track && (np.type === 'track' || np.type === 'music');
   let trackName = '—', artistName = '', albumName = '', artUrl = '', trackId = '';
 
@@ -972,9 +966,6 @@ function updateUI(d) {
 
   if (np.artwork && np.artwork.proxy_512) artUrl = fixHost(np.artwork.proxy_512);
   else if (np.artwork && np.artwork.proxy_320) artUrl = fixHost(np.artwork.proxy_320);
-  else if (isTrack && np.track && np.track.images && np.track.images.length) artUrl = extractImgUrl(np.track.images);
-  else if (np.album && np.album.images && np.album.images.length) artUrl = extractImgUrl(np.album.images);
-  else if (np.radio && np.radio.images && np.radio.images.length) artUrl = extractImgUrl(np.radio.images);
 
   if (trackId !== lastTrackId) {
     lastTrackId = trackId;

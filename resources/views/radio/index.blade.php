@@ -38,7 +38,7 @@
                 <div class="bg-white dark:bg-stone-900 rounded-2xl border border-gray-200/70 dark:border-stone-800/80 shadow-sm p-5 flex flex-col gap-4">
                     <div class="flex items-center gap-4">
                         <div class="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-gray-100 dark:bg-stone-800 flex items-center justify-center">
-                            @if($cover = $artwork[$station->id] ?? $station->image_url)
+                            @if($cover = $artwork[$station->id] ?? null)
                                 <img src="{{ $cover }}" alt="{{ $station->name }}" class="w-full h-full object-cover">
                             @else
                                 <i class="fa-solid fa-radio text-gray-300 dark:text-stone-600 text-xl"></i>

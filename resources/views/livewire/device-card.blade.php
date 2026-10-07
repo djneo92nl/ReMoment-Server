@@ -15,8 +15,10 @@
     $hasDuration = $nowPlaying?->track && ($nowPlaying->track->duration ?? 0) > 0;
 
     // Artwork proxy and dominant colors
-    $artUrl = $nowPlaying ? \App\Domain\Artwork\ArtworkCache::extractImageUrl($nowPlaying) : null;
-    $artwork = $artUrl ? \App\Domain\Artwork\ArtworkCache::get($artUrl) : null;
+    $originalArt = $nowPlaying ? \App\Domain\Artwork\ArtworkCache::extractImageUrl($nowPlaying) : null;
+    $artwork = $originalArt ? \App\Domain\Artwork\ArtworkCache::get($originalArt) : null;
+    // Our proxy, never the original image (a new cover is processed when it starts playing).
+    $artUrl = \App\Domain\Artwork\LibraryItemArtwork::webUrl($artwork['proxy_320'] ?? $artwork['proxy_512'] ?? null);
     $gradientColors = $artwork['colors'] ?? [];
     $gradientStyle = count($gradientColors) >= 2
         ? "background: linear-gradient(135deg, {$gradientColors[0]}55 0%, {$gradientColors[1]}33 100%);"

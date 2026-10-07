@@ -553,6 +553,8 @@ All JPEGs are encoded baseline (`JpegEncoder(progressive: false)`; Intervention'
 
 **Playlist covers** (`app/Domain/Artwork/PlaylistArtwork.php`): a 2×2 mosaic of the covers of the 4 albums with the most tracks in the playlist (ties by playlist order; distinct cover URLs), drawn by `PlaylistCompositeRenderer` (1024² PNG from each cover's processed 512 proxy, else downloaded directly) and processed by `ProcessArtwork` like any cover under the pseudo URL `remoment:playlist/v{VERSION}/{md5 of the 4 cover URLs}`. The URL is a hash, so the job is dispatched with its 4 source URLs (`new ProcessArtwork($url, $sources)`; a composite without matching sources is skipped). 1–3 distinct covers → the first album's cover; none → the playlist's own image. The mosaic is used even when the playlist has its own image, for a consistent look. `artwork:prerender` queues missing playlist covers first (they share `--max-jobs`), `artwork:backfill` queues missing/outdated ones; a changed playlist gets a new URL, so a new composite. Bump `PlaylistArtwork::VERSION` when the layout changes.
 
+**Web UI never shows an original image URL** (DLNA, Spotify, radio): `LibraryItemArtwork::proxy($url, 120|320)` gives our processed proxy as a root-relative path, or `null` until it is processed (queued meanwhile, a failing queue never breaks the page); `<x-artwork-thumb>` applies it to any raw `src`, so views show a placeholder rather than the original. `Play::artUrl($size)` does the same for history. The REST API's `images` arrays stay the originals; clients use `artwork`.
+
 Run `php artisan storage:link` once on new environments to create the `public/storage` symlink.
 
 ### Playback History
