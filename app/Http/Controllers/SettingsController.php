@@ -3,12 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Artwork\SdCardExport;
-use App\Domain\Device\DeviceCache;
 use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibrarySettings;
 use App\Integrations\Spotify\MusicPlayerDriver as SpotifyDriver;
 use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
-use App\Integrations\Spotify\SpotifyDevice;
 use App\Models\Client;
 use App\Models\Device;
 use App\Models\DeviceMeta;
@@ -32,11 +30,10 @@ class SettingsController extends Controller
         $dlnaServerCount = DlnaServer::count();
         $clientCount = Client::count();
         $pendingClientCount = Client::where('status', 'pending')->count();
-        $listenerCount = Device::all()->filter(fn (Device $d) => DeviceCache::isListenerRunning($d->id))->count();
 
         return view('settings.index', compact(
             'userCount', 'deviceCount', 'spotifyConnected', 'lastfmConnected',
-            'dlnaServerCount', 'clientCount', 'pendingClientCount', 'listenerCount',
+            'dlnaServerCount', 'clientCount', 'pendingClientCount',
         ));
     }
 
@@ -100,23 +97,6 @@ class SettingsController extends Controller
     public function health()
     {
         return view('settings.health');
-    }
-
-    public function listeners()
-    {
-        if (app(SpotifyTokenService::class)->isConnected()) {
-            SpotifyDevice::findOrProvision();
-        }
-
-        $devices = Device::orderBy('device_name')->get()->map(function (Device $device) {
-            return [
-                'device' => $device,
-                'listener_running' => DeviceCache::isListenerRunning($device->id),
-                'can_start' => in_array($device->device_driver_name, ['ASE', 'Spotify']),
-            ];
-        });
-
-        return view('settings.listeners', compact('devices'));
     }
 
     public function devices()

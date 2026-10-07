@@ -703,8 +703,7 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 - `/albums/{id}` — album detail with track listing
 - `/settings` — overview of listeners, MQTT config
 - `/settings/users` — user management table
-- `/settings/listeners` — start/stop device background listeners
-- `/settings/health` — scheduler, queue worker, MQTT broker and per-device listener health
+- `/settings/health` — supervisor, scheduler, queue worker, pending jobs, MQTT broker and per-device listener health
 - `/settings/dlna` — discover DLNA servers, trigger library scans
 - `/settings/spotify-connect` — map Spotify Connect speaker names to local devices
 - `/settings/clients` — manage client device registrations; approve/reject pending, assign devices, view tokens; build/download the SD card artwork zips, one per screen size (see `docs/architecture/sd-card-export.md`)

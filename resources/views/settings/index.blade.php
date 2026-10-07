@@ -22,11 +22,6 @@
                              label="Device Drivers">
                 {{ $deviceCount }} {{ $deviceCount === 1 ? 'device' : 'devices' }}
             </x-settings-row>
-            <x-settings-row href="{{ route('settings.listeners') }}"
-                             icon="fa-solid fa-circle-dot" icon-bg="bg-emerald-50 dark:bg-emerald-900/20" icon-color="text-emerald-500"
-                             label="Listeners">
-                {{ $listenerCount }} of {{ $deviceCount }} active
-            </x-settings-row>
             <x-settings-row href="{{ route('settings.health') }}"
                              icon="fa-solid fa-heart-pulse" icon-bg="bg-rose-50 dark:bg-rose-900/20" icon-color="text-rose-500"
                              label="Health">

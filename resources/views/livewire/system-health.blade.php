@@ -11,7 +11,18 @@
 <div wire:poll.5s class="space-y-6">
 
     {{-- Background processes --}}
-    <div class="grid gap-4 sm:grid-cols-3">
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6">
+            <div class="text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-3">Supervisor</div>
+            @if($supervisor === null)
+                <span class="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500"><span class="w-2 h-2 rounded-full bg-gray-400"></span>Unknown</span>
+                <div class="mt-2 text-xs text-gray-500">Can't be checked on this system</div>
+            @else
+                {!! $badge($supervisor, 'Running', 'Not running') !!}
+                <div class="mt-2 text-xs text-gray-500">Keeps the queue, scheduler and listeners alive</div>
+            @endif
+        </div>
+
         <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6">
             <div class="text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-3">MQTT broker</div>
             {!! $badge($broker['ok'], 'Reachable', 'Unreachable') !!}

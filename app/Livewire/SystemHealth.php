@@ -22,6 +22,7 @@ class SystemHealth extends Component
     {
         return view('livewire.system-health', [
             'broker' => $this->broker(),
+            'supervisor' => $this->supervisor(),
             'scheduler' => $this->heartbeat(Heartbeat::SCHEDULER),
             'queueWorker' => $this->heartbeat(Heartbeat::QUEUE),
             'queue' => $this->queue(),
@@ -46,6 +47,23 @@ class SystemHealth extends Component
             'error' => $socket ? null : ($errstr ?: 'Connection failed'),
             'ws_url' => config('mqtt.ws_url') ?: 'ws://{page host}:9001',
         ];
+    }
+
+    /** Whether a supervisord process is running in this container (Linux /proc; null where that can't be told). */
+    private function supervisor(): ?bool
+    {
+        if (!is_dir('/proc/1')) {
+            return null;
+        }
+
+        foreach (glob('/proc/[0-9]*/cmdline') ?: [] as $file) {
+            $cmdline = @file_get_contents($file);
+            if ($cmdline !== false && str_contains($cmdline, 'supervisord')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function heartbeat(string $key): array

@@ -1,4 +1,4 @@
-<a href="{{ route('settings.listeners') }}"
+<a href="{{ route('settings.health') }}"
    title="{{ $listenerRunning ? 'Listener active' : 'No listener running' }}"
    class="flex items-center gap-1.5 text-xs transition-colors {{ $listenerRunning ? 'text-emerald-600 dark:text-emerald-500' : 'text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400' }}">
     @if($listenerRunning)
