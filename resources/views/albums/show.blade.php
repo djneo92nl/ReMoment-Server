@@ -366,10 +366,9 @@
                             <dd class="font-medium text-gray-800 dark:text-gray-200">{{ number_format($totalPlays) }}</dd>
                         </div>
                         @if($totalSeconds > 0)
-                            @php $hours = floor($totalSeconds / 3600); $mins = floor(($totalSeconds % 3600) / 60); @endphp
                             <div class="flex justify-between gap-4">
                                 <dt class="text-gray-500 dark:text-gray-500">Listening time</dt>
-                                <dd class="font-medium text-gray-800 dark:text-gray-200">{{ $hours > 0 ? "{$hours}h {$mins}m" : "{$mins}m" }}</dd>
+                                <dd class="font-medium text-gray-800 dark:text-gray-200">{{ \App\Domain\Helpers\TimeHelper::humanDuration((int) $totalSeconds) }}</dd>
                             </div>
                         @endif
                         <div class="flex justify-between gap-4">

@@ -28,9 +28,8 @@
                 <p class="mt-1.5 text-gray-500 dark:text-gray-500">
                     {{ number_format($totalPlays) }} {{ Str::plural('play', $totalPlays) }}
                     @if($totalSeconds > 0)
-                        @php $hours = floor($totalSeconds / 3600); $mins = floor(($totalSeconds % 3600) / 60); @endphp
                         &middot;
-                        {{ $hours > 0 ? "{$hours}h {$mins}m" : "{$mins}m" }} listened
+                        {{ \App\Domain\Helpers\TimeHelper::humanDuration((int) $totalSeconds) }} listened
                     @endif
                 </p>
             </div>

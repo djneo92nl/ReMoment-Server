@@ -5,9 +5,7 @@
     </x-slot>
 
     @php
-        $listeningHours = $listeningSeconds > 0 ? floor($listeningSeconds / 3600) : 0;
-        $listeningMins  = $listeningSeconds > 0 ? floor(($listeningSeconds % 3600) / 60) : 0;
-        $listeningLabel = $listeningHours > 0 ? "{$listeningHours}h {$listeningMins}m" : ($listeningMins > 0 ? "{$listeningMins}m" : '—');
+        $listeningLabel = $listeningSeconds >= 60 ? \App\Domain\Helpers\TimeHelper::humanDuration((int) $listeningSeconds) : '—';
         $skipRate       = $totalPlays > 0 ? round($skippedPlays / $totalPlays * 100) : 0;
     @endphp
 

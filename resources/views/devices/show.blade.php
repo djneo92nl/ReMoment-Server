@@ -87,18 +87,10 @@
                             <dd class="font-medium text-gray-800 dark:text-gray-200 text-right">{{ number_format($stats['total_plays']) }}</dd>
                         </div>
                         @if($stats['total_seconds'] > 0)
-                            @php
-                                $hours = floor($stats['total_seconds'] / 3600);
-                                $minutes = floor(($stats['total_seconds'] % 3600) / 60);
-                            @endphp
                             <div class="flex justify-between gap-4">
                                 <dt class="text-gray-500 dark:text-gray-500">Listening time</dt>
                                 <dd class="font-medium text-gray-800 dark:text-gray-200 text-right">
-                                    @if($hours > 0)
-                                        {{ $hours }}h {{ $minutes }}m
-                                    @else
-                                        {{ $minutes }}m
-                                    @endif
+                                    {{ \App\Domain\Helpers\TimeHelper::humanDuration((int) $stats['total_seconds']) }}
                                 </dd>
                             </div>
                         @endif
