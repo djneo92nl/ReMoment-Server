@@ -77,10 +77,7 @@ class SpotifyLibraryImporter
         }
 
         if ($album !== null && !empty($spotifyAlbum['uri'])) {
-            Metadata::updateOrCreate(
-                ['metadatable_type' => $album->getMorphClass(), 'metadatable_id' => $album->id, 'key' => 'spotify_album_uri'],
-                ['value' => $spotifyAlbum['uri'], 'type' => 'string', 'source' => 'spotify'],
-            );
+            Enrichment::save($album, 'spotify_album_uri', $spotifyAlbum['uri'], 'string', Enrichment::SPOTIFY);
         }
 
         return $count;

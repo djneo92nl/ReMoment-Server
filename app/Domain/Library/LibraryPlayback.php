@@ -324,10 +324,7 @@ class LibraryPlayback
             return null;
         }
 
-        Metadata::updateOrCreate(
-            ['metadatable_type' => Album::class, 'metadatable_id' => $album->id, 'key' => 'spotify_album_uri'],
-            ['value' => $uri, 'type' => 'string', 'source' => 'spotify'],
-        );
+        Enrichment::save($album, 'spotify_album_uri', $uri, 'string', Enrichment::SPOTIFY);
 
         return $uri;
     }

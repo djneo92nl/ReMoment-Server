@@ -2,11 +2,11 @@
 
 namespace App\Jobs;
 
+use App\Domain\Library\Enrichment;
 use App\Domain\Library\SpotifyUri;
 use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
 use App\Jobs\Concerns\EnrichesFromSource;
 use App\Models\Media\Album;
-use App\Models\Media\Metadata;
 use App\Services\SpotifyTokenService;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -38,10 +38,7 @@ class ImportSpotifyAlbum implements ShouldBeUnique, ShouldQueue
             $importer->importAlbum($spotifyAlbumId);
         }
 
-        Metadata::updateOrCreate(
-            ['metadatable_type' => $this->album->getMorphClass(), 'metadatable_id' => $this->album->id, 'key' => 'spotify_album_imported_at'],
-            ['value' => now()->toIso8601String(), 'type' => 'string', 'source' => 'spotify'],
-        );
+        Enrichment::save($this->album, 'spotify_album_imported_at', now()->toIso8601String(), 'string', Enrichment::SPOTIFY);
     }
 
     private function spotifyAlbumId(SpotifyTokenService $tokenService): ?string

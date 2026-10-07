@@ -477,19 +477,7 @@ class StorePlaybackHistory implements ShouldQueue
 
             $type = $this->inferMetadataType($value);
 
-            Metadata::query()->updateOrCreate(
-                [
-                    'metadatable_type' => $track->getMorphClass(),
-                    'metadatable_id' => $track->id,
-                    'key' => $metaKey,
-                    'source' => $source,
-                ],
-                [
-                    'value' => $this->stringifyMetadataValue($value),
-                    'type' => $type,
-                    'parent_id' => null,
-                ]
-            );
+            Enrichment::save($track, $metaKey, $this->stringifyMetadataValue($value), $type, $source);
 
             // If we just stored the whole list as json, stop.
             if ($metaKey === 'meta' && $value === $meta) {

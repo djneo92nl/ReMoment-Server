@@ -125,19 +125,8 @@ class DlnaLibraryScanner
             ['duration' => $item['duration']],
         );
 
-        Metadata::updateOrCreate(
-            [
-                'metadatable_type' => Track::class,
-                'metadatable_id' => $track->id,
-                'key' => 'dlna_url',
-                // Per server: a merged track can have a stream on more than one.
-                'source' => 'dlna:'.$server->id,
-            ],
-            [
-                'value' => $item['url'],
-                'type' => 'url',
-            ],
-        );
+        // Per server: a merged track can have a stream on more than one.
+        Enrichment::save($track, 'dlna_url', $item['url'], 'url', 'dlna:'.$server->id);
 
         $this->storeTags($track, $item, $server);
 
