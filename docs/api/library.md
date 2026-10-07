@@ -44,6 +44,7 @@ Duplicates from before that are merged by an admin running `php artisan library:
   "year": 2003,
   "artwork": { "hash": "…", "proxy_120": "…", "proxy_320": "…" },
   "favorite": false,
+  "sources": ["dlna", "spotify"],
   "genres": ["Alternative Rock"],
   "details": {
     "label": "Mushroom", "catalog_number": "MUSH-1", "release_type": "album", "secondary_types": ["live"],
@@ -56,6 +57,8 @@ Duplicates from before that are merged by an admin running `php artisan library:
   "tracks": [ { "id": 34, "name": "Intro", "duration": 213, "playable": true, "details": TrackDetails } ]
 }
 ```
+
+`sources` lists where the album's visible tracks come from: `spotify` and/or `dlna`, in that order (a track merged from both counts for both; `App\Domain\Library\LibrarySources::ofTracks`). Playlists (`GET /api/library/playlists/{id}`) have the same field.
 
 **TrackDetails** — `{ "genres": [], "quality": "FLAC · 16-bit / 44.1 kHz · 1411 kbps · stereo"|null, "credits": { "composer": ["…"], "instrument": ["Name (guitar)"] }, "isrc": null, "explicit": true|false|null, "popularity": 67|null, "listeners": null, "playcount": null }`. `quality` is what a DLNA server reported; `credits` are MusicBrainz credits grouped by role (an empty object when none); `popularity` is Spotify's 0–100; `listeners`/`playcount` are Last.fm's.
 

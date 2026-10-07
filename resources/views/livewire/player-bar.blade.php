@@ -13,23 +13,7 @@
         $track = $nowPlaying?->track;
         $radio = $nowPlaying?->radio;
 
-        if ($track) {
-            $title = $track->name;
-            $line2 = collect([$track->artist?->name, $nowPlaying->album?->name ?? $radio?->name])->filter()->implode(' · ');
-        } elseif ($radio) {
-            $title = $radio->name;
-            $line2 = 'Radio';
-        } elseif ($nowPlaying?->source) {
-            $title = $nowPlaying->source->name;
-            $line2 = $nowPlaying->source->sourceType;
-        } else {
-            $title = match ($state) {
-                \App\Domain\Device\State::Standby => 'Standby',
-                \App\Domain\Device\State::Unreachable => 'Unreachable',
-                default => $isActive ? 'Playing' : '—',
-            };
-            $line2 = '';
-        }
+        ['title' => $title, 'subtitle' => $line2] = \App\Domain\Media\NowPlayingLabel::for($nowPlaying, $state, $isActive ? 'Playing' : '—');
 
         // Artwork URLs are prefixed with APP_URL, which may not be the address this page is opened on: use the path.
         $thumb = \App\Domain\Artwork\LibraryItemArtwork::webUrl($artwork['proxy_120'] ?? $artwork['proxy_320'] ?? null);

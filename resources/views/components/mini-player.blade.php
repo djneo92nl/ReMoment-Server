@@ -28,12 +28,7 @@
     $thumb = \App\Domain\Artwork\LibraryItemArtwork::webUrl($artwork['proxy_120'] ?? $artwork['proxy_320'] ?? null);
     $track = $nowPlaying?->track;
     $radio = $nowPlaying?->radio;
-    $title = $track?->name ?? $radio?->name ?? $nowPlaying?->source?->name ?? match ($state) {
-        \App\Domain\Device\State::Standby => 'Standby',
-        \App\Domain\Device\State::Unreachable => 'Unreachable',
-        default => 'No content',
-    };
-    $subtitle = $track ? collect([$track->artist?->name, $nowPlaying->album?->name])->filter()->implode(' · ') : ($radio ? 'Radio' : '');
+    ['title' => $title, 'subtitle' => $subtitle] = \App\Domain\Media\NowPlayingLabel::for($nowPlaying, $state, 'No content');
     $volume = \App\Domain\Device\Cache\Volume::getVolume($device->id);
     $canVolume = ($volumeMethod || $volumeApi)
         && $state !== \App\Domain\Device\State::Unreachable

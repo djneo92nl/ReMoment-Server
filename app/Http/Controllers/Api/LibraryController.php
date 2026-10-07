@@ -162,6 +162,7 @@ class LibraryController extends Controller
             'favorite' => $album->favorited_at !== null,
             'genres' => $album->genres(),
             'details' => $album->details(),
+            'sources' => LibrarySources::ofTracks($tracks),
             'playable' => $items->contains('playable', true),
             'tracks' => $items,
         ]);
@@ -251,7 +252,8 @@ class LibraryController extends Controller
         $hidden = $this->hiddenSources($request);
 
         $playlist->load(['metadata' => fn ($q) => $q->where('key', 'spotify_owner')]);
-        $items = LibraryPlayback::playlistTracks($playlist, self::PLAYLIST_TRACKS, $hidden)->map(fn (Track $track) => [
+        $tracks = LibraryPlayback::playlistTracks($playlist, self::PLAYLIST_TRACKS, $hidden);
+        $items = $tracks->map(fn (Track $track) => [
             'id' => $track->id,
             'name' => $track->name,
             'artist_name' => $track->artist?->name,
@@ -264,6 +266,7 @@ class LibraryController extends Controller
             'name' => $playlist->name,
             'owner' => $this->owner($playlist),
             'artwork' => PlaylistArtwork::itemFor($playlist),
+            'sources' => LibrarySources::ofTracks($tracks),
             'playable' => $items->contains('playable', true),
             'tracks' => $items,
         ]);

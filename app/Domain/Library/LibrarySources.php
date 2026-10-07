@@ -59,6 +59,35 @@ class LibrarySources
         return array_diff($hidden, ['radio']) === [];
     }
 
+    /**
+     * The source keys (`dlna`, `spotify`, in ALL's order) the given tracks are available from: each
+     * track's own `source` plus the source of its `dlna_url` / `external_id` metadata (load that
+     * relation first). A `dlna:{server}` source is reported as `dlna`.
+     *
+     * @param  iterable<Track>  $tracks
+     * @return list<string>
+     */
+    public static function ofTracks(iterable $tracks): array
+    {
+        $found = [];
+        foreach ($tracks as $track) {
+            $sources = [$track->source];
+            foreach ($track->metadata as $row) {
+                if (in_array($row->key, self::SOURCE_METADATA, true)) {
+                    $sources[] = $row->source;
+                }
+            }
+            foreach ($sources as $source) {
+                $key = is_string($source) ? explode(':', $source, 2)[0] : '';
+                if (isset(self::ALL[$key])) {
+                    $found[$key] = true;
+                }
+            }
+        }
+
+        return array_values(array_filter(array_keys(self::ALL), fn ($key) => isset($found[$key])));
+    }
+
     /** Tracks available from at least one source that isn't hidden. */
     public static function tracks(Builder|Relation $query, array $hidden): Builder|Relation
     {
