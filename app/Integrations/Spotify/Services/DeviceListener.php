@@ -15,6 +15,7 @@ use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
 use App\Events\Device\PlaybackModesUpdated;
 use App\Events\Device\ProgressUpdated;
+use App\Integrations\Common\ListenerBackoff;
 use App\Integrations\Contracts\DeviceListenerInterface;
 use App\Integrations\Spotify\MusicPlayerDriver;
 use App\Models\Device;
@@ -28,8 +29,6 @@ use SpotifyWebAPI\SpotifyWebAPIException;
 class DeviceListener implements DeviceListenerInterface
 {
     protected int $pollIntervalSeconds = 3;
-
-    protected ?\Closure $onError = null;
 
     protected ?PlaybackModes $lastModes = null;
 
@@ -52,23 +51,16 @@ class DeviceListener implements DeviceListenerInterface
         return $tokens->isConnected() ? new static($tokens) : null;
     }
 
-    public function onError(\Closure $callback): void
-    {
-        $this->onError = $callback;
-    }
-
     public function listen(string $deviceId): void
     {
-        $cacheKey = "listener_running_{$deviceId}";
-        $retryDelaySeconds = 1;
-        $maxRetryDelaySeconds = 30;
+        $backoff = new ListenerBackoff;
 
         $this->lastEffectiveDeviceId = (int) $deviceId;
 
         DeviceCache::updateState($deviceId, State::Unreachable);
 
         while (true) {
-            cache()->put($cacheKey, true, now()->addSeconds(10));
+            DeviceCache::markListenerAlive($deviceId);
 
             try {
                 $api = $this->tokenService->makeApiClient();
@@ -83,7 +75,7 @@ class DeviceListener implements DeviceListenerInterface
 
                 $this->poll((int) $deviceId, $api);
 
-                $retryDelaySeconds = 1;
+                $backoff->next(failed: false);
                 sleep($this->pollIntervalSeconds);
 
             } catch (SpotifyWebAPIException $e) {
@@ -95,24 +87,16 @@ class DeviceListener implements DeviceListenerInterface
 
                 $this->stopPlayback((int) $deviceId);
                 Log::error("Spotify listener [{$deviceId}] API error: {$e->getMessage()}", ['exception' => $e]);
-                if ($this->onError) {
-                    ($this->onError)($e);
-                }
-                cache()->forget($cacheKey);
+                DeviceCache::forgetListener($deviceId);
                 DeviceCache::updateState($deviceId, State::Unreachable);
-                $retryDelaySeconds = min($retryDelaySeconds * 2, $maxRetryDelaySeconds);
-                sleep($retryDelaySeconds);
+                sleep($backoff->next(failed: true));
 
             } catch (\Throwable $e) {
                 $this->stopPlayback((int) $deviceId);
                 Log::error("Spotify listener [{$deviceId}] error: {$e->getMessage()}", ['exception' => $e]);
-                if ($this->onError) {
-                    ($this->onError)($e);
-                }
-                cache()->forget($cacheKey);
+                DeviceCache::forgetListener($deviceId);
                 DeviceCache::updateState($deviceId, State::Unreachable);
-                $retryDelaySeconds = min($retryDelaySeconds * 2, $maxRetryDelaySeconds);
-                sleep($retryDelaySeconds);
+                sleep($backoff->next(failed: true));
             }
         }
     }

@@ -17,6 +17,7 @@ use App\Events\Device\NowPlayingUpdated;
 use App\Events\Device\PlaybackModesUpdated;
 use App\Events\Device\ProgressUpdated;
 use App\Events\Device\VolumeUpdated;
+use App\Integrations\Common\ListenerBackoff;
 use App\Integrations\Contracts\DeviceListenerInterface;
 use App\Integrations\Sonos\PlayMode;
 use App\Integrations\Sonos\SonosBattery;
@@ -57,9 +58,7 @@ class DeviceListener implements DeviceListenerInterface
 
     public function listen(string $deviceId)
     {
-        $cacheKey = "listener_running_{$deviceId}";
-        $retryDelaySeconds = 1;
-        $maxRetryDelaySeconds = 30;
+        $backoff = new ListenerBackoff;
 
         $lastNowPlayingKey = null;
         $lastPositionSeconds = null;
@@ -72,7 +71,7 @@ class DeviceListener implements DeviceListenerInterface
         DeviceCache::updateState($deviceId, State::Unreachable);
 
         while (true) {
-            cache()->put($cacheKey, true, now()->addSeconds(10));
+            DeviceCache::markListenerAlive($deviceId);
 
             try {
                 $controller = $this->getController();
@@ -140,7 +139,7 @@ class DeviceListener implements DeviceListenerInterface
                     }
                 }
 
-                $retryDelaySeconds = 1;
+                $backoff->next(failed: false);
                 $lastError = null;
                 sleep($this->pollIntervalSeconds);
             } catch (\Throwable $e) {
@@ -149,12 +148,11 @@ class DeviceListener implements DeviceListenerInterface
                     Log::warning("Sonos listener {$deviceId} ({$this->ip}): ".get_class($e).': '.$e->getMessage());
                     $lastError = $e->getMessage();
                 }
-                cache()->forget($cacheKey);
+                DeviceCache::forgetListener($deviceId);
                 DeviceCache::updateState($deviceId, State::Unreachable);
                 $this->controller = null;
 
-                $retryDelaySeconds = min($retryDelaySeconds * 2, $maxRetryDelaySeconds);
-                sleep($retryDelaySeconds);
+                sleep($backoff->next(failed: true));
             }
         }
 

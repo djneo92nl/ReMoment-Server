@@ -17,6 +17,7 @@ use App\Events\Device\NowPlayingUpdated;
 use App\Events\Device\PlaybackModesUpdated;
 use App\Events\Device\ProgressUpdated;
 use App\Events\Device\VolumeUpdated;
+use App\Integrations\Common\ListenerBackoff;
 use App\Integrations\Contracts\DeviceListenerInterface;
 use App\Models\Device;
 use Djneo92nl\BeoMozart\Enums\RenderingStateValue;
@@ -29,8 +30,6 @@ use Remoment\MozartDriver\MusicPlayerDriver;
 class DeviceListener implements DeviceListenerInterface
 {
     protected NotificationClient $client;
-
-    protected ?\Closure $onError = null;
 
     protected ?string $lastSourceType = null;
 
@@ -47,21 +46,14 @@ class DeviceListener implements DeviceListenerInterface
         return new static($device->ip_address, config('mozart.ws_port', 9000));
     }
 
-    public function onError(\Closure $callback): void
-    {
-        $this->onError = $callback;
-    }
-
     public function listen(string $deviceId): void
     {
-        $cacheKey = "listener_running_{$deviceId}";
-        $retryDelaySeconds = 1;
-        $maxRetryDelaySeconds = 30;
+        $backoff = new ListenerBackoff;
 
         DeviceCache::updateState($deviceId, State::Unreachable);
 
         while (true) {
-            cache()->put($cacheKey, true, now()->addSeconds(10));
+            DeviceCache::markListenerAlive($deviceId);
 
             $hadError = false;
 
@@ -71,8 +63,8 @@ class DeviceListener implements DeviceListenerInterface
                 // Battery changes arrive as notifications, but the level is only known after the first one.
                 $this->readBattery($deviceId);
 
-                $this->client->connectAndListen(function (string $eventType, mixed $eventData, array $raw) use ($deviceId, $cacheKey) {
-                    cache()->put($cacheKey, true, now()->addSeconds(10));
+                $this->client->connectAndListen(function (string $eventType, mixed $eventData, array $raw) use ($deviceId) {
+                    DeviceCache::markListenerAlive($deviceId);
                     $this->applyEvent($eventType, $eventData, $deviceId);
                 });
             } catch (\Throwable $e) {
@@ -80,17 +72,12 @@ class DeviceListener implements DeviceListenerInterface
                 Log::error("Mozart listener [{$deviceId}] error: {$e->getMessage()}", [
                     'exception' => $e,
                 ]);
-                if ($this->onError) {
-                    ($this->onError)($e);
-                }
             } finally {
-                cache()->forget($cacheKey);
+                DeviceCache::forgetListener($deviceId);
                 DeviceCache::updateState($deviceId, State::Unreachable);
             }
 
-            $retryDelaySeconds = $hadError ? min($retryDelaySeconds * 2, $maxRetryDelaySeconds) : 1;
-
-            sleep($retryDelaySeconds);
+            sleep($backoff->next($hadError));
         }
     }
 

@@ -81,9 +81,28 @@ final class DeviceCache
         return $value ?: false;
     }
 
+    /** Seconds a listener's heartbeat lives: a listener that stops refreshing it counts as gone. */
+    private const LISTENER_HEARTBEAT_SECONDS = 10;
+
     public static function isListenerRunning(int $deviceId): bool
     {
-        return Cache::has("listener_running_{$deviceId}");
+        return Cache::has(self::listenerKey($deviceId));
+    }
+
+    /** A device listener's heartbeat, renewed while it runs (the UI reads a device without one as unreachable). */
+    public static function markListenerAlive(int|string $deviceId): void
+    {
+        Cache::put(self::listenerKey($deviceId), true, now()->addSeconds(self::LISTENER_HEARTBEAT_SECONDS));
+    }
+
+    public static function forgetListener(int|string $deviceId): void
+    {
+        Cache::forget(self::listenerKey($deviceId));
+    }
+
+    private static function listenerKey(int|string $deviceId): string
+    {
+        return "listener_running_{$deviceId}";
     }
 
     public static function setSpotifyRoutedDevice(int $deviceId): void

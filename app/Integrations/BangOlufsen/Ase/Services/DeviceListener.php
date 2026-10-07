@@ -16,6 +16,7 @@ use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
 use App\Events\Device\ProgressUpdated;
 use App\Events\Device\VolumeUpdated;
+use App\Integrations\Common\ListenerBackoff;
 use App\Integrations\Contracts\DeviceListenerInterface;
 use App\Integrations\Contracts\MultiRoomStatusInterface;
 use App\Models\Device;
@@ -43,23 +44,14 @@ class DeviceListener implements DeviceListenerInterface
         ]);
     }
 
-    protected ?\Closure $onError = null;
-
-    public function onError(\Closure $callback): void
-    {
-        $this->onError = $callback;
-    }
-
     public function listen(string $deviceId)
     {
-        $cacheKey = "listener_running_{$deviceId}";
-        $retryDelaySeconds = 1;
-        $maxRetryDelaySeconds = 30;
+        $backoff = new ListenerBackoff;
 
         DeviceCache::updateState($deviceId, State::Unreachable);
 
         while (true) {
-            cache()->put($cacheKey, true, now()->addSeconds(10));
+            DeviceCache::markListenerAlive($deviceId);
 
             $hadError = false;
 
@@ -102,7 +94,7 @@ class DeviceListener implements DeviceListenerInterface
                         }
                     }
 
-                    cache()->put($cacheKey, true, now()->addSeconds(10));
+                    DeviceCache::markListenerAlive($deviceId);
 
                     // Joining or leaving a session doesn't show in the notifications we read: look now and then.
                     if (time() - $lastMultiRoomCheck >= self::MULTIROOM_CHECK_SECONDS) {
@@ -116,22 +108,13 @@ class DeviceListener implements DeviceListenerInterface
                     'exception' => $e,
                     'url' => $this->url,
                 ]);
-                if ($this->onError) {
-                    ($this->onError)($e);
-                }
             } finally {
-                cache()->forget($cacheKey);
+                DeviceCache::forgetListener($deviceId);
                 MultiRoom::forget((int) $deviceId);
                 DeviceCache::updateState($deviceId, State::Unreachable);
             }
 
-            if ($hadError) {
-                $retryDelaySeconds = min($retryDelaySeconds * 2, $maxRetryDelaySeconds);
-            } else {
-                $retryDelaySeconds = 1;
-            }
-
-            sleep($retryDelaySeconds);
+            sleep($backoff->next($hadError));
         }
 
     }
