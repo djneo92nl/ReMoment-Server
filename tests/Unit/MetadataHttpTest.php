@@ -18,7 +18,7 @@ class MetadataHttpTest extends TestCase
         $this->assertTrue(MetadataHttp::get('https://example.test/x', ['a' => 1], ['Accept' => 'application/json'])->ok());
 
         Http::assertSent(fn (Request $r) => $r->hasHeader('User-Agent', 'Test/1.0 (me@example.test)')
-            && $r->hasHeader('Accept', 'application/json') && $r['a'] === '1');
+            && $r->hasHeader('Accept', 'application/json') && str_contains($r->url(), 'a=1'));
     }
 
     public function test_a_rate_limit_or_outage_throws_so_the_job_is_retried(): void
