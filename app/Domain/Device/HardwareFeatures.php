@@ -18,17 +18,6 @@ final class HardwareFeatures
         'wired_speakers' => ['speaker', 'external'],
     ];
 
-    public static function wisa(Device $device): bool
-    {
-        return self::has($device, 'wisa', true);
-    }
-
-    /** Models without built-in speakers: the Essence and the Moment drive external ones. */
-    public static function externalSpeakers(Device $device): bool
-    {
-        return self::has($device, 'speaker', 'external');
-    }
-
     /** False only for a hardware-bound capability the device's model doesn't have. */
     public static function allows(Device $device, string $capability): bool
     {

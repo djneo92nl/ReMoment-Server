@@ -59,6 +59,12 @@ final class Capabilities
         'digits' => DigitsInterface::class,
     ];
 
+    /** The driver contract behind a capability, null for an unknown one (or a dynamic one like source_controls). */
+    public static function contractFor(string $capability): ?string
+    {
+        return self::MAP[$capability] ?? null;
+    }
+
     /** Not a driver contract: reported while the active source has controls (see SourceControls). */
     private const DYNAMIC = ['source_controls'];
 

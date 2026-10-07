@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Domain\Device\Capabilities;
 use App\Domain\Device\DeviceCapabilities;
 use App\Domain\Device\State;
 use App\Integrations\Contracts\BluetoothInterface;
@@ -301,17 +302,7 @@ class DeviceSettings extends Component
 
     private function driver(string $section): object
     {
-        $contract = [
-            'sound_adjustment' => SoundAdjustmentInterface::class,
-            'bluetooth' => BluetoothInterface::class,
-            'device_info' => DeviceInfoInterface::class,
-            'network_settings' => NetworkSettingsInterface::class,
-            'wireless_speakers' => WirelessSpeakersInterface::class,
-            'wired_speakers' => WiredSpeakersInterface::class,
-            'source_activation' => SourceActivationInterface::class,
-            'sleep_timer' => SleepTimerInterface::class,
-            'digits' => DigitsInterface::class,
-        ][$section];
+        $contract = Capabilities::contractFor($section) ?? throw new \RuntimeException('This device does not support that.');
 
         $driver = $this->device->driver;
         if (!($driver instanceof $contract)) {
