@@ -393,14 +393,9 @@ class LibraryController extends Controller
             'scope' => ['nullable', 'in:'.implode(',', LeadingSource::SCOPES)],
         ]);
 
-        $client = $request->filled('client')
-            ? LibrarySources::hiddenFor(Client::byApiToken((string) $request->query('client')))
-            : [];
+        $client = $request->filled('client') ? Client::byApiToken((string) $request->query('client')) : null;
 
-        return array_values(array_unique([
-            ...$client,
-            ...LeadingSource::hidden(LeadingSource::scope($request->query('scope'))),
-        ]));
+        return LibrarySources::hiddenForRequest($client, $request->query('scope'));
     }
 
     private function artistItem(Artist $artist): array

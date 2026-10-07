@@ -41,6 +41,24 @@ class LibrarySources
         return self::normalize($client?->hidden_sources);
     }
 
+    /**
+     * What to hide for a request: the client's own hidden sources plus those the scope (default the
+     * leading source) leaves out. Radio is not part of the library, so it has no effect on these.
+     */
+    public static function hiddenForRequest(?Client $client, ?string $scope = null): array
+    {
+        return array_values(array_unique([
+            ...self::hiddenFor($client),
+            ...LeadingSource::hidden(LeadingSource::scope($scope)),
+        ]));
+    }
+
+    /** Whether nothing but radio is hidden, i.e. no library filtering is needed. */
+    private static function onlyRadioHidden(array $hidden): bool
+    {
+        return array_diff($hidden, ['radio']) === [];
+    }
+
     /** Tracks available from at least one source that isn't hidden. */
     public static function tracks(Builder|Relation $query, array $hidden): Builder|Relation
     {
@@ -91,7 +109,7 @@ class LibrarySources
     /** Artists with at least one visible album (the library lists artists by their albums). */
     public static function artists(Builder|Relation $query, array $hidden): Builder|Relation
     {
-        if (array_diff($hidden, ['radio']) === []) {
+        if (self::onlyRadioHidden($hidden)) {
             return $query;
         }
 
@@ -106,7 +124,7 @@ class LibrarySources
 
     private static function hasVisibleTracks(Builder|Relation $query, string $relation, array $hidden): Builder|Relation
     {
-        if (array_diff($hidden, ['radio']) === []) {
+        if (self::onlyRadioHidden($hidden)) {
             return $query;
         }
 
