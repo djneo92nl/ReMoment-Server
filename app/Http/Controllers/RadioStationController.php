@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Artwork\RadioLogoFinder;
 use App\Domain\Artwork\RadioStationArtwork;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Models\Device;
@@ -21,12 +22,20 @@ class RadioStationController extends Controller
             ->get();
 
         $artwork = $stations->mapWithKeys(fn (RadioStation $station) => [
-            $station->id => RadioStationArtwork::resolve($station)['proxy_120'] ?? null,
+            $station->id => $this->relative(RadioStationArtwork::resolve($station)['proxy_120'] ?? null),
         ]);
 
         $devices = $this->radioCapableDevices();
 
         return view('radio.index', compact('stations', 'devices', 'artwork'));
+    }
+
+    /** Root-relative, so the image loads whatever host the page is opened on (APP_URL may differ). */
+    private function relative(?string $url): ?string
+    {
+        $pos = $url === null ? false : strpos($url, '/storage/');
+
+        return $pos === false ? $url : substr($url, $pos);
     }
 
     public function create()
@@ -40,6 +49,8 @@ class RadioStationController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'image_url' => ['nullable', 'url', 'max:2048'],
         ]);
+
+        $validated['image_url'] ??= RadioLogoFinder::find($validated['name']);
 
         $station = RadioStation::create($validated);
 
@@ -66,6 +77,8 @@ class RadioStationController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'image_url' => ['nullable', 'url', 'max:2048'],
         ]);
+
+        $validated['image_url'] ??= RadioLogoFinder::find($validated['name']);
 
         $radio->update($validated);
 
