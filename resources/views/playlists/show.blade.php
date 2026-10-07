@@ -82,7 +82,7 @@
                         title="Play on device"
                         :description="$playlist->name"
                         :devices="$devices"
-                        :action-template="url('playlists/'.$playlist->id.'/play').'/{id}'"
+                        :action-template="\App\Support\DeviceAction::template('playlists.play', ['playlist' => $playlist])"
                         wrapper-class="w-full"
                         class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors">
                         <i class="fa-solid fa-play text-xs"></i>

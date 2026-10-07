@@ -119,7 +119,7 @@
                             title="Play all tracks"
                             :description="$artist->name"
                             :devices="$playableDevices"
-                            :action-template="url('artists/'.$artist->id.'/play').'/{id}'"
+                            :action-template="\App\Support\DeviceAction::template('artists.play', ['artist' => $artist])"
                             class="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors">
                             <i class="fa-solid fa-play text-xs"></i>
                             Play all
@@ -129,7 +129,7 @@
                             title="Shuffle all tracks"
                             :description="$artist->name"
                             :devices="$playableDevices"
-                            :action-template="url('artists/'.$artist->id.'/play').'/{id}?shuffle=1'"
+                            :action-template="\App\Support\DeviceAction::template('artists.play', ['artist' => $artist, 'shuffle' => 1])"
                             :elsewhere="false"
                             class="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gray-100 dark:bg-stone-800 hover:bg-gray-200 dark:hover:bg-stone-700 text-gray-700 dark:text-gray-300 text-sm font-medium transition-colors">
                             <i class="fa-solid fa-shuffle text-xs"></i>

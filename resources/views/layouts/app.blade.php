@@ -183,7 +183,7 @@
     title="Choose a player"
     description="Play buttons in the library play on this device."
     :devices="\App\Models\Device::where('hidden', false)->orderBy('device_name')->get()"
-    :action-template="url('player/select').'/{id}'"
+    :action-template="\App\Support\DeviceAction::template('player.select')"
     :selected-id="app(\App\Support\SelectedDevice::class)->device()?->id"
 />
 

@@ -92,7 +92,7 @@
                             title="Play on device"
                             :description="$station->name"
                             :devices="$playableDevices"
-                            :action-template="url('radio/' . $station->id . '/play') . '/{id}'"
+                            :action-template="\App\Support\DeviceAction::template('radio.play', ['radio' => $station])"
                             wrapper-class="w-full"
                             class="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gray-50 dark:bg-stone-800 text-gray-600 dark:text-gray-400 text-sm font-medium hover:bg-gray-100 dark:hover:bg-stone-700 transition-colors">
                             <i class="fa-solid fa-play text-xs"></i>

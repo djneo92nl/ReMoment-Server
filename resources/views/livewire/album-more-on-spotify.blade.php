@@ -45,7 +45,7 @@
                                     title="Play track"
                                     :description="$row['name']"
                                     :devices="$rowDevices"
-                                    :action-template="$viaLibrary ? url('tracks/'.$row['local']->id.'/play').'/{id}' : url('spotify/tracks/'.$row['id'].'/play').'/{id}'"
+                                    :action-template="$viaLibrary ? \App\Support\DeviceAction::template('tracks.play', ['track' => $row['local']]) : \App\Support\DeviceAction::template('spotify.tracks.play', ['spotifyTrackId' => $row['id']])"
                                     :elsewhere="false"
                                     class="w-7 h-7 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-stone-700 flex-shrink-0">
                                     <i class="fa-solid fa-play text-xs"></i>
