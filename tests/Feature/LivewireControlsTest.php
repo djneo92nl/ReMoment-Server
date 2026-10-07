@@ -60,6 +60,32 @@ class LivewireControlsTest extends TestCase
         $this->assertContains(['unmute', null], FakePlayerDriver::$calls);
     }
 
+    public function test_a_failing_command_is_shown_on_the_card_and_cleared_by_the_next_one(): void
+    {
+        $device = $this->makeDevice();
+        cache()->put("listener_running_{$device->id}", true, 10);
+        FakePlayerDriver::$throw = new \RuntimeException('offline');
+
+        Livewire::test(DeviceCard::class, ['device' => $device])
+            ->call('pause')
+            ->assertSet('controlError', 'Command failed: offline')
+            ->assertSee('Command failed: offline')
+            ->tap(fn () => FakePlayerDriver::$throw = null)
+            ->call('pause')
+            ->assertSet('controlError', null);
+    }
+
+    public function test_the_card_volume_is_clamped_and_remembered(): void
+    {
+        $device = $this->makeDevice();
+
+        Livewire::test(DeviceCard::class, ['device' => $device])
+            ->call('setVolume', 150)
+            ->assertSet('volume', 100);
+
+        $this->assertSame(100, \App\Domain\Device\Cache\Volume::getVolume($device->id));
+    }
+
     public function test_playing_cards_render_a_seekable_progress_ticker(): void
     {
         $device = $this->makeDevice();

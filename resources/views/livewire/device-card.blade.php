@@ -314,6 +314,10 @@
             </div>
         @endif
 
+        @if($controlError)
+            <p class="mt-3 text-xs text-red-500">{{ $controlError }}</p>
+        @endif
+
         {{-- ── Footer ── --}}
         <div class="mt-5 pt-4 border-t border-gray-100 dark:border-stone-800 flex items-center justify-between text-xs text-gray-400 dark:text-gray-600">
             <span>{{ $device->device_brand_name }} · {{ $device->device_product_type }}</span>

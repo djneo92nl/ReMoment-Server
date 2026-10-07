@@ -2,11 +2,10 @@
 
 namespace App\Livewire\Concerns;
 
-use App\Domain\Device\Cache\Volume;
+use App\Domain\Device\DeviceVolume;
 use App\Domain\Device\MultiRoomPeers;
 use App\Domain\Device\State;
 use App\Integrations\Contracts\MultiRoomInterface;
-use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
 
 /**
@@ -123,16 +122,11 @@ trait ManagesMultiroom
     /** Volume of one room of this session (this device's own, or a joined room's). */
     public function setMemberVolume(int $deviceId, int $volume): void
     {
-        $volume = max(0, min(100, $volume));
-
         try {
-            $driver = Device::findOrFail($deviceId)->driver;
-            if ($driver instanceof VolumeControlInterface) {
-                $driver->setVolume($volume);
-                Volume::updateVolume($deviceId, $volume);
-                if (property_exists($this, 'volume') && $deviceId === $this->multiroomDevice()->id) {
-                    $this->volume = $volume;
-                }
+            $level = DeviceVolume::set(Device::findOrFail($deviceId), $volume);
+
+            if ($level !== null && property_exists($this, 'volume') && $deviceId === $this->multiroomDevice()->id) {
+                $this->volume = $level;
             }
         } catch (\Throwable) {
         }

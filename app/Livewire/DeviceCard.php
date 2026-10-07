@@ -11,6 +11,7 @@ use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\SeekInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
+use App\Livewire\Concerns\ControlsPlayback;
 use App\Livewire\Concerns\ManagesMultiroom;
 use App\Livewire\Concerns\ManagesTrackExtras;
 use App\Models\Device;
@@ -20,6 +21,7 @@ use Livewire\Component;
 
 class DeviceCard extends Component
 {
+    use ControlsPlayback;
     use ManagesMultiroom;
     use ManagesTrackExtras;
 
@@ -112,52 +114,9 @@ class DeviceCard extends Component
         return view('livewire.device-card', ['canAdd' => $canAdd]);
     }
 
-    public function play(): void
-    {
-        $this->withPlaybackDriver(fn ($d) => $d->play());
-    }
-
-    public function pause(): void
-    {
-        $this->withPlaybackDriver(fn ($d) => $d->pause());
-    }
-
-    public function next(): void
-    {
-        $this->withPlaybackDriver(fn ($d) => $d->next());
-    }
-
-    public function previous(): void
-    {
-        $this->withPlaybackDriver(fn ($d) => $d->previous());
-    }
-
     public function standby(): void
     {
-        $this->withDriver(fn ($d) => $d->standby());
-    }
-
-    public function seek(int $seconds): void
-    {
-        try {
-            $driver = SpotifyRouting::driverFor($this->device, SeekInterface::class);
-            if ($driver instanceof SeekInterface) {
-                $driver->seek($seconds);
-            }
-        } catch (\Throwable) {
-        }
-    }
-
-    public function toggleMute(): void
-    {
-        try {
-            $driver = $this->device->driver;
-            if ($driver instanceof VolumeControlInterface) {
-                $this->muted ? $driver->unmute() : $driver->mute();
-                $this->muted = !$this->muted;
-            }
-        } catch (\Throwable) {
-        }
+        $this->control(MediaControlsInterface::class, fn ($d) => $d->standby(), plain: true);
     }
 
     public function playLastRadioStation(): void
@@ -188,16 +147,21 @@ class DeviceCard extends Component
         }
     }
 
-    public function setVolume(int $volume): void
+    protected function playbackDevice(): ?Device
     {
-        try {
-            $driver = $this->device->driver;
-            if ($driver instanceof VolumeControlInterface) {
-                $driver->setVolume($volume);
-                $this->volume = $volume;
-            }
-        } catch (\Throwable) {
-        }
+        return $this->device;
+    }
+
+    /** The card keeps its own mute state: the grid does not ask every device, only the single-device page does. */
+    protected function isMuted(Device $device): bool
+    {
+        return $this->muted;
+    }
+
+    protected function rememberMuted(Device $device, bool $muted): void
+    {
+        $this->muted = $muted;
+        Volume::updateMuted($device->id, $muted);
     }
 
     protected function multiroomDevice(): Device
@@ -214,30 +178,5 @@ class DeviceCard extends Component
     {
         $this->listenerRunning = DeviceCache::isListenerRunning($this->device->id);
         $this->volume = (int) (Volume::getVolume($this->device->id) ?: 0);
-    }
-
-    /** Transport goes to the Spotify driver while Spotify is routed to this device. */
-    private function withPlaybackDriver(callable $callback): void
-    {
-        try {
-            $driver = SpotifyRouting::driverFor($this->device, MediaControlsInterface::class);
-            if ($driver instanceof MediaControlsInterface) {
-                $callback($driver);
-            }
-        } catch (\Throwable) {
-            // silently ignore driver errors in card context
-        }
-    }
-
-    private function withDriver(callable $callback): void
-    {
-        try {
-            $driver = $this->device->driver;
-            if ($driver instanceof MediaControlsInterface) {
-                $callback($driver);
-            }
-        } catch (\Throwable) {
-            // silently ignore driver errors in card context
-        }
     }
 }

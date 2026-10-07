@@ -12,11 +12,10 @@ use App\Domain\Device\RepeatMode;
 use App\Domain\Device\SpotifyRouting;
 use App\Domain\Device\State;
 use App\Events\Device\PlaybackModesUpdated;
-use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\RepeatInterface;
-use App\Integrations\Contracts\SeekInterface;
 use App\Integrations\Contracts\ShuffleInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
+use App\Livewire\Concerns\ControlsPlayback;
 use App\Livewire\Concerns\ManagesMultiroom;
 use App\Models\Device;
 use App\Support\SelectedDevice;
@@ -26,53 +25,8 @@ use Livewire\Component;
 /** The sticky bottom player: the pinned device's now playing, in the artwork's colors, with its controls. */
 class PlayerBar extends Component
 {
+    use ControlsPlayback;
     use ManagesMultiroom;
-
-    public ?string $controlError = null;
-
-    public function play(): void
-    {
-        $this->control(MediaControlsInterface::class, fn ($d) => $d->play());
-    }
-
-    public function pause(): void
-    {
-        $this->control(MediaControlsInterface::class, fn ($d) => $d->pause());
-    }
-
-    public function next(): void
-    {
-        $this->control(MediaControlsInterface::class, fn ($d) => $d->next());
-    }
-
-    public function previous(): void
-    {
-        $this->control(MediaControlsInterface::class, fn ($d) => $d->previous());
-    }
-
-    public function seek(int $seconds): void
-    {
-        $this->control(SeekInterface::class, fn ($d) => $d->seek($seconds));
-    }
-
-    public function setVolume(int $volume): void
-    {
-        $device = $this->device();
-        $this->control(VolumeControlInterface::class, fn ($d) => $d->setVolume(max(0, min(100, $volume))), plain: true);
-        if ($device) {
-            Volume::updateVolume($device->id, max(0, min(100, $volume)));
-        }
-    }
-
-    public function toggleMute(): void
-    {
-        $device = $this->device();
-        $muted = $device ? (Volume::getMuted($device->id) ?? false) : false;
-        $this->control(VolumeControlInterface::class, fn ($d) => $muted ? $d->unmute() : $d->mute(), plain: true);
-        if ($device) {
-            Volume::updateMuted($device->id, !$muted);
-        }
-    }
 
     public function toggleShuffle(): void
     {
@@ -116,29 +70,14 @@ class PlayerBar extends Component
         return $this->device() ?? throw new \LogicException('No player is pinned.');
     }
 
+    protected function playbackDevice(): ?Device
+    {
+        return $this->device();
+    }
+
     private function device(): ?Device
     {
         return app(SelectedDevice::class)->device();
-    }
-
-    /** @param  bool  $plain  use the device's own driver (volume stays with the speaker) instead of Spotify routing */
-    private function control(string $contract, \Closure $apply, bool $plain = false): void
-    {
-        $device = $this->device();
-        if ($device === null) {
-            return;
-        }
-
-        try {
-            $driver = $plain ? $device->driver : SpotifyRouting::driverFor($device, $contract);
-            if (!($driver instanceof $contract)) {
-                return;
-            }
-            $apply($driver);
-            $this->controlError = null;
-        } catch (\Throwable $e) {
-            $this->controlError = 'Command failed: '.$e->getMessage();
-        }
     }
 
     public function render()
