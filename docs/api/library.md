@@ -4,7 +4,7 @@ Browse the shared media library and its playlists, keep household favorites, and
 
 ## Shapes
 
-**Artwork** — `{ "hash": "<md5 of the cover URL>", "proxy_120": "…", "proxy_320": "…" }`, or `null` when the cover is not processed yet (or there is none). URLs have the same form as elsewhere (prefixed with `APP_URL`, take the path from `/storage/` and prefix `artwork_base_url` from `GET /api/info`); `hash` is the same as in the pre-cache list (`GET /api/clients/{api_token}/artwork`) and the SD card export, so a client can use its cached files. A missing cover is queued for processing at most once an hour per image (`App\Domain\Artwork\LibraryItemArtwork`); requests never wait for a download.
+**Artwork** — `{ "hash": "<md5 of the cover URL>", "proxy_120": "…", "proxy_320": "…" }`, or `null` when the cover is not processed yet (or there is none). URLs are root-relative (`/storage/artwork/…`), never with a host: prefix `artwork_base_url` from `GET /api/info` (a client should also accept an absolute URL and take its path from `/storage/`); `hash` is the same as in the pre-cache list (`GET /api/clients/{api_token}/artwork`) and the SD card export, so a client can use its cached files. A missing cover is queued for processing at most once an hour per image (`App\Domain\Artwork\LibraryItemArtwork`); requests never wait for a download.
 
 **ArtistItem** — `{ "id": 1, "name": "Muse", "album_count": 4, "artwork": Artwork|null, "favorite": false }`. `artwork` is the cover of the artist's most played album with an image.
 

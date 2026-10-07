@@ -8,7 +8,8 @@ use Illuminate\Support\Facades\Storage;
 
 /**
  * The small artwork object of the library API (`/api/library/*`):
- * `{ hash, proxy_120, proxy_320 }` for a processed cover, else null. Never
+ * `{ hash, proxy_120, proxy_320 }` for a processed cover, else null. The proxy URLs are root-relative
+ * (`/storage/...`), never with a host. Never
  * waits for a download: an unprocessed cover is queued once an hour at most.
  */
 final class LibraryItemArtwork
@@ -39,11 +40,13 @@ final class LibraryItemArtwork
         $item = ['hash' => md5($url)];
 
         foreach (self::KEYS as $key) {
+            // Always root-relative (`/storage/...`): a cached URL carries the APP_URL of whoever made it
+            // (a queue worker says `http://localhost`), which no client can reach.
             if (isset($entry[$key])) {
-                $item[$key] = $entry[$key];
+                $item[$key] = self::webUrl($entry[$key]);
             } elseif ($disk->exists($path = LibraryArtwork::path($url, $key))) {
                 // The cache entry expired (30 days); the files stay.
-                $item[$key] = $disk->url($path);
+                $item[$key] = self::webUrl($disk->url($path));
             } else {
                 return null;
             }

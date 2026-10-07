@@ -171,25 +171,7 @@
 
                         {{-- Volume --}}
                         @if($volume > 0)
-                            <div x-data="{ vol: {{ $volume }} }"
-                                 x-init="$watch('$wire.volume', v => vol = v)"
-                                 class="flex items-center gap-3">
-                                <button wire:click="toggleMute" title="{{ $muted ? 'Unmute' : 'Mute' }}"
-                                        class="text-gray-400 dark:text-gray-600 hover:text-gray-700 dark:hover:text-gray-300 text-sm w-4 flex-shrink-0 transition-colors">
-                                    <i class="fa-solid {{ $muted ? 'fa-volume-xmark' : 'fa-volume-high' }}"></i>
-                                </button>
-                                <div class="relative flex-1 max-w-xs">
-                                    <div class="h-1.5 bg-gray-200 dark:bg-stone-700 rounded-full overflow-hidden">
-                                        <div class="h-full bg-gray-500 dark:bg-stone-400 rounded-full"
-                                             :style="'width: ' + vol + '%'"></div>
-                                    </div>
-                                    <input type="range" min="0" max="100"
-                                           x-model="vol"
-                                           @change="$wire.setVolume(vol)"
-                                           class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
-                                </div>
-                                <span class="text-xs font-medium text-gray-500 dark:text-gray-400 w-6 text-right" x-text="vol"></span>
-                            </div>
+                            <x-card-volume :volume="$volume" :muted="$muted" fill="bg-gray-500 dark:bg-stone-400" track="max-w-xs" />
                         @endif
 
                     </div>
@@ -265,22 +247,7 @@
                 </div>
             @endif
 
-            <div x-data="{ vol: {{ $volume }} }"
-                 x-init="$watch('$wire.volume', v => vol = v)"
-                 class="flex items-center gap-3 text-sm">
-                <i class="fa-solid fa-volume-high text-gray-400 dark:text-gray-600 w-4 flex-shrink-0"></i>
-                <div class="relative flex-1">
-                    <div class="h-1.5 bg-gray-200 dark:bg-stone-700 rounded-full overflow-hidden">
-                        <div class="h-full bg-gray-400 dark:bg-stone-500 rounded-full"
-                             :style="'width: ' + vol + '%'"></div>
-                    </div>
-                    <input type="range" min="0" max="100"
-                           x-model="vol"
-                           @change="$wire.setVolume(vol)"
-                           class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
-                </div>
-                <span class="text-xs font-medium text-gray-500 dark:text-gray-400 w-6 text-right" x-text="vol"></span>
-            </div>
+            <x-card-volume :volume="$volume" class="text-sm" />
 
         {{-- ── Unreachable ── --}}
         @else
