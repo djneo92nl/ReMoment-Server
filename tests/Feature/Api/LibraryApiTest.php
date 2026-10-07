@@ -265,6 +265,7 @@ class LibraryApiTest extends TestCase
                 'year' => 2003,
                 'artwork' => null,
                 'favorite' => false,
+                'sources' => ['dlna'],
                 'genres' => [],
                 'details' => [
                     'label' => null, 'catalog_number' => null, 'release_type' => null, 'secondary_types' => [],

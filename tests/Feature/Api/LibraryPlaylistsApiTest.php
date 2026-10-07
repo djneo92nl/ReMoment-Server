@@ -181,6 +181,8 @@ class LibraryPlaylistsApiTest extends TestCase
                 'owner' => null,
                 // Fewer than 4 album covers: the first album's cover.
                 'artwork' => ['hash' => md5('https://x.test/a.jpg'), 'proxy_120' => '/storage/a/120.jpg', 'proxy_320' => '/storage/a/320.jpg'],
+                // Spotify (Two) and DLNA (One), in the library's order.
+                'sources' => ['spotify', 'dlna'],
                 'playable' => true,
                 'tracks' => [
                     ['id' => $two->id, 'name' => 'Two', 'artist_name' => 'Muse', 'duration' => 200, 'playable' => true],
