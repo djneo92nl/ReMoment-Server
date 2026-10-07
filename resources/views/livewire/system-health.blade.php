@@ -56,6 +56,35 @@
         </div>
     @endif
 
+    {{-- Pending jobs --}}
+    @if($pendingJobs)
+        <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 overflow-hidden">
+            <div class="px-8 py-5 border-b border-gray-100 dark:border-stone-800 flex items-center justify-between">
+                <h2 class="text-base font-medium text-gray-900 dark:text-gray-100">Pending jobs</h2>
+                <span class="text-sm text-gray-500">{{ number_format($pendingJobs['total']) }} in queue</span>
+            </div>
+
+            @forelse($pendingJobs['groups'] as $group)
+                <div class="grid grid-cols-2 sm:grid-cols-12 gap-x-4 gap-y-1 items-center px-8 py-3 border-b border-gray-50 dark:border-stone-800/50 last:border-0 text-sm">
+                    <div class="col-span-2 sm:col-span-5 font-medium text-gray-900 dark:text-gray-100 truncate">{{ $group['job'] }}</div>
+                    <div class="sm:col-span-2 text-gray-900 dark:text-gray-100 tabular-nums">{{ number_format($group['count']) }}</div>
+                    <div class="sm:col-span-3 text-xs text-gray-500">
+                        {{ $group['waiting'] }} waiting · {{ $group['running'] }} running · {{ $group['delayed'] }} delayed
+                    </div>
+                    <div class="sm:col-span-2 text-xs text-gray-500 sm:text-right">oldest {{ $group['oldest']?->diffForHumans(short: true) ?? '—' }}</div>
+                </div>
+            @empty
+                <div class="px-8 py-8 text-center text-sm text-gray-500">No pending jobs.</div>
+            @endforelse
+
+            @if($pendingJobs['total'] > $pendingJobs['scanned'])
+                <div class="px-8 py-3 text-xs text-gray-400 border-t border-gray-100 dark:border-stone-800">
+                    Grouped from the oldest {{ number_format($pendingJobs['scanned']) }} of {{ number_format($pendingJobs['total']) }} jobs.
+                </div>
+            @endif
+        </div>
+    @endif
+
     {{-- Devices --}}
     <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 overflow-hidden">
         <div class="px-8 py-5 border-b border-gray-100 dark:border-stone-800">
