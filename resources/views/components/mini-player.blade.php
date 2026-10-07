@@ -13,6 +13,10 @@
     // Full Livewire call run when the check/circle is tapped, e.g. removeListener(4)
     'toggle' => null,
     'closeOnToggle' => false,
+    // Set the volume through the REST API instead of a Livewire method (plain Blade pages like the player selector)
+    'volumeApi' => false,
+    // Modal this row lives in: an unknown volume is read from the device when that modal opens (else at once)
+    'modal' => null,
 ])
 
 {{-- A small player in the Sonos style: name and battery, what is playing, a volume slider. Geometry is inline on purpose (lazy Tailwind classes). --}}
@@ -34,7 +38,9 @@
     };
     $subtitle = $track ? collect([$track->artist?->name, $nowPlaying->album?->name])->filter()->implode(' · ') : ($radio ? 'Radio' : '');
     $volume = \App\Domain\Device\Cache\Volume::getVolume($device->id);
-    $canVolume = $volumeMethod && in_array('volume_control', \App\Domain\Device\DeviceCapabilities::for($device), true) && $volume !== false;
+    $canVolume = ($volumeMethod || $volumeApi)
+        && $state !== \App\Domain\Device\State::Unreachable
+        && in_array('volume_control', \App\Domain\Device\DeviceCapabilities::for($device), true);
 @endphp
 
 <div {{ $attributes->merge(['class' => 'rounded-2xl bg-gray-100 dark:bg-stone-800 text-gray-900 dark:text-gray-100']) }}
@@ -59,16 +65,44 @@
     @endif
 
     @if($canVolume)
-        <div x-data="{ vol: {{ (int) $volume }} }" style="display:flex;align-items:center;gap:.6rem;margin-top:.7rem">
-            <i class="fa-solid {{ (int) $volume < 35 ? 'fa-volume-low' : 'fa-volume-high' }} text-gray-500 dark:text-gray-400" style="width:1.1rem;text-align:center;font-size:.85rem"></i>
+        <div x-data="{
+                 vol: {{ $volume === false ? 'null' : (int) $volume }},
+                 tried: false,
+                 async load() {
+                     if (this.vol !== null || this.tried) return;
+                     this.tried = true;
+                     try {
+                         const r = await fetch('/api/devices/{{ $device->id }}/volume', { headers: { Accept: 'application/json' } });
+                         if (r.ok) this.vol = (await r.json()).volume;
+                     } catch (e) {}
+                 },
+                 async save() {
+                     @if($volumeApi)
+                         try {
+                             await fetch('/api/devices/{{ $device->id }}/volume', {
+                                 method: 'PUT',
+                                 headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                                 body: JSON.stringify({ volume: parseInt(this.vol) }),
+                             });
+                         } catch (e) {}
+                     @else
+                         $wire.{{ $volumeMethod }}({{ $device->id }}, parseInt(this.vol));
+                     @endif
+                 },
+             }"
+             @if($modal) x-on:open-modal.window="$event.detail === '{{ $modal }}' && load()" @else x-init="load()" @endif
+             x-show="vol !== null" style="margin-top:.7rem">
+          <div style="display:flex;align-items:center;gap:.6rem">
+            <i class="fa-solid fa-volume-high text-gray-500 dark:text-gray-400" style="width:1.1rem;text-align:center;font-size:.85rem"></i>
             <div style="position:relative;flex:1;height:1.5rem;display:flex;align-items:center">
                 <div style="width:100%;height:.65rem;border-radius:9999px;overflow:hidden;background:rgba(107,114,128,.3)">
-                    <div :style="{ width: vol + '%' }" style="height:100%;border-radius:9999px;background:currentColor;width:{{ (int) $volume }}%"></div>
+                    <div :style="{ width: (vol ?? 0) + '%' }" style="height:100%;border-radius:9999px;background:currentColor;width:{{ (int) $volume }}%"></div>
                 </div>
-                <input type="range" min="0" max="100" x-model="vol" @change="$wire.{{ $volumeMethod }}({{ $device->id }}, parseInt(vol))"
+                <input type="range" min="0" max="100" x-model="vol" @change="save()"
                        style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer">
             </div>
-            <span class="text-gray-500 dark:text-gray-400" style="width:1.6rem;text-align:right;font-size:.8rem" x-text="vol">{{ (int) $volume }}</span>
+            <span class="text-gray-500 dark:text-gray-400" style="width:1.6rem;text-align:right;font-size:.8rem" x-text="vol"></span>
+          </div>
         </div>
     @endif
 </div>

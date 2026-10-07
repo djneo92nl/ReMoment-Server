@@ -44,7 +44,7 @@
                             default => null,
                         };
                     @endphp
-                    <x-mini-player :device="$device" :tag="$tag" :select-method="$method" :selected="$selectedId === $device->id"
+                    <x-mini-player :device="$device" :tag="$tag" :select-method="$method" :volume-api="true" :modal="$name" :selected="$selectedId === $device->id"
                                    :select-url="str_replace('{id}', $device->id, $actionTemplate)" />
                 @endforeach
             @endif
