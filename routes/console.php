@@ -15,6 +15,7 @@ Schedule::command('spotify:sync-library')->daily();
 Schedule::command('artwork:backfill')->daily();
 Schedule::command('artwork:prerender')->daily();
 Schedule::command('library:enrich')->daily();
+Schedule::command('playlists:refresh-smart')->daily();
 
 // Folds duplicate artists/albums/tracks together (ids of merged records disappear), so weekly and off-hours.
 Schedule::command('library:merge-duplicates --force')->weeklyOn(0, '04:00')->withoutOverlapping();

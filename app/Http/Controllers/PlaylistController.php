@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Library\LibraryPlayback;
+use App\Domain\Library\SmartPlaylist\SmartPlaylistBuilder;
 use App\Http\Controllers\Concerns\FlashesLibraryPlayback;
 use App\Models\Device;
 use App\Models\DeviceMeta;
@@ -28,18 +29,25 @@ class PlaylistController extends Controller
             'name' => ['required', 'string', 'max:255'],
         ]);
 
+        $smart = $request->boolean('smart');
+
         $playlist = Playlist::create([
             'name' => $validated['name'],
-            'source' => 'local',
+            'source' => $smart ? 'smart' : 'local',
+            'rules' => $smart ? SmartPlaylistBuilder::defaults() : null,
         ]);
+
+        if ($smart) {
+            SmartPlaylistBuilder::refresh($playlist);
+        }
 
         return redirect()->route('playlists.show', $playlist)->with('success', 'Playlist created.');
     }
 
     public function destroy(Playlist $playlist)
     {
-        if (!$playlist->isEditable()) {
-            return back()->with('error', 'Only local playlists can be deleted.');
+        if (!$playlist->isDeletable()) {
+            return back()->with('error', 'Only playlists made here can be deleted.');
         }
 
         $playlist->delete();
@@ -51,7 +59,7 @@ class PlaylistController extends Controller
     {
         $playlist->load(['tracks.artist', 'tracks.album']);
 
-        $playableDevices = $playlist->isEditable() ? $this->libraryCapableDevices() : collect();
+        $playableDevices = $playlist->isEditable() || $playlist->isSmart() ? $this->libraryCapableDevices() : collect();
         $spotifyDevices = $playlist->source === 'spotify' ? $this->spotifyConnectMappedDevices() : collect();
 
         return view('playlists.show', compact('playlist', 'playableDevices', 'spotifyDevices'));

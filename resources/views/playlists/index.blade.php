@@ -6,12 +6,20 @@
                 <p class="mt-1.5 text-gray-500 dark:text-gray-500">{{ number_format($playlists->count()) }} playlists</p>
             </div>
 
-            <button type="button"
-                    @click="$dispatch('open-modal', 'create-playlist')"
-                    class="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-sm font-medium transition-colors">
-                <i class="fa-solid fa-plus"></i>
-                <span class="hidden sm:inline">New playlist</span>
-            </button>
+            <div class="flex items-center gap-2">
+                <button type="button"
+                        @click="$dispatch('open-modal', 'create-smart-playlist')"
+                        class="flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-stone-900 border border-gray-200 dark:border-stone-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-stone-800 rounded-2xl text-sm font-medium transition-colors">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span class="hidden sm:inline">New smart playlist</span>
+                </button>
+                <button type="button"
+                        @click="$dispatch('open-modal', 'create-playlist')"
+                        class="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-sm font-medium transition-colors">
+                    <i class="fa-solid fa-plus"></i>
+                    <span class="hidden sm:inline">New playlist</span>
+                </button>
+            </div>
         </div>
     </x-slot>
 
@@ -63,6 +71,30 @@
                 <div>
                     <x-input-label for="name" value="Name" />
                     <x-text-input id="name" name="name" type="text" class="mt-1 block w-full" required autofocus />
+                </div>
+                <button type="submit"
+                        class="w-full px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium transition-colors">
+                    Create
+                </button>
+            </form>
+        </div>
+    </x-modal>
+
+    <x-modal name="create-smart-playlist" maxWidth="sm">
+        <div class="bg-white dark:bg-stone-900 rounded-lg overflow-hidden">
+            <div class="flex items-start justify-between px-6 pt-6 pb-4 border-b border-gray-100 dark:border-stone-800">
+                <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">New smart playlist</h3>
+                <button type="button" @click="$dispatch('close-modal', 'create-smart-playlist')"
+                        class="ml-4 flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-stone-800 hover:text-gray-600 dark:hover:text-gray-300 transition-colors flex-shrink-0">
+                    <i class="fa-solid fa-xmark text-xs"></i>
+                </button>
+            </div>
+            <form method="POST" action="{{ route('playlists.store') }}" class="p-6 space-y-4">
+                @csrf
+                <input type="hidden" name="smart" value="1">
+                <div>
+                    <x-input-label for="smart-name" value="Name" />
+                    <x-text-input id="smart-name" name="name" type="text" class="mt-1 block w-full" required autofocus />
                 </div>
                 <button type="submit"
                         class="w-full px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium transition-colors">

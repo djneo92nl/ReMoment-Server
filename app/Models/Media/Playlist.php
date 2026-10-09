@@ -18,11 +18,15 @@ class Playlist extends Model
         'description',
         'images',
         'last_played_at',
+        'rules',
+        'refreshed_at',
     ];
 
     protected $casts = [
         'images' => 'array',
+        'rules' => 'array',
         'last_played_at' => 'datetime',
+        'refreshed_at' => 'datetime',
     ];
 
     public function tracks(): BelongsToMany
@@ -51,9 +55,22 @@ class Playlist extends Model
         return $this->morphMany(Metadata::class, 'metadatable');
     }
 
+    /** Whether its tracks are picked by hand (local playlists). */
     public function isEditable(): bool
     {
         return $this->source === 'local';
+    }
+
+    /** Whether its tracks are selected by `rules` and refreshed automatically. */
+    public function isSmart(): bool
+    {
+        return $this->source === 'smart';
+    }
+
+    /** Whether it can be deleted here: playlists made here, not those synced from Spotify. */
+    public function isDeletable(): bool
+    {
+        return $this->isEditable() || $this->isSmart();
     }
 
     public function spotifyOwner(): ?string

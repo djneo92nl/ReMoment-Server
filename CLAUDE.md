@@ -35,6 +35,7 @@ docs/
     lastfm.md                Scrobbling, now-playing, auth flow, artist enrichment, backfill
     library-identity.md      One record per artist/album/track across sources: name keys, find-or-create, library:merge-duplicates
     live-updates.md          MQTT-over-WebSocket push to Livewire + /receiver, topics, fallback polling
+    smart-playlists.md       Rule-based playlists (source smart): rules JSON, SmartFields registry, builder, editor, daily refresh
     sd-card-export.md        Admin zip of recent covers/backgrounds + logos in the touch client's SD layout
     refactor-hardware-check.md  Checklist for real devices after the duplicate-code cleanup: listeners, discovery, DLNA playback, volume, multiroom, API errors, artwork, MQTT
     plugin-architecture.md  Design doc: extracting drivers into composable packages
@@ -79,6 +80,9 @@ php artisan library:scan [--server=192.168.1.20] [--root=Muziek]   # --root: sta
 
 # Queue MusicBrainz/lyrics/Spotify/Last.fm/TheAudioDB/Discogs enrichment for tracks, artists and albums still missing a source, plus Spotify photos for artists without one (scheduled daily; artists with a Spotify id are fetched 50 per request, others looked up by exact name). --only=metadata|artist-images runs one part
 php artisan library:enrich [--only=metadata --only=artist-images] [--limit=200] [--dry-run]
+
+# Re-select the tracks of smart (rule-based) playlists (scheduled daily)
+php artisan playlists:refresh-smart [--playlist=ID]
 
 # Rebuild canonical genres from stored genre metadata (after changing GenreNormalizer)
 php artisan library:sync-genres
@@ -689,6 +693,7 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 - `DeviceHistory` (`app/Livewire/DeviceHistory.php`) — last 10 unique tracks for a device
 - `PlayHistory` (`app/Livewire/PlayHistory.php`) — paginated play history with device/source filters
 - `ClientManager` (`app/Livewire/ClientManager.php`) — approve/reject pending registrations, edit client name/type/device assignment, regenerate tokens
+- `SmartPlaylistEditor` (`app/Livewire/SmartPlaylistEditor.php`) — rule rows, live match count and track sample for a smart playlist (see `docs/architecture/smart-playlists.md`)
 - `PlayerBar` (`app/Livewire/PlayerBar.php`) — sticky bottom player for the device pinned in this browser (cookie, `SelectedDevice`); library play buttons (`<x-play-button>`) play on it directly (see `docs/frontend/player-bar.md`)
 - `SetupWizard` (`app/Livewire/SetupWizard.php`) — first-time setup checklist: add devices, client devices, library source (see `docs/architecture/setup-wizard.md`)
 

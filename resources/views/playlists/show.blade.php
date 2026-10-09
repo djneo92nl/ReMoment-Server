@@ -17,7 +17,11 @@
                 </div>
             </div>
 
-            @if(!$playlist->isEditable())
+            @if($playlist->isSmart())
+                <p class="text-xs text-gray-400 dark:text-gray-600 mt-2 flex-shrink-0">
+                    <i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Smart playlist
+                </p>
+            @elseif(!$playlist->isEditable())
                 <p class="text-xs text-gray-400 dark:text-gray-600 mt-2 flex-shrink-0">
                     <i class="fa-solid fa-lock mr-1"></i>Synced from Spotify
                 </p>
@@ -30,6 +34,9 @@
             @if($playlist->isEditable())
                 <livewire:playlist-manager :playlist="$playlist" />
             @else
+                @if($playlist->isSmart())
+                    <livewire:smart-playlist-editor :playlist="$playlist" />
+                @endif
                 <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 overflow-hidden">
                     @if($playlist->tracks->isEmpty())
                         <div class="flex flex-col items-center justify-center py-20 text-center px-8">
@@ -66,7 +73,9 @@
                 <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">Playback</h2>
 
                 @if($playlist->tracks->isEmpty())
-                    <p class="text-xs text-gray-400 dark:text-gray-600">Add tracks before playing this playlist.</p>
+                    <p class="text-xs text-gray-400 dark:text-gray-600">
+                        {{ $playlist->isSmart() ? 'No tracks match the rules yet.' : 'Add tracks before playing this playlist.' }}
+                    </p>
                 @elseif($devices->isEmpty())
                     <p class="text-xs text-gray-400 dark:text-gray-600">
                         @if($playlist->source === 'spotify')
@@ -91,7 +100,7 @@
                 @endif
             </div>
 
-            @if($playlist->isEditable())
+            @if($playlist->isDeletable())
                 <form method="POST" action="{{ route('playlists.destroy', $playlist) }}"
                       onsubmit="return confirm('Delete this playlist? This cannot be undone.')">
                     @csrf @method('DELETE')

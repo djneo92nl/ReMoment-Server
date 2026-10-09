@@ -5,6 +5,7 @@
         'spotify' => ['fa-brands fa-spotify', 'text-emerald-500'],
         'dlna' => ['fa-solid fa-server', 'text-gray-400 dark:text-gray-500'],
         'local' => ['fa-solid fa-house', 'text-gray-400 dark:text-gray-500'],
+        'smart' => ['fa-solid fa-wand-magic-sparkles', 'text-indigo-400 dark:text-indigo-500'],
         default => ['fa-solid fa-music', 'text-gray-300 dark:text-stone-600'],
     };
 @endphp
