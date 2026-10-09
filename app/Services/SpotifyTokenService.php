@@ -31,8 +31,8 @@ class SpotifyTokenService
     public function __construct()
     {
         $this->session = new Session(
-            clientId: config('spotify.auth.client_id'),
-            clientSecret: config('spotify.auth.client_secret'),
+            clientId: (string) config('spotify.auth.client_id'),
+            clientSecret: (string) config('spotify.auth.client_secret'),
             redirectUri: route('spotify.callback'),
         );
     }
