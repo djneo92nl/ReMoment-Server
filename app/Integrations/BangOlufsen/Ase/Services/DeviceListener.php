@@ -268,7 +268,7 @@ class DeviceListener implements DeviceListenerInterface
         return $nowPlaying;
     }
 
-    private function parseSource(mixed $data): NowPlaying
+    protected function parseSource(mixed $data): NowPlaying
     {
         $source = new Source(
             name: $data['primaryExperience']['source']['friendlyName'],

@@ -5,7 +5,7 @@ ReMomentServer can automatically discover devices on the local network via brand
 ## Discovery command
 
 ```bash
-php artisan device:discover [--brand=sonos|ase|mozart ...] [--host=192.168.1.9 ...]
+php artisan device:discover [--brand=sonos|ase|mozart|converter ...] [--host=192.168.1.9 ...]
 ```
 
 One command for every brand. It runs the discoverers registered under `discoverers` in `config/devices.php` (`--brand` keeps those whose class name contains the given text), passes each `--host` to discoverers that implement `HostHintedDiscovery`, and stores everything found through `App\Domain\Device\DiscoveredDevicePersister`: a device is matched on any identifier in `DiscoveredDevice::$meta` (`upnp_uuid` for ASE and Mozart, `sonos_uuid` for Sonos), else on its IP **within the same brand** (DHCP reuses IPs, a new brand never takes over an old device); it is then updated (an IP change is written back) or created, and its meta keys are upserted. Devices are never deleted. Discoverer notes (e.g. "no multicast replies") are printed after the list. The web "Scan" page uses the same discoverers through `NetworkDiscoveryService`, only listing devices not yet stored.
@@ -13,6 +13,7 @@ One command for every brand. It runs the discoverers registered under `discovere
 A new brand needs a `DiscoveryInterface` implementation in `config('devices.discoverers')`, nothing else.
 
 - **ASE** (`AseDiscovery`) and **Mozart** (`Remoment\MozartDriver\MozartDiscovery`) share `App\Integrations\Common\UpnpMediaRendererDiscovery`: an SSDP M-SEARCH (`SsdpClient`) for `urn:schemas-upnp-org:device:MediaRenderer:1`, then each responder's UPnP XML descriptor is fetched and the driver resolved from `config/devices.php` by manufacturer + model. Each subclass only names its `driver_name` (`ASE` / `Mozart`), so it reports just its own platform's models.
+- **Converter** (`ConverterDiscovery`): a BeoLink Converter NL/ML is not a UPnP MediaRenderer and has no multicast announcement the server listens to, so it is found by unicast: `GET http://{ip}:8080/BeoDevice` on every `--host` (and on converters already stored) and kept when `productId.productType` is `BEOLINK_CONVERTER_NL_ML`. Run `php artisan device:discover --brand=converter --host=192.168.1.10`. The meta key is `converter_jid` (`{type}.{item}.{serial}@products.bang-olufsen.com`), deliberately not `ase_jid`, which feeds multiroom peer matching.
 - **Sonos** (`SonosDiscovery`): does not depend on multicast alone. Seeds are the `--host` / "Known device IPs" input, the IPs of Sonos devices already stored, and an SSDP search (`ZonePlayer:1`). The first seed that answers on port 1400 lists the whole household through `ZoneGroupTopology` (`SonosTopology`), so one reachable speaker finds the rest. Stereo-pair secondaries, satellites and Boost bridges are skipped.
 
 ## Docker and multicast

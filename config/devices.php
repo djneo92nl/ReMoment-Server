@@ -3,6 +3,7 @@
 return [
     'discoverers' => [
         \App\Integrations\BangOlufsen\Ase\AseDiscovery::class,
+        \App\Integrations\BangOlufsen\Ase\ConverterDiscovery::class,
         \App\Integrations\Sonos\SonosDiscovery::class,
         \Remoment\MozartDriver\MozartDiscovery::class,
     ],
@@ -10,6 +11,8 @@ return [
     // Driver class => its DeviceListenerInterface implementation, run by `php artisan device:listen`.
     'listeners' => [
         \App\Integrations\BangOlufsen\Ase\MusicPlayerDriver::class => \App\Integrations\BangOlufsen\Ase\Services\DeviceListener::class,
+        // The converter pushes the ASE notifications (SOURCE, NOW_PLAYING_*, ...) plus its own tuner/track number.
+        \App\Integrations\BangOlufsen\Ase\ConverterDriver::class => \App\Integrations\BangOlufsen\Ase\Services\ConverterListener::class,
         \App\Integrations\Sonos\MusicPlayerDriver::class => \App\Integrations\Sonos\Services\DeviceListener::class,
         \App\Integrations\Spotify\MusicPlayerDriver::class => \App\Integrations\Spotify\Services\DeviceListener::class,
         \Remoment\MozartDriver\MusicPlayerDriver::class => \Remoment\MozartDriver\Services\DeviceListener::class,
@@ -42,6 +45,11 @@ return [
             'driver_name' => 'ASE',
             'driver' => \App\Integrations\BangOlufsen\Ase\MusicPlayerDriver::class,
             'speaker' => 'internal',
+        ],
+        // NetworkLink/MasterLink converter: not a UPnP renderer, found with `device:discover --brand=converter --host=IP`.
+        'BeoLink Converter NL/ML' => [
+            'driver_name' => 'ASE',
+            'driver' => \App\Integrations\BangOlufsen\Ase\ConverterDriver::class,
         ],
         'Beoconnect Core' => [
             'driver_name' => 'Mozart',
