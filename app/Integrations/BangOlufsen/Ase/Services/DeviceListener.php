@@ -2,9 +2,11 @@
 
 namespace App\Integrations\BangOlufsen\Ase\Services;
 
+use App\Domain\Artwork\LibraryArtwork;
 use App\Domain\Device\Cache\MultiRoom;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
+use App\Domain\Library\LibraryIdentity;
 use App\Domain\Media\AlbumData;
 use App\Domain\Media\ArtistData;
 use App\Domain\Media\NowPlaying;
@@ -232,7 +234,8 @@ class DeviceListener implements DeviceListenerInterface
     public function parseStoredMusic(array $payload): NowPlaying
     {
         $artist = new ArtistData(name: $payload['artist']);
-        $album = new AlbumData(name: $payload['album'], images: $payload['albumImage'], artist: $artist);
+        [$trackImages, $albumImages] = $this->withLibraryCovers($payload);
+        $album = new AlbumData(name: $payload['album'], images: $albumImages, artist: $artist);
         $source = null;
         $meta = [];
         $trackId = isset($payload['trackId']) ? urldecode($payload['trackId']) : null;
@@ -254,7 +257,7 @@ class DeviceListener implements DeviceListenerInterface
             source: $source,
             artist: $artist,
             duration: $payload['duration'],
-            images: $payload['trackImage'],
+            images: $trackImages,
             meta: $meta
         );
 
@@ -266,6 +269,32 @@ class DeviceListener implements DeviceListenerInterface
         );
 
         return $nowPlaying;
+    }
+
+    /**
+     * The track and album images of a stored-music notification. A DLNA track starts without any
+     * (the player only has its stream URL), so the cover comes from the library's copy of it.
+     *
+     * @return array{0: array, 1: array}
+     */
+    private function withLibraryCovers(array $payload): array
+    {
+        $trackImages = $payload['trackImage'] ?? [];
+        $albumImages = $payload['albumImage'] ?? [];
+
+        if ($trackImages || $albumImages) {
+            return [$trackImages, $albumImages];
+        }
+
+        try {
+            $track = LibraryIdentity::lookupTrack($payload['artist'], $payload['album'] ?? null, $payload['name'], null, null, $payload['duration'] ?? null);
+            $cover = $track ? (LibraryArtwork::coverUrl($track->images) ?? LibraryArtwork::coverUrl($track->album?->images)) : null;
+        } catch (\Throwable $e) {
+            Log::debug("ASE listener: library cover lookup failed: {$e->getMessage()}");
+            $cover = null;
+        }
+
+        return $cover ? [[$cover], [$cover]] : [[], []];
     }
 
     protected function parseSource(mixed $data): NowPlaying
