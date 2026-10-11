@@ -17,6 +17,11 @@ class FakeControlTransport implements ControlTransport
         return true;
     }
 
+    public function commands(Device $device, ControlProfile $profile): ?array
+    {
+        return null;
+    }
+
     public function send(Device $device, ControlProfile $profile, string $commandId): void
     {
         if ($commandId === 'broken') {

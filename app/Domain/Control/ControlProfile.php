@@ -19,6 +19,16 @@ final readonly class ControlProfile
         return in_array($commandId, array_column($this->commands, 'id'), true);
     }
 
+    /** The same profile with only the commands whose id is listed (order kept). */
+    public function only(array $commandIds): self
+    {
+        return new self(
+            $this->key,
+            $this->label,
+            array_values(array_filter($this->commands, fn (array $c) => in_array($c['id'], $commandIds, true))),
+        );
+    }
+
     public function toArray(): array
     {
         return [

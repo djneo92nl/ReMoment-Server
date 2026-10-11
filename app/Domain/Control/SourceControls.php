@@ -36,6 +36,8 @@ final class SourceControls
             $rules,
         );
 
+        $key ??= self::keyByType($profiles, $source->sourceType);
+
         if ($key === null) {
             return null;
         }
@@ -43,12 +45,22 @@ final class SourceControls
         return new ControlProfile($key, $profiles[$key]['label'], $profiles[$key]['commands']);
     }
 
-    /** The profile, when a transport can also deliver its commands to this device. */
+    /**
+     * The profile, when a transport can also deliver its commands to this device,
+     * limited to the commands that transport can send.
+     */
     public static function available(Device $device): ?ControlProfile
     {
         $profile = self::profileFor($device);
+        $transport = $profile ? self::transportFor($device, $profile) : null;
 
-        return $profile && self::transportFor($device, $profile) ? $profile : null;
+        if (!$transport) {
+            return null;
+        }
+
+        $ids = $transport->commands($device, $profile);
+
+        return $ids === null ? $profile : $profile->only($ids);
     }
 
     public static function run(Device $device, string $commandId): void
@@ -60,6 +72,28 @@ final class SourceControls
         }
 
         self::transportFor($device, $profile)->send($device, $profile, $commandId);
+    }
+
+    /**
+     * A profile whose `source_types` name the source's type exactly (case
+     * insensitive): for sources whose words are too common to match on, like
+     * a converter's "RADIO" (a net radio's type is "NET RADIO", not "RADIO").
+     */
+    private static function keyByType(array $profiles, ?string $sourceType): ?string
+    {
+        if ($sourceType === null || $sourceType === '') {
+            return null;
+        }
+
+        foreach ($profiles as $key => $profile) {
+            foreach ($profile['source_types'] ?? [] as $type) {
+                if (strcasecmp($type, $sourceType) === 0) {
+                    return $key;
+                }
+            }
+        }
+
+        return null;
     }
 
     private static function transportFor(Device $device, ControlProfile $profile): ?ControlTransport

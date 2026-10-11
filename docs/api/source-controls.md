@@ -27,6 +27,18 @@ POST /api/devices/{id}/controls/{control}  → { "status": "ok", "control": "nex
 
 Clients should re-read `capabilities` / `GET …/controls` when the source changes.
 
+## Transports
+
+A transport (listed under `transports` in `config/control-profiles.php`, first that `supports()` the device wins) also says which commands of the profile it can really send (`commands()`); the others are left out of `GET …/controls` and answer `422 unsupported`.
+
+### `ConverterDigitTransport` (FM presets of a converter's tuner)
+
+For a B&O NL/ML converter's **RADIO** source played on an ASE player that has **borrowed** it (`App\Integrations\BangOlufsen\Ase\Control\ConverterDigitTransport`). The source is recognised by its type (`source_types: ['RADIO']`, exact — a net radio is `NET RADIO`) and by the converter's product type `1790` in the source's jid; the player must be an ASE `MusicPlayerDriver`/`VideoPlayerDriver`.
+
+- Commands: `preset_1` … `preset_9`. Each is `POST BeoZone/Zone/Digits {"digits": N}` **on the player**, not on the converter. `prev_preset`, `next_preset`, `tune_up` and `tune_down` are not offered: the API has only single digits and no relative step.
+- Why the player: the player forwards the key to the converter as a Beo4 telegram (key `0x01…0x09`, then release `0x7e`), which the converter puts on the Master Link bus. The same call sent to the converter itself is accepted (`200`) but logged as an internal IR command the tuner ignores. Verified on a BeoSound Moment (converter at the Ouverture's Master Link).
+- Borrowing must be switched on for the converter on that player (`PUT BeoZone/System/Products/{converter jid}` with `{"products": {"borrowSource": true}}`) and RADIO selected on the player (`POST BeoZone/Zone/ActiveSources`). Details in `docs/architecture/ase-api-map.md`.
+
 ## Status
 
-Phase 1 only: profiles, resolver, capability and API. The ASE one-way transport (needs the command catalog from a real device) and the ESP transport are still to be written, so `transports` is empty and no device reports `source_controls` yet.
+Profiles, resolver, capability and API are in place. The ASE converter transport above exists; the generic ASE one-way command transport (needs the command catalog from a real device) and the ESP transport are still to be written, so only a player playing a converter's RADIO source reports `source_controls`.

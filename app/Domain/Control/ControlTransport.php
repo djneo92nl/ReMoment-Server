@@ -15,6 +15,14 @@ interface ControlTransport
     public function supports(Device $device, ControlProfile $profile): bool;
 
     /**
+     * The command ids of the profile this transport can send to the device, or
+     * null for all of them. Controls the transport cannot deliver are not listed.
+     *
+     * @return string[]|null
+     */
+    public function commands(Device $device, ControlProfile $profile): ?array;
+
+    /**
      * @throws \App\Integrations\Common\UnsupportedOperationException when the transport has no call for the command
      */
     public function send(Device $device, ControlProfile $profile, string $commandId): void;
