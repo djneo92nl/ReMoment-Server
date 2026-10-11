@@ -20,8 +20,9 @@ return [
 
     // device_meta keys holding a platform's multiroom peer ID (see MultiRoomInterface::multiRoomMetaKey()).
     // Peer IDs are matched across all of them: ASE and Mozart JIDs are mostly interchangeable, so an ASE
-    // device can list a Mozart listener and vice versa.
-    'multiroom_meta_keys' => ['ase_jid', 'mozart_jid', 'sonos_uuid'],
+    // device can list a Mozart listener and vice versa. `converter_jid` is a BeoLink Converter NL/ML, which
+    // an ASE player can join (it hosts, but is no MultiRoomInterface driver itself).
+    'multiroom_meta_keys' => ['ase_jid', 'mozart_jid', 'sonos_uuid', 'converter_jid'],
 
     'Bang & Olufsen' => [
         'BeoSound Essence' => [

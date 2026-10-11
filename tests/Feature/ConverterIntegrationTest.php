@@ -4,10 +4,12 @@ namespace Tests\Feature;
 
 use App\Domain\Device\Capabilities;
 use App\Domain\Device\DiscoveredDevicePersister;
+use App\Domain\Device\MultiRoomPeers;
 use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
 use App\Integrations\BangOlufsen\Ase\ConverterDiscovery;
 use App\Integrations\BangOlufsen\Ase\ConverterDriver;
+use App\Integrations\BangOlufsen\Ase\MusicPlayerDriver;
 use App\Integrations\BangOlufsen\Ase\Services\ConverterListener;
 use App\Integrations\Common\HttpConnector;
 use App\Integrations\Common\UnsupportedOperationException;
@@ -133,6 +135,23 @@ class ConverterIntegrationTest extends TestCase
         } finally {
             $this->assertSame(['GET BeoDevice', 'GET BeoZone/Zone/Sources'], $api->requests);
         }
+    }
+
+    public function test_a_player_joins_the_converter_by_the_converter_adding_it_as_listener(): void
+    {
+        $api = $this->api();
+        $converter = Device::factory()->create(['ip_address' => '192.168.1.10', 'device_name' => 'Converter', 'device_driver' => ConverterDriver::class, 'device_product_type' => 'BeoLink Converter NL/ML']);
+        DeviceMeta::create(['device_id' => $converter->id, 'key' => 'converter_jid', 'value' => '1790.1179011.24978398@products.bang-olufsen.com']);
+        $moment = Device::factory()->create(['ip_address' => '192.168.1.29', 'device_name' => 'Moment', 'device_driver' => MusicPlayerDriver::class]);
+        DeviceMeta::create(['device_id' => $moment->id, 'key' => 'ase_jid', 'value' => '2997.1290084.26093928@products.bang-olufsen.com']);
+
+        // the converter's jid in the Moment's joinable peers resolves to the converter device
+        $this->assertSame([$converter->id], MultiRoomPeers::devices(['1790.1179011.24978398@products.bang-olufsen.com'], $moment)->pluck('id')->all());
+
+        $moment->driver->joinSession($converter);
+
+        $this->assertSame(['POST BeoZone/Zone/ActiveSources/primaryExperience'], $api->requests);
+        $this->assertSame([['listener' => ['jid' => '2997.1290084.26093928@products.bang-olufsen.com']]], $api->bodies);
     }
 
     private function feed(ConverterListener $listener, array $notification): void
