@@ -161,13 +161,34 @@ class ConverterIntegrationTest extends TestCase
         $method->invoke($listener, ['notification' => $notification], '7');
     }
 
-    private function sourceNotification(string $id = self::RADIO, string $name = 'RADIO', string $type = 'RADIO'): array
+    private const CONVERTER = '1790.1179011.24978398@products.bang-olufsen.com';
+
+    private const MOMENT = '2997.1290084.26093928@products.bang-olufsen.com';
+
+    private function experience(string $id, string $name, string $type, ?array $listener, string $product = self::CONVERTER): array
+    {
+        return array_filter([
+            'source' => [
+                'id' => $id, 'friendlyName' => $name, 'sourceType' => ['type' => $type], 'category' => 'RADIO',
+                'product' => ['jid' => $product],
+            ],
+            'listener' => $listener,
+            'state' => 'play',
+        ], fn ($value) => $value !== null);
+    }
+
+    private function sourceNotification(string $id = self::RADIO, string $name = 'RADIO', string $type = 'RADIO', ?array $listener = null, string $product = self::CONVERTER): array
     {
         return ['type' => 'SOURCE', 'kind' => 'source', 'data' => [
             'primary' => $id,
-            'primaryExperience' => ['source' => [
-                'id' => $id, 'friendlyName' => $name, 'sourceType' => ['type' => $type], 'category' => 'RADIO',
-            ]],
+            'primaryExperience' => $this->experience($id, $name, $type, $listener, $product),
+        ]];
+    }
+
+    private function experienceChanged(?array $listener, string $id = self::RADIO): array
+    {
+        return ['type' => 'SOURCE_EXPERIENCE_CHANGED', 'kind' => 'source', 'data' => [
+            'primaryExperience' => $this->experience($id, 'RADIO', 'RADIO', $listener),
         ]];
     }
 
@@ -210,12 +231,65 @@ class ConverterIntegrationTest extends TestCase
         Event::assertDispatched(NowPlayingUpdated::class, fn (NowPlayingUpdated $e) => $e->nowPlaying->track?->name === 'Track 5' && $e->nowPlaying->source?->name === 'CD');
     }
 
+    public function test_plays_locally_follows_the_converters_own_jid_in_the_listener_list(): void
+    {
+        Event::fake();
+        $listener = new ConverterListener('http://example.test', self::CONVERTER);
+
+        $this->feed($listener, $this->sourceNotification(listener: [self::CONVERTER]));
+        $this->feed($listener, $this->sourceNotification(listener: [self::MOMENT]));
+        $this->feed($listener, $this->sourceNotification(listener: null));
+        // a Network Link stream (the M5's B&O Radio) on the master's speakers: its product is not the converter
+        $this->feed($listener, $this->sourceNotification('beoradio:2714.1200298.26924927@products.bang-olufsen.com', 'B&O Radio', 'UNDEFINED', [self::CONVERTER, self::MOMENT], '2714.1200298.26924927@products.bang-olufsen.com'));
+
+        $flags = collect(Event::dispatched(NowPlayingUpdated::class))
+            ->map(fn (array $args) => $args[0]->nowPlaying->source?->playsLocally)
+            ->all();
+
+        $this->assertSame([true, false, null, true], $flags);
+    }
+
+    public function test_a_joining_or_leaving_player_announces_the_source_again_with_the_preset(): void
+    {
+        Event::fake();
+        $listener = new ConverterListener('http://example.test', self::CONVERTER);
+
+        $this->feed($listener, $this->sourceNotification(listener: [self::CONVERTER]));
+        $this->feed($listener, $this->legacy(2));
+        $this->feed($listener, $this->experienceChanged([self::CONVERTER, self::MOMENT])); // the Moment joins: still local
+        $this->feed($listener, $this->experienceChanged([self::MOMENT])); // the Ouverture goes to standby
+        $this->feed($listener, $this->experienceChanged([self::MOMENT])); // repeated: nothing new
+
+        $events = collect(Event::dispatched(NowPlayingUpdated::class))->map(fn (array $args) => $args[0]->nowPlaying);
+
+        // SOURCE, Preset 2, then only the change of the flag
+        $this->assertCount(3, $events);
+        $this->assertSame('Preset 2', $events[2]->track?->name);
+        $this->assertFalse($events[2]->source->playsLocally);
+        $this->assertSame(self::RADIO, $events[2]->source->jid);
+    }
+
+    public function test_a_changed_listener_list_without_a_preset_announces_the_bare_source(): void
+    {
+        Event::fake();
+        $listener = new ConverterListener('http://example.test', self::CONVERTER);
+
+        $this->feed($listener, $this->sourceNotification(listener: [self::CONVERTER]));
+        $this->feed($listener, $this->experienceChanged([self::MOMENT]));
+
+        $last = collect(Event::dispatched(NowPlayingUpdated::class))->last()[0]->nowPlaying;
+
+        $this->assertNull($last->track);
+        $this->assertFalse($last->source->playsLocally);
+        $this->assertFalse($last->source->toArray()['playsLocally']);
+    }
+
     public function test_other_notifications_still_use_the_ase_handling(): void
     {
         Event::fake();
         $listener = new ConverterListener('http://example.test');
 
-        $this->feed($listener, ['type' => 'SOURCE_EXPERIENCE_CHANGED', 'data' => ['primaryExperience' => []]]);
+        $this->feed($listener, ['type' => 'SOURCE_EXPERIENCE_CHANGED', 'data' => ['primaryExperience' => []]]); // no source: nothing to announce
         $this->feed($listener, $this->legacy(0));
         Event::assertNothingDispatched();
 

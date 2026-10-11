@@ -10,6 +10,8 @@ class Source
         public ?string $jid = null,
         public ?string $sourceType = null,
         public ?string $connector = null,
+        /** True while the device itself outputs the source, false while only joined players hear it, null when unknown (a BeoLink Converter reports this). */
+        public ?bool $playsLocally = null,
     ) {}
 
     public function toArray(): array
@@ -20,6 +22,7 @@ class Source
             'sourceType' => $this->sourceType,
             'connector' => $this->connector,
             'jid' => $this->jid,
+            'playsLocally' => $this->playsLocally,
         ], fn ($value) => $value !== null);
     }
 }

@@ -8,7 +8,7 @@ Some sources have physical controls of their own that play/pause/next don't cove
 
 ## How it resolves
 
-1. The device's active source (`now_playing.source`: type, name, connector, category) is matched against the `match` words of each profile in `config/control-profiles.php` (same word matching as `SourceLogo`). First profile wins: `cd`, `tape`, `fm`.
+1. The device's active source (`now_playing.source`: type, name, connector, category; a BeoLink Converter also reports `playsLocally`) is matched against the `match` words of each profile in `config/control-profiles.php` (same word matching as `SourceLogo`). First profile wins: `cd`, `tape`, `fm`.
 2. A **transport** (`App\Domain\Control\ControlTransport`, listed under `transports` in the config) must support the device. It turns the abstract command id into the real call (ASE one-way command, ESP HTTP call). No transport, no controls.
 3. When both hold, the device lists the `source_controls` capability (dynamic, like `battery`).
 
