@@ -67,7 +67,7 @@ class ConverterDigitTransportTest extends TestCase
         $this->assertNull(SourceControls::profileForSource(new Source(sourceType: 'TUNEIN', name: 'TuneIn', category: 'RADIO')));
     }
 
-    public function test_a_player_playing_the_converter_radio_lists_only_the_preset_numbers(): void
+    public function test_a_player_playing_the_converter_radio_lists_the_steps_and_preset_numbers(): void
     {
         $device = $this->playing($this->converterRadio());
 
@@ -79,10 +79,10 @@ class ConverterDigitTransportTest extends TestCase
             ->json('controls');
 
         $this->assertSame(
-            ['preset_1', 'preset_2', 'preset_3', 'preset_4', 'preset_5', 'preset_6', 'preset_7', 'preset_8', 'preset_9'],
+            ['prev_preset', 'next_preset', 'preset_1', 'preset_2', 'preset_3', 'preset_4', 'preset_5', 'preset_6', 'preset_7', 'preset_8', 'preset_9'],
             array_column($controls, 'id'),
         );
-        $this->assertSame('3', $controls[2]['label']);
+        $this->assertSame('3', $controls[4]['label']);
     }
 
     public function test_a_preset_is_sent_as_a_digit_to_the_player(): void
@@ -97,11 +97,22 @@ class ConverterDigitTransportTest extends TestCase
         $this->assertSame([['digits' => 6]], $this->api->bodies);
     }
 
-    public function test_relative_steps_and_tuning_are_not_offered(): void
+    public function test_next_and_previous_are_the_players_transport_keys(): void
     {
         $device = $this->playing($this->converterRadio());
 
-        foreach (['next_preset', 'prev_preset', 'tune_up', 'tune_down', 'preset_0', 'preset_10'] as $control) {
+        $this->postJson("/api/devices/{$device->id}/controls/next_preset")->assertOk();
+        $this->postJson("/api/devices/{$device->id}/controls/prev_preset")->assertOk();
+
+        $this->assertSame(['POST BeoZone/Zone/Stream/Forward', 'POST BeoZone/Zone/Stream/Backward'], $this->api->requests);
+        $this->assertSame([['toBeReleased' => false], ['toBeReleased' => false]], $this->api->bodies);
+    }
+
+    public function test_tuning_and_unknown_presets_are_not_offered(): void
+    {
+        $device = $this->playing($this->converterRadio());
+
+        foreach (['tune_up', 'tune_down', 'preset_0', 'preset_10'] as $control) {
             $this->postJson("/api/devices/{$device->id}/controls/{$control}")
                 ->assertStatus(422)
                 ->assertJsonPath('error', 'unsupported');

@@ -13,14 +13,18 @@ use App\Models\Device;
 
 /**
  * FM presets of a BeoLink Converter NL/ML's tuner, pressed from an ASE player
- * that has borrowed the converter's RADIO source: `POST BeoZone/Zone/Digits`
- * on that player. The player forwards the key as a Beo4 telegram over
- * Network Link and the converter puts it on the Master Link bus.
+ * that has borrowed the converter's RADIO source. The player forwards its keys
+ * as Beo4 telegrams over Network Link and the converter puts them on the
+ * Master Link bus:
  *
- * Sending the same call to the converter itself does nothing useful (it logs an
+ * - `preset_1` .. `preset_9`: `POST BeoZone/Zone/Digits` on the player (one digit per call).
+ * - `next_preset` / `prev_preset`: the player's transport `Stream/Forward` / `Stream/Backward`
+ *   (verified: the converter's `NOW_PLAYING_LEGACY.trackNumber` went 3 -> 4 -> 3).
+ *
+ * Sending the same calls to the converter itself does nothing useful (it logs an
  * IR command for the ML product and the tuner ignores it), so the source must
- * be borrowed and the command goes to the player. Only preset numbers are
- * possible: the API takes one digit per call and has no relative step.
+ * be borrowed and the command goes to the player. Tuning (`tune_up`/`tune_down`)
+ * has no known call and is not offered.
  * See docs/architecture/ase-api-map.md, "NetworkLink/MasterLink converter".
  */
 final class ConverterDigitTransport implements ControlTransport
@@ -38,17 +42,19 @@ final class ConverterDigitTransport implements ControlTransport
 
     public function commands(Device $device, ControlProfile $profile): ?array
     {
-        return array_map(fn (int $digit) => "preset_{$digit}", range(1, 9));
+        return ['prev_preset', 'next_preset', ...array_map(fn (int $digit) => "preset_{$digit}", range(1, 9))];
     }
 
     public function send(Device $device, ControlProfile $profile, string $commandId): void
     {
-        if (!preg_match('/^preset_([1-9])$/', $commandId, $match)) {
-            throw new UnsupportedOperationException("The converter tuner has no call for '{$commandId}'.");
-        }
+        $player = app(HttpConnector::class, ['baseUrl' => $device->ip_address.':8080']);
 
-        app(HttpConnector::class, ['baseUrl' => $device->ip_address.':8080'])
-            ->postStrict('BeoZone/Zone/Digits', ['digits' => (int) $match[1]]);
+        match (true) {
+            $commandId === 'next_preset' => $player->postStrict('BeoZone/Zone/Stream/Forward', ['toBeReleased' => false]),
+            $commandId === 'prev_preset' => $player->postStrict('BeoZone/Zone/Stream/Backward', ['toBeReleased' => false]),
+            (bool) preg_match('/^preset_([1-9])$/', $commandId, $match) => $player->postStrict('BeoZone/Zone/Digits', ['digits' => (int) $match[1]]),
+            default => throw new UnsupportedOperationException("The converter tuner has no call for '{$commandId}'."),
+        };
     }
 
     private function isAsePlayer(Device $device): bool
