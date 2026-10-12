@@ -70,11 +70,13 @@ Tracks are in best-effort album order (by id — there is no track number column
 
 ### `GET /api/library/genres`
 
-`{ "data": [ { "slug": "alternative-rock", "name": "Alternative Rock", "artist_count": 12, "album_count": 30 }, … ] }` — genres with at least one artist or album, most artists first. Genres are canonical: spellings of one genre ("hip hop", "Hip-Hop") are one entry.
+`{ "data": [ { "slug": "alternative-rock", "name": "Alternative Rock", "artist_count": 12, "album_count": 30, "colors": [ "#2a4d8f", "#c7776b" ] }, … ] }` — genres with at least one artist or album, most artists first. Genres are canonical: spellings of one genre ("hip hop", "Hip-Hop") are one entry.
+
+`colors` is `["#rrggbb", …]`, at most 3, the genre's dominant colour first, derived from the cached artwork palettes (`colors` of the cover's cache entry, one bulk cache read, never recomputed) of the albums `album_count` counts (same `scope` and client-hidden filtering). Rule: sample at most 200 albums per genre (most played first, then lowest id); per album take the first 2 palette entries; quantise every channel in steps of 32 (`floor(c/32)`) and group by bucket; count albums per bucket (an album counts once per bucket); the bucket's colour is its most frequent exact hex (ties: lower hex). A bucket is *vivid* when its colour has HSV saturation >= 0.25 and value between 0.2 and 0.95; vivid buckets rank first by album count, then the rest by album count (ties: order of first appearance), top 3 returned. Covers not processed yet add nothing; a genre without any gives `[]` (never null or absent). Computed per genre + scope + client-hidden sources and cached for 1 hour, so a new album shows within an hour.
 
 ### `GET /api/library/genres/{slug}`
 
-`{ "slug", "name", "artists": [ ArtistItem, … ], "albums": [ AlbumItem, … ] }` — up to 100 of each: artists with albums alphabetically ("The " ignored), albums newest year first. Unknown slug: `404`.
+`{ "slug", "name", "colors": [ "#rrggbb", … ], "artists": [ ArtistItem, … ], "albums": [ AlbumItem, … ] }` — up to 100 of each: artists with albums alphabetically ("The " ignored), albums newest year first. `colors` as in the list. Unknown slug: `404`.
 
 ### `GET /api/library/playlists?cursor=`
 

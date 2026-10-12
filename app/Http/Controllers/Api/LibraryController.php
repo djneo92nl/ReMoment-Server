@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Domain\Artwork\LibraryArtwork;
 use App\Domain\Artwork\LibraryItemArtwork;
 use App\Domain\Artwork\PlaylistArtwork;
+use App\Domain\Library\GenreColors;
 use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\LibrarySources;
@@ -244,11 +245,14 @@ class LibraryController extends Controller
             ->sortBy([['artists_count', 'desc'], ['albums_count', 'desc'], ['name', 'asc']])
             ->values();
 
+        $colors = GenreColors::forGenres($genres->pluck('id')->all(), $hidden);
+
         return response()->json(['data' => $genres->map(fn (Genre $genre) => [
             'slug' => $genre->slug,
             'name' => $genre->name,
             'artist_count' => $genre->artists_count,
             'album_count' => $genre->albums_count,
+            'colors' => $colors[$genre->id] ?? [],
         ])]);
     }
 
@@ -271,6 +275,7 @@ class LibraryController extends Controller
         return response()->json([
             'slug' => $genre->slug,
             'name' => $genre->name,
+            'colors' => GenreColors::forGenres([$genre->id], $hidden)[$genre->id] ?? [],
             'artists' => $artists->map(fn (Artist $artist) => $this->artistItem($artist))->values(),
             'albums' => $albums->map(fn (Album $album) => $this->albumItem($album))->values(),
         ]);

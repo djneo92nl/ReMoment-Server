@@ -103,11 +103,12 @@ class GenresTest extends TestCase
         GenreSync::sync($album, ['alternative rock'], 'musicbrainz');
 
         $this->getJson('/api/library/genres')->assertOk()->assertExactJson(['data' => [
-            ['slug' => 'alternative-rock', 'name' => 'Alternative Rock', 'artist_count' => 1, 'album_count' => 1],
+            ['slug' => 'alternative-rock', 'name' => 'Alternative Rock', 'artist_count' => 1, 'album_count' => 1, 'colors' => []],
         ]]);
 
         $this->getJson('/api/library/genres/alternative-rock')->assertOk()
             ->assertJsonPath('name', 'Alternative Rock')
+            ->assertJsonPath('colors', [])
             ->assertJsonPath('artists.0.name', 'Muse')
             ->assertJsonPath('albums.0.name', 'Absolution')
             ->assertJsonPath('albums.0.year', 2003);

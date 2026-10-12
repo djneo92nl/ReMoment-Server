@@ -771,6 +771,7 @@ paths:
                 properties:
                   slug: { type: string }
                   name: { type: string }
+                  colors: { type: array, maxItems: 3, items: { type: string, pattern: "^#[0-9a-f]{6}$" }, description: Same as GenreItem.colors }
                   artists:
                     type: array
                     items: { $ref: "#/components/schemas/ArtistItem" }
@@ -1565,6 +1566,16 @@ components:
         name: { type: string }
         artist_count: { type: integer }
         album_count: { type: integer }
+        colors:
+          type: array
+          maxItems: 3
+          description: >-
+            Up to 3 hex colours the covers of the genre's albums share (same scope and filtering as
+            album_count), dominant first, vivid ones (HSV saturation >= 0.25, value 0.2-0.95) before
+            grey/black/white. Palettes come from the artwork cache (first 2 entries per cover, channels
+            bucketed in steps of 32, most albums per bucket, at most 200 albums sampled). Empty when no
+            cover is processed. Cached 1 hour.
+          items: { type: string, pattern: "^#[0-9a-f]{6}$", example: "#2a4d8f" }
     ArtistDetail:
       type: object
       properties:
