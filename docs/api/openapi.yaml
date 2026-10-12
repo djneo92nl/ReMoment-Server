@@ -782,7 +782,7 @@ paths:
     get:
       tags: [Library]
       summary: Playlists with tracks (smart ones too), recently played first, 50 per page
-      description: "In the Local scope (`dlna`/`local`) playlists of another library (Spotify) with local_coverage >= 0.5 are listed too, with `external: true`."
+      description: "In the Local scope (`dlna`/`local`) playlists of another library (Spotify) with local_coverage >= 0.4 are listed too, with `external: true`."
       operationId: listPlaylists
       parameters:
         - { $ref: "#/components/parameters/cursor" }
@@ -1525,7 +1525,7 @@ components:
         - type: object
           properties:
             library: { type: string, nullable: true, description: "The library the playlist belongs to (spotify); null for local and smart playlists", example: spotify }
-            external: { type: boolean, description: "True only in the Local scope, for a playlist of another library listed because local_coverage >= 0.5; open it with library=dlna" }
+            external: { type: boolean, description: "True only in the Local scope, for a playlist of another library listed because local_coverage >= 0.4; open it with library=dlna" }
             local_track_count: { type: integer, nullable: true, description: Tracks with a playable Local copy; null for local/smart/Local playlists }
             local_coverage: { type: number, nullable: true, description: "local_track_count / track_count, 0..1, 2 decimals; null as local_track_count" }
     Library:

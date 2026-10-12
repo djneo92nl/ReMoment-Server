@@ -339,9 +339,14 @@ class LibraryController extends Controller
         $mode = PlaylistMode::resolve($playlist, $request->query('library'));
 
         $hidden = $this->hiddenSources($request);
-        // Opened as a Local playlist, every track is shown: the missing ones are marked, not hidden.
+        $library = LibraryPlayback::playlistLibrary($playlist);
         if ($mode->isLocal()) {
+            // Opened as a Local playlist, every track is shown: the missing ones are marked, not hidden.
             $hidden = [];
+        } elseif ($library !== null) {
+            // A playlist of a library lists what is visible in THAT library, not what the default (leading
+            // library) scope shows: a Spotify playlist lists all its tracks. The client's own hidden sources still apply.
+            $hidden = array_values(array_unique([...$this->clientHidden($request), ...LibrarySources::allBut($library)]));
         }
 
         $playlist->load(['metadata' => fn ($q) => $q->where('key', 'spotify_owner')]);
@@ -368,6 +373,12 @@ class LibraryController extends Controller
             return $item + ['playable' => LibraryPlayback::playlistTrackPlayable($playlist, $track, $device)];
         })->values();
 
+        // Of a library playlist (or in local mode) the listed tracks are the playlist's: the count is exact when
+        // all fit, else the visible total. Local and smart playlists keep counting every track.
+        $ofLibrary = $mode->isLocal() || $library !== null;
+        $trackCount = $ofLibrary
+            ? ($items->count() < self::PLAYLIST_TRACKS ? $items->count() : LibrarySources::tracks($playlist->tracks(), $hidden)->count())
+            : null;
         $counts = PlaylistCoverage::applies($playlist) ? (PlaylistCoverage::counts([$playlist->id])[$playlist->id] ?? ['total' => 0, 'local' => 0]) : null;
         $smart = $playlist->isSmart();
 
@@ -380,8 +391,8 @@ class LibraryController extends Controller
             'mode' => $mode->mode,
             'mode_library' => $mode->library,
             // A playlist of a library (Spotify) is of that library only, whatever its tracks' merged copies offer; in local mode it is Local.
-            'sources' => $mode->isLocal() ? [PlaylistMode::LOCAL_LIBRARY] : (($library = LibraryPlayback::playlistLibrary($playlist)) !== null ? [$library] : LibrarySources::ofTracks($tracks)),
-            'track_count' => $counts['total'] ?? $playlist->tracks()->count(),
+            'sources' => $mode->isLocal() ? [PlaylistMode::LOCAL_LIBRARY] : ($library !== null ? [$library] : LibrarySources::ofTracks($tracks)),
+            'track_count' => $trackCount ?? $counts['total'] ?? $playlist->tracks()->count(),
             'local_track_count' => $counts['local'] ?? null,
             'local_coverage' => $counts ? PlaylistCoverage::ratio($counts['local'], $counts['total']) : null,
             'smart' => $smart,

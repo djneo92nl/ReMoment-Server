@@ -420,22 +420,24 @@ class LibraryPlaylistsApiTest extends TestCase
     {
         Queue::fake();
         $this->spotifyPlaylist('Half', 4, 2);
-        $this->spotifyPlaylist('Almost', 100, 49);
+        $this->spotifyPlaylist('Almost', 100, 39);
+        $this->spotifyPlaylist('Forty', 100, 40);
+        $this->spotifyPlaylist('Twofifths', 5, 2);
         $this->spotifyPlaylist('Little', 4, 1);
         $this->spotifyPlaylist('Nothing', 3, 0);
         $this->playlist('Mine', [$this->track(null, 'Mine 1')]);
 
-        // 0.5 is in, 0.49 and below are out; Local playlists are not external.
+        // 0.40 is in, 0.39 and below are out; Local playlists are not external.
         $response = $this->getJson('/api/library/playlists?scope=dlna')->assertOk();
-        $this->assertSame(['Half', 'Mine'], $response->json('data.*.name'));
-        $this->assertSame([true, false], $response->json('data.*.external'));
-        $this->assertSame(['spotify', null], $response->json('data.*.library'));
-        $this->assertSame([2, null], $response->json('data.*.local_track_count'));
-        $this->assertSame([4, 1], $response->json('data.*.track_count'));
-        $this->assertSame([0.5, null], $response->json('data.*.local_coverage'));
+        $this->assertSame(['Forty', 'Half', 'Mine', 'Twofifths'], $response->json('data.*.name'));
+        $this->assertSame([true, true, false, true], $response->json('data.*.external'));
+        $this->assertSame(['spotify', 'spotify', null, 'spotify'], $response->json('data.*.library'));
+        $this->assertSame([40, 2, null, 2], $response->json('data.*.local_track_count'));
+        $this->assertSame([100, 4, 1, 5], $response->json('data.*.track_count'));
+        $this->assertSame([0.4, 0.5, null, 0.4], $response->json('data.*.local_coverage'));
 
         // The older alias lists the same.
-        $this->assertSame(['Half', 'Mine'], $this->getJson('/api/library/playlists?scope=local')->json('data.*.name'));
+        $this->assertSame(['Forty', 'Half', 'Mine', 'Twofifths'], $this->getJson('/api/library/playlists?scope=local')->json('data.*.name'));
     }
 
     public function test_coverage_is_rounded_to_two_decimals_and_reported_in_every_scope(): void
@@ -489,6 +491,52 @@ class LibraryPlaylistsApiTest extends TestCase
         $client = \App\Models\Client::create(['status' => 'approved', 'type' => 'multi', 'registration_token' => \App\Models\Client::generateToken(), 'api_token' => \App\Models\Client::generateToken(), 'hidden_sources' => ['spotify']]);
 
         $this->getJson('/api/library/playlists?scope=dlna&client='.$client->api_token)->assertJsonPath('data', []);
+    }
+
+    public function test_a_spotify_playlist_lists_all_its_tracks_in_library_mode(): void
+    {
+        Queue::fake();
+        // 3 Spotify-only tracks and 2 that also exist locally, interleaved.
+        $playlist = $this->spotifyPlaylist('Mix', 5, 0);
+        $tracks = $playlist->tracks()->orderBy('playlist_track.id')->get();
+        foreach ([1, 3] as $i) {
+            Metadata::create(['metadatable_type' => Track::class, 'metadatable_id' => $tracks[$i]->id, 'key' => 'dlna_url', 'value' => 'http://nas.test/'.$i.'.flac', 'type' => 'url', 'source' => 'dlna:1']);
+        }
+
+        // Default scope (the leading library) must not hide the Spotify-only tracks.
+        foreach (['', '?library=spotify', '?scope=dlna'] as $query) {
+            $response = $this->getJson("/api/library/playlists/{$playlist->id}{$query}")->assertOk()
+                ->assertJsonPath('mode', 'library')
+                ->assertJsonPath('track_count', 5)
+                ->assertJsonCount(5, 'tracks');
+            $this->assertSame($tracks->pluck('id')->all(), $response->json('tracks.*.id'));
+        }
+
+        // Local mode is unchanged: all tracks, the Spotify-only ones missing locally.
+        $local = $this->getJson("/api/library/playlists/{$playlist->id}?library=dlna")->assertOk()->assertJsonPath('track_count', 5);
+        $this->assertSame([true, false, true, false, true], $local->json('tracks.*.missing_locally'));
+    }
+
+    public function test_a_spotify_playlist_over_the_page_limit_reports_the_real_total(): void
+    {
+        Queue::fake();
+        $playlist = $this->spotifyPlaylist('Big', 203, 0);
+
+        $this->getJson("/api/library/playlists/{$playlist->id}")->assertOk()
+            ->assertJsonPath('track_count', 203)
+            ->assertJsonCount(200, 'tracks');
+    }
+
+    public function test_a_client_hiding_a_source_still_filters_a_spotify_playlist_detail(): void
+    {
+        Queue::fake();
+        $playlist = $this->spotifyPlaylist('Mix', 3, 0);
+        $client = \App\Models\Client::create(['status' => 'approved', 'type' => 'multi', 'registration_token' => \App\Models\Client::generateToken(), 'api_token' => \App\Models\Client::generateToken(), 'hidden_sources' => ['spotify']]);
+
+        $this->getJson("/api/library/playlists/{$playlist->id}?client=".$client->api_token)->assertOk()
+            ->assertJsonPath('track_count', 0)
+            ->assertJsonCount(0, 'tracks');
+        $this->getJson("/api/library/playlists/{$playlist->id}")->assertJsonCount(3, 'tracks');
     }
 
     public function test_detail_mode_follows_the_library_the_playlist_was_opened_from(): void

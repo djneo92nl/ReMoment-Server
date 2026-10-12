@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\DB;
 final class PlaylistCoverage
 {
     /** Minimum `local_coverage` (0..1, after rounding to 2 decimals) for a playlist of another library to be listed in the Local scope. */
-    public const MIN_COVERAGE = 0.5;
+    public const MIN_COVERAGE = 0.4;
 
     /** The share of local tracks as the API reports it: 0..1, 2 decimals; null without tracks. */
     public static function ratio(int $local, int $total): ?float
