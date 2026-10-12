@@ -24,6 +24,7 @@ A smart playlist (`playlists.source = 'smart'`) selects its tracks from the libr
 
 - `App\Domain\Library\SmartPlaylist\SmartFields` — the registry of fields. Each is a `SmartField` (key, label, type `select|number|text|bool`, operators, options, and an `apply` closure that adds the conditions to a `tracks` query). **To add a field** (a mood, an energy estimate, …) add one entry to `SmartFields::build()`; the editor and the builder pick it up.
 - `SmartPlaylistBuilder` — `normalize()` (drops unknown fields/operators and unusable values; what is stored), `query()` (all matches), `count()`, `tracks()` (sorted and limited), `preview()`, `refresh(Playlist)` (rewrites `playlist_track` in one transaction, idempotent apart from random order).
+- `SmartPlaylistDescriber` — the rules for the API (`GET /api/library/playlists/{id}`: `smart`, `rules`, `rules_summary`): each rule as a phrase from the `SmartFields` labels ("Genre is Rock"), joined with and/or. A new field needs no change here.
 - `App\Livewire\SmartPlaylistEditor` — the rule editor on `/playlists/{id}` with a live match count and a sample of tracks; saving normalizes the rules, refreshes the playlist and reloads the page.
 - `php artisan playlists:refresh-smart [--playlist=ID]`, scheduled daily, so `last_played`, `added` and random lists stay current.
 

@@ -398,7 +398,7 @@ GET  /api/library/random-album?scope=&device_id= → { data: AlbumItem }   one r
 GET  /api/library/genres                   → { data: [{ slug, name, artist_count, album_count }] }   canonical genres, most artists first
 GET  /api/library/genres/{slug}            → { slug, name, artists: [ArtistItem], albums: [AlbumItem] }   up to 100 of each
 GET  /api/library/playlists?cursor=        → { data: [PlaylistItem], next_cursor }   recently played (last_played_at) first, then by name, 50/page, only playlists with tracks
-GET  /api/library/playlists/{id}?device_id= → { id, name, owner, artwork, playable, tracks: [{ id, name, artist_name, duration, playable }] }   playlist order, first 200
+GET  /api/library/playlists/{id}?device_id= → { id, name, owner, last_played_at, artwork, sources, smart, rules, rules_summary, playable, tracks: [{ id, name, artist_name, duration, artwork, playable }] }   playlist order, first 200; track artwork = album cover (one preload, no N+1); rules/rules_summary only for smart playlists (SmartPlaylistDescriber)
 GET  /api/library/recent?limit=30          → { data: [AlbumItem] }   most recently played distinct albums (limit 1–100)
 GET  /api/library/favorites                → { albums: [AlbumItem], artists: [ArtistItem] }   most recently favorited first
 PUT  /api/library/albums/{id}/favorite     body: { "favorite": true }   → { "favorite": true }

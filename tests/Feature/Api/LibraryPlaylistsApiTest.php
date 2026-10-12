@@ -58,7 +58,7 @@ class LibraryPlaylistsApiTest extends TestCase
     /** @param array<int, Track> $tracks in playlist order */
     private function playlist(string $name, array $tracks, array $attributes = []): Playlist
     {
-        $playlist = Playlist::create(['name' => $name, 'source' => 'local'] + $attributes);
+        $playlist = Playlist::create($attributes + ['name' => $name, 'source' => 'local']);
         $playlist->tracks()->sync(collect($tracks)->values()->mapWithKeys(fn (Track $t, int $i) => [$t->id => ['position' => $i]])->all());
 
         return $playlist;
@@ -160,15 +160,19 @@ class LibraryPlaylistsApiTest extends TestCase
                 'id' => $playlist->id,
                 'name' => 'Mix',
                 'owner' => null,
+                'last_played_at' => null,
+                'smart' => false,
+                'rules' => null,
+                'rules_summary' => null,
                 // Fewer than 4 album covers: the first album's cover.
                 'artwork' => ['hash' => md5('https://x.test/a.jpg'), 'proxy_120' => '/storage/a/120.jpg', 'proxy_320' => '/storage/a/320.jpg', 'colors' => ['#111111'], 'safe_colors' => ['#999999']],
                 // Spotify (Two) and DLNA (One), in the library's order.
                 'sources' => ['spotify', 'dlna'],
                 'playable' => true,
                 'tracks' => [
-                    ['id' => $two->id, 'name' => 'Two', 'artist_name' => 'Muse', 'duration' => 200, 'playable' => true],
-                    ['id' => $three->id, 'name' => 'Three', 'artist_name' => 'Muse', 'duration' => 200, 'playable' => false],
-                    ['id' => $one->id, 'name' => 'One', 'artist_name' => 'Muse', 'duration' => 200, 'playable' => true],
+                    ['id' => $two->id, 'name' => 'Two', 'artist_name' => 'Muse', 'duration' => 200, 'artwork' => ['hash' => md5('https://x.test/a.jpg'), 'proxy_120' => '/storage/a/120.jpg', 'proxy_320' => '/storage/a/320.jpg', 'colors' => ['#111111'], 'safe_colors' => ['#999999']], 'playable' => true],
+                    ['id' => $three->id, 'name' => 'Three', 'artist_name' => 'Muse', 'duration' => 200, 'artwork' => null, 'playable' => false],
+                    ['id' => $one->id, 'name' => 'One', 'artist_name' => 'Muse', 'duration' => 200, 'artwork' => ['hash' => md5('https://x.test/a.jpg'), 'proxy_120' => '/storage/a/120.jpg', 'proxy_320' => '/storage/a/320.jpg', 'colors' => ['#111111'], 'safe_colors' => ['#999999']], 'playable' => true],
                 ],
             ]);
 
@@ -182,6 +186,87 @@ class LibraryPlaylistsApiTest extends TestCase
             ->assertJsonPath('playable', false);
 
         $this->getJson('/api/library/playlists/999')->assertNotFound();
+    }
+
+    public function test_playlist_detail_track_covers_are_the_albums_and_null_when_unprocessed(): void
+    {
+        Queue::fake();
+        $done = $this->track($this->album('Done', 'https://x.test/done.jpg'), 'A');
+        $pending = $this->track($this->album('Pending', 'https://x.test/pending.jpg'), 'B');
+        $noCover = $this->track($this->album('Bare'), 'C');
+        $playlist = $this->playlist('Mix', [$done, $pending, $noCover]);
+        $this->cacheProcessedArtwork('https://x.test/done.jpg', ['proxy_120' => '/storage/d/120.jpg', 'proxy_320' => '/storage/d/320.jpg']);
+
+        $tracks = $this->getJson("/api/library/playlists/{$playlist->id}")->assertOk()->json('tracks');
+
+        $this->assertSame(['hash' => md5('https://x.test/done.jpg'), 'proxy_120' => '/storage/d/120.jpg', 'proxy_320' => '/storage/d/320.jpg', 'colors' => ['#111111'], 'safe_colors' => ['#999999']], $tracks[0]['artwork']);
+        $this->assertNull($tracks[1]['artwork']);
+        $this->assertNull($tracks[2]['artwork']);
+    }
+
+    public function test_playlist_detail_resolves_covers_without_a_query_per_track(): void
+    {
+        Queue::fake();
+        $tracks = array_map(fn (int $i) => $this->track($this->album("A{$i}", "https://x.test/{$i}.jpg"), "T{$i}"), range(1, 30));
+        $playlist = $this->playlist('Big', $tracks);
+        $this->getJson("/api/library/playlists/{$playlist->id}")->assertOk();
+
+        \DB::enableQueryLog();
+        $this->getJson("/api/library/playlists/{$playlist->id}")->assertOk();
+        $albumQueries = collect(\DB::getQueryLog())->filter(fn ($q) => str_contains($q['query'], 'from "albums"') || str_contains($q['query'], 'from `albums`'))->count();
+
+        $this->assertLessThanOrEqual(3, $albumQueries);
+    }
+
+    public function test_playlist_detail_has_last_played_at(): void
+    {
+        $playlist = $this->playlist('Mix', [$this->track(null, 'One')], ['last_played_at' => '2026-10-01 12:00:00']);
+
+        $this->getJson("/api/library/playlists/{$playlist->id}")
+            ->assertJsonPath('last_played_at', \Illuminate\Support\Carbon::parse('2026-10-01 12:00:00')->toIso8601String());
+    }
+
+    public function test_a_smart_playlist_detail_has_its_rules_and_a_summary(): void
+    {
+        $genre = \App\Models\Media\Genre::create(['name' => 'Rock', 'slug' => 'rock', 'name_key' => 'rock']);
+        $playlist = $this->playlist('Rocky', [$this->track(null, 'One')], ['source' => 'smart', 'rules' => [
+            'match' => 'all',
+            'rules' => [
+                ['field' => 'genre', 'operator' => 'is', 'value' => (string) $genre->id],
+                ['field' => 'plays', 'operator' => 'gte', 'value' => 3],
+                ['field' => 'bogus', 'operator' => 'is', 'value' => 'x'],
+            ],
+            'sort' => 'most_played',
+            'limit' => 25,
+        ]]);
+
+        $this->getJson("/api/library/playlists/{$playlist->id}")
+            ->assertOk()
+            ->assertJsonPath('smart', true)
+            ->assertJsonPath('rules_summary', 'Genre is Rock and Times played at least 3, up to 25 tracks')
+            ->assertJsonPath('rules', [
+                'match' => 'all',
+                'rules' => [
+                    ['field' => 'genre', 'operator' => 'is', 'value' => (string) $genre->id, 'text' => 'Genre is Rock'],
+                    ['field' => 'plays', 'operator' => 'gte', 'value' => 3, 'text' => 'Times played at least 3'],
+                ],
+                'sort' => 'most_played',
+                'limit' => 25,
+            ]);
+    }
+
+    public function test_smart_rules_summary_covers_any_units_yes_no_and_no_rules(): void
+    {
+        $describe = fn (array $rules) => \App\Domain\Library\SmartPlaylist\SmartPlaylistDescriber::summary($rules);
+
+        $this->assertSame('Every track in the library, up to 50 tracks', $describe([]));
+        $this->assertSame(
+            'Last played not in the last 90 days or Favorite (album or artist): yes, up to 1 track',
+            $describe(['match' => 'any', 'limit' => 1, 'rules' => [
+                ['field' => 'last_played', 'operator' => 'not_within', 'value' => 90],
+                ['field' => 'favorite', 'operator' => 'yes'],
+            ]]),
+        );
     }
 
     public function test_playlist_detail_lists_at_most_200_tracks(): void

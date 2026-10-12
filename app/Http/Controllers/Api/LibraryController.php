@@ -8,6 +8,7 @@ use App\Domain\Artwork\PlaylistArtwork;
 use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\LibrarySources;
+use App\Domain\Library\SmartPlaylist\SmartPlaylistDescriber;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\Device;
@@ -307,22 +308,30 @@ class LibraryController extends Controller
 
         $playlist->load(['metadata' => fn ($q) => $q->where('key', 'spotify_owner')]);
         $choice = PlaylistArtwork::choose(collect([$playlist]))[$playlist->id] ?? null;
-        $this->preloadArtwork(choices: [$choice]);
-        $tracks = LibraryPlayback::playlistTracks($playlist, self::PLAYLIST_TRACKS, $hidden);
+        // The albums of the whole page in one query, their covers in one cache read.
+        $tracks = LibraryPlayback::playlistTracks($playlist, self::PLAYLIST_TRACKS, $hidden)->load('album');
+        $this->preloadArtwork(albums: $tracks->pluck('album'), choices: [$choice]);
         $items = $tracks->map(fn (Track $track) => [
             'id' => $track->id,
             'name' => $track->name,
             'artist_name' => $track->artist?->name,
             'duration' => $track->duration,
+            'artwork' => LibraryItemArtwork::forImages($track->album?->images),
             'playable' => LibraryPlayback::trackPlayable($track, $device),
         ])->values();
+
+        $smart = $playlist->isSmart();
 
         return response()->json([
             'id' => $playlist->id,
             'name' => $playlist->name,
             'owner' => $this->owner($playlist),
+            'last_played_at' => $playlist->last_played_at?->toIso8601String(),
             'artwork' => $choice === null ? null : LibraryItemArtwork::forUrl($choice['url'], $choice['sources']),
             'sources' => LibrarySources::ofTracks($tracks),
+            'smart' => $smart,
+            'rules' => $smart ? SmartPlaylistDescriber::definition($playlist->rules) : null,
+            'rules_summary' => $smart ? SmartPlaylistDescriber::summary($playlist->rules) : null,
             'playable' => $items->contains('playable', true),
             'tracks' => $items,
         ]);

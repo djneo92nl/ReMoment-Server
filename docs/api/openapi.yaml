@@ -1585,7 +1585,31 @@ components:
         id: { type: integer }
         name: { type: string }
         owner: { type: string, nullable: true }
+        last_played_at: { type: string, format: date-time, nullable: true, description: When it was last started from the server }
         artwork: { $ref: "#/components/schemas/LibraryArtwork" }
+        sources:
+          type: array
+          items: { type: string }
+          description: Libraries the visible tracks come from (spotify, dlna)
+        smart: { type: boolean, description: Rule-based playlist }
+        rules:
+          type: object
+          nullable: true
+          description: The stored rules of a smart playlist; null otherwise
+          properties:
+            match: { type: string, enum: [all, any] }
+            sort: { type: string, example: most_played }
+            limit: { type: integer }
+            rules:
+              type: array
+              items:
+                type: object
+                properties:
+                  field: { type: string, example: genre }
+                  operator: { type: string, example: is }
+                  value: { description: string or integer, depending on the field }
+                  text: { type: string, example: Genre is Rock }
+        rules_summary: { type: string, nullable: true, example: "Genre is Rock and Times played at least 3, up to 50 tracks" }
         playable: { type: boolean }
         tracks:
           type: array
@@ -1597,6 +1621,7 @@ components:
               name: { type: string }
               artist_name: { type: string, nullable: true }
               duration: { type: integer, nullable: true }
+              artwork: { $ref: "#/components/schemas/LibraryArtwork", description: The track's album cover, null when none or not processed }
               playable: { type: boolean }
     SearchTrack:
       type: object

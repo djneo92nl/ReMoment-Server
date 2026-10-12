@@ -87,13 +87,38 @@ Tracks are in best-effort album order (by id — there is no track number column
   "id": 3,
   "name": "Discover Weekly",
   "owner": "Spotify",
+  "last_played_at": "2026-10-01T12:00:00+00:00",
   "artwork": { "hash": "…", "proxy_120": "…", "proxy_320": "…", "colors": ["#…"], "safe_colors": ["#…"] },
+  "sources": ["spotify", "dlna"],
+  "smart": false,
+  "rules": null,
+  "rules_summary": null,
   "playable": true,
-  "tracks": [ { "id": 34, "name": "Intro", "artist_name": "Muse", "duration": 213, "playable": true } ]
+  "tracks": [ { "id": 34, "name": "Intro", "artist_name": "Muse", "duration": 213, "artwork": { "hash": "…", "proxy_120": "…", "proxy_320": "…", "colors": ["#…"], "safe_colors": ["#…"] }, "playable": true } ]
 }
 ```
 
-The first 200 tracks in playlist order. `artist_name` and `duration` (seconds) can be `null`. `playable` works as for albums: a stream exists for the track (DLNA URL or Spotify URI), or, with `device_id`, that device can play it; the playlist is `playable` when any listed track is.
+The first 200 tracks in playlist order. `artist_name` and `duration` (seconds) can be `null`. `playable` works as for albums: a stream exists for the track (DLNA URL or Spotify URI), or, with `device_id`, that device can play it; the playlist is `playable` when any listed track is. `last_played_at` is when it was last started from the server (`null` if never), `sources` the libraries its visible tracks come from (as for albums).
+
+Each track's `artwork` is the cover of the track's album, the same small object as album items (`null` when the track has no album or the cover isn't processed yet: show the placeholder). Covers of the whole page are resolved in one cache read.
+
+**Smart playlists** (`docs/architecture/smart-playlists.md`): `"smart": true`, and `rules` and `rules_summary` are filled; for other playlists `smart` is `false` and both are `null`.
+
+```json
+"smart": true,
+"rules": {
+  "match": "all",
+  "rules": [
+    { "field": "genre", "operator": "is", "value": "12", "text": "Genre is Rock" },
+    { "field": "plays", "operator": "gte", "value": 3, "text": "Times played at least 3" }
+  ],
+  "sort": "most_played",
+  "limit": 50
+},
+"rules_summary": "Genre is Rock and Times played at least 3, up to 50 tracks"
+```
+
+`rules` is the stored definition (`match` `all`|`any`, `sort`, `limit`; unknown fields dropped), each rule with its readable phrase in `text`. `rules_summary` is one English sentence: the rule phrases joined with "and" (`match: all`) or "or" (`any`), then ", up to N tracks"; no rules reads "Every track in the library, …". Built by `SmartPlaylistDescriber` from the `SmartFields` labels.
 
 ### Playlist artwork
 
