@@ -317,7 +317,7 @@ class LibraryController extends Controller
             'artist_name' => $track->artist?->name,
             'duration' => $track->duration,
             'artwork' => LibraryItemArtwork::forImages($track->album?->images),
-            'playable' => LibraryPlayback::trackPlayable($track, $device),
+            'playable' => LibraryPlayback::playlistTrackPlayable($playlist, $track, $device),
         ])->values();
 
         $smart = $playlist->isSmart();
@@ -328,7 +328,8 @@ class LibraryController extends Controller
             'owner' => $this->owner($playlist),
             'last_played_at' => $playlist->last_played_at?->toIso8601String(),
             'artwork' => $choice === null ? null : LibraryItemArtwork::forUrl($choice['url'], $choice['sources']),
-            'sources' => LibrarySources::ofTracks($tracks),
+            // A playlist of a library (Spotify) is of that library only, whatever its tracks' merged copies offer.
+            'sources' => ($library = LibraryPlayback::playlistLibrary($playlist)) !== null ? [$library] : LibrarySources::ofTracks($tracks),
             'smart' => $smart,
             'rules' => $smart ? SmartPlaylistDescriber::definition($playlist->rules) : null,
             'rules_summary' => $smart ? SmartPlaylistDescriber::summary($playlist->rules) : null,
@@ -464,7 +465,7 @@ class LibraryController extends Controller
         $artwork = PlaylistArtwork::choose($playlists);
         $this->preloadArtwork(choices: $artwork);
         foreach ($playlists as $playlist) {
-            $library = LibrarySources::libraryOfSource($playlist->source);
+            $library = LibraryPlayback::playlistLibrary($playlist);
             $items->push([
                 'type' => 'playlist',
                 'library' => $library !== null && !in_array($library, $hidden, true)

@@ -1590,7 +1590,7 @@ components:
         sources:
           type: array
           items: { type: string }
-          description: Libraries the visible tracks come from (spotify, dlna)
+          description: "Libraries the visible tracks come from (spotify, dlna); for a playlist of a library (a Spotify playlist) only that library, whatever its tracks' merged copies offer"
         smart: { type: boolean, description: Rule-based playlist }
         rules:
           type: object

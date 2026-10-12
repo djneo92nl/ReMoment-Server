@@ -352,4 +352,56 @@ class LibraryPlaylistsApiTest extends TestCase
         $this->postJson("/api/devices/{$spotify->id}/library/play-playlist", ['playlist_id' => $playlist->id])
             ->assertStatus(502)->assertJsonPath('error', 'driver_error');
     }
+
+    // --- Playlists of a library ---
+
+    public function test_a_spotify_playlist_is_spotify_only_and_playable_only_where_spotify_plays(): void
+    {
+        $this->spotifyApi();
+        $dlnaDevice = $this->device();
+        $spotifyDevice = $this->device(SpotifyDriver::class);
+        // Merged tracks: a DLNA stream and a Spotify URI each.
+        $one = $this->track(null, 'One', dlna: true, spotifyId: 'one');
+        $two = $this->track(null, 'Two', dlna: true, spotifyId: 'two');
+        $playlist = $this->playlist('Mix', [$one, $two], ['source' => 'spotify', 'external_id' => 'spotify:playlist:mix']);
+
+        $this->getJson("/api/library/playlists/{$playlist->id}")
+            ->assertOk()->assertJsonPath('sources', ['spotify'])->assertJsonPath('playable', true);
+
+        $this->getJson("/api/library/playlists/{$playlist->id}?device_id={$dlnaDevice->id}")
+            ->assertOk()
+            ->assertJsonPath('sources', ['spotify'])
+            ->assertJsonPath('playable', false)
+            ->assertJsonPath('tracks.*.playable', [false, false]);
+
+        $this->getJson("/api/library/playlists/{$playlist->id}?device_id={$spotifyDevice->id}")
+            ->assertOk()->assertJsonPath('playable', true)->assertJsonPath('tracks.*.playable', [true, true]);
+
+        $this->postJson("/api/devices/{$dlnaDevice->id}/library/play-playlist", ['playlist_id' => $playlist->id])
+            ->assertStatus(422)->assertJsonPath('error', 'not_playable');
+        $this->assertNull($playlist->fresh()->last_played_at);
+        $this->assertSame([], FakeLibraryPlaybackDriver::$calls);
+    }
+
+    public function test_a_local_playlist_keeps_its_track_derived_sources_and_playability(): void
+    {
+        $this->spotifyApi();
+        $dlnaDevice = $this->device();
+        $one = $this->track(null, 'One', dlna: true, spotifyId: 'one');
+        $playlist = $this->playlist('Mine', [$one]);
+
+        $this->getJson("/api/library/playlists/{$playlist->id}?device_id={$dlnaDevice->id}")
+            ->assertOk()
+            ->assertJsonPath('sources', ['spotify', 'dlna'])
+            ->assertJsonPath('playable', true)
+            ->assertJsonPath('tracks.0.playable', true);
+    }
+
+    public function test_recent_items_say_spotify_for_a_spotify_playlist_with_local_copies(): void
+    {
+        $one = $this->track(null, 'One', dlna: true, spotifyId: 'one');
+        $this->playlist('Mix', [$one], ['external_id' => 'spotify:playlist:mix', 'last_played_at' => now()]);
+
+        $this->getJson('/api/library/recent-items')->assertOk()->assertJsonPath('data.0.library', 'spotify');
+    }
 }

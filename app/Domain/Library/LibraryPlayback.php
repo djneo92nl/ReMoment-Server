@@ -130,6 +130,32 @@ class LibraryPlayback
         return ($dlna && self::canPlayDlna($device)) || ($spotify && self::canPlaySpotify($device));
     }
 
+    /**
+     * The library a playlist belongs to (`spotify` for a synced Spotify playlist), null for local and
+     * smart playlists, which have none of their own and take what their tracks offer.
+     */
+    public static function playlistLibrary(Playlist $playlist): ?string
+    {
+        return LibrarySources::libraryOfSource($playlist->source)
+            ?? (SpotifyUri::isPlaylist($playlist->external_id) ? 'spotify' : null);
+    }
+
+    /**
+     * Whether $track of $playlist is playable. A playlist of a library plays only through that
+     * library (playPlaylist), so its tracks count only when they exist there and, with a $device,
+     * the device can play that library; other playlists are judged per track (trackPlayable).
+     */
+    public static function playlistTrackPlayable(Playlist $playlist, Track $track, ?Device $device = null): bool
+    {
+        $library = self::playlistLibrary($playlist);
+        if ($library === null) {
+            return self::trackPlayable($track, $device);
+        }
+
+        return in_array($library, LibrarySources::ofTracks([$track]), true)
+            && ($device === null || LibrarySources::playableOn($library, $device));
+    }
+
     /** Tracks in best-effort album order (no track number column exists). */
     public static function albumTracks(Album $album, array $hiddenSources = []): Collection
     {
@@ -201,12 +227,19 @@ class LibraryPlayback
      * A Spotify playlist plays as its Spotify context (offset at $start, or a
      * random track when shuffling) on a device that can play Spotify; any
      * playlist otherwise as its tracks, like an album (DLNA, then Spotify
-     * track URIs). Sets the playlist's `last_played_at` once started.
+     * track URIs). A playlist of a library (playlistLibrary) is not played at all on a device that
+     * can't play that library: NotPlayableException. Sets the playlist's `last_played_at` once started.
      */
     public function playPlaylist(Device $device, Playlist $playlist, ?Track $start = null, bool $shuffle = false): PlaybackResult
     {
         $tracks = self::playlistTracks($playlist);
         $spotifyUri = SpotifyUri::isPlaylist($playlist->external_id) ? $playlist->external_id : null;
+
+        // A playlist of a library plays through that library only, never as the merged local copies of its tracks.
+        $library = self::playlistLibrary($playlist);
+        if ($library !== null && !LibrarySources::playableOn($library, $device)) {
+            throw new NotPlayableException("\"{$playlist->name}\" is a ".(LibrarySources::LIBRARIES[$library]['name'] ?? $library)." playlist and can't be played on {$device->device_name}.");
+        }
 
         if ($spotifyUri !== null && self::canPlaySpotify($device)) {
             $spotifyTracks = $tracks->filter(fn (Track $t) => self::spotifyUri($t) !== null)->values();
