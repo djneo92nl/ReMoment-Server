@@ -13,6 +13,8 @@ use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\LibrarySources;
 use App\Domain\Library\NotPlayableException;
 use App\Domain\Library\PlaybackFailedException;
+use App\Domain\Library\PlaybackResult;
+use App\Domain\Library\PlaylistMode;
 use App\Events\Device\PlaybackModesUpdated;
 use App\Http\Controllers\Api\Concerns\GuardsDeviceAccess;
 use App\Http\Controllers\Controller;
@@ -333,6 +335,7 @@ class DeviceController extends Controller
             'playlist_id' => ['required', 'integer', 'exists:playlists,id'],
             'start_track_id' => ['nullable', 'integer', Rule::exists('playlist_track', 'track_id')->where('playlist_id', $request->integer('playlist_id'))],
             'shuffle' => ['nullable', 'boolean'],
+            'library' => ['nullable', 'string', Rule::in(LibrarySources::libraryIds())],
         ]);
 
         if ($error = $this->assertReachable($device)) {
@@ -346,7 +349,13 @@ class DeviceController extends Controller
         $playlist = Playlist::findOrFail($data['playlist_id']);
         $start = isset($data['start_track_id']) ? Track::with('metadata')->find($data['start_track_id']) : null;
 
-        return $this->playFromLibrary(fn () => $library->playPlaylist($device, $playlist, $start, $request->boolean('shuffle')), ['playlist' => $playlist->name]);
+        return $this->playFromLibrary(
+            fn () => $library->playPlaylist($device, $playlist, $start, $request->boolean('shuffle'), $data['library'] ?? null),
+            ['playlist' => $playlist->name],
+            withResult: fn (PlaybackResult $result) => $result->mode === PlaylistMode::LOCAL
+                ? ['queued' => $result->playable, 'skipped' => $result->skipped, 'mode' => $result->mode]
+                : ['mode' => $result->mode],
+        );
     }
 
     /** Plays a library album by DLNA or Spotify; see docs/api/library.md. */
@@ -386,16 +395,16 @@ class DeviceController extends Controller
     }
 
     /** Runs a LibraryPlayback call and maps its outcome to the API's responses. */
-    private function playFromLibrary(\Closure $play, array $response, ?array $notPlayable = null): JsonResponse
+    private function playFromLibrary(\Closure $play, array $response, ?array $notPlayable = null, ?\Closure $withResult = null): JsonResponse
     {
         try {
-            $play();
+            $result = $play();
         } catch (NotPlayableException $e) {
             return response()->json($notPlayable ?? ['error' => 'not_playable', 'message' => $e->getMessage()], 422);
         } catch (PlaybackFailedException $e) {
             return response()->json(['error' => 'driver_error', 'message' => $e->getMessage()], 502);
         }
 
-        return response()->json(['status' => 'ok'] + $response);
+        return response()->json(['status' => 'ok'] + $response + ($withResult ? $withResult($result) : []));
     }
 }

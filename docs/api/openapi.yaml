@@ -782,6 +782,7 @@ paths:
     get:
       tags: [Library]
       summary: Playlists with tracks (smart ones too), recently played first, 50 per page
+      description: "In the Local scope (`dlna`/`local`) playlists of another library (Spotify) with local_coverage >= 0.5 are listed too, with `external: true`."
       operationId: listPlaylists
       parameters:
         - { $ref: "#/components/parameters/cursor" }
@@ -797,7 +798,7 @@ paths:
                 properties:
                   data:
                     type: array
-                    items: { $ref: "#/components/schemas/PlaylistItem" }
+                    items: { $ref: "#/components/schemas/PlaylistListItem" }
                   next_cursor: { type: string, nullable: true }
   /library/playlists/{playlist}:
     parameters:
@@ -808,6 +809,10 @@ paths:
       - name: device_id
         in: query
         schema: { type: integer }
+      - name: library
+        in: query
+        description: "The library the client browsed the playlist in (a library id). Decides `mode`: the playlist's own library, or without `library`, gives `library` mode; `dlna` on a playlist of another library (Spotify) gives `local` mode. A library that makes no sense for the playlist is 422."
+        schema: { type: string, example: dlna }
       - { $ref: "#/components/parameters/client" }
       - { $ref: "#/components/parameters/scope" }
     get:
@@ -987,8 +992,23 @@ paths:
                 playlist_id: { type: integer }
                 start_track_id: { type: integer }
                 shuffle: { type: boolean, default: false }
+                library:
+                  type: string
+                  description: "The library the playlist was browsed in; `dlna` on a playlist of another library plays it in local mode (only tracks with a local copy, others skipped). A library that makes no sense for the playlist is 422."
+                  example: dlna
       responses:
-        "200": { $ref: "#/components/responses/PlayedOk" }
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  playlist: { type: string }
+                  mode: { type: string, enum: [library, local] }
+                  queued: { type: integer, description: Local mode only; tracks queued }
+                  skipped: { type: integer, description: Local mode only; playlist tracks without a local copy }
         "422": { $ref: "#/components/responses/DeviceError" }
 
   /admin/login:
@@ -1498,6 +1518,16 @@ components:
         owner: { type: string, nullable: true }
         last_played_at: { type: string, format: date-time, nullable: true, description: When it was last started from the server; null if never }
         artwork: { $ref: "#/components/schemas/LibraryArtwork" }
+    PlaylistListItem:
+      description: A PlaylistItem of the playlist list, with its library and how much of it exists in Local
+      allOf:
+        - { $ref: "#/components/schemas/PlaylistItem" }
+        - type: object
+          properties:
+            library: { type: string, nullable: true, description: "The library the playlist belongs to (spotify); null for local and smart playlists", example: spotify }
+            external: { type: boolean, description: "True only in the Local scope, for a playlist of another library listed because local_coverage >= 0.5; open it with library=dlna" }
+            local_track_count: { type: integer, nullable: true, description: Tracks with a playable Local copy; null for local/smart/Local playlists }
+            local_coverage: { type: number, nullable: true, description: "local_track_count / track_count, 0..1, 2 decimals; null as local_track_count" }
     Library:
       type: object
       properties:
@@ -1587,10 +1617,15 @@ components:
         owner: { type: string, nullable: true }
         last_played_at: { type: string, format: date-time, nullable: true, description: When it was last started from the server }
         artwork: { $ref: "#/components/schemas/LibraryArtwork" }
+        mode: { type: string, enum: [library, local], description: "How this request would play the playlist: its own library (`library`), or the Local copies of a playlist of another library (`local`, from library=dlna)" }
+        mode_library: { type: string, nullable: true, description: "The library playback goes through in that mode (spotify, dlna); null for a local/smart playlist without `library`" }
         sources:
           type: array
           items: { type: string }
-          description: "Libraries the visible tracks come from (spotify, dlna); for a playlist of a library (a Spotify playlist) only that library, whatever its tracks' merged copies offer"
+          description: "Libraries the visible tracks come from (spotify, dlna); for a playlist of a library (a Spotify playlist) only that library, whatever its tracks' merged copies offer; [dlna] in local mode"
+        track_count: { type: integer, description: All tracks of the playlist }
+        local_track_count: { type: integer, nullable: true, description: Tracks with a playable Local copy; null for local/smart/Local playlists }
+        local_coverage: { type: number, nullable: true, description: "0..1, 2 decimals; null as local_track_count" }
         smart: { type: boolean, description: Rule-based playlist }
         rules:
           type: object
@@ -1622,7 +1657,8 @@ components:
               artist_name: { type: string, nullable: true }
               duration: { type: integer, nullable: true }
               artwork: { $ref: "#/components/schemas/LibraryArtwork", description: The track's album cover, null when none or not processed }
-              playable: { type: boolean }
+              playable: { type: boolean, description: "In local mode: has a local copy playable on device_id" }
+              missing_locally: { type: boolean, description: "Local mode only: the track has no copy in the Local library (not playable)" }
     SearchTrack:
       type: object
       properties:

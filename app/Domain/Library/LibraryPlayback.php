@@ -224,13 +224,31 @@ class LibraryPlayback
     }
 
     /**
-     * A Spotify playlist plays as its Spotify context (offset at $start, or a
-     * random track when shuffling) on a device that can play Spotify; any
-     * playlist otherwise as its tracks, like an album (DLNA, then Spotify
-     * track URIs). A playlist of a library (playlistLibrary) is not played at all on a device that
-     * can't play that library: NotPlayableException. Sets the playlist's `last_played_at` once started.
+     * Plays a playlist in the mode PlaylistMode::resolve picks for $library (the library the client
+     * browsed in; invalid ones raise a ValidationException):
+     *
+     * - library mode: a Spotify playlist plays as its Spotify context (offset at $start, or a random
+     *   track when shuffling); any other playlist as its tracks, like an album (DLNA, then Spotify
+     *   track URIs). A playlist of a library plays only where the device can play that library.
+     * - local mode: only the tracks with a playable Local copy are queued, in playlist order, the
+     *   others skipped; needs a device that plays the Local library and at least one such track.
+     *
+     * Not playable: NotPlayableException (naming the library). Sets `last_played_at` once started.
      */
-    public function playPlaylist(Device $device, Playlist $playlist, ?Track $start = null, bool $shuffle = false): PlaybackResult
+    public function playPlaylist(Device $device, Playlist $playlist, ?Track $start = null, bool $shuffle = false, ?string $library = null): PlaybackResult
+    {
+        $mode = PlaylistMode::resolve($playlist, $library);
+
+        $result = $mode->isLocal()
+            ? $this->playPlaylistLocally($device, $playlist, $start, $shuffle)
+            : $this->playPlaylistOfLibrary($device, $playlist, $start, $shuffle);
+
+        $playlist->forceFill(['last_played_at' => now()])->save();
+
+        return $result;
+    }
+
+    private function playPlaylistOfLibrary(Device $device, Playlist $playlist, ?Track $start, bool $shuffle): PlaybackResult
     {
         $tracks = self::playlistTracks($playlist);
         $spotifyUri = SpotifyUri::isPlaylist($playlist->external_id) ? $playlist->external_id : null;
@@ -238,7 +256,7 @@ class LibraryPlayback
         // A playlist of a library plays through that library only, never as the merged local copies of its tracks.
         $library = self::playlistLibrary($playlist);
         if ($library !== null && !LibrarySources::playableOn($library, $device)) {
-            throw new NotPlayableException("\"{$playlist->name}\" is a ".(LibrarySources::LIBRARIES[$library]['name'] ?? $library)." playlist and can't be played on {$device->device_name}.");
+            throw new NotPlayableException("\"{$playlist->name}\" plays through the ".self::libraryName($library).' library, which this device can\'t play.');
         }
 
         if ($spotifyUri !== null && self::canPlaySpotify($device)) {
@@ -251,9 +269,36 @@ class LibraryPlayback
             $result = $this->playTracks($device, $tracks, $start, $shuffle);
         }
 
-        $playlist->forceFill(['last_played_at' => now()])->save();
+        return new PlaybackResult($result->via, $result->playable, $result->total, PlaylistMode::LIBRARY);
+    }
 
-        return $result;
+    /** Queues the playlist's tracks with a Local copy, in playlist order; the rest is skipped. */
+    private function playPlaylistLocally(Device $device, Playlist $playlist, ?Track $start, bool $shuffle): PlaybackResult
+    {
+        $local = self::libraryName(PlaylistMode::LOCAL_LIBRARY);
+        if (!LibrarySources::playableOn(PlaylistMode::LOCAL_LIBRARY, $device)) {
+            throw new NotPlayableException("\"{$playlist->name}\" can only be played from the {$local} library here, which this device can't play.");
+        }
+
+        $tracks = self::playlistTracks($playlist);
+        $queue = $tracks->filter(fn (Track $t) => (bool) $t->getDlnaUrl())->values();
+
+        if ($queue->isEmpty()) {
+            throw new NotPlayableException("None of the tracks of \"{$playlist->name}\" exist in the {$local} library.");
+        }
+        if ($start !== null && !$queue->contains('id', $start->id)) {
+            throw new NotPlayableException("\"{$start->name}\" has no copy in the {$local} library.");
+        }
+
+        $ordered = self::order($queue, $start, $shuffle);
+        $this->onDriver(fn () => $device->driver->playLibraryTracks($ordered));
+
+        return new PlaybackResult(PlaybackResult::VIA_DLNA, $ordered->count(), $tracks->count(), PlaylistMode::LOCAL, $tracks->count() - $queue->count());
+    }
+
+    private static function libraryName(string $id): string
+    {
+        return LibrarySources::LIBRARIES[$id]['name'] ?? $id;
     }
 
     /**

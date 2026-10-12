@@ -13,5 +13,9 @@ final class PlaybackResult
         /** Tracks that could be played by that path. */
         public readonly int $playable,
         public readonly int $total,
+        /** How a playlist was played (PlaylistMode::LIBRARY or LOCAL); null for anything else. */
+        public readonly ?string $mode = null,
+        /** Playlist tracks left out for having no local copy (local mode). */
+        public readonly int $skipped = 0,
     ) {}
 }

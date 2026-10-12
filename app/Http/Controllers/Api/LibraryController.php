@@ -8,6 +8,8 @@ use App\Domain\Artwork\PlaylistArtwork;
 use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\LibrarySources;
+use App\Domain\Library\PlaylistCoverage;
+use App\Domain\Library\PlaylistMode;
 use App\Domain\Library\SmartPlaylist\SmartPlaylistDescriber;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
@@ -24,6 +26,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -273,14 +276,34 @@ class LibraryController extends Controller
         ]);
     }
 
-    /** Playlists with tracks, recently played first (Playlist::withTracksByRecency). */
+    /**
+     * Playlists with tracks, recently played first (Playlist::withTracksByRecency). In the Local scope
+     * (`dlna` / `local`, also the default while Local leads) playlists of another library (Spotify) are
+     * listed too when PlaylistCoverage::MIN_COVERAGE of their tracks exist in Local: `external: true`.
+     */
     public function playlists(Request $request): JsonResponse
     {
         $request->validate(['cursor' => ['nullable', 'string', 'max:200']]);
         $offset = $this->decodeCursor($request->query('cursor'));
         $hidden = $this->hiddenSources($request);
+        $localScope = in_array(LeadingSource::scope($request->query('scope')), ['local', PlaylistMode::LOCAL_LIBRARY], true);
+        $clientHidden = $this->clientHidden($request);
 
-        $playlists = LibrarySources::playlists(Playlist::query(), $hidden)
+        $query = Playlist::query();
+        if (!$localScope) {
+            LibrarySources::playlists($query, $hidden);
+        } else {
+            // Local playlists by their visible (Local) tracks; playlists of another library by their coverage instead.
+            $query->where(function (Builder $q) use ($hidden, $clientHidden) {
+                $q->where(fn (Builder $own) => LibrarySources::playlists(PlaylistCoverage::ownedByOtherLibrary($own, not: true), $hidden));
+                if (!in_array(PlaylistMode::LOCAL_LIBRARY, $clientHidden, true)) {
+                    $q->orWhere(fn (Builder $other) => PlaylistCoverage::ownedByOtherLibrary($other, $clientHidden)
+                        ->whereIn('playlists.id', PlaylistCoverage::qualifyingIds()));
+                }
+            });
+        }
+
+        $playlists = $query
             ->withTracksByRecency()
             ->withCount(['tracks' => fn ($q) => LibrarySources::tracks($q, $hidden)])
             ->with(['metadata' => fn ($q) => $q->where('key', 'spotify_owner')])
@@ -292,34 +315,60 @@ class LibraryController extends Controller
         $playlists = $playlists->take(self::PLAYLISTS_PAGE_SIZE);
         $artwork = PlaylistArtwork::choose($playlists);
         $this->preloadArtwork(choices: $artwork);
+        // Local copies of the whole page in one aggregate query.
+        $coverage = PlaylistCoverage::counts($playlists->filter(fn (Playlist $p) => PlaylistCoverage::applies($p))->pluck('id'));
 
         return response()->json([
-            'data' => $playlists->map(fn (Playlist $playlist) => $this->playlistItem($playlist, $artwork))->values(),
+            'data' => $playlists->map(fn (Playlist $playlist) => $this->playlistListItem($playlist, $artwork, $coverage[$playlist->id] ?? null, $localScope))->values(),
             'next_cursor' => $hasMore ? $this->encodeCursor($offset + self::PLAYLISTS_PAGE_SIZE) : null,
         ]);
     }
 
+    /**
+     * A playlist with its tracks. `library` is the library the client browsed in; it decides the mode
+     * the playlist would play in (PlaylistMode): `local` lists every track, those without a Local copy
+     * as `missing_locally`.
+     */
     public function playlist(Request $request, Playlist $playlist): JsonResponse
     {
-        $request->validate(['device_id' => ['nullable', 'integer', 'exists:devices,id']]);
+        $request->validate([
+            'device_id' => ['nullable', 'integer', 'exists:devices,id'],
+            'library' => ['nullable', 'string', Rule::in(LibrarySources::libraryIds())],
+        ]);
         $device = $request->filled('device_id') ? Device::find($request->integer('device_id')) : null;
+        $mode = PlaylistMode::resolve($playlist, $request->query('library'));
 
         $hidden = $this->hiddenSources($request);
+        // Opened as a Local playlist, every track is shown: the missing ones are marked, not hidden.
+        if ($mode->isLocal()) {
+            $hidden = [];
+        }
 
         $playlist->load(['metadata' => fn ($q) => $q->where('key', 'spotify_owner')]);
         $choice = PlaylistArtwork::choose(collect([$playlist]))[$playlist->id] ?? null;
         // The albums of the whole page in one query, their covers in one cache read.
         $tracks = LibraryPlayback::playlistTracks($playlist, self::PLAYLIST_TRACKS, $hidden)->load('album');
         $this->preloadArtwork(albums: $tracks->pluck('album'), choices: [$choice]);
-        $items = $tracks->map(fn (Track $track) => [
-            'id' => $track->id,
-            'name' => $track->name,
-            'artist_name' => $track->artist?->name,
-            'duration' => $track->duration,
-            'artwork' => LibraryItemArtwork::forImages($track->album?->images),
-            'playable' => LibraryPlayback::playlistTrackPlayable($playlist, $track, $device),
-        ])->values();
+        $localDevice = $device === null || LibrarySources::playableOn(PlaylistMode::LOCAL_LIBRARY, $device);
+        $items = $tracks->map(function (Track $track) use ($playlist, $device, $mode, $localDevice) {
+            $item = [
+                'id' => $track->id,
+                'name' => $track->name,
+                'artist_name' => $track->artist?->name,
+                'duration' => $track->duration,
+                'artwork' => LibraryItemArtwork::forImages($track->album?->images),
+            ];
 
+            if ($mode->isLocal()) {
+                $local = (bool) $track->getDlnaUrl();
+
+                return $item + ['playable' => $local && $localDevice, 'missing_locally' => !$local];
+            }
+
+            return $item + ['playable' => LibraryPlayback::playlistTrackPlayable($playlist, $track, $device)];
+        })->values();
+
+        $counts = PlaylistCoverage::applies($playlist) ? (PlaylistCoverage::counts([$playlist->id])[$playlist->id] ?? ['total' => 0, 'local' => 0]) : null;
         $smart = $playlist->isSmart();
 
         return response()->json([
@@ -328,8 +377,13 @@ class LibraryController extends Controller
             'owner' => $this->owner($playlist),
             'last_played_at' => $playlist->last_played_at?->toIso8601String(),
             'artwork' => $choice === null ? null : LibraryItemArtwork::forUrl($choice['url'], $choice['sources']),
-            // A playlist of a library (Spotify) is of that library only, whatever its tracks' merged copies offer.
-            'sources' => ($library = LibraryPlayback::playlistLibrary($playlist)) !== null ? [$library] : LibrarySources::ofTracks($tracks),
+            'mode' => $mode->mode,
+            'mode_library' => $mode->library,
+            // A playlist of a library (Spotify) is of that library only, whatever its tracks' merged copies offer; in local mode it is Local.
+            'sources' => $mode->isLocal() ? [PlaylistMode::LOCAL_LIBRARY] : (($library = LibraryPlayback::playlistLibrary($playlist)) !== null ? [$library] : LibrarySources::ofTracks($tracks)),
+            'track_count' => $counts['total'] ?? $playlist->tracks()->count(),
+            'local_track_count' => $counts['local'] ?? null,
+            'local_coverage' => $counts ? PlaylistCoverage::ratio($counts['local'], $counts['total']) : null,
             'smart' => $smart,
             'rules' => $smart ? SmartPlaylistDescriber::definition($playlist->rules) : null,
             'rules_summary' => $smart ? SmartPlaylistDescriber::summary($playlist->rules) : null,
@@ -698,6 +752,27 @@ class LibraryController extends Controller
                 ? LibraryItemArtwork::forUrl($artwork[$playlist->id]['url'], $artwork[$playlist->id]['sources'])
                 : null,
         ];
+    }
+
+    /**
+     * A playlist of the list: the item plus its library and, for a playlist of another library, how
+     * much of it exists in Local (`track_count` is then all its tracks).
+     *
+     * @param  array<int, array{url: string, sources: array}>  $artwork
+     * @param  array{total: int, local: int}|null  $counts  PlaylistCoverage::counts()
+     * @param  bool  $localScope  listed in the Local scope: a playlist of another library is then `external`
+     */
+    private function playlistListItem(Playlist $playlist, array $artwork, ?array $counts, bool $localScope): array
+    {
+        $item = $this->playlistItem($playlist, $artwork);
+
+        return array_merge($item, [
+            'track_count' => $counts !== null ? $counts['total'] : $item['track_count'],
+            'library' => LibraryPlayback::playlistLibrary($playlist),
+            'external' => $counts !== null && $localScope,
+            'local_track_count' => $counts['local'] ?? null,
+            'local_coverage' => $counts !== null ? PlaylistCoverage::ratio($counts['local'], $counts['total']) : null,
+        ]);
     }
 
     private function albumItem(Album $album): array
