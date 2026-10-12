@@ -189,6 +189,8 @@ class LibraryApiTest extends TestCase
                 'hash' => md5('https://img.test/done.jpg'),
                 'proxy_120' => '/storage/a/120.jpg',
                 'proxy_320' => '/storage/a/320.jpg',
+                'colors' => [],
+                'safe_colors' => [],
             ]);
 
         $this->getJson("/api/library/albums/{$pending->id}")->assertJsonPath('artwork', null);

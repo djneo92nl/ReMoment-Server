@@ -39,6 +39,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(MqttService::class);
         $this->app->scoped(\App\Support\SelectedDevice::class);
+        $this->app->scoped(\App\Domain\Artwork\ArtworkEntryMemo::class);
     }
 
     /**

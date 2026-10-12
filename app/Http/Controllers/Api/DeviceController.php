@@ -87,12 +87,17 @@ class DeviceController extends Controller
     {
         $request->validate(['limit' => ['nullable', 'integer', 'min:1', 'max:100']]);
 
-        return $this->withDriver($device, QueueInterface::class, 'queue', fn (QueueInterface $driver) => [
-            'up_next' => array_map(
-                fn ($item) => $item->toArray() + ['artwork' => LibraryItemArtwork::forUrl($item->image)],
-                $driver->getUpNext($request->integer('limit', 20)),
-            ),
-        ]);
+        return $this->withDriver($device, QueueInterface::class, 'queue', function (QueueInterface $driver) use ($request) {
+            $upNext = $driver->getUpNext($request->integer('limit', 20));
+            LibraryItemArtwork::preload(array_map(fn ($item) => $item->image, $upNext));
+
+            return [
+                'up_next' => array_map(
+                    fn ($item) => $item->toArray() + ['artwork' => LibraryItemArtwork::forUrl($item->image)],
+                    $upNext,
+                ),
+            ];
+        });
     }
 
     /** Plays the queue entry `position` places ahead (1 = the first of `up_next`). */

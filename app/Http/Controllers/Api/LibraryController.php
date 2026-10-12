@@ -79,6 +79,7 @@ class LibraryController extends Controller
             ->get();
 
         $hasMore = $artists->count() > self::ARTISTS_PAGE_SIZE;
+        $this->preloadArtwork(artists: $artists->take(self::ARTISTS_PAGE_SIZE));
 
         return response()->json([
             'data' => $artists->take(self::ARTISTS_PAGE_SIZE)->map(fn (Artist $artist) => $this->artistItem($artist))->values(),
@@ -113,6 +114,7 @@ class LibraryController extends Controller
             ->get();
 
         $hasMore = $albums->count() > self::ALBUMS_PAGE_SIZE;
+        $this->preloadArtwork(albums: $albums->take(self::ALBUMS_PAGE_SIZE));
 
         return response()->json([
             'data' => $albums->take(self::ALBUMS_PAGE_SIZE)->map(fn (Album $album) => $this->albumItem($album))->values(),
@@ -128,6 +130,7 @@ class LibraryController extends Controller
                 fn (Album $a, Album $b) => ($b->released_at?->year ?? PHP_INT_MIN) <=> ($a->released_at?->year ?? PHP_INT_MIN),
                 fn (Album $a, Album $b) => strcasecmp($a->name, $b->name),
             ]);
+        $this->preloadArtwork(albums: $albums);
 
         return response()->json([
             'id' => $artist->id,
@@ -146,6 +149,7 @@ class LibraryController extends Controller
         $hidden = $this->hiddenSources($request);
 
         $album->load('artist');
+        $this->preloadArtwork(albums: [$album]);
         $tracks = LibraryPlayback::albumTracks($album, $hidden);
         // The playback keys plus what the track details read, so neither costs a query per track.
         $tracks->load(['genreRelation', 'metadata' => fn ($q) => $q->whereIn('key', array_unique([...LibraryPlayback::PLAYBACK_METADATA, ...Track::DISPLAY_METADATA]))]);
@@ -206,6 +210,7 @@ class LibraryController extends Controller
             ->orderByRaw('albums.released_at IS NULL')->orderByDesc('albums.released_at')->orderBy('albums.name')
             ->limit(self::GENRE_ITEMS)
             ->get();
+        $this->preloadArtwork(albums: $albums, artists: $artists);
 
         return response()->json([
             'slug' => $genre->slug,
@@ -233,6 +238,7 @@ class LibraryController extends Controller
         $hasMore = $playlists->count() > self::PLAYLISTS_PAGE_SIZE;
         $playlists = $playlists->take(self::PLAYLISTS_PAGE_SIZE);
         $artwork = PlaylistArtwork::choose($playlists);
+        $this->preloadArtwork(choices: $artwork);
 
         return response()->json([
             'data' => $playlists->map(fn (Playlist $playlist) => $this->playlistItem($playlist, $artwork))->values(),
@@ -248,6 +254,8 @@ class LibraryController extends Controller
         $hidden = $this->hiddenSources($request);
 
         $playlist->load(['metadata' => fn ($q) => $q->where('key', 'spotify_owner')]);
+        $choice = PlaylistArtwork::choose(collect([$playlist]))[$playlist->id] ?? null;
+        $this->preloadArtwork(choices: [$choice]);
         $tracks = LibraryPlayback::playlistTracks($playlist, self::PLAYLIST_TRACKS, $hidden);
         $items = $tracks->map(fn (Track $track) => [
             'id' => $track->id,
@@ -261,7 +269,7 @@ class LibraryController extends Controller
             'id' => $playlist->id,
             'name' => $playlist->name,
             'owner' => $this->owner($playlist),
-            'artwork' => PlaylistArtwork::itemFor($playlist),
+            'artwork' => $choice === null ? null : LibraryItemArtwork::forUrl($choice['url'], $choice['sources']),
             'sources' => LibrarySources::ofTracks($tracks),
             'playable' => $items->contains('playable', true),
             'tracks' => $items,
@@ -287,6 +295,7 @@ class LibraryController extends Controller
             ->orderByDesc('albums.id')
             ->limit($request->integer('limit', 30))
             ->get();
+        $this->preloadArtwork(albums: $albums);
 
         return response()->json(['data' => $albums->map(fn (Album $album) => $this->albumItem($album))->values()]);
     }
@@ -303,6 +312,7 @@ class LibraryController extends Controller
         $device = $request->filled('device_id') ? Device::find($request->integer('device_id')) : null;
         $clientHidden = $this->clientHidden($request);
         $data = [];
+        $covers = [];
 
         foreach (LibrarySources::forDisplay() as $id => $library) {
             if (in_array($id, $clientHidden, true)) {
@@ -324,6 +334,7 @@ class LibraryController extends Controller
                 ->orderByDesc('albums.id')
                 ->first();
 
+            $covers[$id] = $cover;
             $data[] = [
                 'id' => $id,
                 'name' => $library['name'],
@@ -331,10 +342,17 @@ class LibraryController extends Controller
                 'album_count' => $albumCount,
                 'artist_count' => LibrarySources::artists(Artist::query()->whereHas('albums'), $hidden)->count(),
                 'playlist_count' => $playlistCount,
-                'artwork' => LibraryItemArtwork::forImages($cover?->images),
+                'artwork' => null,
                 ...($device ? ['playable' => LibrarySources::playableOn($id, $device)] : []),
             ];
         }
+
+        // One cache read for all libraries' covers.
+        $this->preloadArtwork(albums: $covers);
+        foreach ($data as &$item) {
+            $item['artwork'] = LibraryItemArtwork::forImages($covers[$item['id']]?->images);
+        }
+        unset($item);
 
         return response()->json(['data' => $data]);
     }
@@ -359,6 +377,7 @@ class LibraryController extends Controller
             ->orderByDesc('albums.id')
             ->limit($limit)
             ->get();
+        $this->preloadArtwork(albums: $albums);
         $playedFrom = $this->albumPlayedFrom($albums->pluck('id')->all());
         foreach ($albums as $album) {
             $played = $playedFrom[$album->id] ?? null;
@@ -382,6 +401,7 @@ class LibraryController extends Controller
             ->limit($limit)
             ->get();
         $artwork = PlaylistArtwork::choose($playlists);
+        $this->preloadArtwork(choices: $artwork);
         foreach ($playlists as $playlist) {
             $library = LibrarySources::libraryOfSource($playlist->source);
             $items->push([
@@ -481,6 +501,7 @@ class LibraryController extends Controller
             ->orderBy('tracks.name')
             ->limit(self::SEARCH_TRACKS)
             ->get();
+        $this->preloadArtwork(albums: $albums->concat($tracks->pluck('album')), artists: $artists);
 
         return response()->json([
             'artists' => $artists->map(fn (Artist $artist) => $this->artistItem($artist))->values(),
@@ -507,6 +528,7 @@ class LibraryController extends Controller
 
         $artists = $this->artistItems(LibrarySources::artists(Artist::query()->whereNotNull('favorited_at'), $hidden), $hidden)
             ->orderByDesc('favorited_at')->orderByDesc('artists.id')->get();
+        $this->preloadArtwork(albums: $albums, artists: $artists);
 
         return response()->json([
             'albums' => $albums->map(fn (Album $album) => $this->albumItem($album))->values(),
@@ -530,6 +552,27 @@ class LibraryController extends Controller
         $favorite = $request->boolean('favorite');
 
         return $model->setFavorite($favorite);
+    }
+
+    /**
+     * Reads the processed-artwork cache entries of everything a page shows in one round trip
+     * (LibraryItemArtwork::preload), so the items cost no cache read each.
+     *
+     * @param  iterable<int, Album|null>  $albums
+     * @param  iterable<int, Artist>  $artists
+     * @param  iterable<int, array{url: string}|null>  $choices  PlaylistArtwork::choose()
+     */
+    private function preloadArtwork(iterable $albums = [], iterable $artists = [], iterable $choices = []): void
+    {
+        $urls = LibraryItemArtwork::urlsOfAlbums($albums);
+        foreach ($artists as $artist) {
+            $urls = [...$urls, ...LibraryItemArtwork::urlsOfAlbums([$artist->coverAlbum()])];
+        }
+        foreach ($choices as $choice) {
+            $urls[] = $choice['url'] ?? null;
+        }
+
+        LibraryItemArtwork::preload($urls);
     }
 
     /** Eager loads what artistItem() reads: album count, and albums for the cover. */

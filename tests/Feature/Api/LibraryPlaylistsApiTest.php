@@ -122,7 +122,7 @@ class LibraryPlaylistsApiTest extends TestCase
 
         $this->processed($composite);
         $this->getJson('/api/library/playlists')
-            ->assertJsonPath('data.0.artwork', ['hash' => md5($composite), 'proxy_120' => '/storage/a/120.jpg', 'proxy_320' => '/storage/a/320.jpg']);
+            ->assertJsonPath('data.0.artwork', ['hash' => md5($composite), 'proxy_120' => '/storage/a/120.jpg', 'proxy_320' => '/storage/a/320.jpg', 'colors' => ['#111111'], 'safe_colors' => ['#999999']]);
     }
 
     public function test_playlists_are_paged_by_an_opaque_cursor(): void
@@ -161,7 +161,7 @@ class LibraryPlaylistsApiTest extends TestCase
                 'name' => 'Mix',
                 'owner' => null,
                 // Fewer than 4 album covers: the first album's cover.
-                'artwork' => ['hash' => md5('https://x.test/a.jpg'), 'proxy_120' => '/storage/a/120.jpg', 'proxy_320' => '/storage/a/320.jpg'],
+                'artwork' => ['hash' => md5('https://x.test/a.jpg'), 'proxy_120' => '/storage/a/120.jpg', 'proxy_320' => '/storage/a/320.jpg', 'colors' => ['#111111'], 'safe_colors' => ['#999999']],
                 // Spotify (Two) and DLNA (One), in the library's order.
                 'sources' => ['spotify', 'dlna'],
                 'playable' => true,

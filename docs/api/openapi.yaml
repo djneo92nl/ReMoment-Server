@@ -1394,6 +1394,8 @@ components:
         hash: { type: string, description: "md5 of the source image URL; stable cache key" }
         proxy_120: { type: string }
         proxy_320: { type: string }
+        colors: { type: array, nullable: true, items: { type: string, example: "#1a2b3c" }, description: "Same palette as Artwork.colors; null when the cover's cache entry expired or predates the palette (proxies still present)" }
+        safe_colors: { type: array, nullable: true, items: { type: string }, description: "Same as Artwork.safe_colors; null like colors" }
     PrecacheArtwork:
       type: object
       properties:

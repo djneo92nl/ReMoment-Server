@@ -4,7 +4,7 @@ Browse the shared media library and its playlists, keep household favorites, and
 
 ## Shapes
 
-**Artwork** — `{ "hash": "<md5 of the cover URL>", "proxy_120": "…", "proxy_320": "…" }`, or `null` when the cover is not processed yet (or there is none). URLs are root-relative (`/storage/artwork/…`), never with a host: prefix `artwork_base_url` from `GET /api/info` (a client should also accept an absolute URL and take its path from `/storage/`); `hash` is the same as in the pre-cache list (`GET /api/clients/{api_token}/artwork`) and the SD card export, so a client can use its cached files. A missing cover is queued for processing at most once an hour per image (`App\Domain\Artwork\LibraryItemArtwork`); requests never wait for a download.
+**Artwork** — `{ "hash": "<md5 of the cover URL>", "proxy_120": "…", "proxy_320": "…", "colors": ["#…"], "safe_colors": ["#…"] }`, or `null` when the cover is not processed yet (or there is none). URLs are root-relative (`/storage/artwork/…`), never with a host: prefix `artwork_base_url` from `GET /api/info` (a client should also accept an absolute URL and take its path from `/storage/`); `hash` is the same as in the pre-cache list (`GET /api/clients/{api_token}/artwork`) and the SD card export, so a client can use its cached files. `colors` / `safe_colors` are the palette of the full artwork object (same format and meaning: five dominant colours, and those lightened to at least 65% lightness for text on dark backgrounds), read from the cover's artwork cache entry; they are `null` (keys always present) when the entry expired or predates the palette while the proxies still exist, until the cover is processed again. A missing cover is queued for processing at most once an hour per image (`App\Domain\Artwork\LibraryItemArtwork`); requests never wait for a download.
 
 **ArtistItem** — `{ "id": 1, "name": "Muse", "album_count": 4, "artwork": Artwork|null, "favorite": false }`. `artwork` is the cover of the artist's most played album with an image.
 
@@ -42,7 +42,7 @@ Duplicates from before that are merged by an admin running `php artisan library:
   "name": "Absolution",
   "artist": { "id": 1, "name": "Muse" },
   "year": 2003,
-  "artwork": { "hash": "…", "proxy_120": "…", "proxy_320": "…" },
+  "artwork": { "hash": "…", "proxy_120": "…", "proxy_320": "…", "colors": ["#…"], "safe_colors": ["#…"] },
   "favorite": false,
   "sources": ["dlna", "spotify"],
   "genres": ["Alternative Rock"],
@@ -83,7 +83,7 @@ Tracks are in best-effort album order (by id — there is no track number column
   "id": 3,
   "name": "Discover Weekly",
   "owner": "Spotify",
-  "artwork": { "hash": "…", "proxy_120": "…", "proxy_320": "…" },
+  "artwork": { "hash": "…", "proxy_120": "…", "proxy_320": "…", "colors": ["#…"], "safe_colors": ["#…"] },
   "playable": true,
   "tracks": [ { "id": 34, "name": "Intro", "artist_name": "Muse", "duration": 213, "playable": true } ]
 }

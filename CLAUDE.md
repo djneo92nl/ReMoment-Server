@@ -313,7 +313,7 @@ GET  /api/devices/{id}/queue?limit=20  → { "up_next": [ QueueItem, … ] }
 
 `limit` is 1–100 (default 20). Returns only the tracks after the current one. The list is empty when the device isn't playing from a queue (radio, line-in).
 
-**QueueItem shape:** `{ "name": "…", "artist": "…"|null, "album": "…"|null, "image": "https://…"|null, "duration": 200|null, "uri": "…"|null, "artwork": { hash, proxy_120, proxy_320 }|null }`. `artwork` is the small library artwork object (see Library): the item's `image` is processed through the artwork pipeline (queued at most once an hour per image, never waited for), so it is `null` until processed.
+**QueueItem shape:** `{ "name": "…", "artist": "…"|null, "album": "…"|null, "image": "https://…"|null, "duration": 200|null, "uri": "…"|null, "artwork": { hash, proxy_120, proxy_320, colors, safe_colors }|null }`. `artwork` is the small library artwork object (see Library): the item's `image` is processed through the artwork pipeline (queued at most once an hour per image, never waited for), so it is `null` until processed.
 
 Validation errors return Laravel's standard `422` `{ "message", "errors" }`. Unknown devices and routes return `404`.
 
@@ -378,7 +378,7 @@ For Sonos, `joinable` is always empty (returns `[]`); the UI falls back to showi
 
 ### Library
 
-Browse, favorites and playback for clients; full shapes in `docs/api/library.md`. Artwork in these responses is the small object `{ hash, proxy_120, proxy_320 }` or `null` while unprocessed (queued at most once an hour per image).
+Browse, favorites and playback for clients; full shapes in `docs/api/library.md`. Artwork in these responses is the small object `{ hash, proxy_120, proxy_320, colors, safe_colors }` or `null` while unprocessed (queued at most once an hour per image). `colors`/`safe_colors` are the full artwork object's palette from the cover's cache entry (`null` when the entry expired or predates it); list endpoints read the entries of a page in one cache round trip (`LibraryItemArtwork::preload`).
 
 ```
 GET  /api/library/libraries[?device_id=]    → { data: [{ id, name, kind, album_count, artist_count, playlist_count, artwork, playable? }] }   music libraries (dlna, spotify, …; LibrarySources::LIBRARIES) with content, not hidden for ?client=; `playable` only with ?device_id= (can that device play it: LibrarySources::LIBRARIES `device` check, 422 unknown device); a library id is also a valid ?scope= on the browse endpoints (next to local|streaming|all)
