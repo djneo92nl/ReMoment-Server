@@ -121,6 +121,23 @@ class Artist extends Model
         return ((array) $this->metaJson('images'))['thumb'] ?? $this->metaValue('spotify_image');
     }
 
+    /** TheAudioDB's fanart (a wide backdrop photo, remote URL); null when unknown. */
+    public function fanartUrl(): ?string
+    {
+        return ((array) $this->metaJson('images'))['fanart'] ?? null;
+    }
+
+    /** Every wide photo TheAudioDB has: fanart 1–4 then the wide thumb (remote URLs, distinct). @return list<string> */
+    public function galleryUrls(): array
+    {
+        $images = (array) $this->metaJson('images');
+
+        return array_values(array_unique(array_filter(array_map(
+            fn (string $key) => $images[$key] ?? null,
+            ['fanart', 'fanart2', 'fanart3', 'fanart4', 'wide_thumb'],
+        ))));
+    }
+
     public function coverAlbum(): ?Album
     {
         if (!$this->relationLoaded('albums')) {

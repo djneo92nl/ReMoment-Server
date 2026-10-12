@@ -194,7 +194,10 @@ class LibraryController extends Controller
             'name' => $artist->name,
             'favorite' => $artist->favorited_at !== null,
             'genres' => $artist->genres(),
-            'details' => $artist->details(),
+            'details' => $artist->details() + [
+                'fanart' => LibraryItemArtwork::fanart($artist->fanartUrl()),
+                'gallery' => array_values(array_filter(array_map(LibraryItemArtwork::fanart(...), $artist->galleryUrls()))),
+            ],
             'albums' => $albums->map(fn (Album $album) => $this->albumItem($album))->values(),
         ]);
     }

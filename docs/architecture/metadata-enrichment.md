@@ -16,7 +16,7 @@ Tracks, albums and artists get extra data from outside services, stored in the p
 | `EnrichTrackLyrics` | `lrclib` | track `lyrics_plain` (empty = none exist), `lyrics_synced` |
 | `EnrichTrackSpotify` | `spotify` | track `spotify_popularity`, `explicit`, `isrc`; artist `spotify_id`, `spotify_popularity`, `genres` (only when MusicBrainz gave none). Spotify-source tracks, when connected |
 | `EnrichArtistLastfm` | `lastfm` | artist `bio`, `similar_artists`, `lastfm_listeners`, `lastfm_playcount`, `tags` |
-| `EnrichArtistAudioDb` | `audiodb` | artist `images` (`{thumb, fanart, logo, banner}`), `mood`, `style`, `audiodb_bio`; needs the MusicBrainz artist id. TheAudioDB's public key `2` works (`AUDIODB_API_KEY` for a supporter key) |
+| `EnrichArtistAudioDb` | `audiodb` | artist `images` (`{thumb, fanart, fanart2-4, wide_thumb, logo, banner}`), `mood`, `style`, `audiodb_bio`; needs the MusicBrainz artist id. TheAudioDB's public key `2` works (`AUDIODB_API_KEY` for a supporter key) |
 | `EnrichAlbumAudioDb` | `audiodb` | album `mood`, `style`, `theme`, `rating` (0–10), `audiodb_description`; needs the release group id the album MusicBrainz job found |
 | `EnrichAlbumDiscogs` | `discogs` | album `discogs_id`, `discogs_url`, `format`, `genres` (styles first), `credits` (`[{role, name}]`); only a search hit whose "Artist - Title" equals the album is used. Needs `DISCOGS_TOKEN`, skipped without |
 

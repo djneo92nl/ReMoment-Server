@@ -54,7 +54,7 @@ final class LibraryItemArtwork
      * @param  array<int, string>  $sources  For a playlist composite: its covers (see ProcessArtwork)
      * @return array{hash: string, proxy_120: string, proxy_320: string, colors: array|null, safe_colors: array|null}|null
      */
-    public static function forUrl(?string $url, array $sources = []): ?array
+    public static function forUrl(?string $url, array $sources = [], array $keys = self::KEYS): ?array
     {
         if ($url === null || $url === '') {
             return null;
@@ -78,7 +78,7 @@ final class LibraryItemArtwork
         $disk = Storage::disk('public');
         $item = ['hash' => md5($url)];
 
-        foreach (self::KEYS as $key) {
+        foreach ($keys as $key) {
             // Always root-relative (`/storage/...`): a cached URL carries the APP_URL of whoever made it
             // (a queue worker says `http://localhost`), which no client can reach.
             if (isset($entry[$key])) {
@@ -111,6 +111,15 @@ final class LibraryItemArtwork
     public static function proxy(?string $url, int $size = 320): ?string
     {
         return self::webUrl(self::forUrl($url)["proxy_{$size}"] ?? null);
+    }
+
+    /**
+     * An artist's fanart: the small object plus the processed `proxy_bg` backdrops (blurred, darkened,
+     * per client screen size) for clients and the web hero. Null until processed (queued meanwhile).
+     */
+    public static function fanart(?string $url): ?array
+    {
+        return self::forUrl($url, [], [...self::KEYS, 'proxy_512', 'proxy_bg', 'proxy_bg_320x480', 'proxy_bg_480x480']);
     }
 
     /** @return array{hash: string, proxy_120: string, proxy_320: string, colors: array|null, safe_colors: array|null}|null */

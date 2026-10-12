@@ -49,6 +49,10 @@ class EnrichArtistAudioDb implements ShouldBeUnique, ShouldQueue
             $images = array_filter([
                 'thumb' => $data['strArtistThumb'] ?? null,
                 'fanart' => $data['strArtistFanart'] ?? null,
+                'fanart2' => $data['strArtistFanart2'] ?? null,
+                'fanart3' => $data['strArtistFanart3'] ?? null,
+                'fanart4' => $data['strArtistFanart4'] ?? null,
+                'wide_thumb' => $data['strArtistWideThumb'] ?? null,
                 'logo' => $data['strArtistLogo'] ?? null,
                 'banner' => $data['strArtistBanner'] ?? null,
             ]);

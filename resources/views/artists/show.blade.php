@@ -45,6 +45,8 @@
         $bio = $details['bio'];
         $links = (array) $details['links'];
         $artistImage = $artist->photoUrl();
+        $fanart = \App\Domain\Artwork\LibraryItemArtwork::webUrl(\App\Domain\Artwork\LibraryItemArtwork::fanart($artist->fanartUrl())['proxy_bg'] ?? null);
+        $gallery = collect($artist->galleryUrls())->map(fn ($url) => ['url' => $url, 'thumb' => \App\Domain\Artwork\LibraryItemArtwork::proxy($url, 320)])->filter(fn ($g) => $g['thumb'])->values();
         $extraTags = collect([$details['mood'], $details['style'], ...$details['tags']])->filter()
             ->reject(fn ($tag) => collect($genres)->contains(fn ($g) => strcasecmp($g, $tag) === 0))->unique()->take(8);
         $lifeSpan = $details['begin_date'] ? ($details['end_date'] ? substr($details['begin_date'], 0, 4).' – '.substr($details['end_date'], 0, 4) : 'Since '.substr($details['begin_date'], 0, 4)) : null;
@@ -52,7 +54,7 @@
     @endphp
 
     <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8 mb-6"
-         @if(count($heroColors) >= 2) style="background: linear-gradient(135deg, {{ $heroColors[0] }}22, {{ $heroColors[1] }}11)" @endif>
+         @if($fanart) style="background: linear-gradient(rgba(0,0,0,.35), rgba(0,0,0,.35)), url('{{ $fanart }}') center/cover" @elseif(count($heroColors) >= 2) style="background: linear-gradient(135deg, {{ $heroColors[0] }}22, {{ $heroColors[1] }}11)" @endif>
         <div class="flex flex-col md:flex-row items-center md:items-start gap-6 text-center md:text-left">
             <x-artwork-thumb
                 :src="$artistImage ?? $coverAlbum?->images[0]['url'] ?? null"
@@ -139,6 +141,16 @@
             </div>
         </div>
     </div>
+
+    @if($gallery->count() > 1)
+        <div class="flex gap-3 overflow-x-auto mb-6 pb-1">
+            @foreach($gallery as $image)
+                <a href="{{ $image['url'] }}" target="_blank" rel="noopener" class="shrink-0">
+                    <img src="{{ $image['thumb'] }}" alt="{{ $artist->name }}" loading="lazy" class="h-32 w-56 object-cover rounded-2xl shadow ring-1 ring-black/5">
+                </a>
+            @endforeach
+        </div>
+    @endif
 
     <div class="grid gap-6 lg:grid-cols-3">
 

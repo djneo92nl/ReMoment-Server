@@ -1586,7 +1586,7 @@ components:
         details:
           type: object
           additionalProperties: true
-          description: "bio, wikipedia_url, links, images, mood, style, tags, listeners, playcount … all may be null; see docs/api/library.md"
+          description: "bio, wikipedia_url, links, images, mood, style, tags, listeners, playcount, fanart (processed artwork object with proxy_bg backdrops, or null) … all may be null; see docs/api/library.md"
         albums:
           type: array
           items: { $ref: "#/components/schemas/AlbumItem" }

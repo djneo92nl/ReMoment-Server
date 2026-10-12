@@ -36,7 +36,7 @@ Duplicates from before that are merged by an admin running `php artisan library:
 
 `{ "id", "name", "favorite", "genres": [ "Rock", … ], "details": ArtistDetails, "albums": [ AlbumItem, … ] }` — albums newest year first (unknown year last), then by name.
 
-**ArtistDetails** — `{ "type": "group"|"person"|…|null, "country": "GB"|null, "area": "London"|null, "begin_date": "1994"|null, "end_date": null, "bio": "…"|null, "wikipedia_url": "…"|null, "links": { "official": "…", "discogs": "…", … } }`. `bio` is the Wikipedia summary, else the Last.fm bio. Dates are MusicBrainz partial dates (`1994`, `1994-05`, `1994-05-12`). `links` keys that may occur: `official`, `wikidata`, `wikipedia`, `discogs`, `allmusic`, `lastfm`, `bandcamp`, `songkick`, `youtube`, `twitter`, `instagram`, `facebook`, `spotify`, `apple_music`, `deezer`, `tidal`. Besides: `"images": { "thumb": "https://…", "fanart": "…", "logo": "…", "banner": "…" }` (TheAudioDB, any key may be absent; remote URLs, not processed by the server), `"mood"`, `"style"`, `"tags": ["Shoegaze", …]` (Last.fm), `"listeners"`, `"playcount"` (Last.fm, integers). Every field is filled in as enrichment reaches the artist (see `docs/architecture/metadata-enrichment.md`), so all may be `null`/empty.
+**ArtistDetails** — `{ "type": "group"|"person"|…|null, "country": "GB"|null, "area": "London"|null, "begin_date": "1994"|null, "end_date": null, "bio": "…"|null, "wikipedia_url": "…"|null, "links": { "official": "…", "discogs": "…", … } }`. `bio` is the Wikipedia summary, else the Last.fm bio. Dates are MusicBrainz partial dates (`1994`, `1994-05`, `1994-05-12`). `links` keys that may occur: `official`, `wikidata`, `wikipedia`, `discogs`, `allmusic`, `lastfm`, `bandcamp`, `songkick`, `youtube`, `twitter`, `instagram`, `facebook`, `spotify`, `apple_music`, `deezer`, `tidal`. Besides: `"images": { "thumb": "https://…", "fanart": "…", "logo": "…", "banner": "…" }` (TheAudioDB, any key may be absent; remote originals), `"mood"`, `"style"`, `"tags": ["Shoegaze", …]` (Last.fm), `"listeners"`, `"playcount"` (Last.fm, integers). Every field is filled in as enrichment reaches the artist (see `docs/architecture/metadata-enrichment.md`), so all may be `null`/empty.
 
 ### `GET /api/library/albums/{id}?device_id=`
 
@@ -325,3 +325,8 @@ A device lists `library_playback` in `capabilities` when either path exists for 
 ### Jumping to a letter
 
 `GET /api/library/artists?letter=M` starts the list at the first artist sorting at or after that letter (a leading "The " is ignored, like the sort). `#` is the start of the list. `next_cursor` continues from there. Used by the clients' A-Z bar.
+
+
+**Artist fanart** — `details.fanart` is `{ hash, proxy_120, proxy_320, proxy_512, proxy_bg, proxy_bg_320x480, proxy_bg_480x480, colors, safe_colors }` (the TheAudioDB fanart run through the artwork pipeline; root-relative `/storage/…` paths) or `null` until processed (queued, at most once an hour) or when the artist has none. The `proxy_bg*` keys are blurred, darkened backdrops for a screen of that size. The web artist page uses `proxy_bg` as its hero background.
+
+`details.gallery` is the same for every wide photo TheAudioDB has (fanart 1–4 and the wide thumb): a list of those objects, only the processed ones (the rest are queued). The web artist page shows them as a strip under the hero, each linking to the original.
