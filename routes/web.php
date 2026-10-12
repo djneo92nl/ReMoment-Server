@@ -84,6 +84,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/settings/dlna/discover', [SettingsController::class, 'dlnaDiscover'])->name('settings.dlna.discover');
     Route::post('/settings/dlna/{server}/scan', [SettingsController::class, 'dlnaScan'])->name('settings.dlna.scan');
 
+    Route::get('/settings/storage', fn () => view('settings.storage'))->name('settings.storage');
+
     Route::get('/settings/library', [SettingsController::class, 'library'])->name('settings.library');
     Route::post('/settings/library', [SettingsController::class, 'librarySave'])->name('settings.library.save');
 

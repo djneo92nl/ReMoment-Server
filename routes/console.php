@@ -17,6 +17,9 @@ Schedule::command('artwork:prerender')->daily();
 Schedule::command('library:enrich')->daily();
 Schedule::command('playlists:refresh-smart')->daily();
 
+// Picks up files added, changed or removed outside the app in the storage locations (queued; see docs/architecture/file-storage.md).
+Schedule::command('library:scan-files --queue')->dailyAt('03:30');
+
 // Folds duplicate artists/albums/tracks together (ids of merged records disappear), so weekly and off-hours.
 Schedule::command('library:merge-duplicates --force')->weeklyOn(0, '04:00')->withoutOverlapping();
 

@@ -28,12 +28,13 @@ class SettingsController extends Controller
         $spotifyConnected = app(SpotifyTokenService::class)->isConnected();
         $lastfmConnected = app(LastfmSessionService::class)->isConnected();
         $dlnaServerCount = DlnaServer::count();
+        $storageLocationCount = \App\Models\StorageLocation::count();
         $clientCount = Client::count();
         $pendingClientCount = Client::where('status', 'pending')->count();
 
         return view('settings.index', compact(
             'userCount', 'deviceCount', 'spotifyConnected', 'lastfmConnected',
-            'dlnaServerCount', 'clientCount', 'pendingClientCount',
+            'dlnaServerCount', 'storageLocationCount', 'clientCount', 'pendingClientCount',
         ));
     }
 

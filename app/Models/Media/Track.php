@@ -64,6 +64,12 @@ class Track extends Model
         return $this->hasMany(Play::class);
     }
 
+    /** The track's file links: the original and any proxies (see App\Models\TrackFile). */
+    public function trackFiles(): HasMany
+    {
+        return $this->hasMany(\App\Models\TrackFile::class);
+    }
+
     public function metadata(): MorphMany
     {
         return $this->morphMany(Metadata::class, 'metadatable');

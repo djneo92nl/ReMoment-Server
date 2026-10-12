@@ -32,6 +32,7 @@ docs/
     proxmox-deployment.md   Ansible: LXC container on an existing Proxmox host, MiniDLNA server
     discovery-for-clients.md mDNS advertisement (_remoment._tcp via host Avahi) so clients find the server
     metadata-enrichment.md  Per-source enrichment jobs (MusicBrainz track/artist/album, Wikipedia, Cover Art Archive, lyrics, Spotify, Last.fm, TheAudioDB, Discogs), DLNA tags, canonical genres: markers, retries, rate limits, library:enrich
+    file-storage.md          Own music files: storage locations (local/S3), files + track_files tables, indexer, organizer, management, /stream, admin API
     lastfm.md                Scrobbling, now-playing, auth flow, artist enrichment, backfill
     library-identity.md      One record per artist/album/track across sources: name keys, find-or-create, library:merge-duplicates
     live-updates.md          MQTT-over-WebSocket push to Livewire + /receiver, topics, fallback polling
@@ -90,6 +91,12 @@ php artisan library:sync-genres
 # Merge library duplicates across sources (DLNA / Spotify / plays) — dry run first
 php artisan library:merge-duplicates --dry-run
 php artisan library:merge-duplicates [--force]
+
+# Index audio files of the storage locations (local/S3), stream them from this server; see docs/architecture/file-storage.md
+php artisan library:scan-files [location]
+php artisan library:import                  # inbox → library, organized by artist/album
+php artisan library:reorganize [--dry-run]
+php artisan library:verify-files
 
 # Queue missing artwork for playlist covers and the last N played albums (scheduled daily)
 php artisan artwork:prerender [--limit=500] [--max-jobs=100]
@@ -717,6 +724,7 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 - `/settings/users` — user management table
 - `/settings/health` — supervisor, scheduler, queue worker, pending jobs, MQTT broker and per-device listener health
 - `/settings/dlna` — discover DLNA servers, trigger library scans
+- `/settings/storage` — storage locations (local/S3) for the own music files, queued scan/import/reorganize with live status, file browser (see `docs/architecture/file-storage.md`)
 - `/settings/spotify-connect` — map Spotify Connect speaker names to local devices
 - `/settings/clients` — manage client device registrations; approve/reject pending, assign devices, view tokens; build/download the SD card artwork zips, one per screen size (see `docs/architecture/sd-card-export.md`)
 

@@ -1,0 +1,69 @@
+# File storage
+
+ReMoment can serve its own music files instead of relying on a DLNA server. Files are described in their own tables, separate from tracks; Flysystem (Laravel disks) only moves the bytes.
+
+## Tables
+
+- `storage_locations` — `name`, `driver` (`local` | `s3`), encrypted JSON `config` (local: `root`; s3: `bucket`, `region`, `key`, `secret`, `endpoint`, `use_path_style_endpoint`, `prefix`), `role` (`library` = the organized home of files, `inbox` = where imports arrive), `last_scanned_at`. `StorageLocation::disk()` builds the Flysystem disk (`Storage::build`). Several locations can exist at once; all feed one library. Secrets never leave the server (the API shows `config` without `key`/`secret`).
+- `files` — one row per stored file: `storage_location_id`, `path` (relative to the location root), `hash` (sha256 of the content), `size`, `mtime`, `mime_type`, `extension`, audio properties, `status` (`present` | `missing`). A file knows nothing about tracks and can exist without one.
+- `track_files` — links a track to its files: `role` (`original` | `proxy`), `profile` (e.g. `mp3-320`), `derived_from_file_id`, `is_primary`. A track can have several files; proxy *generation* (transcoding) is not built yet, the schema and stream selection are.
+
+## Code (`app/Domain/Storage/`)
+
+- `FileStore` — bytes of one location: put/read/delete/move, streaming sha256, listing, `withLocalPath()` (real path locally, temporary copy for remote disks).
+- `AudioTags` — tags and audio properties of a local file (getID3).
+- `FileIndexer` — `index($location, $path)`: hash + tags → `files` row → track through `LibraryIdentity` (track external id `local:file:{file id}`) → `track_files`. A file whose hash exists at another path whose old file is gone is a **move**: the row, and so the track, is kept. Unchanged files (size + mtime) are skipped.
+- `LibraryOrganizer` — layout `{album artist}/{album} ({year})/{disc}-{track} {title}.{ext}` (illegal characters cleaned, `(2)` on collisions). Moves within a location use the disk's move; across locations or drivers the file is copied, the copy's hash verified, then the source removed.
+- `LibraryFiles` — management: `upload` (inbox → index → library layout), `importInbox`, `reorganize`, `deleteFile`, `deleteTrack`, `move` (rename), `writeTags` (getID3, mp3 pure PHP; flac needs `metaflac`, ogg `vorbiscomment`; re-reads the file and re-files the track), `verify` (re-hash, flag missing), `duplicates` (same hash).
+- `App\Services\Local\LocalLibraryScanner` — scans a location through the indexer and marks files that disappeared `missing`.
+
+A track made from a file gets source `dlna` and a `dlna_url` (metadata source `dlna:local`) of `{APP_URL}/stream/{track}`, so playback, library scopes and `library:merge-duplicates` work unchanged; a proper `local` library entry in `LibrarySources` is still to do. `APP_URL` must be an address the speakers can reach.
+
+A track whose last file is deleted is removed, unless another source (a real DLNA server, Spotify) still plays it; then only the local stream is unlinked.
+
+## Streaming
+
+`GET /stream/{track}` (unauthenticated, like the REST API) sends the track's primary original, or with `?profile=low` the proxy of that profile, falling back to the original. Local files get range support (seek). Remote files are redirected to a 30-minute temporary URL when the disk can sign one (S3), else streamed through the server. Missing files give `404`. Not tested yet on real speakers: whether Sonos/ASE follow the redirect.
+
+## Queued tasks and the settings page
+
+Scanning, importing the inbox and reorganizing can take long, so the web UI and `?queue=1` run them on the queue (`App\Jobs\RunStorageTask`, one per kind, per location for scans; `ShouldBeUnique`). `App\Domain\Storage\StorageTasks` queues them and keeps their state (`queued` | `running` | `done` | `failed`, a summary message, progress while scanning) in the cache for a day; a task queued or running for over two hours counts as lost (no worker) and can be queued again. The queue worker must be running (`composer dev`, supervisor).
+
+`/settings/storage` (admin login; Livewire `StorageManager` + `StorageFiles`):
+- add/edit/remove locations (local folder must exist on the server; S3 key and secret are never sent back to the browser: leave blank to keep), test reachability;
+- Scan per location, Import inbox, Reorganize library — each queued, with live status (the page polls every 2 s while something is active);
+- file browser: search by path, filter by location/status, verify, move/rename, delete.
+
+All locations are also scanned nightly at 03:30 (`library:scan-files --queue`).
+
+## Commands
+
+```bash
+php artisan library:scan-files [location] [--queue]   # name or id; default all; --queue runs it on the queue
+php artisan library:import                  # inbox → library, organized
+php artisan library:reorganize [--dry-run]  # re-apply the layout
+php artisan library:verify-files            # re-hash, flag missing, report duplicates
+```
+
+## Admin API (`admin.token`)
+
+```
+GET|POST        /api/admin/storage/locations              list / create {name, driver, role, config}
+PUT|DELETE      /api/admin/storage/locations/{id}         update / delete (422 while it has files)
+POST            /api/admin/storage/locations/{id}/test    can it be listed (502 with the reason if not)
+POST            /api/admin/storage/locations/{id}/scan    → { changed, counts }; with ?queue=1 → 202 { status: queued } (409 while one is queued or running)
+POST            /api/admin/storage/import                 inbox → library
+POST            /api/admin/storage/reorganize             { dry_run? } → { moves: [{file_id, from, to}] }
+POST            /api/admin/files                          multipart `file` → { file, track_id }
+GET|DELETE      /api/admin/tracks/{id}/files              files of a track / delete the track and its files
+DELETE          /api/admin/files/{id}                     delete a file (and its track if it was the last)
+POST            /api/admin/files/{id}/move                { path, storage_location_id? }
+PUT             /api/admin/files/{id}/tags                { title, artist, album, album_artist, year, track_number, disc_number, genre }
+POST            /api/admin/files/{id}/verify              → { result: ok | missing | changed }
+```
+
+`422` invalid request (e.g. no library location yet), `502` the disk or tag tool failed. Scans without `?queue=1` run inside the request.
+
+## Not built yet
+
+ffmpeg proxies, embedded cover art, `X-Accel-Redirect`/sendfile handoff, S3 against a real bucket, a `local` entry in `LibrarySources`.

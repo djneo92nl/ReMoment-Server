@@ -32,6 +32,11 @@
                              label="DLNA Library">
                 {{ $dlnaServerCount }} {{ $dlnaServerCount === 1 ? 'server' : 'servers' }}
             </x-settings-row>
+            <x-settings-row href="{{ route('settings.storage') }}"
+                             icon="fa-solid fa-hard-drive" icon-bg="bg-sky-50 dark:bg-sky-900/20" icon-color="text-sky-500"
+                             label="File Storage">
+                {{ $storageLocationCount }} {{ $storageLocationCount === 1 ? 'location' : 'locations' }}
+            </x-settings-row>
         </x-settings-group>
 
         <x-settings-group title="Integrations">

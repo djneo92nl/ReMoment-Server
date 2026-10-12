@@ -18,10 +18,13 @@ use Illuminate\Support\Facades\DB;
  */
 class LibraryRemover
 {
-    /** @return bool false when the track is available from DLNA and so was kept */
-    public static function track(Track $track): bool
+    /**
+     * @param  bool  $force  remove even a `dlna`-source track: the caller (LibraryFiles) owns the track's own files
+     * @return bool false when the track is available from DLNA and so was kept
+     */
+    public static function track(Track $track, bool $force = false): bool
     {
-        if (!$track->isRemovable()) {
+        if (!$force && !$track->isRemovable()) {
             return false;
         }
 

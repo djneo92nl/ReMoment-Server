@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\DeviceSettingsController;
 use App\Http\Controllers\Api\InfoController;
 use App\Http\Controllers\Api\LibraryController;
 use App\Http\Controllers\Api\SourceControlsController;
+use App\Http\Controllers\Api\StorageController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/info', InfoController::class);
@@ -97,4 +98,21 @@ Route::post('/admin/login', [AdminAuthController::class, 'login']);
 Route::middleware('admin.token')->group(function () {
     Route::get('/admin/me', [AdminAuthController::class, 'me']);
     Route::delete('/admin/token', [AdminAuthController::class, 'logout']);
+
+    // Storage locations and the library's files (docs/architecture/file-storage.md)
+    Route::get('/admin/storage/locations', [StorageController::class, 'locations']);
+    Route::post('/admin/storage/locations', [StorageController::class, 'storeLocation']);
+    Route::put('/admin/storage/locations/{location}', [StorageController::class, 'updateLocation']);
+    Route::delete('/admin/storage/locations/{location}', [StorageController::class, 'destroyLocation']);
+    Route::post('/admin/storage/locations/{location}/test', [StorageController::class, 'testLocation']);
+    Route::post('/admin/storage/locations/{location}/scan', [StorageController::class, 'scan']);
+    Route::post('/admin/storage/import', [StorageController::class, 'import']);
+    Route::post('/admin/storage/reorganize', [StorageController::class, 'reorganize']);
+    Route::post('/admin/files', [StorageController::class, 'upload']);
+    Route::get('/admin/tracks/{track}/files', [StorageController::class, 'trackFiles']);
+    Route::delete('/admin/tracks/{track}/files', [StorageController::class, 'destroyTrack']);
+    Route::delete('/admin/files/{file}', [StorageController::class, 'destroyFile']);
+    Route::post('/admin/files/{file}/move', [StorageController::class, 'move']);
+    Route::put('/admin/files/{file}/tags', [StorageController::class, 'tags']);
+    Route::post('/admin/files/{file}/verify', [StorageController::class, 'verify']);
 });

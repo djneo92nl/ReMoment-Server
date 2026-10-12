@@ -22,6 +22,7 @@
         "ksubileau/color-thief-php": "^1.4",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
+        "league/flysystem-aws-s3-v3": "^3.0",
         "livewire/livewire": "^3.7",
         "mikealmond/musicbrainz": "^0.2.2",
         "php-mqtt/client": "^2.3",

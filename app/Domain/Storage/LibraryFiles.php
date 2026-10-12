@@ -1,0 +1,261 @@
+<?php
+
+namespace App\Domain\Storage;
+
+use App\Domain\Library\LibraryRemover;
+use App\Models\File;
+use App\Models\Media\Metadata;
+use App\Models\Media\Track;
+use App\Models\StorageLocation;
+use Illuminate\Support\Str;
+
+/**
+ * Managing the library's files: upload and import into the organized library, delete, move/rename, write
+ * tags back into a file, verify, find duplicates. Bytes go through FileStore, rows through FileIndexer.
+ */
+class LibraryFiles
+{
+    public function __construct(
+        private FileIndexer $indexer,
+        private LibraryOrganizer $organizer,
+    ) {}
+
+    /**
+     * Stores an uploaded file in the inbox (or the library when there is no inbox), indexes it and moves it
+     * into the library layout.
+     *
+     * @param  resource  $stream
+     */
+    public function upload(string $filename, $stream): File
+    {
+        $library = StorageLocation::library() ?? throw new \InvalidArgumentException('Add a library storage location first.');
+        $inbox = StorageLocation::inbox() ?? $library;
+
+        $filename = basename(str_replace('\\', '/', $filename));
+        if (!AudioTags::isAudio($filename)) {
+            throw new \InvalidArgumentException('Not an audio file.');
+        }
+
+        $store = new FileStore($inbox);
+        $path = '_uploads/'.Str::ulid().'/'.$filename;
+        $store->put($path, $stream);
+
+        [$file] = $this->indexer->index($inbox, $path, $store);
+        if ($file === null) {
+            $store->delete($path);
+            throw new \InvalidArgumentException('The file could not be read as audio.');
+        }
+
+        return $this->place($file, $library);
+    }
+
+    /**
+     * Indexes everything in the inbox and moves it into the library.
+     *
+     * @return int files moved
+     */
+    public function importInbox(): int
+    {
+        $library = StorageLocation::library() ?? throw new \InvalidArgumentException('Add a library storage location first.');
+        $inbox = StorageLocation::inbox() ?? throw new \InvalidArgumentException('Add an inbox storage location first.');
+
+        $store = new FileStore($inbox);
+        $moved = 0;
+
+        foreach ($store->files() as $path => $_) {
+            [$file] = $this->indexer->index($inbox, $path, $store);
+            if ($file && $file->storage_location_id === $inbox->id) {
+                $this->place($file, $library);
+                $moved++;
+            }
+        }
+
+        return $moved;
+    }
+
+    /** Re-applies the library layout to every file in the library; with $dryRun only reports `[file, newPath]`. */
+    public function reorganize(bool $dryRun = false): array
+    {
+        $library = StorageLocation::library() ?? throw new \InvalidArgumentException('Add a library storage location first.');
+        $store = new FileStore($library);
+        $changes = [];
+
+        foreach ($library->files()->where('status', File::PRESENT)->get() as $file) {
+            $track = $file->tracks()->first();
+            if ($track === null) {
+                continue;
+            }
+            $path = $this->organizer->pathFor($track, $file, $file->path, $store);
+            if ($path === $file->path) {
+                continue;
+            }
+            $changes[] = [$file, $path];
+            if (!$dryRun) {
+                $this->organizer->relocate($file, $library, $path);
+            }
+        }
+
+        return $changes;
+    }
+
+    /** Removes a file's bytes and row; tracks left without a file are removed (or just unlinked from our stream). */
+    public function deleteFile(File $file): void
+    {
+        $store = new FileStore($file->location);
+        $trackIds = $file->trackFiles()->pluck('track_id')->all();
+
+        if ($store->exists($file->path)) {
+            $store->delete($file->path);
+        }
+        $file->delete();
+
+        $this->releaseTracks($trackIds);
+    }
+
+    /** Removes every file of the track (original and proxies), then the track itself. */
+    public function deleteTrack(Track $track): void
+    {
+        foreach (File::whereIn('id', $track->trackFiles()->pluck('file_id'))->get() as $file) {
+            $this->deleteFile($file);
+        }
+
+        $this->releaseTracks([$track->id]);
+    }
+
+    /** Moves or renames a file inside its location (or to another location when $target is given). */
+    public function move(File $file, string $path, ?StorageLocation $target = null): File
+    {
+        $target ??= $file->location;
+        $path = ltrim($path, '/');
+
+        if (str_contains($path, '..') || $path === '') {
+            throw new \InvalidArgumentException('Invalid path.');
+        }
+        if ((new FileStore($target))->exists($path)) {
+            throw new \InvalidArgumentException("{$path} already exists.");
+        }
+
+        return $this->organizer->relocate($file, $target, $path);
+    }
+
+    /**
+     * Writes tags into the file (title, artist, album, album_artist, year, track_number, disc_number, genre),
+     * stores it back, re-reads it and, when it is in the library, re-files it. Needs the tag tool of the
+     * format (mp3 works without one; flac needs metaflac, ogg vorbiscomment).
+     *
+     * @param  array<string, string|int>  $tags
+     */
+    public function writeTags(File $file, array $tags): File
+    {
+        $formats = match ($file->extension) {
+            'mp3' => ['id3v2.3'],
+            'flac' => ['metaflac'],
+            'ogg', 'oga', 'opus' => ['vorbiscomment'],
+            default => throw new \InvalidArgumentException("Writing tags to .{$file->extension} files is not supported."),
+        };
+
+        $map = ['title' => 'title', 'artist' => 'artist', 'album' => 'album', 'album_artist' => 'band', 'year' => 'year',
+            'track_number' => 'track_number', 'disc_number' => 'part_of_a_set', 'genre' => 'genre'];
+        $data = [];
+        foreach ($map as $key => $id3) {
+            if (isset($tags[$key]) && $tags[$key] !== '') {
+                $data[$id3] = [(string) $tags[$key]];
+            }
+        }
+        if ($data === []) {
+            throw new \InvalidArgumentException('No tags given.');
+        }
+
+        $store = new FileStore($file->location);
+        $oldTrackIds = $file->trackFiles()->pluck('track_id')->all();
+
+        $store->withLocalPath($file->path, function (string $tmp) use ($formats, $data, $store, $file) {
+            $writer = new \getid3_writetags;
+            $writer->filename = $tmp;
+            $writer->tagformats = $formats;
+            $writer->overwrite_tags = true;
+            $writer->remove_other_tags = false;
+            $writer->tag_encoding = 'UTF-8';
+            $writer->tag_data = $data;
+
+            if (!$writer->WriteTags()) {
+                throw new \RuntimeException('Writing tags failed: '.implode('; ', $writer->errors));
+            }
+
+            $in = fopen($tmp, 'rb');
+            $store->put($file->path, $in);
+            fclose($in);
+        }, writable: true);
+
+        [$file] = $this->indexer->index($file->location, $file->path, $store);
+        $this->releaseTracks(array_diff($oldTrackIds, $file?->trackFiles()->pluck('track_id')->all() ?? []));
+
+        if ($file && $file->location->role === StorageLocation::ROLE_LIBRARY) {
+            $file = $this->organizer->organize($file, $file->location);
+        }
+
+        return $file;
+    }
+
+    /** @return 'ok'|'missing'|'changed' — `changed` means the content no longer matches the stored hash (re-indexed). */
+    public function verify(File $file): string
+    {
+        $store = new FileStore($file->location);
+
+        if (!$store->exists($file->path)) {
+            $file->update(['status' => File::MISSING]);
+
+            return 'missing';
+        }
+        if ($store->hash($file->path) === $file->hash) {
+            $file->update(['status' => File::PRESENT]);
+
+            return 'ok';
+        }
+
+        $file->update(['size' => -1]); // force the indexer past its size/mtime shortcut
+        $this->indexer->index($file->location, $file->path, $store);
+
+        return 'changed';
+    }
+
+    /** Groups of files with identical content, as lists of File. @return list<\Illuminate\Support\Collection<int, File>> */
+    public function duplicates(): array
+    {
+        $hashes = File::query()->select('hash')->groupBy('hash')->havingRaw('count(*) > 1')->pluck('hash');
+
+        return $hashes->map(fn ($hash) => File::where('hash', $hash)->get())->all();
+    }
+
+    private function place(File $file, StorageLocation $library): File
+    {
+        return $this->organizer->organize($file, $library);
+    }
+
+    /**
+     * Tracks that no longer have a file: removed, unless another source (a DLNA server, Spotify) still
+     * plays them — then only our own stream is unlinked.
+     *
+     * @param  iterable<int>  $trackIds
+     */
+    private function releaseTracks(iterable $trackIds): void
+    {
+        foreach (Track::whereIn('id', $trackIds)->get() as $track) {
+            if ($track->trackFiles()->exists()) {
+                continue;
+            }
+
+            $others = $track->metadata()->whereIn('key', ['dlna_url', 'external_id'])
+                ->where(fn ($q) => $q->where('source', '!=', FileIndexer::URL_SOURCE)->orWhereNull('source'))->exists();
+
+            if ($others) {
+                Metadata::where('metadatable_type', $track->getMorphClass())->where('metadatable_id', $track->id)
+                    ->where('key', 'dlna_url')->where('source', FileIndexer::URL_SOURCE)->delete();
+
+                continue;
+            }
+
+            LibraryRemover::track($track, force: true);
+        }
+    }
+}
