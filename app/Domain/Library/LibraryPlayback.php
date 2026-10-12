@@ -12,6 +12,7 @@ use App\Models\Media\Metadata;
 use App\Models\Media\Playlist;
 use App\Models\Media\Track;
 use App\Services\SpotifyTokenService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use SpotifyWebAPI\SpotifyWebAPI;
 
@@ -85,6 +86,35 @@ class LibraryPlayback
     private static function isSpotifyTrackUri(?string $id): bool
     {
         return SpotifyUri::isTrack($id);
+    }
+
+    /** Whether $device can play a library track from DLNA or Spotify at all. */
+    public static function canPlayAny(Device $device): bool
+    {
+        return self::canPlayDlna($device) || self::canPlaySpotify($device);
+    }
+
+    /**
+     * Narrows a tracks query (`tracks` table) to those trackPlayable() says $device can play: a
+     * DLNA url when it plays DLNA, a Spotify track URI (own id or kept metadata) when it plays Spotify.
+     */
+    public static function playableTracks(Builder $tracks, Device $device): Builder
+    {
+        $morph = (new Track)->getMorphClass();
+        $metadata = fn ($m, string $key) => $m->selectRaw('1')->from('metadata')
+            ->whereColumn('metadata.metadatable_id', 'tracks.id')
+            ->where('metadata.metadatable_type', $morph)
+            ->where('metadata.key', $key);
+
+        return $tracks->where(function (Builder $q) use ($device, $metadata) {
+            if (self::canPlayDlna($device)) {
+                $q->orWhereExists(fn ($m) => $metadata($m, 'dlna_url')->where('metadata.value', '!=', ''));
+            }
+            if (self::canPlaySpotify($device)) {
+                $q->orWhere('tracks.external_id', 'like', 'spotify:track:%')
+                    ->orWhereExists(fn ($m) => $metadata($m, 'external_id')->where('metadata.source', 'spotify')->where('metadata.value', 'like', 'spotify:track:%'));
+            }
+        });
     }
 
     /** Whether the server has a stream for the track (any device), or one $device can play. */

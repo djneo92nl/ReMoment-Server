@@ -28,6 +28,10 @@ Duplicates from before that are merged by an admin running `php artisan library:
 
 `{ "data": [ AlbumItem, … ], "next_cursor": "…"|null }` — every album with at least one visible track, 60 per page, paged like artists (opaque `cursor`). `sort` is `name` (default, case-insensitive), `artist` (artist name with "The " ignored, then album name), `year` (newest first, unknown year last), `added` (newest in the library first) or `plays` (most played first); any other value is a `422`. Ties fall back to the album id, so paging is stable. For the most recently *played* albums use `recent`.
 
+### `GET /api/library/random-album?scope=&device_id=`
+
+`{ "data": AlbumItem }` — one random album with at least one visible track in the scope (artwork with `colors`, for a "surprise me" button). `scope` is a library id (`dlna`, `spotify`, …), `local`, `streaming` or `all`, and `client` hides sources, exactly as on the other browse endpoints; an unknown `scope` is a `422`, and an empty library (nothing to pick) a `404` (`{ "message": "No albums in this library." }`). With `device_id` an album that device can play (the `playable` rule of the album detail: some visible track has a DLNA stream the device can play or a Spotify URI while Spotify is usable on it) is preferred; when none is playable, any album is returned. The pick is a random offset into the matching albums (one count, one single-row query), so it stays cheap on a large library.
+
 ### `GET /api/library/artists/{id}`
 
 `{ "id", "name", "favorite", "genres": [ "Rock", … ], "details": ArtistDetails, "albums": [ AlbumItem, … ] }` — albums newest year first (unknown year last), then by name.

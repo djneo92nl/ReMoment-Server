@@ -17,6 +17,7 @@
         "djneo92nl/beo-mozart-php": "*",
         "duncan3dc/sonos": "^3.0",
         "intervention/image": "^3.0",
+        "james-heinrich/getid3": "^1.9",
         "jwilsson/spotify-web-api-php": "^7.0",
         "ksubileau/color-thief-php": "^1.4",
         "laravel/framework": "^12.0",

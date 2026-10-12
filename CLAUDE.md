@@ -387,6 +387,7 @@ GET  /api/library/artists?cursor=          → { data: [ArtistItem], next_cursor
 GET  /api/library/albums?cursor=&sort=      → { data: [AlbumItem], next_cursor }   sort name (default) | artist | year | added | plays, 60/page, only albums with tracks
 GET  /api/library/artists/{id}             → { id, name, favorite, genres, details (bio, links, images, mood, Last.fm stats …), albums: [AlbumItem] }   newest year first, then name
 GET  /api/library/albums/{id}?device_id=   → { id, name, artist: {id, name}, year, artwork, favorite, genres, details (label, release type, mood, rating, credits …), playable, tracks: [{ id, name, duration, playable, details }] }
+GET  /api/library/random-album?scope=&device_id= → { data: AlbumItem }   one random album with a visible track in the scope (library id, local|streaming|all; ?client= hides as elsewhere; 404 when the library has none, 422 unknown scope); with device_id prefers an album that device can play, else any; random offset into the id order, not loading rows
 GET  /api/library/genres                   → { data: [{ slug, name, artist_count, album_count }] }   canonical genres, most artists first
 GET  /api/library/genres/{slug}            → { slug, name, artists: [ArtistItem], albums: [AlbumItem] }   up to 100 of each
 GET  /api/library/playlists?cursor=        → { data: [PlaylistItem], next_cursor }   recently played (last_played_at) first, then by name, 50/page, only playlists with tracks

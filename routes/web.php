@@ -15,7 +15,10 @@ use App\Http\Controllers\RadioStationController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SpotifyAuthController;
 use App\Http\Controllers\StatsController;
+use App\Http\Controllers\StreamController;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/stream/{track}', [StreamController::class, 'show'])->name('stream');
 
 Route::get('/', function () {
     return redirect()->route('devices.index');

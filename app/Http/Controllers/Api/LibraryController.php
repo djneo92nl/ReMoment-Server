@@ -122,6 +122,39 @@ class LibraryController extends Controller
         ]);
     }
 
+    /**
+     * One random album with a visible track in the scope (docs/api/library.md). With `device_id`, an
+     * album that device can play is preferred, else any. The pick is a random offset into the id
+     * order (a count and a one-row query), never loading the albums.
+     */
+    public function randomAlbum(Request $request): JsonResponse
+    {
+        $request->validate(['device_id' => ['nullable', 'integer', 'exists:devices,id']]);
+        $hidden = $this->hiddenSources($request);
+        $device = $request->filled('device_id') ? Device::find($request->integer('device_id')) : null;
+
+        $any = fn () => LibrarySources::albums(Album::query()->whereHas('tracks')->with('artist'), $hidden);
+
+        $album = null;
+        if ($device !== null && LibraryPlayback::canPlayAny($device)) {
+            $album = $this->randomOf(LibrarySources::albums(Album::query()->with('artist'), $hidden)
+                ->whereHas('tracks', fn (Builder $q) => LibraryPlayback::playableTracks(LibrarySources::tracks($q, $hidden), $device)));
+        }
+        $album ??= $this->randomOf($any());
+
+        abort_if($album === null, 404, 'No albums in this library.');
+        $this->preloadArtwork(albums: [$album]);
+
+        return response()->json(['data' => $this->albumItem($album)]);
+    }
+
+    private function randomOf(Builder $albums): ?Album
+    {
+        $count = (clone $albums)->count();
+
+        return $count === 0 ? null : $albums->orderBy('albums.id')->offset(random_int(0, $count - 1))->first();
+    }
+
     public function artist(Request $request, Artist $artist): JsonResponse
     {
         $hidden = $this->hiddenSources($request);

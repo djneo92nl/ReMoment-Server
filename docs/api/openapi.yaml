@@ -838,6 +838,29 @@ paths:
                   data:
                     type: array
                     items: { $ref: "#/components/schemas/AlbumItem" }
+  /library/random-album:
+    get:
+      tags: [Library]
+      summary: One random album in a library
+      description: A random album with at least one visible track in the scope; with device_id one that device can play is preferred, else any. 404 when the library has no album.
+      operationId: randomAlbum
+      parameters:
+        - name: device_id
+          in: query
+          schema: { type: integer }
+        - { $ref: "#/components/parameters/client" }
+        - { $ref: "#/components/parameters/scope" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/AlbumItem" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
   /library/favorites:
     get:
       tags: [Library]
