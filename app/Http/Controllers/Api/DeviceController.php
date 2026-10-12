@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Domain\Artwork\LibraryItemArtwork;
-use App\Domain\Artwork\RadioStationArtwork;
 use App\Domain\Device\Cache\Modes;
 use App\Domain\Device\MultiRoomPeers;
 use App\Domain\Device\PlaybackModes;
@@ -197,14 +196,7 @@ class DeviceController extends Controller
                 ->orderBy('name')
                 ->get()
                 ->filter(fn (RadioStation $station) => $driver->canPlayRadioStation($station))
-                ->map(fn (RadioStation $station) => [
-                    'id' => $station->id,
-                    'name' => $station->name,
-                    // RadioStation has no genre yet; kept in the shape for clients.
-                    'genre' => null,
-                    'favorite' => $station->favorited_at !== null,
-                    'artwork' => RadioStationArtwork::resolve($station),
-                ])
+                ->map(fn (RadioStation $station) => $station->apiItem())
                 ->values()];
         });
     }
@@ -213,6 +205,7 @@ class DeviceController extends Controller
     {
         return $this->withDriver($device, RadioControlInterface::class, 'radio_control', function (RadioControlInterface $driver) use ($station) {
             $driver->playRadioStation($station);
+            $station->markPlayed();
 
             return ['status' => 'ok', 'station' => $station->name];
         });

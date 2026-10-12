@@ -115,7 +115,7 @@ class LibraryPlaylistsApiTest extends TestCase
 
         // Not processed yet: null, and the composite is queued once with its covers.
         $this->getJson('/api/library/playlists')
-            ->assertJsonPath('data.0', ['id' => $playlist->id, 'name' => 'Mix', 'track_count' => 4, 'owner' => 'Remko', 'artwork' => null]);
+            ->assertJsonPath('data.0', ['id' => $playlist->id, 'name' => 'Mix', 'track_count' => 4, 'owner' => 'Remko', 'last_played_at' => null, 'artwork' => null]);
         $this->getJson('/api/library/playlists');
         Queue::assertPushed(ProcessArtwork::class, 1);
         Queue::assertPushed(ProcessArtwork::class, fn (ProcessArtwork $job) => $job->originalUrl === $composite && $job->sources === $covers);

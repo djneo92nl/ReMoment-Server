@@ -111,6 +111,7 @@ class RadioStationController extends Controller
             }
 
             $driver->playRadioStation($radio);
+            $radio->markPlayed();
         } catch (\Throwable $e) {
             return back()->with('error', "Could not reach {$device->device_name}: {$e->getMessage()}");
         }

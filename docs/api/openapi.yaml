@@ -549,6 +549,51 @@ paths:
                 properties:
                   status: { type: string }
 
+  /library/libraries:
+    get:
+      tags: [Library]
+      summary: The music libraries that currently have content (not hidden for the client)
+      description: >-
+        A library is a music collection (DLNA/local, Spotify, later Deezer and Tidal); not to be
+        confused with a device source (an input). Libraries cannot be played combined, so there is no
+        "all" entry. Libraries without albums and playlists, and those the client hides, are left out.
+      operationId: listLibraries
+      parameters:
+        - { $ref: "#/components/parameters/client" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Library" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /library/recent-items:
+    get:
+      tags: [Library]
+      summary: Recently played albums, playlists and radio stations mixed, newest first
+      operationId: listRecentItems
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 30 }
+        - { $ref: "#/components/parameters/client" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/RecentItem" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /library/artists:
     get:
       tags: [Library]
@@ -727,7 +772,7 @@ paths:
   /library/playlists:
     get:
       tags: [Library]
-      summary: Playlists with tracks, recently played first, 50 per page
+      summary: Playlists with tracks (smart ones too), recently played first, 50 per page
       operationId: listPlaylists
       parameters:
         - { $ref: "#/components/parameters/cursor" }
@@ -1118,8 +1163,13 @@ components:
     scope:
       name: scope
       in: query
-      description: Library scope. Default is the leading source (DLNA when it has tracks, else Spotify)
-      schema: { type: string, enum: [local, streaming, all] }
+      description: >-
+        What to show: a library id (`dlna`, `spotify`, and any library added later, see
+        `GET /library/libraries`), or `local` / `streaming` (kept for compatibility: the libraries of
+        that kind) / `all` (every library combined; the library list never offers this to a player UI).
+        Without it the default is the leading library (DLNA when it has tracks, else Spotify), so pass
+        `all` to list e.g. the playlists of every library. Anything else is 422.
+      schema: { type: string, enum: [dlna, spotify, local, streaming, all] }
 
   responses:
     Unauthenticated:
@@ -1412,7 +1462,37 @@ components:
         name: { type: string }
         track_count: { type: integer }
         owner: { type: string, nullable: true }
+        last_played_at: { type: string, format: date-time, nullable: true, description: When it was last started from the server; null if never }
         artwork: { $ref: "#/components/schemas/LibraryArtwork" }
+    Library:
+      type: object
+      properties:
+        id: { type: string, description: "Stable id, also a valid `scope`: dlna | spotify | (deezer, tidal later)", example: dlna }
+        name: { type: string, example: Local }
+        kind: { type: string, enum: [local, streaming] }
+        album_count: { type: integer }
+        artist_count: { type: integer }
+        playlist_count: { type: integer }
+        artwork:
+          allOf: [{ $ref: "#/components/schemas/LibraryArtwork" }]
+          nullable: true
+          description: A representative cover, its most recently played album (else its newest); null until processed
+    RecentItem:
+      type: object
+      description: Exactly one of album, playlist and station is set, matching `type`
+      properties:
+        type: { type: string, enum: [album, playlist, radio] }
+        library: { type: string, description: "A library id, or `radio` for a station" }
+        played_at: { type: string, format: date-time }
+        album:
+          allOf: [{ $ref: "#/components/schemas/AlbumItem" }]
+          nullable: true
+        playlist:
+          allOf: [{ $ref: "#/components/schemas/PlaylistItem" }]
+          nullable: true
+        station:
+          allOf: [{ $ref: "#/components/schemas/RadioStation" }]
+          nullable: true
     GenreItem:
       type: object
       properties:

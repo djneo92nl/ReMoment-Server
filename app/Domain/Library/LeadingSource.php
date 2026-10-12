@@ -11,7 +11,7 @@ use Illuminate\Http\Request;
  * and streaming services extend it; without, Spotify leads.
  *
  * What a page or API call shows is a scope: `local` (DLNA), `streaming`
- * (Spotify) or `all`. It defaults to the leading source and is applied
+ * (Spotify) or `all`; the API also takes a library id (LibrarySources::LIBRARIES). It defaults to the leading source and is applied
  * through LibrarySources' hidden-source filters, so nothing is deleted and
  * a track available from both sources shows in either scope.
  */
@@ -53,10 +53,16 @@ class LeadingSource
         };
     }
 
-    /** A valid scope, the default for anything else. */
+    /** Every value the API accepts as `scope`: the legacy kinds plus each library id. @return list<string> */
+    public static function apiScopes(): array
+    {
+        return [...self::SCOPES, ...LibrarySources::libraryIds()];
+    }
+
+    /** A valid scope (`local`, `streaming`, `all` or a library id), the default for anything else. */
     public static function scope(mixed $requested): string
     {
-        return is_string($requested) && in_array($requested, self::SCOPES, true)
+        return is_string($requested) && in_array($requested, self::apiScopes(), true)
             ? $requested
             : self::defaultScope();
     }
@@ -64,9 +70,10 @@ class LeadingSource
     /** Sources a scope hides, in LibrarySources' terms. */
     public static function hidden(string $scope): array
     {
-        return match ($scope) {
-            'local' => ['spotify'],
-            'streaming' => ['dlna'],
+        return match (true) {
+            $scope === 'local' => LibrarySources::libraryIdsOfKind('streaming'),
+            $scope === 'streaming' => LibrarySources::libraryIdsOfKind('local'),
+            in_array($scope, LibrarySources::libraryIds(), true) => LibrarySources::allBut($scope),
             default => [],
         };
     }

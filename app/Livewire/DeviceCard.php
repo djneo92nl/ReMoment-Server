@@ -130,6 +130,7 @@ class DeviceCard extends Component
                 $station = RadioStation::find($this->lastRadioStation['id']);
                 if ($station) {
                     $driver->playRadioStation($station);
+                    $station->markPlayed();
                 }
             }
         } catch (\Throwable) {

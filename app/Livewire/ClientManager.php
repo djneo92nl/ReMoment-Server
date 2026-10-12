@@ -24,7 +24,7 @@ class ClientManager extends Component
     /** @var array<int> */
     public array $editDeviceIds = [];
 
-    /** @var array<string> Sources this client doesn't see in the library (LibrarySources::ALL keys). */
+    /** @var array<string> Sources this client doesn't see in the library (LibrarySources::all() keys). */
     public array $editHiddenSources = [];
 
     public function startApprove(int $clientId): void
@@ -76,7 +76,7 @@ class ClientManager extends Component
             'editDeviceIds' => ['array'],
             'editDeviceIds.*' => ['integer', 'exists:devices,id'],
             'editHiddenSources' => ['array'],
-            'editHiddenSources.*' => ['string', 'in:'.implode(',', array_keys(LibrarySources::ALL))],
+            'editHiddenSources.*' => ['string', 'in:'.implode(',', array_keys(LibrarySources::all()))],
         ]);
 
         $client = Client::findOrFail($this->editing);
@@ -124,7 +124,7 @@ class ClientManager extends Component
                 ->orderBy('created_at', 'desc')
                 ->get(),
             'allDevices' => Device::orderBy('device_name')->get(),
-            'librarySources' => LibrarySources::ALL,
+            'librarySources' => LibrarySources::all(),
         ]);
     }
 }

@@ -114,7 +114,7 @@ final class SmartFields
 
             new SmartField('source', 'Available from', SmartField::SELECT, self::IS,
                 fn (Builder $q, string $op, $v) => self::negatable($q, $op === 'is_not', fn ($w) => LibrarySources::availableFrom($w, (string) $v)),
-                fn () => collect(LibrarySources::ALL)->except('radio')->all()),
+                fn () => collect(LibrarySources::all())->except('radio')->all()),
 
             new SmartField('favorite', 'Favorite (album or artist)', SmartField::BOOL, self::YES_NO,
                 fn (Builder $q, string $op) => self::negatable($q, $op === 'no', fn ($w) => $w->where(function ($any) {

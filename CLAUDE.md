@@ -381,6 +381,8 @@ For Sonos, `joinable` is always empty (returns `[]`); the UI falls back to showi
 Browse, favorites and playback for clients; full shapes in `docs/api/library.md`. Artwork in these responses is the small object `{ hash, proxy_120, proxy_320 }` or `null` while unprocessed (queued at most once an hour per image).
 
 ```
+GET  /api/library/libraries                → { data: [{ id, name, kind, album_count, artist_count, playlist_count, artwork }] }   music libraries (dlna, spotify, …; LibrarySources::LIBRARIES) with content, not hidden for ?client=; a library id is also a valid ?scope= on the browse endpoints (next to local|streaming|all)
+GET  /api/library/recent-items?limit=30   → { data: [{ type: album|playlist|radio, library, played_at, album, playlist, station }] }   mixed recently played, newest first
 GET  /api/library/artists?cursor=          → { data: [ArtistItem], next_cursor }   alphabetical ("The " ignored), 50/page, only artists with albums
 GET  /api/library/albums?cursor=&sort=      → { data: [AlbumItem], next_cursor }   sort name (default) | artist | year | added | plays, 60/page, only albums with tracks
 GET  /api/library/artists/{id}             → { id, name, favorite, genres, details (bio, links, images, mood, Last.fm stats …), albums: [AlbumItem] }   newest year first, then name
@@ -395,7 +397,7 @@ PUT  /api/library/albums/{id}/favorite     body: { "favorite": true }   → { "f
 PUT  /api/library/artists/{id}/favorite    body: { "favorite": true }   → { "favorite": true }
 ```
 
-ArtistItem `{ id, name, album_count, artwork, favorite }`; AlbumItem `{ id, name, artist_name, year, artwork, favorite }`; PlaylistItem `{ id, name, track_count, owner, artwork }` (`owner` = Spotify owner or `null`; `artwork` = the generated playlist cover, see [Artwork](#artwork-caching--processing)). A playlist counts as played when started from the server (API or web), which sets `playlists.last_played_at`. Favorites are household-wide (`favorited_at` on `albums`/`artists`; the web album/artist pages toggle them too). There is one record per artist/album/track across sources (see [Library identity](#library-identity)); ids of records merged by `library:merge-duplicates` disappear, so clients get `404` (or `422` in play bodies) for a stale id and should re-read the list.
+ArtistItem `{ id, name, album_count, artwork, favorite }`; AlbumItem `{ id, name, artist_name, year, artwork, favorite }`; PlaylistItem `{ id, name, track_count, owner, last_played_at, artwork }` (`owner` = Spotify owner or `null`; `artwork` = the generated playlist cover, see [Artwork](#artwork-caching--processing)). A playlist counts as played when started from the server (API or web), which sets `playlists.last_played_at`. Favorites are household-wide (`favorited_at` on `albums`/`artists`; the web album/artist pages toggle them too). There is one record per artist/album/track across sources (see [Library identity](#library-identity)); ids of records merged by `library:merge-duplicates` disappear, so clients get `404` (or `422` in play bodies) for a stale id and should re-read the list.
 
 **Playing from the library**
 

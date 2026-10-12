@@ -16,7 +16,11 @@ use App\Models\Media\Artist;
 use App\Models\Media\Genre;
 use App\Models\Media\Playlist;
 use App\Models\Media\Track;
+use App\Models\Play;
+use App\Models\RadioStation;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -231,15 +235,7 @@ class LibraryController extends Controller
         $artwork = PlaylistArtwork::choose($playlists);
 
         return response()->json([
-            'data' => $playlists->map(fn (Playlist $playlist) => [
-                'id' => $playlist->id,
-                'name' => $playlist->name,
-                'track_count' => (int) $playlist->tracks_count,
-                'owner' => $this->owner($playlist),
-                'artwork' => isset($artwork[$playlist->id])
-                    ? LibraryItemArtwork::forUrl($artwork[$playlist->id]['url'], $artwork[$playlist->id]['sources'])
-                    : null,
-            ])->values(),
+            'data' => $playlists->map(fn (Playlist $playlist) => $this->playlistItem($playlist, $artwork))->values(),
             'next_cursor' => $hasMore ? $this->encodeCursor($offset + self::PLAYLISTS_PAGE_SIZE) : null,
         ]);
     }
@@ -293,6 +289,163 @@ class LibraryController extends Controller
             ->get();
 
         return response()->json(['data' => $albums->map(fn (Album $album) => $this->albumItem($album))->values()]);
+    }
+
+    /**
+     * The libraries with content for this client (docs/api/library.md): LibrarySources::LIBRARIES
+     * minus the client's hidden ones and those without albums or playlists, each with its counts
+     * and a representative cover (the library's most recently played album, else its newest).
+     */
+    public function libraries(Request $request): JsonResponse
+    {
+        $clientHidden = $this->clientHidden($request);
+        $data = [];
+
+        foreach (LibrarySources::forDisplay() as $id => $library) {
+            if (in_array($id, $clientHidden, true)) {
+                continue;
+            }
+            $hidden = [...$clientHidden, ...LibrarySources::allBut($id)];
+
+            $albumCount = LibrarySources::albums(Album::query(), $hidden)->count();
+            $playlistCount = LibrarySources::playlists(Playlist::query()->whereHas('tracks'), $hidden)->count();
+            if ($albumCount === 0 && $playlistCount === 0) {
+                continue;
+            }
+
+            $cover = LibrarySources::albums(Album::query()->whereNotNull('albums.images'), $hidden)
+                ->leftJoinSub(LibraryArtwork::lastPlayedPerAlbum(), 'recent', 'recent.album_id', '=', 'albums.id')
+                ->select('albums.*')
+                ->orderByRaw('CASE WHEN recent.last_played_at IS NULL THEN 1 ELSE 0 END')
+                ->orderByDesc('recent.last_played_at')
+                ->orderByDesc('albums.id')
+                ->first();
+
+            $data[] = [
+                'id' => $id,
+                'name' => $library['name'],
+                'kind' => $library['kind'],
+                'album_count' => $albumCount,
+                'artist_count' => LibrarySources::artists(Artist::query()->whereHas('albums'), $hidden)->count(),
+                'playlist_count' => $playlistCount,
+                'artwork' => LibraryItemArtwork::forImages($cover?->images),
+            ];
+        }
+
+        return response()->json(['data' => $data]);
+    }
+
+    /**
+     * Recently played albums, playlists and radio stations in one list, newest first (docs/api/library.md).
+     * Each kind is limited to `limit` before merging, so the merged list is complete.
+     */
+    public function recentItems(Request $request): JsonResponse
+    {
+        $request->validate(['limit' => ['nullable', 'integer', 'min:1', 'max:100']]);
+        $limit = $request->integer('limit', 30);
+        $hidden = $this->clientHidden($request);
+
+        $items = collect();
+
+        $albums = LibrarySources::albums(Album::query(), $hidden)
+            ->joinSub(LibraryArtwork::lastPlayedPerAlbum(), 'recent', 'recent.album_id', '=', 'albums.id')
+            ->with('artist')
+            ->select('albums.*', 'recent.last_played_at as recent_played_at')
+            ->orderByDesc('recent.last_played_at')
+            ->orderByDesc('albums.id')
+            ->limit($limit)
+            ->get();
+        $playedFrom = $this->albumPlayedFrom($albums->pluck('id')->all());
+        foreach ($albums as $album) {
+            $played = $playedFrom[$album->id] ?? null;
+            $library = $played !== null && !in_array($played, $hidden, true)
+                ? $played
+                : $this->leadingLibrary($album->tracks(), $hidden);
+            $items->push([
+                'type' => 'album',
+                'library' => $library,
+                'played_at' => Carbon::parse($album->recent_played_at)->toIso8601String(),
+                'album' => $this->albumItem($album),
+                'playlist' => null,
+                'station' => null,
+            ]);
+        }
+
+        $playlists = LibrarySources::playlists(Playlist::query()->whereNotNull('last_played_at'), $hidden)
+            ->withCount(['tracks' => fn ($q) => LibrarySources::tracks($q, $hidden)])
+            ->with(['metadata' => fn ($q) => $q->where('key', 'spotify_owner')])
+            ->orderByDesc('last_played_at')->orderByDesc('id')
+            ->limit($limit)
+            ->get();
+        $artwork = PlaylistArtwork::choose($playlists);
+        foreach ($playlists as $playlist) {
+            $library = LibrarySources::libraryOfSource($playlist->source);
+            $items->push([
+                'type' => 'playlist',
+                'library' => $library !== null && !in_array($library, $hidden, true)
+                    ? $library
+                    : $this->leadingLibrary($playlist->tracks(), $hidden),
+                'played_at' => $playlist->last_played_at->toIso8601String(),
+                'album' => null,
+                'playlist' => $this->playlistItem($playlist, $artwork),
+                'station' => null,
+            ]);
+        }
+
+        if (!in_array(LibrarySources::RADIO, $hidden, true)) {
+            RadioStation::query()->with('meta')->whereNotNull('last_played_at')
+                ->orderByDesc('last_played_at')->orderByDesc('id')
+                ->limit($limit)
+                ->get()
+                ->each(fn (RadioStation $station) => $items->push([
+                    'type' => 'radio',
+                    'library' => LibrarySources::RADIO,
+                    'played_at' => $station->last_played_at->toIso8601String(),
+                    'album' => null,
+                    'playlist' => null,
+                    'station' => $station->apiItem(),
+                ]));
+        }
+
+        return response()->json(['data' => $items->sortByDesc('played_at')->take($limit)->values()]);
+    }
+
+    /**
+     * The library each album was last played from: the library of its latest played track
+     * (`tracks.source`); albums whose latest plays were not of a library track are left out.
+     *
+     * @param  list<int>  $albumIds
+     * @return array<int, string> album id => library id
+     */
+    private function albumPlayedFrom(array $albumIds): array
+    {
+        if ($albumIds === []) {
+            return [];
+        }
+
+        $plays = Play::query()
+            ->join('tracks', 'tracks.id', '=', 'plays.track_id')
+            ->whereIn('tracks.album_id', $albumIds)
+            ->orderByDesc('plays.played_at')->orderByDesc('plays.id')
+            ->get(['tracks.album_id', 'tracks.source']);
+
+        $from = [];
+        foreach ($plays as $play) {
+            $from[$play->album_id] ??= LibrarySources::libraryOfSource($play->source);
+        }
+
+        return array_filter($from);
+    }
+
+    /** The leading library among those a track query is available from (and the client doesn't hide). */
+    private function leadingLibrary(Relation|Builder $tracks, array $hidden): ?string
+    {
+        $available = array_filter(
+            array_diff(LibrarySources::libraryIds(), $hidden),
+            fn (string $id) => LibrarySources::availableFrom(clone $tracks, $id)->exists(),
+        );
+
+        return LibrarySources::leadingOf(array_values($available));
     }
 
     /**
@@ -393,12 +546,23 @@ class LibraryController extends Controller
     {
         $request->validate([
             'client' => ['nullable', 'string', 'max:100'],
-            'scope' => ['nullable', 'in:'.implode(',', LeadingSource::SCOPES)],
+            'scope' => ['nullable', 'in:'.implode(',', LeadingSource::apiScopes())],
         ]);
 
-        $client = $request->filled('client') ? Client::byApiToken((string) $request->query('client')) : null;
+        return LibrarySources::hiddenForRequest($this->client($request), $request->query('scope'));
+    }
 
-        return LibrarySources::hiddenForRequest($client, $request->query('scope'));
+    /** What the requesting client hides (`?client={api_token}`), without any scope. */
+    private function clientHidden(Request $request): array
+    {
+        $request->validate(['client' => ['nullable', 'string', 'max:100']]);
+
+        return LibrarySources::hiddenFor($this->client($request));
+    }
+
+    private function client(Request $request): ?Client
+    {
+        return $request->filled('client') ? Client::byApiToken((string) $request->query('client')) : null;
     }
 
     private function artistItem(Artist $artist): array
@@ -409,6 +573,21 @@ class LibraryController extends Controller
             'album_count' => (int) $artist->albums_count,
             'artwork' => LibraryItemArtwork::forImages($artist->coverAlbum()?->images),
             'favorite' => $artist->favorited_at !== null,
+        ];
+    }
+
+    /** @param array<int, array{url: string, sources: array}> $artwork PlaylistArtwork::choose() */
+    private function playlistItem(Playlist $playlist, array $artwork): array
+    {
+        return [
+            'id' => $playlist->id,
+            'name' => $playlist->name,
+            'track_count' => (int) $playlist->tracks_count,
+            'owner' => $this->owner($playlist),
+            'last_played_at' => $playlist->last_played_at?->toIso8601String(),
+            'artwork' => isset($artwork[$playlist->id])
+                ? LibraryItemArtwork::forUrl($artwork[$playlist->id]['url'], $artwork[$playlist->id]['sources'])
+                : null,
         ];
     }
 

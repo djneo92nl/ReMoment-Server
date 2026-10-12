@@ -20,12 +20,84 @@ use Illuminate\Database\Eloquent\Relations\Relation;
  */
 class LibrarySources
 {
-    /** Hideable source key => label. */
-    public const ALL = [
-        'spotify' => 'Spotify',
-        'dlna' => 'DLNA library',
-        'radio' => 'Radio',
+    /**
+     * The music libraries: id => name (what clients list), kind (`local` or
+     * `streaming`, which the legacy scopes of that name select) and the label of the hide switch.
+     * Adding a library (Deezer, Tidal) starts here: it then appears in `GET /api/library/libraries`,
+     * is accepted as a `scope`, and can be hidden per client.
+     */
+    public const LIBRARIES = [
+        'spotify' => ['name' => 'Spotify', 'kind' => 'streaming', 'label' => 'Spotify'],
+        'dlna' => ['name' => 'Local', 'kind' => 'local', 'label' => 'DLNA library'],
     ];
+
+    /** Hideable source that is not a library. */
+    public const RADIO = 'radio';
+
+    /** Hideable source key => label: every library plus radio. */
+    public static function all(): array
+    {
+        return [
+            ...array_map(fn (array $library) => $library['label'], self::LIBRARIES),
+            self::RADIO => 'Radio',
+        ];
+    }
+
+    /** The libraries as a list shows them: local ones first, then streaming, each in registry order. */
+    public static function forDisplay(): array
+    {
+        $libraries = self::LIBRARIES;
+        uksort($libraries, fn ($a, $b) => [$libraries[$a]['kind'] !== 'local'] <=> [$libraries[$b]['kind'] !== 'local']);
+
+        return $libraries;
+    }
+
+    /** @return list<string> */
+    public static function libraryIds(): array
+    {
+        return array_keys(self::LIBRARIES);
+    }
+
+    /** The libraries of a kind (`local` | `streaming`). @return list<string> */
+    public static function libraryIdsOfKind(string $kind): array
+    {
+        return array_keys(array_filter(self::LIBRARIES, fn (array $library) => $library['kind'] === $kind));
+    }
+
+    /** Every library but $id: what to hide to show only $id. @return list<string> */
+    public static function allBut(string $id): array
+    {
+        return array_values(array_diff(self::libraryIds(), [$id]));
+    }
+
+    /**
+     * The library to show an item under when it is available from several: the leading library if it
+     * is among $ids, else the first of $ids in LIBRARIES' order; null for none.
+     *
+     * @param  list<string>  $ids
+     */
+    public static function leadingOf(array $ids): ?string
+    {
+        $leading = LeadingSource::leading();
+        if (in_array($leading, $ids, true)) {
+            return $leading;
+        }
+        foreach (self::libraryIds() as $id) {
+            if (in_array($id, $ids, true)) {
+                return $id;
+            }
+        }
+
+        return null;
+    }
+
+    /** The library id of a track `source` (`dlna:3` is `dlna`); null for anything that isn't a library. */
+    public static function libraryOfSource(?string $source): ?string
+    {
+        $key = is_string($source) ? explode(':', $source, 2)[0] : '';
+
+        return isset(self::LIBRARIES[$key]) ? $key : null;
+    }
 
     /** Metadata keys that make a track available from the metadata row's source. */
     private const SOURCE_METADATA = ['dlna_url', 'external_id'];
@@ -33,7 +105,7 @@ class LibrarySources
     /** Hidden sources that are valid, e.g. what a client stored. */
     public static function normalize(?array $hidden): array
     {
-        return array_values(array_intersect(array_keys(self::ALL), $hidden ?? []));
+        return array_values(array_intersect(array_keys(self::all()), $hidden ?? []));
     }
 
     public static function hiddenFor(?Client $client): array
@@ -56,7 +128,7 @@ class LibrarySources
     /** Whether nothing but radio is hidden, i.e. no library filtering is needed. */
     private static function onlyRadioHidden(array $hidden): bool
     {
-        return array_diff($hidden, ['radio']) === [];
+        return array_diff($hidden, [self::RADIO]) === [];
     }
 
     /**
@@ -79,19 +151,19 @@ class LibrarySources
             }
             foreach ($sources as $source) {
                 $key = is_string($source) ? explode(':', $source, 2)[0] : '';
-                if (isset(self::ALL[$key])) {
+                if (isset(self::all()[$key])) {
                     $found[$key] = true;
                 }
             }
         }
 
-        return array_values(array_filter(array_keys(self::ALL), fn ($key) => isset($found[$key])));
+        return array_values(array_filter(array_keys(self::all()), fn ($key) => isset($found[$key])));
     }
 
     /** Tracks available from at least one source that isn't hidden. */
     public static function tracks(Builder|Relation $query, array $hidden): Builder|Relation
     {
-        $hidden = array_values(array_diff($hidden, ['radio']));
+        $hidden = array_values(array_diff($hidden, [self::RADIO]));
         if ($hidden === []) {
             return $query;
         }
