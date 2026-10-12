@@ -6,6 +6,7 @@ use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibrarySources;
 use App\Models\Client;
 use App\Models\Device;
+use App\Models\DeviceMeta;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
 use App\Models\Media\Metadata;
@@ -16,13 +17,17 @@ use App\Models\RadioStation;
 use App\Models\Setting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\CachesArtwork;
+use Tests\Support\FakeBareDriver;
+use Tests\Support\FakeLibraryPlaybackDriver;
 use Tests\Support\FakeRadioDriver;
+use Tests\Support\FakesSpotify;
 use Tests\TestCase;
 
 /** GET /api/library/libraries, per-library scope and GET /api/library/recent-items (docs/api/library.md). */
 class LibraryLibrariesApiTest extends TestCase
 {
     use CachesArtwork;
+    use FakesSpotify;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -225,5 +230,49 @@ class LibraryLibrariesApiTest extends TestCase
         $this->assertSame(['spotify', 'dlna'], LibrarySources::libraryIds());
         $this->assertSame(['spotify', 'dlna', 'radio'], array_keys(LibrarySources::all()));
         $this->assertSame(['spotify'], LeadingSource::hidden('dlna'));
+    }
+
+    /** @return array<string, bool> library id => playable */
+    private function playableOn(Device $device): array
+    {
+        $data = $this->getJson("/api/library/libraries?device_id={$device->id}")->assertOk()->json('data');
+
+        return array_column($data, 'playable', 'id');
+    }
+
+    private function mappedDevice(string $driver): Device
+    {
+        $device = Device::factory()->create(['ip_address' => '10.0.0.1', 'device_driver' => $driver]);
+        DeviceMeta::create(['device_id' => $device->id, 'key' => 'spotify_connect_name', 'value' => 'Speaker']);
+
+        return $device;
+    }
+
+    public function test_playable_per_library_for_a_device(): void
+    {
+        $this->release('Dlna Band', 'dlna');
+        $this->release('Spot Band', 'spotify');
+
+        $dlnaOnly = Device::factory()->create(['ip_address' => '10.0.0.1', 'device_driver' => FakeLibraryPlaybackDriver::class]);
+        $neither = Device::factory()->create(['ip_address' => '10.0.0.2', 'device_driver' => FakeBareDriver::class]);
+
+        // Spotify not connected: a mapped device still cannot play it.
+        $this->disconnectSpotify();
+        $this->assertSame(['dlna' => true, 'spotify' => false], $this->playableOn($dlnaOnly));
+        $this->assertSame(['dlna' => false, 'spotify' => false], $this->playableOn($this->mappedDevice(FakeBareDriver::class)));
+
+        $this->connectSpotify();
+        $this->assertSame(['dlna' => true, 'spotify' => false], $this->playableOn($dlnaOnly));
+        $this->assertSame(['dlna' => false, 'spotify' => false], $this->playableOn($neither));
+        $this->assertSame(['dlna' => false, 'spotify' => true], $this->playableOn($this->mappedDevice(FakeBareDriver::class)));
+        $this->assertSame(['dlna' => true, 'spotify' => true], $this->playableOn($this->mappedDevice(FakeLibraryPlaybackDriver::class)));
+    }
+
+    public function test_playable_is_absent_without_a_device_and_an_unknown_device_is_422(): void
+    {
+        $this->release('Dlna Band', 'dlna');
+
+        $this->getJson('/api/library/libraries')->assertJsonMissingPath('data.0.playable');
+        $this->getJson('/api/library/libraries?device_id=9999')->assertStatus(422)->assertJsonValidationErrors('device_id');
     }
 }

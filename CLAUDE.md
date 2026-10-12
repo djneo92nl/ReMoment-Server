@@ -381,7 +381,7 @@ For Sonos, `joinable` is always empty (returns `[]`); the UI falls back to showi
 Browse, favorites and playback for clients; full shapes in `docs/api/library.md`. Artwork in these responses is the small object `{ hash, proxy_120, proxy_320 }` or `null` while unprocessed (queued at most once an hour per image).
 
 ```
-GET  /api/library/libraries                → { data: [{ id, name, kind, album_count, artist_count, playlist_count, artwork }] }   music libraries (dlna, spotify, …; LibrarySources::LIBRARIES) with content, not hidden for ?client=; a library id is also a valid ?scope= on the browse endpoints (next to local|streaming|all)
+GET  /api/library/libraries[?device_id=]    → { data: [{ id, name, kind, album_count, artist_count, playlist_count, artwork, playable? }] }   music libraries (dlna, spotify, …; LibrarySources::LIBRARIES) with content, not hidden for ?client=; `playable` only with ?device_id= (can that device play it: LibrarySources::LIBRARIES `device` check, 422 unknown device); a library id is also a valid ?scope= on the browse endpoints (next to local|streaming|all)
 GET  /api/library/recent-items?limit=30   → { data: [{ type: album|playlist|radio, library, played_at, album, playlist, station }] }   mixed recently played, newest first
 GET  /api/library/artists?cursor=          → { data: [ArtistItem], next_cursor }   alphabetical ("The " ignored), 50/page, only artists with albums
 GET  /api/library/albums?cursor=&sort=      → { data: [AlbumItem], next_cursor }   sort name (default) | artist | year | added | plays, 60/page, only albums with tracks

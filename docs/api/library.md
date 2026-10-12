@@ -97,20 +97,24 @@ Playlist covers are generated, like Spotify's: a **2×2 mosaic of 4 album covers
 
 The mosaic is used **even when the playlist has its own image**, so all playlists look alike on the clients whatever their source (Spotify's own images are often a mosaic or a personalised banner anyway). A composite is addressed by the pseudo URL `remoment:playlist/v1/{md5 of the 4 cover URLs, newline-joined, in tile order}` and goes through the normal artwork pipeline (`ProcessArtwork`: the same 512/320/120 squares, `proxy_bg`/`proxy_bg_320x480`, colors, baseline JPEGs) — so its `hash` is `md5` of that URL, and changes exactly when the 4 chosen covers change. Like album covers it is `null` until processed (queued at most once an hour); `artwork:prerender` and `artwork:backfill` (both daily) queue missing ones, and processed composites are in the client pre-cache list as `kind: "playlist"` items (`docs/api/client-devices.md`). Code: `App\Domain\Artwork\PlaylistArtwork` (choice, URL), `PlaylistCompositeRenderer` (drawing: processed covers are read from their 512 proxy, others downloaded directly, so a composite doesn't wait for its covers' own jobs).
 
-### `GET /api/library/libraries[?client={api_token}]`
+### `GET /api/library/libraries[?client={api_token}][&device_id={id}]`
 
 A **library** is a music collection: DLNA/local, Spotify, later Deezer and Tidal. (A *source*, in the device APIs, is an input of a device: never the same thing.) Libraries cannot be played combined, so there is no "all" entry. Registered in `App\Domain\Library\LibrarySources::LIBRARIES`: adding one there makes it appear here, accepted as a `scope` and hideable per client.
 
 ```
 { "data": [ Library, … ] }
-Library = { id, name, kind, album_count, artist_count, playlist_count, artwork }
+Library = { id, name, kind, album_count, artist_count, playlist_count, artwork, playable? }
   id        "dlna" | "spotify" | … (also a valid `scope`)
   name      "Local" | "Spotify" | …
   kind      "local" | "streaming"
   *_count   what the library has for this client (a track merged from DLNA and Spotify counts in both)
   artwork   a representative cover (the library's most recently played album with a cover, else its newest), the small
             LibraryArtwork object; null until processed or without covers
+  playable  only with `?device_id=`: whether that device can play this library, boolean. Absent without `device_id`
+            ("unknown"). A library that is not playable stays listed: it can still be browsed
 ```
+
+`playable` uses the rules of "Library playback" below, per library: `dlna` needs a device whose driver implements `LibraryPlaybackInterface`; `spotify` needs Spotify connected and the device to be the Spotify virtual device or mapped to a Spotify Connect name. Each library declares its check as `device` in `LibrarySources::LIBRARIES` (the `LibraryPlayback::canPlay…` methods the play endpoints use), so a future library adds its rule in that one place. An unknown `device_id` is `422` (like the other `device_id` query parameters).
 
 Only libraries with albums or playlists that are not hidden for the client are listed (`?client=`, see below; unknown token `404`), local libraries first, then streaming ones (`LibrarySources::forDisplay()`).
 

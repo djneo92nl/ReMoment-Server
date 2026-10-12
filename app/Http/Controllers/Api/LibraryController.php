@@ -295,9 +295,12 @@ class LibraryController extends Controller
      * The libraries with content for this client (docs/api/library.md): LibrarySources::LIBRARIES
      * minus the client's hidden ones and those without albums or playlists, each with its counts
      * and a representative cover (the library's most recently played album, else its newest).
+     * With `device_id`, each also says whether that device can play it (LibrarySources::playableOn).
      */
     public function libraries(Request $request): JsonResponse
     {
+        $request->validate(['device_id' => ['nullable', 'integer', 'exists:devices,id']]);
+        $device = $request->filled('device_id') ? Device::find($request->integer('device_id')) : null;
         $clientHidden = $this->clientHidden($request);
         $data = [];
 
@@ -329,6 +332,7 @@ class LibraryController extends Controller
                 'artist_count' => LibrarySources::artists(Artist::query()->whereHas('albums'), $hidden)->count(),
                 'playlist_count' => $playlistCount,
                 'artwork' => LibraryItemArtwork::forImages($cover?->images),
+                ...($device ? ['playable' => LibrarySources::playableOn($id, $device)] : []),
             ];
         }
 

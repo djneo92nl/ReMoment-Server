@@ -3,6 +3,7 @@
 namespace App\Domain\Library;
 
 use App\Models\Client;
+use App\Models\Device;
 use App\Models\Media\Track;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -22,14 +23,24 @@ class LibrarySources
 {
     /**
      * The music libraries: id => name (what clients list), kind (`local` or
-     * `streaming`, which the legacy scopes of that name select) and the label of the hide switch.
-     * Adding a library (Deezer, Tidal) starts here: it then appears in `GET /api/library/libraries`,
-     * is accepted as a `scope`, and can be hidden per client.
+     * `streaming`, which the legacy scopes of that name select), the label of the hide switch and
+     * `device`: the static `fn (Device): bool` callable saying whether a device can play the library
+     * (the same check the play endpoints use). Adding a library (Deezer, Tidal) starts here: it then
+     * appears in `GET /api/library/libraries` (with its `playable`), is accepted as a `scope`, and
+     * can be hidden per client.
      */
     public const LIBRARIES = [
-        'spotify' => ['name' => 'Spotify', 'kind' => 'streaming', 'label' => 'Spotify'],
-        'dlna' => ['name' => 'Local', 'kind' => 'local', 'label' => 'DLNA library'],
+        'spotify' => ['name' => 'Spotify', 'kind' => 'streaming', 'label' => 'Spotify', 'device' => [LibraryPlayback::class, 'canPlaySpotify']],
+        'dlna' => ['name' => 'Local', 'kind' => 'local', 'label' => 'DLNA library', 'device' => [LibraryPlayback::class, 'canPlayDlna']],
     ];
+
+    /** Whether $device can play the library $id; false for an unknown library. */
+    public static function playableOn(string $id, Device $device): bool
+    {
+        $check = self::LIBRARIES[$id]['device'] ?? null;
+
+        return $check !== null && (bool) $check($device);
+    }
 
     /** Hideable source that is not a library. */
     public const RADIO = 'radio';

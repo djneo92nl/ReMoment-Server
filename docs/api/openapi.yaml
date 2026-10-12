@@ -560,6 +560,10 @@ paths:
       operationId: listLibraries
       parameters:
         - { $ref: "#/components/parameters/client" }
+        - name: device_id
+          in: query
+          description: Add `playable` to every library, for this device. Unknown id is 422.
+          schema: { type: integer }
       responses:
         "200":
           description: OK
@@ -572,6 +576,7 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Library" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: Unknown device_id }
   /library/recent-items:
     get:
       tags: [Library]
@@ -1473,6 +1478,7 @@ components:
         album_count: { type: integer }
         artist_count: { type: integer }
         playlist_count: { type: integer }
+        playable: { type: boolean, description: "Only with `device_id`: whether that device can play this library (a non-playable library can still be browsed). Absent without it." }
         artwork:
           allOf: [{ $ref: "#/components/schemas/LibraryArtwork" }]
           nullable: true
