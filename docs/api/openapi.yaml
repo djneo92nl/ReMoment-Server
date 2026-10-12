@@ -676,6 +676,10 @@ paths:
         - name: sort
           in: query
           schema: { type: string, enum: [name, artist, year, added, plays], default: name }
+        - name: letter
+          in: query
+          description: "Start at the first album whose sort key (album name with `name`, artist name with `artist`, \"The \" ignored for artists only) is at or after this letter (`#` = the start). Ignored with `year`, `added`, `plays` and with a cursor."
+          schema: { type: string, pattern: "^[A-Za-z#]$" }
         - { $ref: "#/components/parameters/client" }
         - { $ref: "#/components/parameters/scope" }
       responses:

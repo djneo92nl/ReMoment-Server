@@ -259,6 +259,67 @@ class LibraryApiTest extends TestCase
         $this->getJson('/api/library/albums?sort=bogus')->assertUnprocessable()->assertJsonValidationErrors('sort');
     }
 
+    public function test_albums_can_start_at_a_letter_by_name(): void
+    {
+        $artist = $this->artist('Someone');
+        foreach (['1999', 'Alpha', 'bravo', 'Charlie', 'The Dawn', 'Echo'] as $name) {
+            $this->track($this->album($artist, $name), 'One');
+        }
+
+        // Case-insensitive; "The " is not ignored for album names (as in the name sort)
+        $this->getJson('/api/library/albums?letter=B')->assertOk()
+            ->assertJsonPath('data.*.name', ['bravo', 'Charlie', 'Echo', 'The Dawn']);
+        $this->getJson('/api/library/albums?letter=t')->assertOk()->assertJsonPath('data.*.name', ['The Dawn']);
+        $this->getJson('/api/library/albums?letter=D')->assertOk()->assertJsonPath('data.*.name', ['Echo', 'The Dawn']);
+        $this->getJson('/api/library/albums?letter=%23')->assertOk()->assertJsonCount(6, 'data');
+        $this->getJson('/api/library/albums?letter=Z')->assertOk()->assertJsonPath('data', []);
+        $this->getJson('/api/library/albums?letter=AB')->assertUnprocessable()->assertJsonValidationErrors('letter');
+        $this->getJson('/api/library/albums?letter=1')->assertUnprocessable();
+    }
+
+    public function test_albums_can_start_at_a_letter_by_artist_and_other_sorts_ignore_it(): void
+    {
+        $this->track($this->album($this->artist('ABBA'), 'Zzz', '2001-01-01'), 'One');
+        $this->track($this->album($this->artist('The Beatles'), 'Yyy', '2002-01-01'), 'One');
+        $this->track($this->album($this->artist('Coldplay'), 'Xxx', '2003-01-01'), 'One');
+
+        // "The Beatles" sorts under B
+        $this->getJson('/api/library/albums?sort=artist&letter=B')->assertOk()
+            ->assertJsonPath('data.*.name', ['Yyy', 'Xxx']);
+        $this->getJson('/api/library/albums?sort=artist&letter=%23')->assertJsonCount(3, 'data');
+        // By name, "Y" is the album name
+        $this->getJson('/api/library/albums?letter=Y')->assertJsonPath('data.*.name', ['Yyy', 'Zzz']);
+
+        foreach (['year', 'added', 'plays'] as $sort) {
+            $this->getJson('/api/library/albums?letter=Z&sort='.$sort)->assertOk()->assertJsonCount(3, 'data');
+        }
+    }
+
+    public function test_albums_paging_continues_after_a_letter_jump_and_respects_scope(): void
+    {
+        $artist = $this->artist('Many');
+        foreach (range(1, 70) as $i) {
+            $this->track($this->album($artist, sprintf('A %02d', $i)), 'One');
+        }
+        foreach (range(1, 62) as $i) {
+            $this->track($this->album($artist, sprintf('B %02d', $i)), 'One');
+        }
+
+        $first = $this->getJson('/api/library/albums?letter=B')->assertJsonCount(60, 'data');
+        $first->assertJsonPath('data.0.name', 'B 01');
+        $second = $this->getJson('/api/library/albums?cursor='.$first->json('next_cursor'))
+            ->assertJsonPath('data.*.name', ['B 61', 'B 62'])
+            ->assertJsonPath('next_cursor', null);
+        $this->assertNull($second->json('next_cursor'));
+
+        // Spotify-only albums are out of the DLNA scope, so they do not shift the jump
+        $spotify = $this->artist('Sp');
+        $this->track($this->album($spotify, 'A 000'), 'One', dlna: false, spotifyId: 'sp1');
+        $this->getJson('/api/library/albums?scope=dlna&letter=B')->assertJsonPath('data.0.name', 'B 01');
+        $this->getJson('/api/library/albums?scope=all&letter=B')->assertJsonPath('data.0.name', 'B 01');
+        $this->getJson('/api/library/albums?scope=dlna&letter=A')->assertJsonPath('data.0.name', 'A 01');
+    }
+
     public function test_albums_are_paged_by_an_opaque_cursor(): void
     {
         $artist = $this->artist('Many');

@@ -58,6 +58,9 @@ class LibraryController extends Controller
     /** Artist name for sorting: lower case, without a leading "The ". */
     private const ARTIST_SORT_NAME = Artist::SORT_NAME_SQL;
 
+    /** Album name for sorting: lower case (a leading "The " is not ignored for albums). */
+    private const ALBUM_SORT_NAME = 'LOWER(albums.name)';
+
     /** Artists with albums, paged: `sort` is name (default) or plays (most played first, in the scope). */
     public function artists(Request $request): JsonResponse
     {
@@ -70,13 +73,11 @@ class LibraryController extends Controller
         $hidden = $this->hiddenSources($request);
         $offset = $this->decodeCursor($request->query('cursor'));
 
-        // Jump to a letter (the clients' A-Z bar): start at the first artist sorting at or after
-        // it; "#" is the start (digits and symbols sort before letters). Paging continues from there.
-        $letter = $request->query('letter');
-        if (!$byPlays && $letter !== null && $letter !== '#' && $request->query('cursor') === null) {
-            $offset = LibrarySources::artists(Artist::query()->whereHas('albums'), $hidden)
-                ->whereRaw(self::ARTIST_SORT_NAME.' < ?', [strtolower($letter)])
-                ->count();
+        if (!$byPlays) {
+            $offset = $this->letterOffset(
+                LibrarySources::artists(Artist::query()->whereHas('albums'), $hidden),
+                self::ARTIST_SORT_NAME, $request, $offset,
+            );
         }
 
         $query = $this->artistItems(LibrarySources::artists(Artist::query()->whereHas('albums'), $hidden), $hidden);
@@ -116,21 +117,28 @@ class LibraryController extends Controller
     {
         $request->validate([
             'cursor' => ['nullable', 'string', 'max:200'],
+            'letter' => ['nullable', 'string', 'regex:/^[A-Za-z#]$/'],
             'sort' => ['nullable', 'in:name,artist,year,added,plays'],
         ]);
         $hidden = $this->hiddenSources($request);
         $offset = $this->decodeCursor($request->query('cursor'));
+        $sort = $request->query('sort', 'name');
 
         $query = LibrarySources::albums(Album::query(), $hidden)->whereHas('tracks')->with('artist');
 
-        match ($request->query('sort', 'name')) {
+        match ($sort) {
             'artist' => $query->join('artists', 'artists.id', '=', 'albums.artist_id')
                 ->orderByRaw(self::ARTIST_SORT_NAME)->orderBy('albums.name')->select('albums.*'),
             'year' => $query->orderByRaw('albums.released_at IS NULL')->orderByDesc('albums.released_at')->orderBy('albums.name'),
             'added' => $query->orderByDesc('albums.created_at')->orderByDesc('albums.id'),
             'plays' => $query->withCount('plays')->orderByDesc('plays_count')->orderByDesc('albums.created_at'),
-            default => $query->orderBy('albums.name'),
+            default => $query->orderByRaw(self::ALBUM_SORT_NAME)->orderBy('albums.name'),
         };
+
+        // Jump to a letter in the active sort key (name or artist); other sorts ignore it.
+        if ($sort === 'name' || $sort === 'artist') {
+            $offset = $this->letterOffset($query, $sort === 'artist' ? self::ARTIST_SORT_NAME : self::ALBUM_SORT_NAME, $request, $offset);
+        }
 
         $albums = $query->orderBy('albums.id')
             ->offset($offset)
@@ -804,6 +812,22 @@ class LibraryController extends Controller
             'artwork' => LibraryItemArtwork::forImages($album->images),
             'favorite' => $album->favorited_at !== null,
         ];
+    }
+
+    /**
+     * Jump to a letter (the clients' A-Z bar): the offset of the first row whose sort key (lower case SQL
+     * expression) sorts at or after the letter; "#" is the start (digits and symbols sort before letters).
+     * Only without a cursor: with one, paging continues from the cursor's offset. The count ignores ordering.
+     */
+    private function letterOffset(Builder $query, string $sortKeySql, Request $request, int $offset): int
+    {
+        $letter = $request->query('letter');
+
+        if ($letter === null || $letter === '#' || $request->query('cursor') !== null) {
+            return $offset;
+        }
+
+        return (clone $query)->reorder()->whereRaw($sortKeySql.' < ?', [strtolower($letter)])->count();
     }
 
     private function encodeCursor(int $offset): string

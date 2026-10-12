@@ -24,9 +24,9 @@ Duplicates from before that are merged by an admin running `php artisan library:
 
 `{ "data": [ ArtistItem, … ], "next_cursor": "…"|null }` — artists with at least one album, alphabetical (case-insensitive, a leading "The " ignored), 50 per page. Pass `next_cursor` back as `cursor` until it is `null`. The cursor is opaque; an invalid one returns Laravel's `422` validation error. `sort` is `name` (default) or `plays` (most played first; any other value is a `422`). Plays of an artist are the plays of the tracks on its albums that are visible in the requested scope (`scope=dlna` counts only plays of tracks available from DLNA, and the client's hidden sources apply). Artists without plays come last; ties fall back to name ("The " ignored) then id, so paging with the cursor is stable. `letter` has no effect with `sort=plays`.
 
-### `GET /api/library/albums?cursor=&sort=`
+### `GET /api/library/albums?cursor=&sort=&letter=`
 
-`{ "data": [ AlbumItem, … ], "next_cursor": "…"|null }` — every album with at least one visible track, 60 per page, paged like artists (opaque `cursor`). `sort` is `name` (default, case-insensitive), `artist` (artist name with "The " ignored, then album name), `year` (newest first, unknown year last), `added` (newest in the library first) or `plays` (most played first); any other value is a `422`. Ties fall back to the album id, so paging is stable. For the most recently *played* albums use `recent`.
+`{ "data": [ AlbumItem, … ], "next_cursor": "…"|null }` — every album with at least one visible track, 60 per page, paged like artists (opaque `cursor`). `sort` is `name` (default, case-insensitive), `artist` (artist name with "The " ignored, then album name), `year` (newest first, unknown year last), `added` (newest in the library first) or `plays` (most played first); any other value is a `422`. Ties fall back to the album id, so paging is stable. `letter` jumps to a letter in the active sort key (see [Jumping to a letter](#jumping-to-a-letter)) and has no effect with `year`, `added` or `plays`. For the most recently *played* albums use `recent`.
 
 ### `GET /api/library/random-album?scope=&device_id=`
 
@@ -325,6 +325,8 @@ A device lists `library_playback` in `capabilities` when either path exists for 
 ### Jumping to a letter
 
 `GET /api/library/artists?letter=M` starts the list at the first artist sorting at or after that letter (a leading "The " is ignored, like the sort). `#` is the start of the list. `next_cursor` continues from there. Used by the clients' A-Z bar.
+
+`GET /api/library/albums?letter=M` does the same for albums, following the active sort: with `sort=name` (default) the album name, case-insensitive (a leading "The " is **not** ignored for album names, as in that sort), with `sort=artist` the artist name ("The " ignored). With `year`, `added` and `plays` `letter` has no effect. Names starting with a digit or symbol sort before A, so `A` skips them and `#` is the start. `letter` is one character `A-Z`/`a-z`/`#`, anything else is a `422`; it is ignored when a `cursor` is given. The jump respects `scope` and the client's hidden sources.
 
 
 **Artist fanart** — `details.fanart` is `{ hash, proxy_120, proxy_320, proxy_512, proxy_bg, proxy_bg_320x480, proxy_bg_480x480, colors, safe_colors }` (the TheAudioDB fanart run through the artwork pipeline; root-relative `/storage/…` paths) or `null` until processed (queued, at most once an hour) or when the artist has none. The `proxy_bg*` keys are blurred, darkened backdrops for a screen of that size. The web artist page uses `proxy_bg` as its hero background.
