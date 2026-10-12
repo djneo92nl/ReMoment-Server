@@ -53,25 +53,44 @@ class LibraryController extends Controller
     /** Artist name for sorting: lower case, without a leading "The ". */
     private const ARTIST_SORT_NAME = Artist::SORT_NAME_SQL;
 
+    /** Artists with albums, paged: `sort` is name (default) or plays (most played first, in the scope). */
     public function artists(Request $request): JsonResponse
     {
         $request->validate([
             'cursor' => ['nullable', 'string', 'max:200'],
             'letter' => ['nullable', 'string', 'regex:/^[A-Za-z#]$/'],
+            'sort' => ['nullable', 'in:name,plays'],
         ]);
+        $byPlays = $request->query('sort') === 'plays';
         $hidden = $this->hiddenSources($request);
         $offset = $this->decodeCursor($request->query('cursor'));
 
         // Jump to a letter (the clients' A-Z bar): start at the first artist sorting at or after
         // it; "#" is the start (digits and symbols sort before letters). Paging continues from there.
         $letter = $request->query('letter');
-        if ($letter !== null && $letter !== '#' && $request->query('cursor') === null) {
+        if (!$byPlays && $letter !== null && $letter !== '#' && $request->query('cursor') === null) {
             $offset = LibrarySources::artists(Artist::query()->whereHas('albums'), $hidden)
                 ->whereRaw(self::ARTIST_SORT_NAME.' < ?', [strtolower($letter)])
                 ->count();
         }
 
-        $artists = $this->artistItems(LibrarySources::artists(Artist::query()->whereHas('albums'), $hidden), $hidden)
+        $query = $this->artistItems(LibrarySources::artists(Artist::query()->whereHas('albums'), $hidden), $hidden);
+
+        if ($byPlays) {
+            // Plays of the artist's albums' visible tracks in the scope, summed once in SQL and joined;
+            // artists without plays count 0. Ties fall back to name then id, so the offset cursor is stable.
+            $plays = Play::query()
+                ->join('tracks', 'tracks.id', '=', 'plays.track_id')
+                ->join('albums', 'albums.id', '=', 'tracks.album_id');
+            LibrarySources::tracks($plays, $hidden);
+            $plays->selectRaw('albums.artist_id, COUNT(plays.id) AS plays_total')->groupBy('albums.artist_id');
+
+            $query->select('artists.*')
+                ->leftJoinSub($plays, 'artist_plays', 'artist_plays.artist_id', '=', 'artists.id')
+                ->orderByRaw('COALESCE(artist_plays.plays_total, 0) DESC');
+        }
+
+        $artists = $query
             ->orderByRaw(self::ARTIST_SORT_NAME)
             ->orderBy('artists.id')
             ->offset($offset)

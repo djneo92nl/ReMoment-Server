@@ -20,9 +20,9 @@ Duplicates from before that are merged by an admin running `php artisan library:
 
 ## Browse
 
-### `GET /api/library/artists?cursor=&letter=`
+### `GET /api/library/artists?cursor=&letter=&sort=`
 
-`{ "data": [ ArtistItem, … ], "next_cursor": "…"|null }` — artists with at least one album, alphabetical (case-insensitive, a leading "The " ignored), 50 per page. Pass `next_cursor` back as `cursor` until it is `null`. The cursor is opaque; an invalid one returns Laravel's `422` validation error.
+`{ "data": [ ArtistItem, … ], "next_cursor": "…"|null }` — artists with at least one album, alphabetical (case-insensitive, a leading "The " ignored), 50 per page. Pass `next_cursor` back as `cursor` until it is `null`. The cursor is opaque; an invalid one returns Laravel's `422` validation error. `sort` is `name` (default) or `plays` (most played first; any other value is a `422`). Plays of an artist are the plays of the tracks on its albums that are visible in the requested scope (`scope=dlna` counts only plays of tracks available from DLNA, and the client's hidden sources apply). Artists without plays come last; ties fall back to name ("The " ignored) then id, so paging with the cursor is stable. `letter` has no effect with `sort=plays`.
 
 ### `GET /api/library/albums?cursor=&sort=`
 

@@ -138,6 +138,78 @@ class LibraryApiTest extends TestCase
         $this->getJson('/api/library/artists?cursor=nonsense')->assertStatus(422)->assertJsonValidationErrors('cursor');
     }
 
+    private function playsOf(Track $track, int $times): void
+    {
+        $device = $this->device();
+        foreach (range(1, $times) as $_) {
+            Play::create(['device_id' => $device->id, 'track_id' => $track->id, 'source_type' => 'dlna', 'played_at' => now()]);
+        }
+    }
+
+    public function test_artists_sort_by_plays_with_unplayed_last_and_name_then_id_as_ties(): void
+    {
+        $zed = $this->artist('Zed');
+        $abba = $this->artist('Abba');
+        $mid = $this->artist('The Mid');
+        $none = $this->artist('Aaa Unplayed');
+        $twin = $this->artist('Abbb');
+        foreach ([$zed, $abba, $mid, $none, $twin] as $a) {
+            $this->track($this->album($a, 'Album'), 'T');
+        }
+        $this->playsOf($zed->albums()->first()->tracks()->first(), 3);
+        $this->playsOf($abba->albums()->first()->tracks()->first(), 1);
+        $this->playsOf($mid->albums()->first()->tracks()->first(), 1);
+        $this->playsOf($twin->albums()->first()->tracks()->first(), 1);
+
+        $this->getJson('/api/library/artists?sort=plays')
+            ->assertOk()
+            ->assertJsonPath('data.*.id', [$zed->id, $abba->id, $twin->id, $mid->id, $none->id])
+            ->assertJsonPath('data.0.name', 'Zed');
+    }
+
+    public function test_artist_plays_only_count_visible_tracks_in_the_scope(): void
+    {
+        $a = $this->artist('A');
+        $b = $this->artist('B');
+        $albumA = $this->album($a, 'A1');
+        $albumB = $this->album($b, 'B1');
+        $this->playsOf($this->track($albumA, 'dlna'), 1);
+        $this->playsOf($this->track($albumA, 'spot', false, 'sa'), 5);
+        $this->playsOf($this->track($albumB, 'dlna'), 2);
+
+        $this->getJson('/api/library/artists?sort=plays&scope=all')->assertJsonPath('data.*.name', ['A', 'B']);
+        $this->getJson('/api/library/artists?sort=plays&scope=dlna')->assertJsonPath('data.*.name', ['B', 'A']);
+    }
+
+    public function test_artists_by_plays_page_stably_across_the_page_boundary(): void
+    {
+        foreach (range(1, 55) as $i) {
+            $artist = $this->artist(sprintf('Artist %02d', $i));
+            $track = $this->track($this->album($artist, 'Album'), 'T');
+            $this->playsOf($track, $i % 3);
+        }
+
+        $first = $this->getJson('/api/library/artists?sort=plays')->assertJsonCount(50, 'data');
+        $second = $this->getJson('/api/library/artists?sort=plays&cursor='.$first->json('next_cursor'))
+            ->assertJsonCount(5, 'data')->assertJsonPath('next_cursor', null);
+
+        $ids = array_merge($first->json('data.*.id'), $second->json('data.*.id'));
+        $this->assertCount(55, array_unique($ids));
+        $this->assertSame('Artist 02', $first->json('data.0.name'));
+    }
+
+    public function test_artists_default_order_is_unchanged_and_an_invalid_sort_is_rejected(): void
+    {
+        $b = $this->artist('Bravo');
+        $a = $this->artist('Alpha');
+        $this->playsOf($this->track($this->album($b, 'X'), 'T'), 4);
+        $this->track($this->album($a, 'Y'), 'T');
+
+        $this->getJson('/api/library/artists')->assertJsonPath('data.*.name', ['Alpha', 'Bravo']);
+        $this->getJson('/api/library/artists?sort=name')->assertJsonPath('data.*.name', ['Alpha', 'Bravo']);
+        $this->getJson('/api/library/artists?sort=bogus')->assertStatus(422)->assertJsonValidationErrors('sort');
+    }
+
     public function test_albums_are_listed_by_name_and_sortable_and_only_with_tracks(): void
     {
         $zed = $this->artist('The Zed');

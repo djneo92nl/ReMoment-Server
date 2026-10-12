@@ -602,10 +602,14 @@ paths:
   /library/artists:
     get:
       tags: [Library]
-      summary: Artists with albums, alphabetical ("The " ignored), 50 per page
+      summary: Artists with albums, alphabetical ("The " ignored) or most played, 50 per page
       operationId: listArtists
       parameters:
         - { $ref: "#/components/parameters/cursor" }
+        - name: sort
+          in: query
+          description: "`name` (default) or `plays` (most played first: plays of the artist's visible tracks in the scope; no plays last; ties by name then id). `letter` is ignored with `plays`."
+          schema: { type: string, enum: [name, plays], default: name }
         - name: letter
           in: query
           description: Start at the first artist at or after this letter (`#` = the start)
