@@ -130,6 +130,27 @@ class ExtraSourcesEnrichmentTest extends TestCase
         Http::assertSent(fn ($request) => str_contains($request->url(), 'artist-mb.php?i=art-1'));
     }
 
+    public function test_audiodb_uses_the_working_public_key_by_default(): void
+    {
+        $this->assertSame('123', config('metadata.audiodb_key'), 'the old public key "2" answers 404 for everything');
+    }
+
+    public function test_requeue_migration_clears_markers_without_data_only(): void
+    {
+        [$empty, $album] = $this->records();
+        $full = Artist::create(['name' => 'Other', 'source' => 'dlna']);
+        Enrichment::markDone($empty, Enrichment::AUDIODB);
+        Enrichment::markDone($album, Enrichment::AUDIODB);
+        Enrichment::markDone($full, Enrichment::AUDIODB);
+        Enrichment::save($full, 'mood', 'Dreamy', 'string', Enrichment::AUDIODB);
+
+        (require database_path('migrations/2026_10_12_120000_requeue_audiodb_after_dead_public_key.php'))->up();
+
+        $this->assertFalse(Enrichment::isDone($empty, Enrichment::AUDIODB));
+        $this->assertFalse(Enrichment::isDone($album, Enrichment::AUDIODB));
+        $this->assertTrue(Enrichment::isDone($full, Enrichment::AUDIODB));
+    }
+
     public function test_audiodb_album_and_missing_data(): void
     {
         Http::fake(['theaudiodb.com/*' => Http::sequence()
