@@ -181,6 +181,34 @@ class LibraryApiTest extends TestCase
         $this->getJson('/api/library/artists?sort=plays&scope=dlna')->assertJsonPath('data.*.name', ['B', 'A']);
     }
 
+    public function test_artist_items_are_identical_under_sort_plays_and_sort_name(): void
+    {
+        $a = $this->artist('Alpha');
+        $a->update(['favorited_at' => now()]);
+        $this->track($this->album($a, 'A1'), 'dlna');
+        $second = $this->album($a, 'A2');
+        $this->playsOf($this->track($second, 'dlna'), 2);
+        $this->track($this->album($a, 'A3 streaming'), 'spot', false, 'sa');
+        $b = $this->artist('Beta');
+        $this->playsOf($this->track($this->album($b, 'B1'), 'dlna'), 1);
+
+        foreach (['', '&scope=dlna', '&scope=all'] as $scope) {
+            $byName = $this->getJson('/api/library/artists?sort=name'.$scope)->assertOk()->json('data');
+            $byPlays = $this->getJson('/api/library/artists?sort=plays'.$scope)->assertOk()->json('data');
+            $this->assertSame(
+                collect($byName)->sortBy('id')->values()->all(),
+                collect($byPlays)->sortBy('id')->values()->all(),
+                "items differ for scope [$scope]"
+            );
+        }
+
+        $dlna = collect($this->getJson('/api/library/artists?sort=plays&scope=dlna')->json('data'))->keyBy('name');
+        $this->assertSame(2, $dlna['Alpha']['album_count']);
+        $this->assertTrue($dlna['Alpha']['favorite']);
+        $all = collect($this->getJson('/api/library/artists?sort=plays&scope=all')->json('data'))->keyBy('name');
+        $this->assertSame(3, $all['Alpha']['album_count']);
+    }
+
     public function test_artists_by_plays_page_stably_across_the_page_boundary(): void
     {
         foreach (range(1, 55) as $i) {

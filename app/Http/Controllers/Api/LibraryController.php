@@ -89,8 +89,8 @@ class LibraryController extends Controller
             LibrarySources::tracks($plays, $hidden);
             $plays->selectRaw('albums.artist_id, COUNT(plays.id) AS plays_total')->groupBy('albums.artist_id');
 
-            $query->select('artists.*')
-                ->leftJoinSub($plays, 'artist_plays', 'artist_plays.artist_id', '=', 'artists.id')
+            // No select() here: it would replace the albums_count subselect that artistItems() added.
+            $query->leftJoinSub($plays, 'artist_plays', 'artist_plays.artist_id', '=', 'artists.id')
                 ->orderByRaw('COALESCE(artist_plays.plays_total, 0) DESC');
         }
 
