@@ -126,20 +126,32 @@
                     </button>
                 @endif
 
-                {{-- Progress. A waveform can replace the bar inside this slot later. --}}
+                {{-- Progress: the track's waveform (own audio file, analysed) with the played part in the accent, else a plain bar --}}
                 @if($isActive && $duration > 0)
                     <div wire:key="bar-progress-{{ $device->id }}-{{ $position }}-{{ $isPlaying ? 1 : 0 }}"
                          x-data="progressTicker({{ $device->id }}, {{ $position }}, {{ $duration }}, {{ $isPlaying ? 'true' : 'false' }})"
                          class="player-progress" style="flex:1;min-width:6rem;margin-left:.5rem;display:flex;align-items:center;gap:.6rem;font-size:.7rem;font-variant-numeric:tabular-nums">
                         <span style="opacity:.75;min-width:2.2rem;text-align:right" x-text="elapsed">{{ \App\Domain\Helpers\TimeHelper::secondsToMinutes($position) }}</span>
-                        <div @if($seekable) @click.stop="seekTo($event)" @endif
-                             style="flex:1;padding:.6rem 0;position:relative;{{ $seekable ? 'cursor:pointer' : '' }}">
-                            <div style="height:.25rem;border-radius:9999px;background:rgba(255,255,255,.28)">
-                                <div :style="{ width: pct + '%' }" style="height:100%;background:{{ $accent }};border-radius:9999px;position:relative;width:{{ min(100, (int) ($position / $duration * 100)) }}%">
-                                    <span style="position:absolute;right:-.3rem;top:50%;width:.6rem;height:.6rem;margin-top:-.3rem;border-radius:9999px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></span>
+                        @if($waveform)
+                            <div @if($seekable) @click.stop="seekTo($event)" @endif
+                                 style="flex:1;position:relative;height:2rem;{{ $seekable ? 'cursor:pointer' : '' }}">
+                                <x-waveform :points="$waveform" :height="32" :opacity="0.35" style="position:absolute;inset:0;width:100%;height:100%;color:#fff" />
+                                {{-- the played part: the same waveform in the accent, clipped to the progress --}}
+                                <div style="position:absolute;inset:0;color:{{ $accent }};clip-path:inset(0 {{ 100 - min(100, (int) ($position / $duration * 100)) }}% 0 0)"
+                                     :style="{ clipPath: 'inset(0 ' + (100 - pct) + '% 0 0)' }">
+                                    <x-waveform :points="$waveform" :height="32" :opacity="1" style="width:100%;height:100%;display:block" />
                                 </div>
                             </div>
-                        </div>
+                        @else
+                            <div @if($seekable) @click.stop="seekTo($event)" @endif
+                                 style="flex:1;padding:.6rem 0;position:relative;{{ $seekable ? 'cursor:pointer' : '' }}">
+                                <div style="height:.25rem;border-radius:9999px;background:rgba(255,255,255,.28)">
+                                    <div :style="{ width: pct + '%' }" style="height:100%;background:{{ $accent }};border-radius:9999px;position:relative;width:{{ min(100, (int) ($position / $duration * 100)) }}%">
+                                        <span style="position:absolute;right:-.3rem;top:50%;width:.6rem;height:.6rem;margin-top:-.3rem;border-radius:9999px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
                         <span style="opacity:.75;min-width:2.2rem">{{ \App\Domain\Helpers\TimeHelper::secondsToMinutes($duration) }}</span>
                     </div>
                 @elseif($isActive)

@@ -1,4 +1,4 @@
-@props(['points', 'height' => 36])
+@props(['points', 'height' => 36, 'opacity' => 0.6])
 
 {{-- A track's waveform as one path of vertical strokes; viewBox units are the points, so it scales to any width. --}}
 @php
@@ -12,5 +12,5 @@
 @endphp
 <svg viewBox="0 0 {{ $count }} {{ $height }}" preserveAspectRatio="none" role="img" aria-label="Waveform"
      {{ $attributes->merge(['style' => "width:100%;height:{$height}px;display:block"]) }}>
-    <path d="{{ $d }}" stroke="currentColor" stroke-width="0.7" stroke-linecap="round" fill="none" opacity="0.6" />
+    <path d="{{ $d }}" stroke="currentColor" stroke-width="0.7" stroke-linecap="round" fill="none" opacity="{{ $opacity }}" />
 </svg>

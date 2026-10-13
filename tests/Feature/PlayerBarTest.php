@@ -152,4 +152,24 @@ class PlayerBarTest extends TestCase
             ['devices' => $devices]
         );
     }
+
+    public function test_bar_draws_the_waveform_of_a_playing_local_track(): void
+    {
+        $device = $this->makeDevice('Kitchen');
+        cache()->put("listener_running_{$device->id}", true, 60);
+        $artist = \App\Models\Media\Artist::create(['name' => 'Wave Artist', 'source' => 'dlna']);
+        $track = \App\Models\Media\Track::create(['name' => 'Wave Song', 'artist_id' => $artist->id, 'source' => 'dlna', 'duration' => 200]);
+        $location = \App\Models\StorageLocation::create(['name' => 'Music', 'driver' => 'local', 'config' => ['root' => sys_get_temp_dir()], 'role' => 'library']);
+        $file = \App\Models\File::create(['storage_location_id' => $location->id, 'path' => 'w.flac', 'hash' => 'w1', 'size' => 1, 'mtime' => 1, 'status' => \App\Models\File::PRESENT, 'extension' => 'flac']);
+        \App\Models\TrackFile::create(['track_id' => $track->id, 'file_id' => $file->id, 'role' => \App\Models\TrackFile::ORIGINAL, 'is_primary' => true]);
+        \App\Models\FileAnalysis::create(['file_id' => $file->id, 'content_hash' => 'w1', 'waveform' => [10, 50, 100, 50, 10]]);
+
+        DeviceCache::updateNowPlaying($device->id, new \App\Domain\Media\NowPlaying(
+            track: new \App\Domain\Media\TrackData(name: 'Wave Song', artist: new \App\Domain\Media\ArtistData(name: 'Wave Artist'), duration: 200),
+        ));
+
+        Livewire::withCookie(SelectedDevice::COOKIE, (string) $device->id)
+            ->test(PlayerBar::class)
+            ->assertSee('aria-label="Waveform"', false);
+    }
 }
