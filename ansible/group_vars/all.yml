@@ -65,6 +65,11 @@ proxmox_library_size: 200
 music_host_path: "{{ proxmox_music_host_path or ((proxmox_nfs_mount_base ~ '/music') if proxmox_music_nfs else '') }}"
 library_host_path: "{{ proxmox_library_host_path or ((proxmox_nfs_mount_base ~ '/library') if proxmox_library_nfs else '') }}"
 
+# Default-queue workers in the app container (artwork, enrichment, history, scans). More workers
+# drain a big backlog faster (e.g. after the first library scan) but each takes RAM and CPU; the
+# analysis worker is always one. Takes effect on the next deploy.
+queue_workers: 2
+
 # --- Integrations (env.j2) ---------------------------------------------------------
 # User-Agent for MusicBrainz, Wikipedia and the other metadata APIs; they ask for a contact address.
 metadata_user_agent: "ReMoment/1.0 (remko@pionect.nl)"

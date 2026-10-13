@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Health\Heartbeat;
+use App\Domain\Health\QueueWatchdog;
 use App\Jobs\QueueHeartbeat;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -31,3 +32,6 @@ Schedule::call(function () {
     Heartbeat::beat(Heartbeat::SCHEDULER);
     QueueHeartbeat::dispatch();
 })->everyMinute()->name('health-heartbeat');
+
+// Kills a hung default-queue worker so supervisor starts a new one (a stale queue beat while the scheduler beats).
+Schedule::call(fn () => (new QueueWatchdog)->run())->everyMinute()->name('queue-watchdog');

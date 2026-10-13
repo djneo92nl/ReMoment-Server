@@ -15,6 +15,7 @@ services:
             WWWUSER: '${WWWUSER:-1000}'
             SUPERVISOR_PHP_USER: 'sail'
             APP_PORT: '${APP_PORT:-80}'
+            QUEUE_WORKERS: '${QUEUE_WORKERS:-1}'
             XDEBUG_MODE: 'off'
         volumes:
             - '.:/var/www/html'

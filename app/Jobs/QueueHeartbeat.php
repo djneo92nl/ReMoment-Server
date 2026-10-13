@@ -11,6 +11,12 @@ class QueueHeartbeat implements ShouldQueue
 {
     use Dispatchable, Queueable;
 
+    /** Its own queue, polled first by the default worker, so a backlog of real jobs can't make the worker look dead. */
+    public function __construct()
+    {
+        $this->onQueue('health');
+    }
+
     public function handle(): void
     {
         Heartbeat::beat(Heartbeat::QUEUE);
