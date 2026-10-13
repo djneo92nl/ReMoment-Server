@@ -2,6 +2,8 @@
 
 namespace App\Domain\Storage;
 
+use App\Domain\Analysis\AudioAnalysis;
+use App\Domain\Library\Enrichment;
 use App\Domain\Library\LibraryRemover;
 use App\Models\File;
 use App\Models\Media\Metadata;
@@ -53,6 +55,8 @@ class LibraryFiles
      * Indexes everything in the inbox and moves it into the library. With $keepSource the files are copied
      * and verified but stay in the inbox; a later import skips those whose content is already in the library.
      *
+     * Then queues enrichment and analysis for a batch of the new tracks, as a scan does.
+     *
      * @return int files moved (copied)
      */
     public function importInbox(bool $keepSource = false): int
@@ -73,6 +77,11 @@ class LibraryFiles
                 $this->place($file, $library, $keepSource);
                 $moved++;
             }
+        }
+
+        if ($moved > 0) { // like a scan: a bounded batch now, the daily jobs work off the rest
+            Enrichment::queueBacklog(Enrichment::SCAN_BATCH);
+            AudioAnalysis::queueBacklog((int) config('analysis.scan_batch'));
         }
 
         return $moved;

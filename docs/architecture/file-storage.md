@@ -33,7 +33,7 @@ Albums indexed before this existed, or retagged since, are filled by `php artisa
 
 ## Queued tasks and the settings page
 
-Scanning, importing the inbox and reorganizing can take long, so the web UI and `?queue=1` run them on the queue (`App\Jobs\RunStorageTask`, one per kind, per location for scans; `ShouldBeUnique`). `App\Domain\Storage\StorageTasks` queues them and keeps their state (`queued` | `running` | `done` | `failed`, a summary message, progress while scanning) in the cache for a day; a task queued or running for over two hours counts as lost (no worker) and can be queued again. The queue worker must be running (`composer dev`, supervisor).
+Scanning, importing the inbox and reorganizing can take long, so the web UI and `?queue=1` run them on the queue (`App\Jobs\RunStorageTask`, one per kind, per location for scans; `ShouldBeUnique`). `App\Domain\Storage\StorageTasks` queues them and keeps their state (`queued` | `running` | `done` | `failed`, a summary message, progress while scanning) in the cache for a day; a task queued or running for over two hours counts as lost (no worker) and can be queued again. The queue worker must be running (`composer dev`, supervisor). An import (like a scan) ends by queueing enrichment and audio analysis for a bounded batch of the new tracks (`Enrichment::SCAN_BATCH`, `analysis.scan_batch`); the daily `library:enrich` / `library:analyze` work off the rest.
 
 `/settings/storage` (admin login; Livewire `StorageManager` + `StorageFiles`):
 - add/edit/remove locations (local folder must exist on the server; S3 key and secret are never sent back to the browser: leave blank to keep), test reachability;
