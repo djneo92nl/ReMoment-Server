@@ -34,6 +34,8 @@ final class SmartField
         public readonly Closure $apply,
         private readonly ?Closure $options = null,
         public readonly string $unit = '',
+        /** A number field that may be negative (loudness in LUFS). */
+        public readonly bool $signed = false,
     ) {}
 
     /** @return array<string, string> */
@@ -60,7 +62,7 @@ final class SmartField
         }
 
         return match ($this->type) {
-            self::NUMBER => is_numeric($value) && $value >= 0 ? (int) $value : null,
+            self::NUMBER => is_numeric($value) && ($this->signed || $value >= 0) ? (int) $value : null,
             self::SELECT => is_scalar($value) && isset($this->options()[(string) $value]) ? (string) $value : null,
             default => is_string($value) && trim($value) !== '' ? mb_substr(trim($value), 0, 100) : null,
         };

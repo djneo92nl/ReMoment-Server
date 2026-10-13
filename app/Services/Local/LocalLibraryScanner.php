@@ -2,6 +2,7 @@
 
 namespace App\Services\Local;
 
+use App\Domain\Analysis\AudioAnalysis;
 use App\Domain\Library\Enrichment;
 use App\Domain\Storage\FileIndexer;
 use App\Domain\Storage\FileStore;
@@ -50,6 +51,7 @@ class LocalLibraryScanner
 
         $location->update(['last_scanned_at' => now()]);
         Enrichment::queueBacklog(Enrichment::SCAN_BATCH);
+        AudioAnalysis::queueBacklog((int) config('analysis.scan_batch'));
 
         return $handled;
     }

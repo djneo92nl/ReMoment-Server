@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /** A stored file; the bytes live on its StorageLocation. Tracks reach it through track_files. */
 class File extends Model
@@ -37,6 +38,11 @@ class File extends Model
     public function trackFiles(): HasMany
     {
         return $this->hasMany(TrackFile::class);
+    }
+
+    public function analysis(): HasOne
+    {
+        return $this->hasOne(FileAnalysis::class);
     }
 
     public function tracks(): BelongsToMany

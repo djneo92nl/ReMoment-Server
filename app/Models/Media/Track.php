@@ -3,12 +3,15 @@
 namespace App\Models\Media;
 
 use App\Domain\Library\Normalizer;
+use App\Models\FileAnalysis;
 use App\Models\Media\Concerns\HasGenres;
 use App\Models\Media\Concerns\ReadsMetadata;
 use App\Models\Play;
+use App\Models\TrackFile;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Track extends Model
@@ -68,6 +71,13 @@ class Track extends Model
     public function trackFiles(): HasMany
     {
         return $this->hasMany(\App\Models\TrackFile::class);
+    }
+
+    /** What the server computed from this track's primary file (loudness, BPM, key, …), when it has been analysed. */
+    public function analysis(): HasOneThrough
+    {
+        return $this->hasOneThrough(FileAnalysis::class, TrackFile::class, 'track_id', 'file_id', 'id', 'file_id')
+            ->where('track_files.is_primary', true);
     }
 
     public function metadata(): MorphMany
@@ -182,6 +192,45 @@ class Track extends Model
             'popularity' => $this->metaInt('spotify_popularity'),
             'listeners' => $this->metaInt('lastfm_listeners'),
             'playcount' => $this->metaInt('lastfm_playcount'),
+            'analysis' => $this->sound(),
         ];
+    }
+
+    /**
+     * What the server computed from the track's own audio file (App\Domain\Analysis): loudness, ReplayGain,
+     * BPM, key, danceability, mood, …; null while it has no analysed file. Fractions are 0–1.
+     */
+    public function sound(): ?array
+    {
+        $a = $this->relationLoaded('analysis') ? $this->analysis : $this->analysis()->first();
+
+        if ($a === null) {
+            return null;
+        }
+
+        return [
+            'bpm' => $a->bpm !== null ? round($a->bpm, 1) : null,
+            'key' => $a->key,
+            'mode' => $a->mode,
+            'loudness' => $a->loudness_lufs,
+            'loudness_range' => $a->loudness_range,
+            'true_peak' => $a->true_peak,
+            'replaygain_track_gain' => $a->replaygain_track_gain,
+            'replaygain_album_gain' => $a->replaygain_album_gain,
+            'danceability' => $a->danceability,
+            'arousal' => $a->arousal,
+            'valence' => $a->valence,
+            'instrumental' => $a->instrumental,
+            'mood' => array_column($a->mood_tags ?? [], 'name'),
+            'recording_mbid' => $a->acoustid_recording_mbid,
+        ];
+    }
+
+    /** The MusicBrainz recording id: the one found by name or by audio fingerprint (not the tag's release-track id). */
+    public function recordingMbid(): ?string
+    {
+        $rows = $this->relationLoaded('metadata') ? $this->metadata : $this->metadata()->where('key', 'mbid')->get();
+
+        return $rows->first(fn ($m) => $m->key === 'mbid' && in_array($m->source, ['musicbrainz', 'acoustid'], true))?->value;
     }
 }

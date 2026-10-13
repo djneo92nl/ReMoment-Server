@@ -32,6 +32,7 @@ docs/
     ase-api-map.md          What the B&O ASE REST API offers beyond the driver (Bluetooth, network, WiSA, sound), per model; the ase:map command
     proxmox-deployment.md   Ansible: LXC container on an existing Proxmox host, MiniDLNA server
     discovery-for-clients.md mDNS advertisement (_remoment._tcp via host Avahi) so clients find the server
+    audio-analysis.md       Analysis of the own audio files: loudness, ReplayGain, Chromaprint/AcoustID, Essentia sidecar (BPM, key, mood), `analysis` queue, library:analyze, smart fields
     metadata-enrichment.md  Per-source enrichment jobs (MusicBrainz track/artist/album, Wikipedia, Cover Art Archive, lyrics, Spotify, Last.fm, TheAudioDB, Discogs), DLNA tags, canonical genres: markers, retries, rate limits, library:enrich
     file-storage.md          Own music files: storage locations (local/S3), files + track_files tables, indexer, organizer, management, /stream, admin API
     lastfm.md                Scrobbling, now-playing, auth flow, artist enrichment, backfill
@@ -86,6 +87,9 @@ php artisan library:scan [--server=192.168.1.20] [--root=Muziek]   # --root: sta
 
 # Queue MusicBrainz/lyrics/Spotify/Last.fm/TheAudioDB/Discogs enrichment for tracks, artists and albums still missing a source, plus Spotify photos for artists without one (scheduled daily; artists with a Spotify id are fetched 50 per request, others looked up by exact name). --only=metadata|artist-images runs one part
 php artisan library:enrich [--only=metadata --only=artist-images] [--limit=200] [--dry-run]
+
+# Audio analysis of the own files (loudness, fingerprint + AcoustID, BPM/key/mood via the optional Essentia sidecar); needs ANALYSIS_ENABLED=true, runs on the `analysis` queue (scheduled nightly). --now with --file runs inline
+php artisan library:analyze [--limit=100] [--stage=loudness|fingerprint|acoustid|essentia] [--file=ID --now] [--dry-run]
 
 # Re-select the tracks of smart (rule-based) playlists (scheduled daily)
 php artisan playlists:refresh-smart [--playlist=ID]

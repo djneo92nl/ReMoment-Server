@@ -73,10 +73,24 @@ services:
         networks:
             - sail
 
+    # Opt-in audio analysis (BPM, key, mood): docker compose --profile analysis up -d, then set
+    # ANALYSIS_ENABLED=true and ANALYSIS_ESSENTIA_URL=http://analysis:8090 (docs/architecture/audio-analysis.md).
+    analysis:
+        profiles: [analysis]
+        build:
+            context: './docker/analysis'
+            args:
+                ESSENTIA_ML: '${ANALYSIS_ESSENTIA_ML_BUILD:-0}'
+        volumes:
+            - 'sail-analysis-models:/models'
+        networks:
+            - sail
+
 networks:
     sail:
         driver: bridge
 volumes:
+    sail-analysis-models:
     sail-redis:
         driver: local
     sail-meilisearch:

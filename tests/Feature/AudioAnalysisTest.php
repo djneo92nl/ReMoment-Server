@@ -1,0 +1,370 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Domain\Analysis\AudioAnalysis;
+use App\Domain\Analysis\Stages\EssentiaStage;
+use App\Domain\Analysis\Stages\LoudnessStage;
+use App\Domain\Analysis\Tools;
+use App\Domain\Library\Enrichment;
+use App\Domain\Library\LibraryMerger;
+use App\Domain\Storage\FileIndexer;
+use App\Jobs\AnalyzeAudioFile;
+use App\Jobs\EnrichTrackMusicBrainz;
+use App\Models\File;
+use App\Models\FileAnalysis;
+use App\Models\Media\Album;
+use App\Models\Media\Artist;
+use App\Models\Media\Track;
+use App\Models\StorageLocation;
+use App\Models\TrackFile;
+use Illuminate\Filesystem\Filesystem;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Process\PendingProcess;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Sleep;
+use Tests\TestCase;
+
+/** Audio analysis of the own files: stages, the job, the backlog, what it does for the library, and where it shows. */
+class AudioAnalysisTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private const EBUR128 = <<<'TXT'
+        [Parsed_ebur128_0 @ 0x1] t: 3.0 TARGET:-23 LUFS M: -20.1 S: -22.0 I: -21.5 LUFS LRA: 0.0 LU FTPK: -1.0 dBFS TPK: -1.0 dBFS
+        [Parsed_ebur128_0 @ 0x1] Summary:
+
+          Integrated loudness:
+            I:         -14.1 LUFS
+            Threshold: -24.2 LUFS
+
+          Loudness range:
+            LRA:         6.4 LU
+            Threshold:  -34.2 LUFS
+            LRA low:    -18.0 LUFS
+            LRA high:   -11.6 LUFS
+
+          True peak:
+            Peak:        -0.5 dBFS
+        TXT;
+
+    private string $dir;
+
+    private bool $ffmpegFails = false;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Tools::forget();
+        Http::preventStrayRequests();
+        config(['analysis.enabled' => true, 'analysis.acoustid_key' => 'key', 'analysis.essentia_url' => null]);
+
+        $this->dir = sys_get_temp_dir().'/remoment-analysis-'.uniqid();
+        mkdir($this->dir);
+
+        Process::fake(function (PendingProcess $process) {
+            $command = is_array($process->command) ? implode(' ', $process->command) : (string) $process->command;
+
+            return match (true) {
+                str_contains($command, '-version') => Process::result("tool version 1.0\n"),
+                str_contains($command, 'ebur128') => $this->ffmpegFails
+                    ? Process::result('', 'song.flac: Invalid data found when processing input', 1)
+                    : Process::result('', self::EBUR128),
+                str_contains($command, 'fpcalc') => Process::result(json_encode(['duration' => 241.3, 'fingerprint' => 'AQADtEmS'])),
+                str_contains($command, '-f wav') => Process::result(''),
+                default => Process::result('', "unexpected: {$command}", 1),
+            };
+        });
+    }
+
+    protected function tearDown(): void
+    {
+        (new Filesystem)->deleteDirectory($this->dir);
+        Tools::forget();
+
+        parent::tearDown();
+    }
+
+    /** @return array{0: File, 1: Track} an indexed local file with its track */
+    private function localTrack(string $name = 'Song', string $hash = 'h1', ?Album $album = null): array
+    {
+        $location = StorageLocation::first() ?? StorageLocation::create(['name' => 'Music', 'driver' => 'local', 'config' => ['root' => $this->dir], 'role' => 'library']);
+        $artist = Artist::firstOrCreate(['name' => 'Band'], ['source' => 'dlna']);
+        $album ??= Album::firstOrCreate(['artist_id' => $artist->id, 'name' => 'LP'], ['source' => 'dlna']);
+
+        file_put_contents("{$this->dir}/{$name}.flac", 'not really audio');
+        $file = File::create([
+            'storage_location_id' => $location->id, 'path' => "{$name}.flac", 'hash' => $hash, 'size' => 16, 'mtime' => 1,
+            'status' => File::PRESENT, 'extension' => 'flac',
+        ]);
+        $track = Track::create(['artist_id' => $artist->id, 'album_id' => $album->id, 'name' => $name, 'duration' => 200, 'source' => 'dlna', 'external_id' => "local:file:{$file->id}"]);
+        TrackFile::create(['track_id' => $track->id, 'file_id' => $file->id, 'role' => TrackFile::ORIGINAL, 'is_primary' => true]);
+        Enrichment::save($track, 'dlna_url', url('/stream/'.$track->id), 'url', FileIndexer::URL_SOURCE);
+
+        return [$file, $track];
+    }
+
+    private function fakeAcoustId(float $score = 0.97): void
+    {
+        Http::fake(['api.acoustid.org/*' => Http::response([
+            'status' => 'ok',
+            'results' => [['id' => 'ac-1', 'score' => $score, 'recordings' => [['id' => 'rec-1']]]],
+        ])]);
+    }
+
+    public function test_loudness_summary_is_parsed_from_the_last_block(): void
+    {
+        $this->assertSame(
+            ['loudness_lufs' => -14.1, 'loudness_range' => 6.4, 'true_peak' => -0.5],
+            LoudnessStage::parseSummary(self::EBUR128),
+        );
+
+        $this->expectException(\RuntimeException::class);
+        LoudnessStage::parseSummary("Summary:\n\n  Integrated loudness:\n    I:         -inf LUFS\n");
+    }
+
+    public function test_the_job_runs_every_stage_and_the_library_uses_the_result(): void
+    {
+        $this->fakeAcoustId();
+        [$file, $track] = $this->localTrack();
+
+        AnalyzeAudioFile::dispatchSync($file);
+
+        $analysis = $file->analysis()->first();
+        $this->assertSame('h1', $analysis->content_hash);
+        $this->assertSame(-14.1, $analysis->loudness_lufs);
+        $this->assertSame(6.4, $analysis->loudness_range);
+        $this->assertSame('AQADtEmS', $analysis->fingerprint);
+        $this->assertSame(241, $analysis->fingerprint_duration);
+        $this->assertSame('rec-1', $analysis->acoustid_recording_mbid);
+        $this->assertEqualsCanonicalizing(['loudness', 'fingerprint', 'acoustid'], array_keys($analysis->stages), 'no Essentia sidecar configured');
+        $this->assertSame([], $analysis->errors);
+
+        // The recording id becomes the track's mbid, from the source "acoustid".
+        $this->assertSame('rec-1', $track->metadata()->where('key', 'mbid')->where('source', 'acoustid')->value('value'));
+        $this->assertSame('rec-1', $track->recordingMbid());
+        $this->assertSame(0, AudioAnalysis::pending()->count());
+    }
+
+    public function test_a_weak_acoustid_match_is_no_match(): void
+    {
+        $this->fakeAcoustId(0.5);
+        [$file, $track] = $this->localTrack();
+
+        AnalyzeAudioFile::dispatchSync($file);
+
+        $analysis = $file->analysis()->first();
+        $this->assertNull($analysis->acoustid_recording_mbid);
+        $this->assertNotNull($analysis->stageVersion('acoustid'), 'an answer without a match is a result');
+        $this->assertSame(0, $track->metadata()->where('source', 'acoustid')->count());
+    }
+
+    public function test_a_failing_stage_does_not_stop_the_others_and_is_retried_until_it_gives_up(): void
+    {
+        $this->fakeAcoustId();
+        $this->ffmpegFails = true;
+        [$file] = $this->localTrack();
+
+        AnalyzeAudioFile::dispatchSync($file);
+
+        $analysis = $file->analysis()->first();
+        $this->assertNull($analysis->loudness_lufs);
+        $this->assertStringContainsString('could not decode', $analysis->errors['loudness']['message']);
+        $this->assertSame(1, $analysis->errors['loudness']['attempts']);
+        $this->assertSame('rec-1', $analysis->acoustid_recording_mbid, 'the fingerprint stages still ran');
+
+        $this->assertSame(1, AudioAnalysis::pending()->count(), 'the failed stage is still to do');
+
+        AnalyzeAudioFile::dispatchSync($file);
+        AnalyzeAudioFile::dispatchSync($file);
+        $this->assertSame(3, $file->analysis()->first()->errors['loudness']['attempts']);
+        $this->assertSame(0, AudioAnalysis::pending()->count(), 'after max_attempts the backlog leaves it alone');
+
+        $this->ffmpegFails = false;
+        $analysis = $file->analysis()->first();
+        $analysis->forceFill(['stages' => array_merge($analysis->stages, ['loudness' => ['version' => '0']])]);
+        $this->assertTrue($analysis->gaveUp('loudness', '1'));
+    }
+
+    public function test_a_stage_version_change_and_a_changed_file_bring_a_file_back(): void
+    {
+        $this->fakeAcoustId();
+        [$file] = $this->localTrack();
+        AnalyzeAudioFile::dispatchSync($file);
+        $this->assertSame(0, AudioAnalysis::pending()->count());
+
+        $analysis = $file->analysis()->first();
+        $stages = $analysis->stages;
+        $stages['loudness']['version'] = '0';
+        $analysis->update(['stages' => $stages]);
+        $this->assertSame(1, AudioAnalysis::pending(only: 'loudness')->count());
+        $this->assertSame(0, AudioAnalysis::pending(only: 'fingerprint')->count(), 'only that stage is stale');
+
+        AnalyzeAudioFile::dispatchSync($file, 'loudness');
+        $this->assertSame(0, AudioAnalysis::pending()->count());
+
+        $file->update(['hash' => 'changed']);
+        $this->assertSame(1, AudioAnalysis::pending()->count());
+
+        AnalyzeAudioFile::dispatchSync($file->fresh());
+        $this->assertSame('changed', $file->analysis()->first()->content_hash);
+    }
+
+    public function test_missing_files_and_files_without_a_track_are_not_analysed(): void
+    {
+        [$gone] = $this->localTrack('Gone', 'h-gone');
+        $gone->update(['status' => File::MISSING]);
+        $orphan = File::create(['storage_location_id' => $gone->storage_location_id, 'path' => 'orphan.flac', 'hash' => 'h2', 'size' => 1, 'mtime' => 1, 'status' => File::PRESENT]);
+
+        $this->assertSame(0, AudioAnalysis::pending()->count());
+        $this->assertNotNull($orphan);
+    }
+
+    public function test_essentia_results_are_stored_and_flats_become_sharps(): void
+    {
+        config(['analysis.essentia_url' => 'http://analysis:8090']);
+        Http::fake([
+            'analysis:8090/analyze' => Http::response([
+                'bpm' => 123.46, 'key' => 'Bb', 'mode' => 'minor', 'key_strength' => 0.8, 'danceability' => 1.4,
+                'mood_tags' => [['name' => 'happy', 'score' => 0.91234]], 'genre_tags' => [['name' => 'Trip Hop', 'score' => 0.4]],
+            ]),
+            'api.acoustid.org/*' => Http::response(['status' => 'ok', 'results' => []]),
+        ]);
+        [$file, $track] = $this->localTrack();
+
+        AnalyzeAudioFile::dispatchSync($file);
+
+        $analysis = $file->analysis()->first();
+        $this->assertSame(123.5, $analysis->bpm);
+        $this->assertSame('A#', $analysis->key);
+        $this->assertSame('minor', $analysis->mode);
+        $this->assertSame(1.0, $analysis->danceability, 'clamped to 0–1');
+        $this->assertSame([['name' => 'happy', 'score' => 0.912]], $analysis->mood_tags);
+        $this->assertSame('1', $analysis->stageVersion('essentia'));
+        Http::assertSent(fn ($request) => $request->url() === 'http://analysis:8090/analyze');
+
+        // Classifier genres only stand in while the track has none.
+        $this->assertSame(['Trip Hop'], $track->genres());
+    }
+
+    public function test_the_ml_flag_is_part_of_the_essentia_version(): void
+    {
+        $this->assertSame('1', (new EssentiaStage)->version());
+        config(['analysis.essentia_ml' => true]);
+        $this->assertSame('1+ml', (new EssentiaStage)->version());
+    }
+
+    public function test_features_the_sidecar_did_not_compute_are_left_out(): void
+    {
+        $this->assertSame(['bpm' => 120.0], EssentiaStage::attributes(['bpm' => 120, 'mode' => 'weird', 'mood_tags' => []]));
+    }
+
+    public function test_the_command_queues_on_the_analysis_queue_and_respects_the_switch(): void
+    {
+        Queue::fake();
+        [$a] = $this->localTrack('A', 'ha');
+        $this->localTrack('B', 'hb');
+
+        config(['analysis.enabled' => false]);
+        $this->artisan('library:analyze')->expectsOutputToContain('Audio analysis is off')->assertSuccessful();
+        Queue::assertNothingPushed();
+
+        config(['analysis.enabled' => true]);
+        $this->artisan('library:analyze --dry-run')->expectsOutputToContain('2 file(s) still need analysis')->assertSuccessful();
+
+        $this->artisan('library:analyze --limit=1')->expectsOutputToContain('Queued analysis of 1 file(s)')->assertSuccessful();
+        Queue::assertPushedOn('analysis', AnalyzeAudioFile::class);
+        Queue::assertPushed(AnalyzeAudioFile::class, 1);
+
+        $this->artisan('library:analyze --stage=nonsense')->assertFailed();
+        $this->assertNotNull($a);
+    }
+
+    public function test_analysis_shows_in_track_details_the_api_and_the_album_page(): void
+    {
+        [$file, $track] = $this->localTrack();
+        FileAnalysis::create([
+            'file_id' => $file->id, 'content_hash' => 'h1', 'bpm' => 124.0, 'key' => 'A', 'mode' => 'minor', 'loudness_lufs' => -9.2,
+            'danceability' => 0.8, 'instrumental' => 0.9, 'mood_tags' => [['name' => 'relaxed', 'score' => 0.7]], 'acoustid_recording_mbid' => 'rec-1',
+        ]);
+
+        $sound = $track->fresh()->sound();
+        $this->assertSame(124.0, $sound['bpm']);
+        $this->assertSame(['relaxed'], $sound['mood']);
+        $this->assertSame('rec-1', $sound['recording_mbid']);
+
+        $this->getJson("/api/library/albums/{$track->album_id}")->assertOk()
+            ->assertJsonPath('tracks.0.details.analysis.bpm', 124)
+            ->assertJsonPath('tracks.0.details.analysis.key', 'A')
+            ->assertJsonPath('tracks.0.details.analysis.loudness', -9.2);
+
+        $this->get("/albums/{$track->album_id}")->assertOk()
+            ->assertSee('124 BPM · A minor · -9.2 LUFS')->assertSee('relaxed')->assertSee('80%')->assertSee('instrumental');
+
+        $other = Track::create(['artist_id' => $track->artist_id, 'album_id' => $track->album_id, 'name' => 'Unanalysed', 'source' => 'dlna']);
+        $this->assertNull($other->sound());
+    }
+
+    public function test_recordings_with_the_same_acoustid_merge_and_different_ones_stay_apart(): void
+    {
+        [$fileA, $a] = $this->localTrack('Alpha', 'ha');
+        [$fileB, $b] = $this->localTrack('Beta', 'hb');
+        [, $c] = $this->localTrack('Gamma', 'hc');
+        [, $d] = $this->localTrack('Gamma2', 'hd');
+        $d->update(['name' => 'Gamma']);
+        $c->update(['name' => 'Gamma']);
+        foreach ([[$a, 'rec-1'], [$b, 'rec-1'], [$c, 'rec-live'], [$d, 'rec-studio']] as [$track, $mbid]) {
+            Enrichment::save($track, 'mbid', $mbid, 'string', Enrichment::ACOUSTID);
+        }
+
+        $merger = new LibraryMerger;
+        $plan = $merger->plan();
+        $this->assertSame([[$a->id, [$b->id]]], $plan['tracks'], 'one recording under two names merges; one name with two recordings does not');
+
+        $merger->merge($plan);
+
+        $this->assertNull(Track::find($b->id));
+        $this->assertNotNull(Track::find($c->id));
+        $this->assertNotNull(Track::find($d->id));
+    }
+
+    public function test_a_merged_track_keeps_its_files_and_stream_url(): void
+    {
+        $spotify = Track::create(['artist_id' => Artist::create(['name' => 'Band', 'source' => 'spotify'])->id, 'name' => 'Alpha', 'duration' => 200, 'source' => 'spotify', 'external_id' => 'spotify:track:a']);
+        [$file, $local] = $this->localTrack('Alpha', 'ha');
+        $this->assertGreaterThan($spotify->id, $local->id);
+
+        $merger = new LibraryMerger;
+        $merger->mergeTracks($spotify->id, [$local->id]);
+
+        $link = TrackFile::where('file_id', $file->id)->first();
+        $this->assertSame($spotify->id, $link->track_id, 'the file is not lost with its track');
+        $this->assertTrue($link->is_primary);
+        $this->assertSame(url('/stream/'.$spotify->id), $spotify->metadata()->where('key', 'dlna_url')->value('value'));
+    }
+
+    public function test_the_musicbrainz_job_looks_the_recording_up_directly_when_acoustid_named_it(): void
+    {
+        Sleep::fake();
+        Queue::fake();
+        Http::fake([
+            'musicbrainz.org/ws/2/recording/rec-1*' => Http::response([
+                'isrcs' => ['NLA000000001'],
+                'artist-credit' => [['artist' => ['id' => 'art-1']]],
+                'releases' => [['id' => 'rel-1', 'title' => 'LP']],
+            ]),
+        ]);
+        [, $track] = $this->localTrack();
+        Enrichment::save($track, 'mbid', 'rec-1', 'string', Enrichment::ACOUSTID);
+
+        (new EnrichTrackMusicBrainz($track))->handle();
+
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'query='));
+        $this->assertSame('NLA000000001', $track->metadata()->where('key', 'isrc')->value('value'));
+        $this->assertSame('art-1', $track->artist->metadata()->where('key', 'mbid')->value('value'));
+        $this->assertSame('rel-1', $track->album->metadata()->where('key', 'mbid')->value('value'));
+    }
+}

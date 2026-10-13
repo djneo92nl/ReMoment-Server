@@ -13,7 +13,7 @@ class AudioTags
     }
 
     /**
-     * @return array{artist:?string,album_artist:?string,album:?string,title:?string,year:?string,track_number:?int,disc_number:?int,genres:list<string>,mbid:?string,duration:?int,mime_type:?string,codec:?string,bitrate:?int,sample_rate:?int,bit_depth:?int,channels:?int}|null
+     * @return array{artist:?string,album_artist:?string,album:?string,title:?string,year:?string,track_number:?int,disc_number:?int,genres:list<string>,mbid:?string,duration:?int,mime_type:?string,codec:?string,bitrate:?int,sample_rate:?int,bit_depth:?int,channels:?int,replaygain_track_gain:?float,replaygain_album_gain:?float}|null
      */
     public static function read(string $localPath): ?array
     {
@@ -27,6 +27,7 @@ class AudioTags
         $tag = fn (string $key) => trim((string) ($info['comments'][$key][0] ?? '')) ?: null;
         $audio = $info['audio'];
         $int = fn ($v) => isset($v) && is_numeric($v) ? (int) round($v) : null;
+        $gain = fn ($v) => isset($v) && is_numeric($v) ? round((float) $v, 2) : null;
 
         return [
             'artist' => $tag('artist'),
@@ -45,6 +46,8 @@ class AudioTags
             'sample_rate' => $int($audio['sample_rate'] ?? null),
             'bit_depth' => $int($audio['bits_per_sample'] ?? null),
             'channels' => $int($audio['channels'] ?? null),
+            'replaygain_track_gain' => $gain($info['replay_gain']['track']['adjustment'] ?? null),
+            'replaygain_album_gain' => $gain($info['replay_gain']['album']['adjustment'] ?? null),
         ];
     }
 }

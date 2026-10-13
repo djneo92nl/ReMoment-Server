@@ -194,8 +194,14 @@
                                 $isrc = $track->metaValue('isrc');
                                 $popularity = $track->metaValue('spotify_popularity');
                                 $listeners = $track->metaInt('lastfm_listeners');
-                                $recordingMbid = $track->metaValue('mbid');
-                                $hasInfo = $quality || $credits || $trackGenres || $isrc || $popularity !== null || $listeners;
+                                $recordingMbid = $track->recordingMbid();
+                                $sound = $track->sound();
+                                $soundLine = $sound ? collect([
+                                    $sound['bpm'] ? round($sound['bpm']).' BPM' : null,
+                                    $sound['key'] ? $sound['key'].' '.$sound['mode'] : null,
+                                    $sound['loudness'] !== null ? number_format($sound['loudness'], 1).' LUFS' : null,
+                                ])->filter()->implode(' · ') : '';
+                                $hasInfo = $quality || $credits || $trackGenres || $isrc || $popularity !== null || $listeners || $soundLine !== '' || ($sound && $sound['mood']);
                             @endphp
                             <div id="track-{{ $track->id }}" class="scroll-mt-24" x-data="{ panel: null }" @if($localCount > 0 && !$dlnaUrl) x-show="!localOnly" @endif>
                                 @php
@@ -295,6 +301,18 @@
                                             @if($quality)
                                                 <dt class="text-gray-400 dark:text-gray-600">Quality</dt>
                                                 <dd class="text-gray-700 dark:text-gray-300">{{ $quality }}</dd>
+                                            @endif
+                                            @if($soundLine !== '')
+                                                <dt class="text-gray-400 dark:text-gray-600">Sound</dt>
+                                                <dd class="text-gray-700 dark:text-gray-300">{{ $soundLine }}</dd>
+                                            @endif
+                                            @if($sound && $sound['danceability'] !== null)
+                                                <dt class="text-gray-400 dark:text-gray-600">Danceability</dt>
+                                                <dd class="text-gray-700 dark:text-gray-300">{{ round($sound['danceability'] * 100) }}%{{ $sound['instrumental'] !== null ? ' · '.($sound['instrumental'] >= 0.5 ? 'instrumental' : 'vocals') : '' }}</dd>
+                                            @endif
+                                            @if($sound && $sound['mood'])
+                                                <dt class="text-gray-400 dark:text-gray-600">Mood</dt>
+                                                <dd class="text-gray-700 dark:text-gray-300">{{ implode(', ', $sound['mood']) }}</dd>
                                             @endif
                                             @foreach($credits as $role => $names)
                                                 <dt class="text-gray-400 dark:text-gray-600">{{ ucfirst($role) }}</dt>

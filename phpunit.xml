@@ -32,5 +32,11 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <!-- Keys in a developer's .env must not make tests talk to the real services. -->
+        <env name="LASTFM_API_KEY" value=""/>
+        <env name="DISCOGS_TOKEN" value=""/>
+        <env name="ACOUSTID_API_KEY" value=""/>
+        <env name="ANALYSIS_ENABLED" value="false"/>
+        <env name="ANALYSIS_ESSENTIA_URL" value=""/>
     </php>
 </phpunit>

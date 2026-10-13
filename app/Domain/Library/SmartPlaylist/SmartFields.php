@@ -33,6 +33,13 @@ final class SmartFields
     /** Mime types of lossless files, as a DLNA server reports them. */
     private const LOSSLESS = ['audio/flac', 'audio/x-flac', 'audio/wav', 'audio/x-wav', 'audio/aiff', 'audio/x-aiff'];
 
+    private const ATLEAST_ATMOST = ['gte' => 'at least', 'lte' => 'at most'];
+
+    private const KEYS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+    /** The moods the Essentia sidecar's classifiers name (docker/analysis). */
+    private const MOODS = ['happy', 'sad', 'aggressive', 'relaxed', 'party', 'acoustic', 'electronic'];
+
     /** @var array<string, SmartField>|null */
     private static ?array $fields = null;
 
@@ -56,6 +63,7 @@ final class SmartFields
             'operators' => $f->operators,
             'options' => $f->options(),
             'unit' => $f->unit,
+            'signed' => $f->signed,
         ], self::all());
     }
 
@@ -135,6 +143,41 @@ final class SmartFields
             new SmartField('duration', 'Length', SmartField::NUMBER, ['gte' => 'at least', 'lte' => 'at most'],
                 fn (Builder $q, string $op, $v) => $q->where('tracks.duration', self::COMPARE[$op], $v * 60), unit: 'minutes'),
 
+            // What the server computed from the own audio files (App\Domain\Analysis); tracks without an analysed file never match.
+            new SmartField('bpm', 'Tempo', SmartField::NUMBER, self::ATLEAST_ATMOST,
+                fn (Builder $q, string $op, $v) => $q->whereExists(fn ($s) => self::analysis($s)->where('file_analyses.bpm', self::COMPARE[$op], $v)), unit: 'BPM'),
+
+            new SmartField('danceability', 'Danceability', SmartField::NUMBER, self::ATLEAST_ATMOST,
+                fn (Builder $q, string $op, $v) => $q->whereExists(fn ($s) => self::analysis($s)->where('file_analyses.danceability', self::COMPARE[$op], $v / 100)), unit: '%'),
+
+            new SmartField('energy', 'Energy', SmartField::NUMBER, self::ATLEAST_ATMOST,
+                fn (Builder $q, string $op, $v) => $q->whereExists(fn ($s) => self::analysis($s)->where('file_analyses.arousal', self::COMPARE[$op], $v / 100)), unit: '%'),
+
+            new SmartField('positivity', 'Positivity (valence)', SmartField::NUMBER, self::ATLEAST_ATMOST,
+                fn (Builder $q, string $op, $v) => $q->whereExists(fn ($s) => self::analysis($s)->where('file_analyses.valence', self::COMPARE[$op], $v / 100)), unit: '%'),
+
+            new SmartField('loudness', 'Loudness', SmartField::NUMBER, self::ATLEAST_ATMOST,
+                fn (Builder $q, string $op, $v) => $q->whereExists(fn ($s) => self::analysis($s)->where('file_analyses.loudness_lufs', self::COMPARE[$op], $v)), unit: 'LUFS (e.g. -14)', signed: true),
+
+            new SmartField('musical_key', 'Key', SmartField::SELECT, self::IS,
+                fn (Builder $q, string $op, $v) => self::negatable($q, $op === 'is_not', fn ($w) => $w->whereExists(fn ($s) => self::analysis($s)->where('file_analyses.key', $v))),
+                fn () => array_combine(self::KEYS, self::KEYS)),
+
+            new SmartField('mode', 'Major or minor', SmartField::SELECT, self::IS,
+                fn (Builder $q, string $op, $v) => self::negatable($q, $op === 'is_not', fn ($w) => $w->whereExists(fn ($s) => self::analysis($s)->where('file_analyses.mode', $v))),
+                fn () => ['major' => 'major', 'minor' => 'minor']),
+
+            new SmartField('mood', 'Mood', SmartField::SELECT, self::IS,
+                fn (Builder $q, string $op, $v) => self::negatable($q, $op === 'is_not', fn ($w) => $w->whereExists(
+                    fn ($s) => self::analysis($s)->where('file_analyses.mood_tags', 'like', '%"name":"'.$v.'"%')
+                )),
+                fn () => array_combine(self::MOODS, self::MOODS)),
+
+            new SmartField('instrumental', 'Instrumental', SmartField::BOOL, self::YES_NO,
+                fn (Builder $q, string $op) => self::negatable($q, $op === 'no', fn ($w) => $w->whereExists(
+                    fn ($s) => self::analysis($s)->where('file_analyses.instrumental', '>=', 0.5)
+                ))),
+
             new SmartField('plays', 'Times played', SmartField::NUMBER, self::NUMBER,
                 fn (Builder $q, string $op, $v) => $q->whereRaw('(select count(*) from plays where plays.track_id = tracks.id) '.self::COMPARE[$op].' ?', [$v])),
 
@@ -178,6 +221,15 @@ final class SmartFields
             $from && $s->where('albums.released_at', '>=', $from);
             $to && $s->where('albums.released_at', '<', $to);
         });
+    }
+
+    /** The analysis of the track's primary file. */
+    private static function analysis(QueryBuilder $query): QueryBuilder
+    {
+        return $query->selectRaw('1')->from('file_analyses')
+            ->join('track_files', 'track_files.file_id', '=', 'file_analyses.file_id')
+            ->whereColumn('track_files.track_id', 'tracks.id')
+            ->where('track_files.is_primary', true);
     }
 
     /** A metadata row of $type / the id in $column with one of $keys. */

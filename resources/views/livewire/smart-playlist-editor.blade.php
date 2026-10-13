@@ -49,7 +49,7 @@
                                 @endforeach
                             </select>
                         @elseif($def['type'] === 'number')
-                            <input type="number" min="0" wire:model.live.debounce.500ms="rules.{{ $i }}.value" class="py-1.5 w-24 {{ $input }}">
+                            <input type="number" @unless($def['signed'] ?? false) min="0" @endunless wire:model.live.debounce.500ms="rules.{{ $i }}.value" class="py-1.5 w-24 {{ $input }}">
                             @if($def['unit'])
                                 <span class="text-sm text-gray-400 dark:text-gray-600">{{ $def['unit'] }}</span>
                             @endif

@@ -17,6 +17,9 @@ Schedule::command('artwork:prerender')->daily();
 Schedule::command('library:enrich')->daily();
 Schedule::command('playlists:refresh-smart')->daily();
 
+// Audio analysis (loudness, fingerprints, BPM/key/mood) of the own files; a bounded batch on its own queue, off by default (ANALYSIS_ENABLED).
+Schedule::command('library:analyze')->dailyAt('02:00');
+
 // Picks up files added, changed or removed outside the app in the storage locations (queued; see docs/architecture/file-storage.md).
 Schedule::command('library:scan-files --queue')->dailyAt('03:30');
 

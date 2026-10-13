@@ -46,7 +46,16 @@ A smart playlist (`playlists.source = 'smart'`) selects its tracks from the libr
 | `last_played` | played / not played in the last N days (never played counts as "not") |
 | `added` | added to the library in / not in the last N days |
 
-Not available yet (no stored data to select on): mood, BPM, energy.
+Computed from the own audio files (`file_analyses` of the track's primary file, see `docs/architecture/audio-analysis.md`; a track without an analysed file never matches a positive rule, while `is not` / `no` rules do match it):
+
+| Field | Looks at |
+|-------|----------|
+| `bpm` | tempo, at least / at most |
+| `danceability`, `energy`, `positivity` | 0–100 %, at least / at most (`danceability`, `arousal`, `valence`; energy and positivity need the ML tier of the Essentia sidecar) |
+| `loudness` | integrated loudness in LUFS (negative numbers, e.g. -14) |
+| `musical_key`, `mode` | key (C…B) and major / minor |
+| `mood` | one of the classifier moods (happy, sad, aggressive, relaxed, party, acoustic, electronic) |
+| `instrumental` | the classifier says instrumental |
 
 ## Scope
 

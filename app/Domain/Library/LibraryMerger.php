@@ -4,11 +4,13 @@ namespace App\Domain\Library;
 
 use App\Domain\Artwork\ArtworkCache;
 use App\Domain\Artwork\LibraryArtwork;
+use App\Domain\Storage\FileIndexer;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
 use App\Models\Media\Metadata;
 use App\Models\Media\Track;
 use App\Models\Play;
+use App\Models\TrackFile;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -180,6 +182,7 @@ final class LibraryMerger
             Play::query()->where('track_id', $loser->id)->update(['track_id' => $survivor->id]);
             $this->mergePlaylistEntries($loser->id, $survivor->id);
             $this->mergeMetadata($loser, $survivor);
+            $this->mergeFiles($loser, $survivor);
 
             $survivor->album_id ??= $loser->album_id;
             $survivor->duration = $survivor->duration ?: $loser->duration;
@@ -204,6 +207,32 @@ final class LibraryMerger
         $survivor->save();
 
         return $losers->count();
+    }
+
+    /**
+     * The loser's stored files become the survivor's (a file lost with its track would stop being served), the
+     * survivor keeps its own primary one, and a stream URL taken over from the loser points at the survivor.
+     */
+    private function mergeFiles(Track $loser, Track $survivor): void
+    {
+        $links = TrackFile::query()->where('track_id', $survivor->id)->get();
+
+        foreach (TrackFile::query()->where('track_id', $loser->id)->get() as $link) {
+            if ($links->contains('file_id', $link->file_id)) {
+                $link->delete();
+
+                continue;
+            }
+
+            $link->update(['track_id' => $survivor->id, 'is_primary' => $link->is_primary && !$links->contains('is_primary', true)]);
+            $links->push($link);
+        }
+
+        Metadata::query()
+            ->where('metadatable_type', $survivor->getMorphClass())->where('metadatable_id', $survivor->id)
+            ->where('key', 'dlna_url')->where('source', FileIndexer::URL_SOURCE)
+            ->where('value', url('/stream/'.$loser->id))
+            ->update(['value' => url('/stream/'.$survivor->id)]);
     }
 
     /**
@@ -246,9 +275,14 @@ final class LibraryMerger
         $clusters = [];
         $albumHeads = [];
 
-        $place = function (string $bucket, Track $track) use (&$clusters): array {
+        // Recording ids found by audio fingerprint: two different ones are different recordings (live and studio
+        // versions) whatever their names say, and one shared id is one recording whatever the names say.
+        $recordings = $this->recordingIds($tracks);
+        $apart = fn (Track $a, Track $b) => isset($recordings[$a->id], $recordings[$b->id]) && $recordings[$a->id] !== $recordings[$b->id];
+
+        $place = function (string $bucket, Track $track) use (&$clusters, $apart): array {
             foreach ($clusters[$bucket] ?? [] as $i => $cluster) {
-                if (LibraryIdentity::sameDuration($cluster['head']->duration, $track->duration)) {
+                if (LibraryIdentity::sameDuration($cluster['head']->duration, $track->duration) && !$apart($cluster['head'], $track)) {
                     $clusters[$bucket][$i]['ids'][] = $track->id;
 
                     return $clusters[$bucket][$i];
@@ -272,7 +306,7 @@ final class LibraryMerger
 
         foreach ($tracks->whereNull('album_id') as $track) {
             $head = collect($albumHeads[$artist($track).'|'.$key($track)] ?? [])
-                ->first(fn (Track $h) => LibraryIdentity::sameDuration($h->duration, $track->duration));
+                ->first(fn (Track $h) => LibraryIdentity::sameDuration($h->duration, $track->duration) && !$apart($h, $track));
 
             if ($head !== null) {
                 $bucket = 'album:'.($albumOf[$head->album_id] ?? $head->album_id).'|'.$key($head);
@@ -286,18 +320,86 @@ final class LibraryMerger
             }
         }
 
-        $groups = [];
+        $sets = [];
         foreach ($clusters as $bucket) {
             foreach ($bucket as $cluster) {
-                if (count($cluster['ids']) > 1) {
-                    $ids = $cluster['ids'];
-                    sort($ids);
-                    $groups[] = [$cluster['head']->id, array_values(array_diff($ids, [$cluster['head']->id]))];
-                }
+                $sets[] = ['head' => $cluster['head']->id, 'ids' => $cluster['ids']];
+            }
+        }
+
+        $byId = $tracks->keyBy('id');
+
+        return $this->joinByRecording($sets, $recordings, $byId);
+    }
+
+    /**
+     * Tracks that share a fingerprint-found recording id (and a compatible length) join the same group, so a
+     * re-tagged copy whose name differs is merged too; groups already formed by name stay as they are.
+     *
+     * @param  list<array{head: int, ids: list<int>}>  $sets  clusters by name, singletons included
+     * @param  array<int, string>  $recordings  track id => recording id
+     * @param  Collection<int, Track>  $tracks
+     * @return list<array{0: int, 1: list<int>}>
+     */
+    private function joinByRecording(array $sets, array $recordings, Collection $tracks): array
+    {
+        $setOf = [];
+        foreach ($sets as $i => $set) {
+            foreach ($set['ids'] as $id) {
+                $setOf[$id] = $i;
+            }
+        }
+
+        $union = function (int $from, int $into) use (&$sets, &$setOf) {
+            foreach ($sets[$from]['ids'] as $id) {
+                $setOf[$id] = $into;
+            }
+            $sets[$into] = [
+                'head' => min($sets[$into]['head'], $sets[$from]['head']),
+                'ids' => array_merge($sets[$into]['ids'], $sets[$from]['ids']),
+            ];
+            $sets[$from] = ['head' => 0, 'ids' => []];
+        };
+
+        $first = [];
+        foreach ($recordings as $trackId => $recording) {
+            $headId = $first[$recording] ?? null;
+
+            if ($headId === null) {
+                $first[$recording] = $trackId;
+
+                continue;
+            }
+
+            $head = $tracks[$headId];
+            $track = $tracks[$trackId];
+            if ($setOf[$headId] !== $setOf[$trackId] && LibraryIdentity::sameDuration($head->duration, $track->duration)) {
+                $union($setOf[$trackId], $setOf[$headId]);
+            }
+        }
+
+        $groups = [];
+        foreach ($sets as $set) {
+            if (count($set['ids']) > 1) {
+                $ids = $set['ids'];
+                sort($ids);
+                $groups[] = [$set['head'], array_values(array_diff($ids, [$set['head']]))];
             }
         }
 
         return $groups;
+    }
+
+    /** @return array<int, string> track id => the recording id AcoustID found for its file */
+    private function recordingIds(Collection $tracks): array
+    {
+        return Metadata::query()
+            ->where('metadatable_type', (new Track)->getMorphClass())
+            ->where('key', 'mbid')->where('source', Enrichment::ACOUSTID)
+            ->whereIn('metadatable_id', $tracks->pluck('id'))
+            ->orderBy('metadatable_id')
+            ->pluck('value', 'metadatable_id')
+            ->all();
     }
 
     /**

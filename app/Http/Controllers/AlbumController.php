@@ -54,7 +54,7 @@ class AlbumController extends Controller
 
     public function show(Album $album)
     {
-        $album->load(['artist', 'tracks' => fn ($q) => $q->withCount('plays')->with(['genreRelation', 'metadata' => fn ($q) => $q->whereIn('key', [...Track::DISPLAY_METADATA, 'external_id'])])->orderByDesc('plays_count')]);
+        $album->load(['artist', 'tracks' => fn ($q) => $q->withCount('plays')->with(['genreRelation', 'analysis', 'metadata' => fn ($q) => $q->whereIn('key', [...Track::DISPLAY_METADATA, 'external_id'])])->orderByDesc('plays_count')]);
 
         // Album order (disc, then track number), tracks without a position last by plays.
         $album->setRelation('tracks', $album->tracks->sortBy(fn ($t) => [

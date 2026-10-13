@@ -220,7 +220,7 @@ class LibraryController extends Controller
         $this->preloadArtwork(albums: [$album]);
         $tracks = LibraryPlayback::albumTracks($album, $hidden);
         // The playback keys plus what the track details read, so neither costs a query per track.
-        $tracks->load(['genreRelation', 'metadata' => fn ($q) => $q->whereIn('key', array_unique([...LibraryPlayback::PLAYBACK_METADATA, ...Track::DISPLAY_METADATA]))]);
+        $tracks->load(['genreRelation', 'analysis', 'metadata' => fn ($q) => $q->whereIn('key', array_unique([...LibraryPlayback::PLAYBACK_METADATA, ...Track::DISPLAY_METADATA]))]);
         $items = $tracks->map(fn (Track $track) => [
             'id' => $track->id,
             'name' => $track->name,

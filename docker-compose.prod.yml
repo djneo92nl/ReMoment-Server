@@ -69,11 +69,29 @@ services:
             - remoment
         restart: unless-stopped
 
+    # Opt-in audio analysis (BPM, key, mood): docker compose --profile analysis up -d, then set
+    # ANALYSIS_ENABLED=true and ANALYSIS_ESSENTIA_URL=http://127.0.0.1:8090 (docs/architecture/audio-analysis.md).
+    analysis:
+        profiles: [analysis]
+        build:
+            context: './docker/analysis'
+            args:
+                ESSENTIA_ML: '${ANALYSIS_ESSENTIA_ML_BUILD:-0}'
+        image: 'remoment/analysis:latest'
+        ports:
+            - '127.0.0.1:8090:8090'
+        volumes:
+            - 'remoment-analysis-models:/models'
+        networks:
+            - remoment
+        restart: unless-stopped
+
 networks:
     remoment:
         driver: bridge
 
 volumes:
+    remoment-analysis-models:
     remoment-redis:
     remoment-meilisearch:
     remoment-mosquitto-data:

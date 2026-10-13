@@ -45,6 +45,9 @@ class Enrichment
 
     public const DISCOGS = 'discogs';
 
+    /** The source of a recording id found by audio fingerprint (App\Domain\Analysis). */
+    public const ACOUSTID = 'acoustid';
+
     /** Tracks queued by a library scan, so a first scan of a big library doesn't flood the queue. */
     public const SCAN_BATCH = 100;
 

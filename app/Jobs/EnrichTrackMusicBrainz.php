@@ -57,24 +57,33 @@ class EnrichTrackMusicBrainz implements ShouldBeUnique, ShouldQueue
 
     private function enrich(Track $track, MusicBrainzClient $mb): void
     {
-        $query = sprintf(
-            'recording:"%s" AND artist:"%s"',
-            str_replace('"', '\\"', trim($track->name)),
-            str_replace('"', '\\"', trim($track->artist->name))
-        );
+        // An audio fingerprint already named the recording: look it up directly instead of searching by name.
+        $recordingMbid = $track->metadata()->where('key', 'mbid')->where('source', Enrichment::ACOUSTID)->value('value');
+        $best = null;
 
-        $best = collect($mb->get('recording', ['query' => $query, 'limit' => 5])['recordings'] ?? [])
-            ->sortByDesc('score')
-            ->first(fn ($r) => ($r['score'] ?? 0) >= 60);
+        if ($recordingMbid === null) {
+            $query = sprintf(
+                'recording:"%s" AND artist:"%s"',
+                str_replace('"', '\\"', trim($track->name)),
+                str_replace('"', '\\"', trim($track->artist->name))
+            );
 
-        if (!$best) {
-            return;
+            $best = collect($mb->get('recording', ['query' => $query, 'limit' => 5])['recordings'] ?? [])
+                ->sortByDesc('score')
+                ->first(fn ($r) => ($r['score'] ?? 0) >= 60);
+
+            if (!$best) {
+                return;
+            }
+
+            $recordingMbid = $best['id'];
         }
 
-        $recordingMbid = $best['id'];
         Enrichment::save($track, 'mbid', $recordingMbid, 'string', Enrichment::MUSICBRAINZ);
 
-        $recording = $mb->get("recording/{$recordingMbid}", ['inc' => 'isrcs+artist-rels+work-rels+work-level-rels']) ?? [];
+        $recording = $mb->get("recording/{$recordingMbid}", ['inc' => 'isrcs+artist-rels+work-rels+work-level-rels+artist-credits+releases']) ?? [];
+        $best ??= ['artist-credit' => $recording['artist-credit'] ?? [], 'releases' => $recording['releases'] ?? []];
+
         if ($isrc = $recording['isrcs'][0] ?? null) {
             Enrichment::save($track, 'isrc', $isrc, 'string', Enrichment::MUSICBRAINZ);
         }
