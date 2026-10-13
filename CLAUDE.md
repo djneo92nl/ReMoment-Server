@@ -21,6 +21,7 @@ docs/
     library.md              Library browse (artists, albums, playlists), favorites, play album/artist/playlist on a device (DLNA or Spotify), playlist artwork
     source-controls.md      Per-source controls (change disc, FM presets) from control profiles: GET/POST /api/devices/{id}/controls, resolution, transports
     server-info.md          GET /api/info bootstrap endpoint (API/MQTT/artwork addresses for clients)
+    mcp.md                  MCP server at /mcp for AI agents: tools, admin-token gating, how tools reuse the REST API
     admin-auth.md           Token login of the single admin for apps: POST /api/admin/login, bearer tokens, revocation, what it gates
     openapi.yaml            OpenAPI 3 contract for native clients (info, devices, playback, radio, multiroom, library, clients); update it when an endpoint's shape changes
     device-settings.md      Sound adjustment (bass/treble/loudness), Bluetooth pairing, device name: endpoints, shapes, per-platform support
@@ -47,6 +48,10 @@ docs/
 ```
 
 When adding a significant feature, add a matching doc in the relevant subfolder (`api/` for new REST endpoints, `architecture/` for server-side systems, `frontend/` for complex UI pages).
+
+## MCP Server
+
+`/mcp` (`app/Mcp/`, `laravel/mcp`, `routes/ai.php`) lets an AI agent control devices and manage the library. Open like the REST API; the tools marked ADMIN (maintenance, removal, storage) are listed only with the admin bearer token (no new accounts). Device/library tools go through `App\Mcp\ApiBridge`, an in-process call of the REST API, so the API stays the single implementation: when you add an endpoint, add or extend a tool in `app/Mcp/Tools/` and the table in `docs/api/mcp.md`. Playlist create/edit/delete lives in `App\Domain\Library\PlaylistEditor` (web UI and MCP share it). See `docs/api/mcp.md`.
 
 ## Common Commands
 

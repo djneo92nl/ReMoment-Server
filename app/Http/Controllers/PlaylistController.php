@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Library\LibraryPlayback;
-use App\Domain\Library\SmartPlaylist\SmartPlaylistBuilder;
+use App\Domain\Library\PlaylistEditor;
 use App\Http\Controllers\Concerns\FlashesLibraryPlayback;
 use App\Models\Device;
 use App\Models\DeviceMeta;
@@ -23,34 +23,22 @@ class PlaylistController extends Controller
         return view('playlists.index', compact('playlists'));
     }
 
-    public function store(Request $request)
+    public function store(Request $request, PlaylistEditor $editor)
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
         ]);
 
-        $smart = $request->boolean('smart');
-
-        $playlist = Playlist::create([
-            'name' => $validated['name'],
-            'source' => $smart ? 'smart' : 'local',
-            'rules' => $smart ? SmartPlaylistBuilder::defaults() : null,
-        ]);
-
-        if ($smart) {
-            SmartPlaylistBuilder::refresh($playlist);
-        }
+        $playlist = $editor->create($validated['name'], $request->boolean('smart'));
 
         return redirect()->route('playlists.show', $playlist)->with('success', 'Playlist created.');
     }
 
-    public function destroy(Playlist $playlist)
+    public function destroy(Playlist $playlist, PlaylistEditor $editor)
     {
-        if (!$playlist->isDeletable()) {
+        if (!$editor->delete($playlist)) {
             return back()->with('error', 'Only playlists made here can be deleted.');
         }
-
-        $playlist->delete();
 
         return redirect()->route('playlists.index')->with('success', 'Playlist deleted.');
     }
