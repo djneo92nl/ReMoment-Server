@@ -11,6 +11,7 @@ trait SourceControls
     public function getSources(): array
     {
         $raw = $this->deviceApiClient()->get('BeoZone/Zone/Sources');
+        $activeId = $this->activeSourceId();
 
         return collect($raw['sources'] ?? [])
             ->filter(fn ($pair) => isset($pair[1]['friendlyName']))
@@ -23,9 +24,29 @@ trait SourceControls
                 borrowed: (bool) ($pair[1]['borrowed'] ?? false),
                 providerJid: $pair[1]['product']['jid'] ?? null,
                 providerName: $pair[1]['product']['friendlyName'] ?? null,
+                active: $activeId === null ? null : $activeId === ($pair[1]['id'] ?? $pair[0]),
             ))
             ->values()
             ->all();
+    }
+
+    /**
+     * Id of the selected source, or null when the device does not say. `inUse`
+     * on the sources list is not this (it is true for nearly every source).
+     * Unverified on hardware: `activeSources.primary` is the id (an empty
+     * string when idle), with `primaryExperience.source.id` as a second place.
+     */
+    private function activeSourceId(): ?string
+    {
+        try {
+            $data = $this->getActiveSources();
+        } catch (\Throwable) {
+            return null;
+        }
+
+        $id = $data['activeSources']['primary'] ?? $data['primaryExperience']['source']['id'] ?? '';
+
+        return is_string($id) && $id !== '' ? $id : null;
     }
 
     public function getActiveSources(): array

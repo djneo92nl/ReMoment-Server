@@ -22,32 +22,25 @@
         </button>
     </div>
 
-    @php $chipClass = 'flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-stone-800 text-sm text-gray-700 dark:text-gray-300 transition-colors'; @endphp
-
     @if($visible->isEmpty())
         <p class="text-sm text-gray-400 dark:text-gray-600">
-            No visible sources.
+            No sources shown.
             <button x-data @click.stop="$dispatch('open-modal', '{{ $modalName }}')"
                     class="underline hover:text-gray-600 dark:hover:text-gray-400 transition-colors">Manage</button>
-            to configure.
+            to choose which ones appear.
         </p>
     @else
-        <div class="flex flex-wrap gap-2">
-            @foreach($visible as $source)
-                @if($supportsActivation)
-                    <button wire:click="activateSource({{ $source['id'] }})"
-                            class="{{ $chipClass }} hover:bg-gray-200 dark:hover:bg-stone-700 hover:text-gray-900 dark:hover:text-gray-100 {{ $source['borrowed'] ? 'opacity-70' : '' }}">
-                        <i class="fa-solid {{ $typeIcon($source['type']) }} text-xs text-gray-400 dark:text-gray-500"></i>
-                        {{ $source['name'] }}
-                    </button>
-                @else
-                    <span class="{{ $chipClass }} {{ $source['borrowed'] ? 'opacity-70' : '' }}">
-                        <i class="fa-solid {{ $typeIcon($source['type']) }} text-xs text-gray-400 dark:text-gray-500"></i>
-                        {{ $source['name'] }}
-                    </span>
-                @endif
+        @php $shown = $showAll ? $visible : $visible->take(6); @endphp
+        <div class="space-y-2">
+            @foreach($shown as $source)
+                @include('livewire.partials.source-row', ['source' => $source, 'supportsActivation' => $supportsActivation])
             @endforeach
         </div>
+        @if($visible->count() > 6)
+            <button wire:click="$toggle('showAll')" class="mt-3 text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors">
+                {{ $showAll ? 'Show less' : 'Show all ('.$visible->count().')' }}
+            </button>
+        @endif
         @if($hiddenCount > 0)
             <p class="mt-3 text-xs text-gray-400 dark:text-gray-600">{{ $hiddenCount }} hidden</p>
         @endif
@@ -137,29 +130,16 @@
                     @endif
 
                 @else
-                    {{-- Normal mode: all visible (own + borrowed) with activate --}}
+                    {{-- Normal mode: the picker, visible sources only --}}
                     @foreach($visible as $source)
-                        <li class="flex items-center gap-3 px-3 py-2 rounded-xl text-sm group hover:bg-gray-50 dark:hover:bg-stone-800/60 transition-colors {{ $source['borrowed'] ? 'opacity-70' : '' }}">
-                            <i class="fa-solid {{ $typeIcon($source['type']) }} text-gray-400 dark:text-gray-500 w-4 text-center flex-shrink-0 text-xs"></i>
-                            <div class="flex-1 min-w-0">
-                                <span class="text-gray-800 dark:text-gray-200 truncate block">{{ $source['name'] }}</span>
-                                @if($source['borrowed'])
-                                    <span class="text-xs text-gray-400 dark:text-gray-600">↳ {{ $source['provider_name'] }}</span>
-                                @endif
-                            </div>
-                            <span class="text-xs text-gray-400 dark:text-gray-600 flex-shrink-0">{{ $source['type'] }}</span>
-                            @if($supportsActivation)
-                                <button wire:click="activateSource({{ $source['id'] }})" @click="$dispatch('close')"
-                                        class="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-stone-800 hover:text-gray-700 dark:hover:text-gray-300 transition-colors opacity-0 group-hover:opacity-100">
-                                    <i class="fa-solid fa-play text-xs"></i>
-                                </button>
-                            @endif
+                        <li class="py-0.5">
+                            @include('livewire.partials.source-row', ['source' => $source, 'supportsActivation' => $supportsActivation, 'closeOnPick' => true])
                         </li>
                     @endforeach
 
                     @if($hiddenCount > 0)
                         <li class="px-3 pt-3 pb-1 border-t border-gray-100 dark:border-stone-800 mt-1">
-                            <span class="text-xs text-gray-400 dark:text-gray-600">{{ $hiddenCount }} hidden · use Edit to show them</span>
+                            <span class="text-xs text-gray-400 dark:text-gray-600">{{ $hiddenCount }} hidden · use Edit to show or hide sources</span>
                         </li>
                     @endif
                 @endif

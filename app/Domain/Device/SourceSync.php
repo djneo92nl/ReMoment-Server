@@ -9,7 +9,8 @@ use App\Models\Device;
  * Brings a device's stored sources (`device_sources`) in line with what its
  * driver reports. Hidden/sort preferences survive, keyed by source id; a
  * newly seen source is placed at the device's position and a newly seen
- * borrowed (shared) source starts hidden.
+ * borrowed (shared) source, or one nobody uses day to day (QPlay), starts
+ * hidden.
  */
 final class SourceSync
 {
@@ -20,6 +21,11 @@ final class SourceSync
         self::store($device, $sources);
 
         return count($sources);
+    }
+
+    public static function startsHidden(AvailableSource $s): bool
+    {
+        return $s->borrowed || stripos($s->sourceType.' '.$s->friendlyName, 'qplay') !== false;
     }
 
     /** Stores sources a driver already returned. @param  AvailableSource[]  $sources */
@@ -47,7 +53,7 @@ final class SourceSync
                     ...$fields,
                     'source_id' => $s->sourceId,
                     'sort_order' => $position,
-                    'hidden' => $s->borrowed,
+                    'hidden' => self::startsHidden($s),
                 ]);
             }
         }

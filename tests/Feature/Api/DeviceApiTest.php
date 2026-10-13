@@ -345,6 +345,39 @@ class DeviceApiTest extends TestCase
         $this->assertDatabaseMissing('device_sources', ['device_id' => $device->id, 'source_id' => 'GONE']);
     }
 
+    public function test_sources_carry_hidden_and_sort_order_and_can_be_filtered(): void
+    {
+        $device = $this->makeDevice();
+        $device->deviceSources()->create([
+            'source_id' => 'MUSIC', 'friendly_name' => 'Music', 'source_type' => 'MUSIC', 'category' => 'music',
+            'hidden' => true, 'sort_order' => 3,
+        ]);
+
+        $this->getJson("/api/devices/{$device->id}/sources")
+            ->assertOk()
+            ->assertJsonPath('sources.0.hidden', true)
+            ->assertJsonPath('sources.0.sort_order', 3);
+
+        $this->getJson("/api/devices/{$device->id}/sources?visible=1")
+            ->assertOk()
+            ->assertJsonCount(0, 'sources');
+    }
+
+    public function test_qplay_and_borrowed_sources_start_hidden(): void
+    {
+        $device = $this->makeDevice();
+        $mk = fn ($id, $name, $type, $borrowed) => new \App\Domain\Device\AvailableSource($id, $name, $type, 'music', true, $borrowed, null, null);
+
+        \App\Domain\Device\SourceSync::store($device, [
+            $mk('A', 'Spotify', 'SPOTIFY', false),
+            $mk('B', 'QPlay', 'QPLAY', false),
+            $mk('C', 'Line-In', 'LINE_IN', true),
+        ]);
+
+        $hidden = $device->deviceSources()->pluck('hidden', 'source_id')->all();
+        $this->assertSame(['A' => false, 'B' => true, 'C' => true], array_map('boolval', $hidden));
+    }
+
     public function test_activate_source(): void
     {
         $device = $this->makeDevice();

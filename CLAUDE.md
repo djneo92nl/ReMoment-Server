@@ -331,7 +331,7 @@ GET  /api/devices/{id}/sources         → { "sources": [ AvailableSource, … ]
 POST /api/devices/{id}/sources/activate  body: { "source_id": "MUSIC" }   → { "status": "ok", "source_id": "MUSIC" }
 ```
 
-`GET` fetches live data from the device and refreshes the `device_sources` table; hidden/sort preferences are preserved by `source_id`.
+`GET` fetches live data from the device and refreshes the `device_sources` table; hidden/sort preferences are preserved by `source_id`. The response is ordered by `sort_order` and carries `hidden` and `sort_order`; `?visible=1` drops hidden ones (use it for pickers). `PUT /api/admin/devices/{id}/sources/{source_id}` (admin token) body `{ "hidden": bool, "sort_order": int }` changes them. QPlay and borrowed sources start hidden. UX rules: `docs/ux/sources.md`.
 
 **AvailableSource shape:**
 ```json
@@ -343,9 +343,15 @@ POST /api/devices/{id}/sources/activate  body: { "source_id": "MUSIC" }   → { 
   "in_use": true,
   "borrowed": false,
   "provider_jid": "provider@jid.example",
-  "provider_name": "Spotify"
+  "provider_name": "Spotify",
+  "input": "HDMI 5",
+  "active": true,
+  "hidden": false,
+  "sort_order": 0
 }
 ```
+
+`in_use` is not "selected" (ASE reports it true for nearly every source). `active` is the selected source and is absent when the device cannot tell; clients then match `now_playing.source`. `input` is the physical connection (TV devices), absent for digital sources.
 
 ### Radio
 

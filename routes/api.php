@@ -112,6 +112,8 @@ Route::middleware('admin.token')->group(function () {
     Route::get('/admin/tracks/{track}/files', [StorageController::class, 'trackFiles']);
     Route::delete('/admin/tracks/{track}/files', [StorageController::class, 'destroyTrack']);
     Route::delete('/admin/files/{file}', [StorageController::class, 'destroyFile']);
+    // Device source visibility (the web UI's DeviceSourceManager)
+    Route::put('/admin/devices/{device}/sources/{sourceId}', [DeviceController::class, 'updateSource'])->where('sourceId', '[^/]+');
     Route::post('/admin/files/{file}/move', [StorageController::class, 'move']);
     Route::put('/admin/files/{file}/tags', [StorageController::class, 'tags']);
     Route::post('/admin/files/{file}/verify', [StorageController::class, 'verify']);

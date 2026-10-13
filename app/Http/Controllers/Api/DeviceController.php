@@ -218,14 +218,42 @@ class DeviceController extends Controller
         });
     }
 
-    public function sources(Device $device): JsonResponse
+    public function sources(Request $request, Device $device): JsonResponse
     {
-        return $this->withDriver($device, SourcesInterface::class, 'source_control', function (SourcesInterface $driver) use ($device) {
+        return $this->withDriver($device, SourcesInterface::class, 'source_control', function (SourcesInterface $driver) use ($device, $request) {
             $sources = $driver->getSources();
             SourceSync::store($device, $sources);
 
-            return ['sources' => array_map(fn ($s) => $s->toArray(), $sources)];
+            $stored = $device->deviceSources()->get()->keyBy('source_id');
+            $rows = collect($sources)->map(fn ($s) => $s->toArray() + [
+                'hidden' => (bool) ($stored[$s->sourceId]->hidden ?? false),
+                'sort_order' => (int) ($stored[$s->sourceId]->sort_order ?? 0),
+            ]);
+
+            if ($request->boolean('visible')) {
+                $rows = $rows->reject(fn ($r) => $r['hidden']);
+            }
+
+            return ['sources' => $rows->sortBy('sort_order')->values()->all()];
         }, reachable: false);
+    }
+
+    /** Admin: show/hide or reorder one source (household-wide). */
+    public function updateSource(Request $request, Device $device, string $sourceId): JsonResponse
+    {
+        $data = $request->validate([
+            'hidden' => ['sometimes', 'boolean'],
+            'sort_order' => ['sometimes', 'integer', 'min:0', 'max:65535'],
+        ]);
+
+        $source = $device->deviceSources()->where('source_id', $sourceId)->firstOrFail();
+        $source->update($data);
+
+        return response()->json([
+            'source_id' => $source->source_id,
+            'hidden' => $source->hidden,
+            'sort_order' => (int) $source->sort_order,
+        ]);
     }
 
     public function activateSource(Request $request, Device $device): JsonResponse

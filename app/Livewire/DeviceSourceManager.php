@@ -19,6 +19,11 @@ class DeviceSourceManager extends Component
 
     public bool $supportsActivation = false;
 
+    /** Live data per source id (`active`, `input`); empty when the device is unreachable. */
+    public array $live = [];
+
+    public bool $showAll = false;
+
     public function mount(Device $device): void
     {
         $this->device = $device;
@@ -28,6 +33,7 @@ class DeviceSourceManager extends Component
             $this->supportsActivation = false;
         }
         $this->syncWhenEmpty();
+        $this->loadLive();
         $this->loadSources();
     }
 
@@ -65,6 +71,25 @@ class DeviceSourceManager extends Component
                 $driver->activateSource($source->source_id);
             }
         } catch (\Throwable) {
+        }
+        $this->loadLive();
+    }
+
+    /** Which source is selected and which physical input each has; the stored rows only hold preferences. */
+    private function loadLive(): void
+    {
+        $this->live = [];
+
+        try {
+            $driver = $this->device->driver;
+            if (!$driver instanceof SourcesInterface) {
+                return;
+            }
+            foreach ($driver->getSources() as $s) {
+                $this->live[$s->sourceId] = ['active' => $s->active, 'input' => $s->input];
+            }
+        } catch (\Throwable) {
+            // Unreachable device: the list still renders from the stored rows, with no active row.
         }
     }
 
@@ -125,6 +150,9 @@ class DeviceSourceManager extends Component
             ->get()
             ->map(fn ($s) => [
                 'id' => $s->id,
+                'source_id' => $s->source_id,
+                'active' => (bool) ($this->live[$s->source_id]['active'] ?? false),
+                'input' => $this->live[$s->source_id]['input'] ?? null,
                 'name' => $s->friendly_name,
                 'type' => $s->source_type,
                 'category' => $s->category,

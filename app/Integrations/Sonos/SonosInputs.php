@@ -55,7 +55,7 @@ final class SonosInputs
     public static function source(string $input, bool $inUse): AvailableSource
     {
         return $input === self::TV
-            ? new AvailableSource(self::TV, 'TV', 'TV', 'video', $inUse, false, null, null)
-            : new AvailableSource(self::LINE_IN, 'Line-in', 'LINE_IN', 'music', $inUse, false, null, null);
+            ? new AvailableSource(self::TV, 'TV', 'TV', 'video', $inUse, false, null, null, active: $inUse)
+            : new AvailableSource(self::LINE_IN, 'Line-in', 'LINE_IN', 'music', $inUse, false, null, null, active: $inUse);
     }
 }

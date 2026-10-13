@@ -353,8 +353,8 @@
                 <div class="divide-y divide-gray-100 dark:divide-stone-800">
                     @foreach($inputs as $input)
                         <div class="{{ $row }}" wire:key="input-{{ $input['source_id'] }}">
-                            <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ $input['friendly_name'] }}@if($input['shared_from']) <span class="{{ $muted }}">· shared from {{ $input['shared_from'] }}</span>@endif @if($input['in_use']) <span class="{{ $muted }}">· active</span>@endif</span>
-                            @unless($input['in_use'])
+                            <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ $input['friendly_name'] }}@if($input['shared_from']) <span class="{{ $muted }}">· shared from {{ $input['shared_from'] }}</span>@endif @if($input['active']) <span class="{{ $muted }}">· active</span>@endif</span>
+                            @unless($input['active'])
                                 <button type="button" wire:click="switchInput(@js($input['source_id']))" wire:loading.attr="disabled"
                                         class="px-4 py-2 bg-gray-100 dark:bg-stone-800 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-medium disabled:opacity-50">Switch to</button>
                             @endunless

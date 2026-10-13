@@ -44,6 +44,33 @@ class DeviceSourceManagerTest extends TestCase
         $this->assertSame(1, $device->deviceSources()->count());
     }
 
+    public function test_the_picker_outlines_the_active_source_and_badges_input_and_borrowed(): void
+    {
+        $device = $this->device();
+        $device->deviceSources()->create(['source_id' => 'tv', 'friendly_name' => 'TV', 'source_type' => 'TV', 'category' => 'video', 'borrowed' => false, 'hidden' => false, 'sort_order' => 0]);
+        $device->deviceSources()->create(['source_id' => 'spotify', 'friendly_name' => 'Spotify', 'source_type' => 'SPOTIFY', 'category' => 'music', 'borrowed' => true, 'hidden' => false, 'sort_order' => 1, 'provider_name' => 'Beolab 28']);
+
+        Livewire::test(DeviceSourceManager::class, ['device' => $device])
+            ->assertSee('HDMI 5')
+            ->assertSee('Borrowed')
+            ->assertSee('ring-2', escape: false);
+    }
+
+    public function test_hidden_sources_stay_out_of_the_picker_and_long_lists_collapse(): void
+    {
+        $device = $this->device();
+        foreach (range(1, 8) as $i) {
+            $device->deviceSources()->create(['source_id' => "s{$i}", 'friendly_name' => "Source {$i}", 'source_type' => 'LINE', 'category' => 'music', 'borrowed' => false, 'hidden' => $i === 8, 'sort_order' => $i]);
+        }
+
+        Livewire::test(DeviceSourceManager::class, ['device' => $device])
+            ->assertSee('Show all (7)')
+            ->assertSee('1 hidden')
+            ->set('showAll', true)
+            ->assertSee('Show less')
+            ->assertDontSee('Show all');
+    }
+
     public function test_a_device_without_sources_shows_no_card(): void
     {
         $device = $this->device();

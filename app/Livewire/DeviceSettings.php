@@ -288,7 +288,7 @@ class DeviceSettings extends Component
         $this->inputs = array_map(fn ($s) => [
             'source_id' => $s->sourceId,
             'friendly_name' => $s->friendlyName,
-            'in_use' => $s->inUse,
+            'active' => (bool) $s->active,
             'shared_from' => $s->borrowed ? ($s->providerName ?: 'another product') : null,
         ], $sources);
         $this->defaultSource = (string) $this->device->meta()->where('key', SwitchToDefaultSource::META_KEY)->value('value');

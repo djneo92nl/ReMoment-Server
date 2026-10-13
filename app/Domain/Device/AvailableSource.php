@@ -13,6 +13,10 @@ class AvailableSource
         public bool $borrowed,
         public ?string $providerJid,
         public ?string $providerName,
+        /** Physical connection ("HDMI 5", "DVB"); null for purely digital sources. */
+        public ?string $input = null,
+        /** Currently selected source; null when the device cannot tell. */
+        public ?bool $active = null,
     ) {}
 
     public function toArray(): array
@@ -26,6 +30,8 @@ class AvailableSource
             'borrowed' => $this->borrowed,
             'provider_jid' => $this->providerJid,
             'provider_name' => $this->providerName,
+            'input' => $this->input,
+            'active' => $this->active,
         ], fn ($v) => $v !== null);
     }
 }

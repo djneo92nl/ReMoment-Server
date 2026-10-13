@@ -394,7 +394,18 @@ paths:
     get:
       tags: [Devices]
       summary: Live source list (capability source_control)
+      description: |
+        Ordered by `sort_order`. Includes hidden sources (`hidden: true`); pass `visible=1` for the picker
+        (visible only). Visibility is household-wide and changed with `PUT /admin/devices/{device}/sources/{source_id}`.
+        `in_use` is NOT "selected" on B&O devices; use `active` (absent when the device cannot tell; then match
+        `now_playing.source` against `source_type` or name). See `docs/ux/sources.md`.
       operationId: listSources
+      parameters:
+        - name: visible
+          in: query
+          required: false
+          schema: { type: boolean }
+          description: Only sources that are not hidden.
       responses:
         "200":
           description: OK
@@ -1092,6 +1103,38 @@ paths:
                 properties:
                   status: { type: string, example: ok }
         "401": { $ref: "#/components/responses/Unauthenticated" }
+  /admin/devices/{device}/sources/{source_id}:
+    parameters:
+      - { $ref: "#/components/parameters/device" }
+      - { name: source_id, in: path, required: true, schema: { type: string }, description: URL-encoded }
+    put:
+      tags: [Admin]
+      summary: Show/hide or reorder a source (household-wide)
+      operationId: updateSource
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                hidden: { type: boolean }
+                sort_order: { type: integer, minimum: 0, maximum: 65535 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  source_id: { type: string }
+                  hidden: { type: boolean }
+                  sort_order: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { description: Source not known for this device (list sources first) }
+        "422": { description: Invalid body }
 
   /clients/register:
     post:
@@ -1480,6 +1523,14 @@ components:
         borrowed: { type: boolean }
         provider_jid: { type: string, nullable: true }
         provider_name: { type: string, nullable: true }
+        input:
+          type: string
+          description: Physical connection such as "HDMI 5" or "DVB". Absent for purely digital sources. Show it as a badge, never invent it from the name.
+        active:
+          type: boolean
+          description: This is the selected source. Absent when the device cannot tell.
+        hidden: { type: boolean, description: "Household preference; hidden sources stay out of pickers. QPlay and borrowed sources start hidden." }
+        sort_order: { type: integer }
     RadioStation:
       type: object
       properties:

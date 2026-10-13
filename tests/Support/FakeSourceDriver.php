@@ -20,7 +20,7 @@ class FakeSourceDriver implements MusicPlayerDriverInterface, SourceActivationIn
 
     public function getSources(): array
     {
-        return [new AvailableSource('tv', 'TV', 'TV', 'video', false, false, null, null),
+        return [new AvailableSource('tv', 'TV', 'TV', 'video', false, false, null, null, input: 'HDMI 5', active: true),
             new AvailableSource('spotify', 'Spotify', 'SPOTIFY', 'music', false, true, 'jid', 'Beolab 28'),
         ];
     }

@@ -52,6 +52,6 @@ Tokens do not expire on their own.
 
 ## What it gates, and what it does not
 
-Only routes inside the `admin.token` group. Today that is the three routes above. The device-settings endpoints (`/api/devices/{id}/sound-adjustment`, `bluetooth`, `network`, `info`, …) are **unchanged and still open**, as is everything else documented in `docs/api/`; moving the admin-only ones (network and Wi-Fi changes, renaming) behind the token is a separate, breaking decision for the ESP clients. Admin endpoints that only exist in the web UI today (source hide/reorder, multiroom presets, Spotify Connect mapping, DLNA scans, client approval) will be added inside the group.
+Only routes inside the `admin.token` group. Today that is the three routes above plus `PUT /api/admin/devices/{id}/sources/{source_id}` (source hide/reorder) and the storage routes. The device-settings endpoints (`/api/devices/{id}/sound-adjustment`, `bluetooth`, `network`, `info`, …) are **unchanged and still open**, as is everything else documented in `docs/api/`; moving the admin-only ones (network and Wi-Fi changes, renaming) behind the token is a separate, breaking decision for the ESP clients. Admin endpoints that only exist in the web UI today (source hide/reorder, multiroom presets, Spotify Connect mapping, DLNA scans, client approval) will be added inside the group.
 
 Brute force: the limiter is per IP and in the cache (Redis), like the web login's.

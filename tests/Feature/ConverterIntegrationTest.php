@@ -133,7 +133,7 @@ class ConverterIntegrationTest extends TestCase
         try {
             $driver->setDeviceName('Other');
         } finally {
-            $this->assertSame(['GET BeoDevice', 'GET BeoZone/Zone/Sources'], $api->requests);
+            $this->assertSame(['GET BeoDevice', 'GET BeoZone/Zone/Sources', 'GET BeoZone/Zone/ActiveSources'], $api->requests);
         }
     }
 
