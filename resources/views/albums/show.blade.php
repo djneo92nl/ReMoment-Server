@@ -201,7 +201,8 @@
                                     $sound['key'] ? $sound['key'].' '.$sound['mode'] : null,
                                     $sound['loudness'] !== null ? number_format($sound['loudness'], 1).' LUFS' : null,
                                 ])->filter()->implode(' · ') : '';
-                                $hasInfo = $quality || $credits || $trackGenres || $isrc || $popularity !== null || $listeners || $soundLine !== '' || ($sound && $sound['mood']);
+                                $waveform = $track->waveform();
+                                $hasInfo = $waveform || $quality || $credits || $trackGenres || $isrc || $popularity !== null || $listeners || $soundLine !== '' || ($sound && $sound['mood']);
                             @endphp
                             <div id="track-{{ $track->id }}" class="scroll-mt-24" x-data="{ panel: null }" @if($localCount > 0 && !$dlnaUrl) x-show="!localOnly" @endif>
                                 @php
@@ -237,8 +238,16 @@
                                                 <span class="px-1 rounded bg-gray-200 dark:bg-stone-700 text-[9px] font-semibold text-gray-500 dark:text-gray-400" title="Explicit">E</span>
                                             @endif
                                         </p>
-                                        @if($track->duration)
-                                            <p class="text-xs text-gray-400 dark:text-gray-600 mt-0.5">{{ \App\Domain\Helpers\TimeHelper::secondsToMinutes((int) $track->duration) }}</p>
+                                        {{-- Length, and tempo and mood when the file is analysed: visible without opening the options --}}
+                                        @php
+                                            $rowMeta = collect([
+                                                $track->duration ? \App\Domain\Helpers\TimeHelper::secondsToMinutes((int) $track->duration) : null,
+                                                ($sound['bpm'] ?? null) ? round($sound['bpm']).' BPM' : null,
+                                                ($sound['mood'] ?? null) ? implode(', ', array_map('ucfirst', array_slice($sound['mood'], 0, 2))) : null,
+                                            ])->filter()->implode(' · ');
+                                        @endphp
+                                        @if($rowMeta !== '')
+                                            <p class="text-xs text-gray-400 dark:text-gray-600 mt-0.5">{{ $rowMeta }}</p>
                                         @endif
                                     </div>
                                     {{-- Fixed slots, so the columns line up whatever a track has --}}
@@ -293,10 +302,14 @@
                                 </div>
                                 @if($hasInfo)
                                     <div x-show="panel === 'info'" x-cloak class="px-14 py-4 border-t border-gray-50 dark:border-stone-800/50 bg-gray-50/50 dark:bg-stone-800/20">
-                                        <dl class="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1.5 text-xs">
+                                        <dl class="text-xs" style="display:grid;grid-template-columns:max-content 1fr;gap:6px 24px">
                                             @if($trackGenres)
                                                 <dt class="text-gray-400 dark:text-gray-600">Genres</dt>
                                                 <dd class="text-gray-700 dark:text-gray-300">{{ implode(', ', $trackGenres) }}</dd>
+                                            @endif
+                                            @if($waveform)
+                                                <dt class="text-gray-400 dark:text-gray-600">Waveform</dt>
+                                                <dd class="text-gray-500 dark:text-gray-400" style="max-width:32rem"><x-waveform :points="$waveform" /></dd>
                                             @endif
                                             @if($quality)
                                                 <dt class="text-gray-400 dark:text-gray-600">Quality</dt>
@@ -356,6 +369,46 @@
 
         <!-- Right: Stats + recent plays -->
         <div class="space-y-6">
+
+            @if($albumSound)
+                <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8">
+                    <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">Sound</h2>
+                    <dl class="space-y-4 text-sm">
+                        @if($albumSound['bpm'])
+                            <div class="flex justify-between gap-4">
+                                <dt class="text-gray-500 dark:text-gray-500">Average tempo</dt>
+                                <dd class="font-medium text-gray-800 dark:text-gray-200">{{ $albumSound['bpm'] }} BPM</dd>
+                            </div>
+                        @endif
+                        @if($albumSound['loudness'] !== null)
+                            <div class="flex justify-between gap-4">
+                                <dt class="text-gray-500 dark:text-gray-500">Average loudness</dt>
+                                <dd class="font-medium text-gray-800 dark:text-gray-200">{{ number_format($albumSound['loudness'], 1) }} LUFS</dd>
+                            </div>
+                        @endif
+                        @if($albumSound['danceability'] !== null)
+                            <div class="flex justify-between gap-4">
+                                <dt class="text-gray-500 dark:text-gray-500">Danceability</dt>
+                                <dd class="font-medium text-gray-800 dark:text-gray-200">{{ round($albumSound['danceability'] * 100) }}%</dd>
+                            </div>
+                        @endif
+                        @if($albumSound['keys'])
+                            <div class="flex justify-between gap-4">
+                                <dt class="text-gray-500 dark:text-gray-500">Common keys</dt>
+                                <dd class="font-medium text-gray-800 dark:text-gray-200 text-right">{{ implode(', ', $albumSound['keys']) }}</dd>
+                            </div>
+                        @endif
+                        @if($albumSound['moods'])
+                            <div style="display:flex;flex-wrap:wrap;gap:6px;padding-top:4px">
+                                @foreach($albumSound['moods'] as $mood)
+                                    <a href="{{ route('albums.index', ['mood' => $mood]) }}" class="text-xs font-medium bg-gray-100 dark:bg-stone-800 text-gray-600 dark:text-gray-400 hover:underline" style="padding:2px 10px;border-radius:9999px">{{ ucfirst($mood) }}</a>
+                                @endforeach
+                            </div>
+                        @endif
+                        <p class="text-xs text-gray-400 dark:text-gray-600">From {{ $albumSound['tracks'] }} of {{ $album->tracks->count() }} {{ Str::plural('track', $album->tracks->count()) }} analysed on the server.</p>
+                    </dl>
+                </div>
+            @endif
 
             @php $albumCredits = (array) $details['credits']; @endphp
             @if($albumCredits)

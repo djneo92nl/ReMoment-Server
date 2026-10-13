@@ -79,6 +79,7 @@ Route::get('/library/albums', [LibraryController::class, 'albums']);
 Route::get('/library/random-album', [LibraryController::class, 'randomAlbum']);
 Route::get('/library/albums/{album}', [LibraryController::class, 'album']);
 Route::put('/library/albums/{album}/favorite', [LibraryController::class, 'favoriteAlbum']);
+Route::get('/library/tracks/{track}/waveform', [LibraryController::class, 'waveform']);
 Route::get('/library/genres', [LibraryController::class, 'genres']);
 Route::get('/library/genres/{genre:slug}', [LibraryController::class, 'genre']);
 Route::get('/library/playlists', [LibraryController::class, 'playlists']);

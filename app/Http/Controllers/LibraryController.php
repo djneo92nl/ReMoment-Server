@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Library\AlbumSound;
 use App\Domain\Library\LeadingSource;
+use App\Domain\Library\LibraryOverview;
 use App\Domain\Library\LibrarySources;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
@@ -18,11 +20,12 @@ class LibraryController extends Controller
 
         $recentAlbums = LibrarySources::albums(Album::query(), $hidden)
             ->whereHas('tracks')
-            ->with('artist')
+            ->with(['artist', 'genreRelation', 'metadata' => fn ($q) => $q->whereIn('key', Album::CARD_METADATA)])
             ->withSourceFlags()
             ->latest()
             ->limit(18)
             ->get();
+        AlbumSound::attach($recentAlbums);
 
         $recentPlays = Play::where(fn ($q) => $q->whereNotNull('track_id')->orWhereNotNull('track_name'))
             ->with(['track.album', 'track.artist', 'device'])
@@ -38,6 +41,17 @@ class LibraryController extends Controller
             ->limit(10)
             ->get();
 
-        return view('library.index', compact('recentAlbums', 'recentPlays', 'topArtists', 'scope'));
+        $genres = LibraryOverview::topGenres($hidden);
+        $glance = LibraryOverview::glance($hidden);
+        $similarArtists = LibraryOverview::similarArtists($hidden, $topArtists);
+        $sound = LibraryOverview::soundBuckets($hidden);
+        $topRated = LibraryOverview::topRated($hidden)
+            ->with(['artist', 'genreRelation', 'metadata' => fn ($q) => $q->whereIn('key', Album::CARD_METADATA)])
+            ->withSourceFlags()
+            ->limit(6)
+            ->get();
+        AlbumSound::attach($topRated);
+
+        return view('library.index', compact('recentAlbums', 'recentPlays', 'topArtists', 'scope', 'genres', 'glance', 'similarArtists', 'sound', 'topRated'));
     }
 }

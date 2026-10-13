@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Domain\Analysis\AudioAnalysis;
 use App\Domain\Analysis\Stages\EssentiaStage;
 use App\Domain\Analysis\Stages\LoudnessStage;
+use App\Domain\Analysis\Stages\WaveformStage;
 use App\Domain\Analysis\Tools;
 use App\Domain\Library\Enrichment;
 use App\Domain\Library\LibraryMerger;
@@ -50,6 +51,12 @@ class AudioAnalysisTest extends TestCase
             Peak:        -0.5 dBFS
         TXT;
 
+    /** 8 samples of mono PCM: a quiet half and a loud half. */
+    private static function pcm(): string
+    {
+        return pack('s*', 100, -200, 300, -400, 5000, -10000, 20000, -20000);
+    }
+
     private string $dir;
 
     private bool $ffmpegFails = false;
@@ -74,6 +81,7 @@ class AudioAnalysisTest extends TestCase
                     ? Process::result('', 'song.flac: Invalid data found when processing input', 1)
                     : Process::result('', self::EBUR128),
                 str_contains($command, 'fpcalc') => Process::result(json_encode(['duration' => 241.3, 'fingerprint' => 'AQADtEmS'])),
+                str_contains($command, 's16le') => Process::result(self::pcm()),
                 str_contains($command, '-f wav') => Process::result(''),
                 default => Process::result('', "unexpected: {$command}", 1),
             };
@@ -140,7 +148,7 @@ class AudioAnalysisTest extends TestCase
         $this->assertSame('AQADtEmS', $analysis->fingerprint);
         $this->assertSame(241, $analysis->fingerprint_duration);
         $this->assertSame('rec-1', $analysis->acoustid_recording_mbid);
-        $this->assertEqualsCanonicalizing(['loudness', 'fingerprint', 'acoustid'], array_keys($analysis->stages), 'no Essentia sidecar configured');
+        $this->assertEqualsCanonicalizing(['loudness', 'waveform', 'fingerprint', 'acoustid'], array_keys($analysis->stages), 'no Essentia sidecar configured');
         $this->assertSame([], $analysis->errors);
 
         // The recording id becomes the track's mbid, from the source "acoustid".
@@ -160,7 +168,7 @@ class AudioAnalysisTest extends TestCase
 
         $analysis = $file->analysis()->first();
         $this->assertSame([], $analysis->errors, 'no "no fingerprint" error');
-        $this->assertSame(['loudness'], array_keys($analysis->stages));
+        $this->assertSame(['loudness', 'waveform'], array_keys($analysis->stages));
     }
 
     public function test_a_weak_acoustid_match_is_no_match(): void
@@ -380,5 +388,32 @@ class AudioAnalysisTest extends TestCase
         $this->assertSame('NLA000000001', $track->metadata()->where('key', 'isrc')->value('value'));
         $this->assertSame('art-1', $track->artist->metadata()->where('key', 'mbid')->value('value'));
         $this->assertSame('rel-1', $track->album->metadata()->where('key', 'mbid')->value('value'));
+    }
+
+    public function test_peaks_are_the_loudest_sample_of_each_part_scaled_to_100(): void
+    {
+        $this->assertSame([1, 2, 50, 100], WaveformStage::peaks(self::pcm(), 4));
+        $this->assertSame([100], WaveformStage::peaks(self::pcm(), 1));
+        $this->assertCount(8, WaveformStage::peaks(self::pcm(), 400), 'never more points than samples');
+
+        $this->expectException(\RuntimeException::class);
+        WaveformStage::peaks('', 4);
+    }
+
+    public function test_the_waveform_is_stored_and_served_by_the_api_and_drawn_on_the_album_page(): void
+    {
+        config(['analysis.waveform_points' => 4]);
+        $this->fakeAcoustId();
+        [$file, $track] = $this->localTrack();
+        $this->getJson("/api/library/tracks/{$track->id}/waveform")->assertNotFound();
+
+        AnalyzeAudioFile::dispatchSync($file);
+
+        $this->assertSame([1, 2, 50, 100], $file->analysis()->first()->waveform);
+        $this->assertSame([1, 2, 50, 100], $track->fresh()->waveform());
+        $this->getJson("/api/library/tracks/{$track->id}/waveform")->assertOk()
+            ->assertJsonPath('points', [1, 2, 50, 100])->assertJsonPath('duration', 200);
+
+        $this->get("/albums/{$track->album_id}")->assertOk()->assertSee('aria-label="Waveform"', false)->assertSee('Waveform');
     }
 }

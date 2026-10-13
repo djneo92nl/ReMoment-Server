@@ -29,6 +29,9 @@ return [
     /** Failed attempts of one stage (same version) before the backlog stops retrying it. */
     'max_attempts' => 3,
 
+    /** Peak values stored per track for drawing its waveform. */
+    'waveform_points' => (int) env('ANALYSIS_WAVEFORM_POINTS', 400),
+
     'ffmpeg' => env('FFMPEG_BINARY', 'ffmpeg'),
 
     'fpcalc' => env('FPCALC_BINARY', 'fpcalc'),

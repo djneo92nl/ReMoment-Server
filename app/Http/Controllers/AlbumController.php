@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Library\AlbumSound;
 use App\Domain\Library\LeadingSource;
+use App\Domain\Library\LibraryOverview;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\LibraryRemover;
 use App\Domain\Library\LibrarySources;
@@ -22,17 +24,26 @@ class AlbumController extends Controller
 
     public function index(Request $request)
     {
-        $sort = in_array($request->query('sort'), ['plays', 'recent', 'name', 'artist', 'year'], true)
+        $sort = in_array($request->query('sort'), ['plays', 'recent', 'name', 'artist', 'year', 'rating', 'listeners'], true)
             ? $request->query('sort')
             : 'recent';
         $search = trim((string) $request->query('q'));
         $favorites = $request->boolean('fav');
         $scope = LeadingSource::forRequest($request);
+        $hidden = LeadingSource::hidden($scope);
+        $genre = (string) $request->query('genre', '');
+        $mood = (string) $request->query('mood', '');
+        $tempo = (string) $request->query('tempo', '');
 
-        $albums = LibrarySources::albums(Album::query(), LeadingSource::hidden($scope))
+        $albums = LibrarySources::albums(Album::query(), $hidden)
             ->whereHas('tracks')
-            ->with('artist')
+            ->with(['artist', 'genreRelation', 'metadata' => fn ($q) => $q->whereIn('key', Album::CARD_METADATA)])
             ->withSourceFlags()
+            ->when($genre !== '', fn ($q) => LibraryOverview::whereGenre($q, $genre))
+            ->when($mood !== '', fn ($q) => LibraryOverview::whereMood($q, $mood))
+            ->when(isset(LibraryOverview::TEMPOS[$tempo]), fn ($q) => LibraryOverview::whereTempo($q, $tempo))
+            ->when($sort === 'rating', fn ($q) => LibraryOverview::orderByMeta($q, 'rating'))
+            ->when($sort === 'listeners', fn ($q) => LibraryOverview::orderByMeta($q, 'lastfm_listeners'))
             ->withCount('plays')
             ->when($search !== '', fn ($q) => $q->where(fn ($q) => $q
                 ->where('albums.name', 'like', "%{$search}%")
@@ -49,7 +60,16 @@ class AlbumController extends Controller
             ->paginate(96)
             ->withQueryString();
 
-        return view('albums.index', compact('albums', 'sort', 'scope', 'search', 'favorites'));
+        AlbumSound::attach($albums->getCollection());
+
+        $filters = [
+            'genres' => LibraryOverview::topGenres($hidden, 40),
+            'moods' => array_keys(LibraryOverview::soundBuckets($hidden)['moods']),
+            'tempos' => array_keys(LibraryOverview::soundBuckets($hidden)['tempos']),
+            'genre' => $genre, 'mood' => $mood, 'tempo' => $tempo,
+        ];
+
+        return view('albums.index', compact('albums', 'sort', 'scope', 'search', 'favorites', 'filters'));
     }
 
     public function show(Album $album)
@@ -76,8 +96,11 @@ class AlbumController extends Controller
         $playableDevices = Device::libraryCapable();
         $spotifyConnected = app(SpotifyTokenService::class)->isConnected();
 
+        $albumSound = AlbumSound::forAlbums([$album->id])[$album->id] ?? null;
+
         return view('albums.show', compact(
             'album',
+            'albumSound',
             'totalPlays',
             'totalSeconds',
             'recentPlays',

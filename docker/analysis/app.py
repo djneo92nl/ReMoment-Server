@@ -37,32 +37,79 @@ def _classes(name):
         return []
 
 
+_errors = {}
+
+
+def _schema(name):
+    """The graph's input and output node names, from the `schema` of its metadata json (models differ)."""
+    try:
+        with open(_path(name + ".json")) as f:
+            schema = json.load(f).get("schema", {})
+    except (OSError, ValueError):
+        return None, None, []
+    inputs = [i.get("name") for i in schema.get("inputs", [])]
+    outputs = schema.get("outputs", [])
+    return (inputs[0] if inputs else None), (outputs[0].get("name") if outputs else None), outputs
+
+
+def _try(key, build):
+    """Builds one model; a failure is remembered for /health and skips that model only."""
+    try:
+        _models[key] = build()
+    except Exception as e:  # noqa: BLE001 - any Essentia/TensorFlow error just drops this model
+        _errors[key] = str(e).splitlines()[0][:300]
+
+
+def _predictor(name):
+    """A TensorflowPredict2D classifier head, configured with the node names its json declares."""
+    from essentia.standard import TensorflowPredict2D
+    inp, out, _ = _schema(name)
+    kwargs = {"graphFilename": _path(name + ".pb")}
+    if inp:
+        kwargs["input"] = inp
+    if out:
+        kwargs["output"] = out
+    return TensorflowPredict2D(**kwargs)
+
+
 def _load_models():
-    """Loads whatever models are present; a missing one is skipped, not fatal."""
+    """Loads whatever models are present; a missing or broken one is skipped, not fatal."""
     if not WANT_ML:
         return
     try:
-        from essentia.standard import (TensorflowPredict2D, TensorflowPredictEffnetDiscogs,
-                                       TensorflowPredictMusiCNN)
+        from essentia.standard import TensorflowPredictEffnetDiscogs, TensorflowPredictMusiCNN
     except ImportError:
         return
 
     if os.path.exists(_path("discogs-effnet-bs64-1.pb")):
-        _models["effnet"] = TensorflowPredictEffnetDiscogs(
-            graphFilename=_path("discogs-effnet-bs64-1.pb"), output="PartitionedCall:1")
-        heads = [f"mood_{m}-discogs-effnet-1" for m in MOODS] + [
-            "danceability-discogs-effnet-1", "voice_instrumental-discogs-effnet-1", "genre_discogs400-discogs-effnet-1"]
-        for head in heads:
-            if os.path.exists(_path(head + ".pb")):
-                _models[head] = TensorflowPredict2D(
-                    graphFilename=_path(head + ".pb"),
-                    input="serving_default_model_Placeholder", output="PartitionedCall:0")
+        def effnet():
+            # The embedding is the output the json calls "embeddings"; the first one is the logits.
+            _, out, outputs = _schema("discogs-effnet-bs64-1")
+            for o in outputs:
+                if "embedding" in str(o.get("output_purpose", "")).lower() or "embedding" in str(o.get("description", "")).lower():
+                    out = o.get("name")
+            return TensorflowPredictEffnetDiscogs(graphFilename=_path("discogs-effnet-bs64-1.pb"), output=out or "PartitionedCall:1")
+
+        _try("effnet", effnet)
+
+        if "effnet" in _models:
+            heads = [f"mood_{m}-discogs-effnet-1" for m in MOODS] + [
+                "danceability-discogs-effnet-1", "voice_instrumental-discogs-effnet-1", "genre_discogs400-discogs-effnet-1"]
+            for head in heads:
+                if os.path.exists(_path(head + ".pb")):
+                    _try(head, lambda head=head: _predictor(head))
 
     if os.path.exists(_path("msd-musicnn-1.pb")) and os.path.exists(_path("deam-msd-musicnn-2.pb")):
-        _models["musicnn"] = TensorflowPredictMusiCNN(
-            graphFilename=_path("msd-musicnn-1.pb"), output="model/dense/BiasAdd")
-        _models["deam"] = TensorflowPredict2D(
-            graphFilename=_path("deam-msd-musicnn-2.pb"), input="model/Placeholder", output="model/Identity")
+        def musicnn():
+            _, out, outputs = _schema("msd-musicnn-1")
+            for o in outputs:
+                if "embedding" in str(o.get("output_purpose", "")).lower() or "embedding" in str(o.get("description", "")).lower():
+                    out = o.get("name")
+            return TensorflowPredictMusiCNN(graphFilename=_path("msd-musicnn-1.pb"), output=out or "model/dense/BiasAdd")
+
+        _try("musicnn", musicnn)
+        if "musicnn" in _models:
+            _try("deam", lambda: _predictor("deam-msd-musicnn-2"))
 
 
 _load_models()
@@ -137,7 +184,7 @@ def _ml(path):
 @app.get("/health")
 def health():
     return {"ok": True, "essentia": essentia.__version__, "ml": any(k in _models for k in ("effnet", "musicnn")),
-            "models": sorted(_models)}
+            "models": sorted(_models), "errors": _errors}
 
 
 @app.post("/analyze")

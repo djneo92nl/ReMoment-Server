@@ -13,7 +13,7 @@ class FileAnalysis extends Model
         'loudness_lufs', 'loudness_range', 'true_peak', 'replaygain_track_gain', 'replaygain_album_gain',
         'fingerprint', 'fingerprint_duration', 'acoustid_id', 'acoustid_recording_mbid', 'acoustid_score',
         'bpm', 'key', 'mode', 'key_strength', 'danceability', 'arousal', 'valence', 'instrumental',
-        'mood_tags', 'genre_tags',
+        'mood_tags', 'genre_tags', 'waveform',
     ];
 
     protected $guarded = ['id'];
@@ -23,7 +23,7 @@ class FileAnalysis extends Model
         'replaygain_track_gain' => 'float', 'replaygain_album_gain' => 'float',
         'acoustid_score' => 'float', 'bpm' => 'float', 'key_strength' => 'float', 'danceability' => 'float',
         'arousal' => 'float', 'valence' => 'float', 'instrumental' => 'float',
-        'mood_tags' => 'array', 'genre_tags' => 'array', 'stages' => 'array', 'errors' => 'array',
+        'mood_tags' => 'array', 'genre_tags' => 'array', 'waveform' => 'array', 'stages' => 'array', 'errors' => 'array',
     ];
 
     public function file(): BelongsTo

@@ -241,6 +241,14 @@ class Track extends Model
         ];
     }
 
+    /** @return list<int>|null peak values 0–100 of the track's own audio file, null until it is analysed */
+    public function waveform(): ?array
+    {
+        $a = $this->relationLoaded('analysis') ? $this->analysis : $this->analysis()->first();
+
+        return $a?->waveform ?: null;
+    }
+
     /** The MusicBrainz recording id: the one found by name or by audio fingerprint (not the tag's release-track id). */
     public function recordingMbid(): ?string
     {

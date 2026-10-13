@@ -244,6 +244,17 @@ class LibraryController extends Controller
         ]);
     }
 
+    /** The waveform of a track's own audio file: peak values 0–100, evenly spread over its length. */
+    public function waveform(Track $track): JsonResponse
+    {
+        $points = $track->waveform();
+
+        abort_if($points === null, 404, 'This track has no waveform (yet).');
+
+        return response()->json(['points' => $points, 'duration' => $track->duration])
+            ->header('Cache-Control', 'public, max-age=3600');
+    }
+
     /** Genres with artists or albums, most artists first. */
     public function genres(Request $request): JsonResponse
     {

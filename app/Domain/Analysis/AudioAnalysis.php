@@ -6,6 +6,7 @@ use App\Domain\Analysis\Stages\AcoustIdStage;
 use App\Domain\Analysis\Stages\EssentiaStage;
 use App\Domain\Analysis\Stages\FingerprintStage;
 use App\Domain\Analysis\Stages\LoudnessStage;
+use App\Domain\Analysis\Stages\WaveformStage;
 use App\Domain\Library\Enrichment;
 use App\Jobs\AnalyzeAudioFile;
 use App\Models\File;
@@ -32,7 +33,7 @@ class AudioAnalysis
      */
     public static function stages(): array
     {
-        $stages = [new LoudnessStage, new FingerprintStage, new AcoustIdStage, new EssentiaStage];
+        $stages = [new LoudnessStage, new WaveformStage, new FingerprintStage, new AcoustIdStage, new EssentiaStage];
 
         return array_combine(array_map(fn (AnalysisStage $s) => $s->key(), $stages), $stages);
     }

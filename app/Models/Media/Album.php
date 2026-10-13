@@ -18,6 +18,9 @@ class Album extends Model
 {
     use Favoritable, HasGenres, ReadsMetadata;
 
+    /** Metadata keys an album card (library, albums list) reads; load only these for a list of albums. */
+    public const CARD_METADATA = ['label', 'release_type', 'lastfm_listeners', 'rating'];
+
     protected $table = 'albums';
 
     protected $fillable = [
