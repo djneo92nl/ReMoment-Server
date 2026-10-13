@@ -26,7 +26,7 @@ mqtt_public_port: 1883
 # An unprivileged LXC container with nesting enabled (required for Docker).
 proxmox_ct_id: 200
 proxmox_ct_hostname: remoment
-proxmox_ct_ip: 192.168.1.100          # must match ansible_host of remoment_server
+proxmox_ct_ip: dhcp                   # 'dhcp', or a fixed address (then gateway/dns/cidr below apply); the playbook prints the address
 proxmox_ct_cidr: 24
 proxmox_ct_gateway: 192.168.1.1
 proxmox_ct_dns: 192.168.1.1
@@ -36,6 +36,7 @@ proxmox_ct_memory: 4096               # MB
 proxmox_ct_swap: 512                  # MB
 proxmox_ct_disk_storage: local-lvm    # storage for the root disk
 proxmox_ct_disk_size: 32              # GB
+proxmox_template_pattern: debian-13-standard   # pveam template to use (e.g. debian-12-standard)
 proxmox_template_storage: local       # storage holding container templates
 proxmox_ssh_public_key: ~/.ssh/id_rsa.pub   # key (on the control machine) installed for ansible_user
 
@@ -52,3 +53,14 @@ dlna_port: 8200
 # Unprivileged containers see host uid 0 as 100000+, so the path must be world-readable.
 proxmox_media_host_path: ''
 proxmox_media_size: 200
+
+# --- Audio analysis sidecar (deploy.yml) ----------------------------------------
+# Essentia container (BPM, key, mood), see docs/architecture/audio-analysis.md.
+# Adds the `analysis` compose profile and the ANALYSIS_* settings to .env.
+analysis_enabled: false
+# true = the TensorFlow build (mood, arousal/valence, instrumental, genre): a large image,
+# ~1 GB of models and a lot of CPU/RAM. Raise proxmox_ct_memory (6144+) and proxmox_ct_cores for it.
+analysis_essentia_ml: false
+analysis_mood_min_score: 0.7
+# Free AcoustID key (https://acoustid.org/new-application) for fingerprint lookups; empty = skip that stage.
+acoustid_api_key: ''

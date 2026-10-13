@@ -29,7 +29,7 @@ The app runs in Docker on a bridge network (`compose.yaml`, `docker-compose.prod
 | Responder in PHP inside the app container | No maintained PHP mDNS *responder* (`clue/mdns-react`, already a dependency, only resolves). Multicast from a bridge network doesn't reach the LAN reliably, and a long-running PHP responder would be one more process to supervise. |
 | Avahi container with `network_mode: host` | Works, but needs host networking plus usually the host's D-Bus socket or must conflict with a host Avahi already bound to 5353. More moving parts than the host package. |
 | `network_mode: host` for the app | Breaks the compose network (redis/meilisearch/mosquitto service names). |
-| **Avahi on the host + a static service file** | Chosen. Ubuntu ships `avahi-daemon`; a service file in `/etc/avahi/services/` is the whole implementation. Nothing in the app, no new dependencies, survives container restarts, and the advertised port matches the port Docker publishes. |
+| **Avahi on the host + a static service file** | Chosen. Debian ships `avahi-daemon`; a service file in `/etc/avahi/services/` is the whole implementation. Nothing in the app, no new dependencies, survives container restarts, and the advertised port matches the port Docker publishes. |
 
 The trade-off: the advertisement is static. It keeps announcing while the app container is down. Clients must handle a failing `GET /api/info` anyway (retry with backoff), so that is acceptable.
 

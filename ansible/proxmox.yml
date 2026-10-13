@@ -3,7 +3,7 @@
 # Usage: ansible-playbook -i ansible/inventory.yml ansible/proxmox.yml
 #
 # Then: setup.yml and deploy.yml against the new container.
-# Skip this playbook if you already have an Ubuntu VM/host: point remoment_server at it.
+# Skip this playbook if you already have a Debian VM/host: point remoment_server at it.
 
 - name: Create ReMoment container on Proxmox
   hosts: proxmox
@@ -18,9 +18,9 @@
         failed_when: false
         changed_when: false
 
-      - name: Find the latest Ubuntu 24.04 template
+      - name: Find the latest Debian template
         ansible.builtin.shell:
-            cmd: set -o pipefail; pveam available --section system | awk '/ubuntu-24.04-standard/ {print $2}' | sort -V | tail -n1
+            cmd: set -o pipefail; pveam available --section system | awk '/{{ proxmox_template_pattern }}/ {print $2}' | sort -V | tail -n1
             executable: /bin/bash
         register: ct_template
         changed_when: false
@@ -40,12 +40,13 @@
             --memory {{ proxmox_ct_memory }}
             --swap {{ proxmox_ct_swap }}
             --rootfs {{ proxmox_ct_disk_storage }}:{{ proxmox_ct_disk_size }}
-            --net0 name=eth0,bridge={{ proxmox_ct_bridge }},ip={{ proxmox_ct_ip }}/{{ proxmox_ct_cidr }},gw={{ proxmox_ct_gateway }}
-            --nameserver {{ proxmox_ct_dns }}
+            --net0 {{ ('name=eth0,bridge=' ~ proxmox_ct_bridge ~ ',ip=dhcp') if proxmox_ct_ip == 'dhcp'
+                      else ('name=eth0,bridge=' ~ proxmox_ct_bridge ~ ',ip=' ~ proxmox_ct_ip ~ '/' ~ proxmox_ct_cidr ~ ',gw=' ~ proxmox_ct_gateway) }}
+            {{ ('--nameserver ' ~ proxmox_ct_dns) if proxmox_ct_ip != 'dhcp' else '' }}
             --unprivileged 1
             --features nesting=1,keyctl=1
             --onboot 1
-            --ostype ubuntu
+            --ostype debian
             --mp0 {{ (proxmox_media_host_path ~ ',mp=' ~ dlna_media_dir ~ ',ro=1') if proxmox_media_host_path
                      else (proxmox_ct_disk_storage ~ ':' ~ proxmox_media_size ~ ',mp=' ~ dlna_media_dir) }}
         when: ct_status.rc != 0
@@ -55,7 +56,7 @@
         changed_when: false
 
       - name: Wait for the container network
-        ansible.builtin.command: pct exec {{ proxmox_ct_id }} -- getent hosts archive.ubuntu.com
+        ansible.builtin.command: pct exec {{ proxmox_ct_id }} -- getent hosts deb.debian.org
         register: ct_net
         retries: 15
         delay: 2
@@ -90,6 +91,18 @@
                   systemctl enable --now ssh
         changed_when: false
 
+      - name: Read the container's IP address
+        ansible.builtin.shell:
+            cmd: pct exec {{ proxmox_ct_id }} -- hostname -I | awk '{print $1}'
+        register: ct_addr
+        retries: 15
+        delay: 2
+        until: ct_addr.stdout | length > 0
+        changed_when: false
+
       - name: Report
         ansible.builtin.debug:
-            msg: "Container {{ proxmox_ct_id }} is up at {{ proxmox_ct_ip }}. Next: setup.yml, then deploy.yml."
+            msg: >-
+                Container {{ proxmox_ct_id }} is up at {{ ct_addr.stdout }}.
+                {{ 'It got this address from DHCP: reserve it in your router and ' if proxmox_ct_ip == 'dhcp' else '' }}
+                Set ansible_host of remoment_server in inventory.yml to it. Next: setup.yml, then deploy.yml.
