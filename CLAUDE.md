@@ -738,7 +738,7 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 - `/albums/{id}` — album detail with track listing
 - `/settings` — overview of listeners, MQTT config
 - `/settings/users` — user management table
-- `/settings/health` — supervisor, scheduler, queue worker, pending jobs, MQTT broker and per-device listener health
+- `/settings/health` — external services (Spotify/Last.fm/Discogs/TheAudioDB credentials, MusicBrainz, Wikipedia, Cover Art Archive, LRCLIB, storage locations; `Domain/Health/ExternalServices`, one read-only probe each, results cached 15 min, "Check now" re-runs them), supervisor, scheduler, queue worker, pending jobs, MQTT broker and per-device listener health
 - `/settings/dlna` — discover DLNA servers, trigger library scans
 - `/settings/storage` — storage locations (local/S3) for the own music files, queued scan/import/reorganize with live status, file browser (see `docs/architecture/file-storage.md`)
 - `/settings/spotify-connect` — map Spotify Connect speaker names to local devices
