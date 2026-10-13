@@ -70,6 +70,14 @@
             chdir: "{{ app_dir }}"
         changed_when: true
 
+      - name: Install npm dependencies
+        ansible.builtin.command:
+            cmd: >
+                docker compose -f docker-compose.prod.yml exec -T -u sail app
+                npm ci
+            chdir: "{{ app_dir }}"
+        changed_when: true
+
       - name: Build frontend assets
         ansible.builtin.command:
             cmd: >
@@ -83,6 +91,15 @@
             cmd: >
                 docker compose -f docker-compose.prod.yml exec -T -u sail app
                 php artisan migrate --force
+            chdir: "{{ app_dir }}"
+        changed_when: true
+
+      # Creates the admin login on a fresh install (firstOrCreate: never touches an existing one).
+      - name: Seed the admin user
+        ansible.builtin.command:
+            cmd: >
+                docker compose -f docker-compose.prod.yml exec -T -u sail app
+                php artisan db:seed --force
             chdir: "{{ app_dir }}"
         changed_when: true
 
