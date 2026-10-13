@@ -100,7 +100,7 @@ class FileIndexer
             'duration' => $tags['duration'],
         ]);
 
-        Enrichment::save($track, 'dlna_url', url('/stream/'.$track->id), 'url', self::URL_SOURCE);
+        Enrichment::save($track, 'dlna_url', StreamUrl::for($track->id), 'url', self::URL_SOURCE);
         $this->saveTags($track, $file, $tags);
 
         TrackFile::where('file_id', $file->id)->where('track_id', '!=', $track->id)->where('role', TrackFile::ORIGINAL)->delete();

@@ -294,12 +294,12 @@ class MusicPlayerDriver implements BatteryInterface, BluetoothInterface, DeviceI
 
     // --- LibraryPlaybackInterface ---
 
-    protected function startDlna(string $url): void
+    protected function startDlna(string $url, ?\App\Models\Media\Track $track = null): void
     {
         $this->client->playback()->playUri($url);
     }
 
-    protected function enqueueDlna(string $url): void
+    protected function enqueueDlna(string $url, ?\App\Models\Media\Track $track = null): void
     {
         $this->client->playback()->enqueue('track', 'dlna', $url);
     }

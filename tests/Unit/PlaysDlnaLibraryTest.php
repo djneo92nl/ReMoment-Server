@@ -20,14 +20,19 @@ class PlaysDlnaLibraryTest extends TestCase
 
             public array $calls = [];
 
-            protected function startDlna(string $url): void
+            protected function startDlna(string $url, ?Track $track = null): void
             {
                 $this->calls[] = ['start', $url];
             }
 
-            protected function enqueueDlna(string $url): void
+            protected function enqueueDlna(string $url, ?Track $track = null): void
             {
                 $this->calls[] = ['enqueue', $url];
+            }
+
+            protected function clearDlnaQueue(): void
+            {
+                $this->calls[] = ['clear'];
             }
         };
     }
@@ -50,7 +55,7 @@ class PlaysDlnaLibraryTest extends TestCase
 
         $player->playLibraryTracks(collect([$this->track('a', 'http://x/a'), $this->track('skipped', null), $this->track('b', 'http://x/b')]));
 
-        $this->assertSame([['start', 'http://x/a'], ['enqueue', 'http://x/b']], $player->calls);
+        $this->assertSame([['clear'], ['start', 'http://x/a'], ['enqueue', 'http://x/b']], $player->calls, 'the player queue is emptied before the first track starts');
     }
 
     public function test_nothing_playable_is_an_error(): void
@@ -65,6 +70,6 @@ class PlaysDlnaLibraryTest extends TestCase
         $player = $this->player();
         $player->playLibraryTrack($this->track('a', 'http://x/a'));
 
-        $this->assertSame([['start', 'http://x/a']], $player->calls);
+        $this->assertSame([['clear'], ['start', 'http://x/a']], $player->calls);
     }
 }

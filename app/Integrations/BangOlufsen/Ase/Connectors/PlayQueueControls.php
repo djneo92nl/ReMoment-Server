@@ -42,4 +42,36 @@ trait PlayQueueControls
 
         return array_slice($items, 0, $limit);
     }
+
+    /**
+     * Empties the speaker's play queue, item by item through the ids it lists (its own `delete` links), so
+     * what it played before cannot play on after the library content. Best effort: a queue that cannot be
+     * read or an item that cannot be removed never blocks playback.
+     */
+    public function clearPlayQueue(): void
+    {
+        try {
+            $queue = $this->deviceApiClient()->getStrict('BeoZone/Zone/PlayQueue')['playQueue'] ?? [];
+            $total = (int) ($queue['total'] ?? 0);
+
+            if ($total === 0) {
+                return;
+            }
+
+            // Offsets count from the playing item, so the queue starts at a negative one.
+            $items = $this->deviceApiClient()->getStrict('BeoZone/Zone/PlayQueue', ['offset' => (int) ($queue['startOffset'] ?? 0), 'count' => $total])['playQueue']['playQueueItem'] ?? [];
+        } catch (\Throwable) {
+            return;
+        }
+
+        foreach ($items as $item) {
+            if (!empty($item['id'])) {
+                try {
+                    $this->deviceApiClient()->deleteStrict('BeoZone/Zone/PlayQueue/'.$item['id']);
+                } catch (\Throwable) {
+                    // keep clearing the rest
+                }
+            }
+        }
+    }
 }

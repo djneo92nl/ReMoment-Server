@@ -2,6 +2,7 @@
 
 namespace App\Domain\Library;
 
+use App\Domain\Storage\StreamUrl;
 use App\Models\Media\Metadata;
 use App\Models\Media\Track;
 
@@ -14,6 +15,11 @@ final class DlnaTrackLookup
      */
     public static function byUrl(string $url): ?Track
     {
+        // Our own files: the URL is built when played from the current base address, so match on the track id.
+        if (($id = StreamUrl::trackId($url)) !== null) {
+            return Track::query()->with(['artist', 'album'])->find($id);
+        }
+
         $query = fn () => Metadata::query()->where('metadatable_type', Track::class)->where('key', 'dlna_url');
 
         $id = $query()->where('value', $url)->value('metadatable_id');

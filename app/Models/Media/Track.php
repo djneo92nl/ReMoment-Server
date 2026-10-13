@@ -3,6 +3,8 @@
 namespace App\Models\Media;
 
 use App\Domain\Library\Normalizer;
+use App\Domain\Storage\FileIndexer;
+use App\Domain\Storage\StreamUrl;
 use App\Models\FileAnalysis;
 use App\Models\Media\Concerns\HasGenres;
 use App\Models\Media\Concerns\ReadsMetadata;
@@ -122,13 +124,26 @@ class Track extends Model
         return $this->source === 'radio';
     }
 
+    /** Whether this server streams the track from a file of its own (see FileIndexer). */
+    public function isOwnFile(): bool
+    {
+        $rows = $this->relationLoaded('metadata') ? $this->metadata : $this->metadata()->where('key', 'dlna_url')->get();
+
+        return $rows->contains(fn ($m) => $m->key === 'dlna_url' && $m->source === FileIndexer::URL_SOURCE);
+    }
+
     public function getDlnaUrl(): ?string
     {
-        if ($this->relationLoaded('metadata')) {
-            return $this->metadata->firstWhere('key', 'dlna_url')?->value;
+        $row = $this->relationLoaded('metadata')
+            ? $this->metadata->firstWhere('key', 'dlna_url')
+            : $this->metadata()->where('key', 'dlna_url')->first();
+
+        // Our own files are addressed at play time, so the setting applies to tracks scanned before it.
+        if ($row?->source === FileIndexer::URL_SOURCE) {
+            return StreamUrl::for($this->id);
         }
 
-        return $this->metadata()->where('key', 'dlna_url')->value('value');
+        return $row?->value;
     }
 
     public function lyricsPlain(): ?string

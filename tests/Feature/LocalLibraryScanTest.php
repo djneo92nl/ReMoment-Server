@@ -65,7 +65,7 @@ class LocalLibraryScanTest extends TestCase
         $track = Track::firstOrFail();
         $this->assertSame('one', $track->name);
         $this->assertSame(1, $track->duration);
-        $this->assertSame(url('/stream/'.$track->id), $track->getDlnaUrl());
+        $this->assertSame(\App\Domain\Storage\StreamUrl::for($track->id), $track->getDlnaUrl());
         $this->assertSame(1, File::count());
         $this->assertTrue(TrackFile::firstOrFail()->is_primary);
 
@@ -235,5 +235,43 @@ class LocalLibraryScanTest extends TestCase
 
         $this->assertCount(1, $groups);
         $this->assertCount(2, $groups[0]);
+    }
+
+    public function test_the_stream_url_uses_the_configured_base_when_played(): void
+    {
+        $library = $this->location('library', 'library');
+        file_put_contents($this->base.'/library/a.wav', $this->wav());
+        app(LocalLibraryScanner::class)->scan($library);
+        $track = Track::firstOrFail();
+
+        config(['app.url' => 'http://remoment.test', 'app.stream_url' => null]);
+        $this->assertSame('http://remoment.test/stream/'.$track->id, $track->getDlnaUrl());
+
+        config(['app.stream_url' => 'http://192.168.1.48:8080/']);
+        $this->assertSame('http://192.168.1.48:8080/stream/'.$track->id, Track::find($track->id)->getDlnaUrl());
+    }
+
+    public function test_the_stream_answers_without_a_session_or_cookies(): void
+    {
+        $library = $this->location('library', 'library');
+        file_put_contents($this->base.'/library/a.wav', $this->wav());
+        app(LocalLibraryScanner::class)->scan($library);
+
+        $response = $this->get('/stream/'.Track::firstOrFail()->id)->assertOk();
+
+        $this->assertSame([], $response->headers->getCookies());
+        $this->assertNull($response->headers->get('Set-Cookie'));
+    }
+
+    public function test_our_stream_urls_are_found_again_whatever_host_they_were_built_with(): void
+    {
+        $library = $this->location('library', 'library');
+        file_put_contents($this->base.'/library/a.wav', $this->wav());
+        app(LocalLibraryScanner::class)->scan($library);
+        $track = Track::firstOrFail();
+
+        $this->assertSame($track->id, \App\Domain\Library\DlnaTrackLookup::byUrl('http://192.168.1.48:8080/stream/'.$track->id)?->id);
+        $this->assertSame($track->id, \App\Domain\Library\DlnaTrackLookup::byUrl('http://remoment.test/stream/'.$track->id.'?x=1')?->id);
+        $this->assertNull(\App\Domain\Storage\StreamUrl::trackId('http://x/other/5'));
     }
 }

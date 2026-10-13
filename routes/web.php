@@ -18,7 +18,15 @@ use App\Http\Controllers\StatsController;
 use App\Http\Controllers\StreamController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/stream/{track}', [StreamController::class, 'show'])->name('stream');
+// Speakers pull audio here: no session, cookies or CSRF (every request would write a session row), only route binding.
+Route::get('/stream/{track}', [StreamController::class, 'show'])->name('stream')->withoutMiddleware([
+    \Illuminate\Cookie\Middleware\EncryptCookies::class,
+    \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+    \Illuminate\Session\Middleware\StartSession::class,
+    \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+    \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
+    \App\Http\Middleware\RedirectToSetupWizard::class,
+]);
 
 Route::get('/', function () {
     return redirect()->route('devices.index');

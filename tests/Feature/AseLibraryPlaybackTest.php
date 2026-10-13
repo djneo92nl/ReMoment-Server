@@ -65,7 +65,7 @@ class AseLibraryPlaybackTest extends TestCase
 
         $driver->playLibraryTrack($this->track('One', 'http://dlna.test/one.mp3'));
 
-        $this->assertSame(['POST BeoZone/Zone/PlayQueue?instantplay'], $api->requests);
+        $this->assertSame(['GET BeoZone/Zone/PlayQueue', 'POST BeoZone/Zone/PlayQueue?instantplay'], $api->requests);
         $this->assertSame(['playQueueItem' => ['behaviour' => 'impulsive', 'track' => ['dlna' => ['url' => 'http://dlna.test/one.mp3']]]], $api->bodies[0]);
     }
 
@@ -89,7 +89,7 @@ class AseLibraryPlaybackTest extends TestCase
 
         $driver->playLibraryTracks($tracks);
 
-        $this->assertSame(['POST BeoZone/Zone/PlayQueue?instantplay', 'POST BeoZone/Zone/PlayQueue'], $api->requests, 'the first starts playing, the rest are queued; a track without a stream is skipped');
+        $this->assertSame(['GET BeoZone/Zone/PlayQueue', 'POST BeoZone/Zone/PlayQueue?instantplay', 'POST BeoZone/Zone/PlayQueue'], $api->requests, 'the old queue is read first; the first starts playing, the rest are queued; a track without a stream is skipped');
     }
 
     public function test_plays_a_playlist(): void
@@ -100,7 +100,86 @@ class AseLibraryPlaybackTest extends TestCase
 
         $driver->playLibraryPlaylist($playlist);
 
-        $this->assertCount(2, $api->requests);
+        $this->assertCount(3, $api->requests);
         $this->assertSame('http://dlna.test/a.mp3', $api->bodies[0]['playQueueItem']['track']['dlna']['url']);
+    }
+
+    public function test_the_speakers_old_queue_is_emptied_before_a_library_album_plays(): void
+    {
+        $driver = $this->driver($api);
+        $api->seed('BeoZone/Zone/PlayQueue', ['playQueue' => ['total' => 3, 'startOffset' => -2]]);
+        $api->seed('BeoZone/Zone/PlayQueue?offset=-2&count=3', ['playQueue' => ['playQueueItem' => [['id' => 'plid-1'], ['id' => 'plid-2'], ['id' => 'plid-3']]]]);
+
+        $driver->playLibraryTracks(collect([$this->track('A', 'http://dlna.test/a.mp3'), $this->track('B', 'http://dlna.test/b.mp3')]));
+
+        $this->assertSame([
+            'GET BeoZone/Zone/PlayQueue',
+            'GET BeoZone/Zone/PlayQueue?offset=-2&count=3',
+            'DELETE BeoZone/Zone/PlayQueue/plid-1',
+            'DELETE BeoZone/Zone/PlayQueue/plid-2',
+            'DELETE BeoZone/Zone/PlayQueue/plid-3',
+            'POST BeoZone/Zone/PlayQueue?instantplay',
+            'POST BeoZone/Zone/PlayQueue',
+        ], $api->requests);
+    }
+
+    public function test_an_item_that_cannot_be_removed_does_not_stop_the_rest_or_playback(): void
+    {
+        $driver = $this->driver($api);
+        $api->seed('BeoZone/Zone/PlayQueue', ['playQueue' => ['total' => 2, 'startOffset' => 0]]);
+        $api->seed('BeoZone/Zone/PlayQueue?offset=0&count=2', ['playQueue' => ['playQueueItem' => [['id' => 'plid-1'], ['id' => 'plid-2']]]]);
+        $api->seed('BeoZone/Zone/PlayQueue/plid-1', [], 500);
+
+        $driver->playLibraryTrack($this->track('A', 'http://dlna.test/a.mp3'));
+
+        $this->assertContains('DELETE BeoZone/Zone/PlayQueue/plid-2', $api->requests);
+        $this->assertSame('POST BeoZone/Zone/PlayQueue?instantplay', end($api->requests));
+    }
+
+    private function ownTrack(string $name): Track
+    {
+        $track = $this->track($name, 'http://old-host.test/stream/1');
+        Metadata::where('metadatable_id', $track->id)->where('key', 'dlna_url')->update(['source' => 'dlna:local']);
+
+        return $track->refresh();
+    }
+
+    public function test_a_track_of_our_own_files_carries_its_details_to_the_speaker(): void
+    {
+        config(['app.stream_url' => 'http://192.168.1.48:8080']);
+        $driver = $this->driver($api);
+        $track = $this->ownTrack('Casualty');
+        $track->update(['duration' => 200]);
+
+        $driver->playLibraryTrack($track);
+
+        $item = $api->bodies[0]['playQueueItem']['track'];
+        $this->assertSame('http://192.168.1.48:8080/stream/'.$track->id, $item['dlna']['url']);
+        $this->assertSame('Casualty', $item['name']);
+        $this->assertArrayNotHasKey('duration', $item, 'the B&O app would show it as seconds');
+        $this->assertArrayNotHasKey('artist', $item, 'the speaker answers 400 to artist and parentAlbum on a DLNA item');
+        $this->assertArrayNotHasKey('parentAlbum', $item);
+    }
+
+    public function test_a_speaker_that_rejects_the_details_gets_the_plain_item(): void
+    {
+        $driver = $this->driver($api);
+        $api->seed('BeoZone/Zone/PlayQueue?instantplay', [], 400);
+        $track = $this->ownTrack('Casualty');
+
+        $driver->playLibraryTrack($track);
+
+        $posts = array_values(array_filter($api->requests, fn ($r) => str_starts_with($r, 'POST')));
+        $this->assertCount(2, $posts, 'details first, then the plain item');
+        $this->assertSame(['dlna'], array_keys($api->bodies[1]['playQueueItem']['track']));
+    }
+
+    public function test_tracks_of_a_dlna_server_keep_the_plain_item(): void
+    {
+        $driver = $this->driver($api);
+
+        $driver->playLibraryTrack($this->track('One', 'http://dlna.test/one.mp3'));
+
+        $this->assertSame(['dlna'], array_keys($api->bodies[0]['playQueueItem']['track']));
     }
 }

@@ -156,22 +156,34 @@ class LibraryPlayback
             && ($device === null || LibrarySources::playableOn($library, $device));
     }
 
-    /** Tracks in best-effort album order (no track number column exists). */
+    /** Metadata the album order reads, next to what playback needs. */
+    private const ORDER_METADATA = ['disc_number', 'track_number'];
+
+    /** Tracks in album order: disc, then track number (tracks without a position last, in the order they were added). */
     public static function albumTracks(Album $album, array $hiddenSources = []): Collection
     {
-        return LibrarySources::tracks($album->tracks(), $hiddenSources)
-            ->orderBy('id')
-            ->with(['metadata' => fn ($q) => $q->whereIn('key', self::PLAYBACK_METADATA)])
-            ->get();
+        return self::inAlbumOrder(LibrarySources::tracks($album->tracks(), $hiddenSources)
+            ->with(['metadata' => fn ($q) => $q->whereIn('key', [...self::PLAYBACK_METADATA, ...self::ORDER_METADATA])])
+            ->get());
     }
 
-    /** Tracks grouped by album, best-effort order within. */
+    /** Tracks grouped by album, in album order within each. */
     public static function artistTracks(Artist $artist): Collection
     {
-        return $artist->tracks()
-            ->orderBy('album_id')->orderBy('id')
-            ->with(['metadata' => fn ($q) => $q->whereIn('key', self::PLAYBACK_METADATA)])
-            ->get();
+        return self::inAlbumOrder($artist->tracks()
+            ->with(['metadata' => fn ($q) => $q->whereIn('key', [...self::PLAYBACK_METADATA, ...self::ORDER_METADATA])])
+            ->get(), byAlbum: true);
+    }
+
+    /** @param  Collection<int, Track>  $tracks  with their metadata loaded */
+    private static function inAlbumOrder(Collection $tracks, bool $byAlbum = false): Collection
+    {
+        return $tracks->sortBy(fn (Track $t) => [
+            $byAlbum ? (int) $t->album_id : 0,
+            (int) ($t->metaValue('disc_number') ?: 1),
+            (int) ($t->metaValue('track_number') ?: 9999),
+            $t->id,
+        ])->values();
     }
 
     public function playAlbum(Device $device, Album $album, ?Track $start = null, bool $shuffle = false): PlaybackResult

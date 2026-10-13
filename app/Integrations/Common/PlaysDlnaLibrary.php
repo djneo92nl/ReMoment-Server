@@ -12,11 +12,14 @@ use Illuminate\Support\Collection;
  */
 trait PlaysDlnaLibrary
 {
-    /** Plays the stream now, replacing what plays. */
-    abstract protected function startDlna(string $url): void;
+    /** Plays the stream now, replacing what plays. $track is the library track, for players that can show its details. */
+    abstract protected function startDlna(string $url, ?Track $track = null): void;
 
     /** Appends the stream to the queue. */
-    abstract protected function enqueueDlna(string $url): void;
+    abstract protected function enqueueDlna(string $url, ?Track $track = null): void;
+
+    /** Empties the player's own queue before a library track or collection starts; players that replace it themselves do nothing. */
+    protected function clearDlnaQueue(): void {}
 
     public function playLibraryTrack(Track $track): void
     {
@@ -26,7 +29,8 @@ trait PlaysDlnaLibrary
             throw new \RuntimeException("Track {$track->id} has no DLNA URL.");
         }
 
-        $this->startDlna($url);
+        $this->clearDlnaQueue();
+        $this->startDlna($url, $track);
     }
 
     public function playLibraryTracks(Collection $tracks): void
@@ -37,8 +41,10 @@ trait PlaysDlnaLibrary
             throw new \RuntimeException('No tracks with a playable DLNA URL.');
         }
 
+        $this->clearDlnaQueue();
+
         foreach ($playable as $i => $track) {
-            $i === 0 ? $this->startDlna($track->getDlnaUrl()) : $this->enqueueDlna($track->getDlnaUrl());
+            $i === 0 ? $this->startDlna($track->getDlnaUrl(), $track) : $this->enqueueDlna($track->getDlnaUrl(), $track);
         }
     }
 

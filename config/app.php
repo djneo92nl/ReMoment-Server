@@ -58,6 +58,12 @@ return [
     'url' => env('APP_URL', 'http://localhost'),
 
     /*
+     * Where speakers pull our own audio files from (see App\Domain\Storage\StreamUrl). Must be an address the
+     * speakers can reach, e.g. http://192.168.1.48:8080; empty means APP_URL.
+     */
+    'stream_url' => env('STREAM_BASE_URL'),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------

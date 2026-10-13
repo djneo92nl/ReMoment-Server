@@ -186,4 +186,31 @@ class LibraryPlaybackTest extends TestCase
         $this->assertCount(1, FakeLibraryPlaybackDriver::$calls);
         $this->assertSame('playLibraryTrack', FakeLibraryPlaybackDriver::$calls[0]['method']);
     }
+
+    public function test_an_album_plays_in_track_order_not_in_the_order_it_was_scanned(): void
+    {
+        $artist = \App\Models\Media\Artist::create(['name' => 'A', 'source' => 'dlna']);
+        $album = \App\Models\Media\Album::create(['name' => 'Al', 'artist_id' => $artist->id, 'source' => 'dlna']);
+        $make = function (string $name, ?int $disc, ?int $number) use ($artist, $album) {
+            $track = \App\Models\Media\Track::create(['album_id' => $album->id, 'artist_id' => $artist->id, 'name' => $name, 'external_id' => 'x:'.$name, 'source' => 'dlna']);
+            foreach (['disc_number' => $disc, 'track_number' => $number] as $key => $value) {
+                if ($value !== null) {
+                    \App\Models\Media\Metadata::create(['metadatable_type' => \App\Models\Media\Track::class, 'metadatable_id' => $track->id, 'key' => $key, 'value' => (string) $value, 'type' => 'int', 'source' => 'local']);
+                }
+            }
+
+            return $track;
+        };
+
+        // created in the order the files were scanned
+        $make('five', null, 5);
+        $make('unnumbered', null, null);
+        $make('disc2-one', 2, 1);
+        $make('one', null, 1);
+        $make('three', 1, 3);
+
+        $names = \App\Domain\Library\LibraryPlayback::albumTracks($album)->pluck('name')->all();
+
+        $this->assertSame(['one', 'three', 'five', 'unnumbered', 'disc2-one'], $names);
+    }
 }

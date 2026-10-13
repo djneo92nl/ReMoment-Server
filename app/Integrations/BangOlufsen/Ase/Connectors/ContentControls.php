@@ -2,20 +2,60 @@
 
 namespace App\Integrations\BangOlufsen\Ase\Connectors;
 
+use App\Domain\Artwork\ArtworkCache;
+use App\Domain\Artwork\LibraryArtwork;
+use App\Domain\Storage\StreamUrl;
+use App\Models\Media\Track;
+
 trait ContentControls
 {
     abstract protected function deviceApiClient(): \App\Integrations\Common\HttpConnector;
 
-    public function playDlnaTrack(string $url, bool $instant = true): void
+    /**
+     * Starts or queues a stream. For a track of our own files the item also carries its name, number and
+     * cover, because the speaker keeps nothing else to show; a speaker that rejects those fields gets the plain
+     * item, which is what DLNA servers' tracks always use.
+     */
+    public function playDlnaTrack(string $url, bool $instant = true, ?Track $track = null): void
     {
         $path = 'BeoZone/Zone/PlayQueue'.($instant ? '?instantplay' : '');
-        $this->deviceApiClient()->post($path, [
-            'playQueueItem' => [
-                'behaviour' => 'impulsive',
-                'track' => [
-                    'dlna' => ['url' => $url],
-                ],
-            ],
+        $item = ['behaviour' => 'impulsive', 'track' => ['dlna' => ['url' => $url]]];
+
+        if ($track !== null && $track->isOwnFile()) {
+            try {
+                $rich = $item;
+                $rich['track'] += $this->ownTrackDetails($track);
+                $this->deviceApiClient()->postStrict($path, ['playQueueItem' => $rich]);
+
+                return;
+            } catch (\RuntimeException $e) {
+                // fall through to the plain item
+                \Illuminate\Support\Facades\Log::warning('ASE rejected the track details of a queue item, sending it plain: '.$e->getMessage());
+            }
+        }
+
+        $this->deviceApiClient()->post($path, ['playQueueItem' => $item]);
+    }
+
+    /**
+     * What the speaker keeps of a streamed track's own item: name, track number and the cover as `image` entries.
+     * No `duration`: it is kept but the B&O app then shows it as seconds (a 190 s track as -3166:38); the speaker reads
+     * the real length from the stream. Probed on a BeoSound Essence MK2: it drops any other field inside `dlna`,
+     * and answers 400 ("Illegal structure ... Key: dlna") to `artist` and `parentAlbum`, whose objects
+     * need provider ids a DLNA stream has none of. Title, artist and album come from the file's tags when it plays.
+     *
+     * @return array<string, mixed>
+     */
+    private function ownTrackDetails(Track $track): array
+    {
+        $track->loadMissing('album');
+        $cover = LibraryArtwork::coverUrl($track->images) ?? LibraryArtwork::coverUrl($track->album?->images);
+        $url = $cover ? StreamUrl::storage((string) (ArtworkCache::get($cover)['proxy_512'] ?? '')) : null;
+
+        return array_filter([
+            'name' => $track->name,
+            'trackNumber' => $track->metaInt('track_number'),
+            'image' => $url ? [['url' => $url, 'size' => 'large', 'mediatype' => 'image/jpg']] : null,
         ]);
     }
 

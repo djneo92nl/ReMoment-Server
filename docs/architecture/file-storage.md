@@ -42,6 +42,14 @@ Scanning, importing the inbox and reorganizing can take long, so the web UI and 
 
 All locations are also scanned nightly at 03:30 (`library:scan-files --queue`).
 
+## Playing on a speaker
+
+- **Address:** the speaker must be able to reach the stream URL. It is built when a track is played (`StreamUrl::for()`) from `STREAM_BASE_URL` (config `app.stream_url`, e.g. `http://192.168.1.48:8080`), falling back to `APP_URL`; never stored, so changing it needs no rescan. On a dev machine `APP_URL` is often a name only that machine resolves (`remomentserver.test`), which a speaker cannot; with Sail use the published port.
+- **No session:** `/stream/{track}` skips the cookie/session/CSRF middleware, so a speaker's requests write nothing.
+- **Queue:** playing library content on a B&O ASE speaker first empties the speaker's own play queue (item by item through the ids it lists, best effort), so earlier Tidal or album items do not play on after it. Sonos already replaces its queue.
+- **Track details:** for a track of our own files the ASE queue item also carries name, track number and cover (`ContentControls::ownTrackDetails`); no `duration`, which the speaker keeps but the B&O app then shows as seconds (-3166:38 for a 190 s track). Probed on a BeoSound Essence MK2: the track keeps `name`, `duration`, `trackNumber`, `genre`, `id` and `image`; fields inside `dlna` are accepted but dropped; `artist` and `parentAlbum` are answered with `400` (they need provider ids), so artist and album come from the file's tags when it plays. If the speaker rejects the item the plain one is sent (logged as a warning). DLNA servers' tracks always use the plain item. The queue-item fields and the per-item `DELETE BeoZone/Zone/PlayQueue/{id}` follow what the speaker itself lists; not yet verified on every model.
+- `DlnaTrackLookup::byUrl()` recognizes our stream URLs by `/stream/{id}`, whatever host they were built with, so the speaker's queue ("up next") resolves them.
+
 ## Commands
 
 ```bash
