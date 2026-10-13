@@ -39,5 +39,7 @@
         <env name="ACOUSTID_API_KEY" value=""/>
         <env name="ANALYSIS_ENABLED" value="false"/>
         <env name="ANALYSIS_ESSENTIA_URL" value=""/>
+        <env name="ANALYSIS_ESSENTIA_ML" value="false"/>
+        <env name="ANALYSIS_MOOD_MIN_SCORE" value="0.7"/>
     </php>
 </phpunit>

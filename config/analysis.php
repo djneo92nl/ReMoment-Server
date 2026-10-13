@@ -54,6 +54,9 @@ return [
 
     'essentia_ml' => (bool) env('ANALYSIS_ESSENTIA_ML', false),
 
+    /** A mood classifier score below this is not kept as a mood tag (scores run 0–1; the sidecar already drops those under 0.5). */
+    'mood_min_score' => (float) env('ANALYSIS_MOOD_MIN_SCORE', 0.7),
+
     'essentia_timeout' => (int) env('ANALYSIS_ESSENTIA_TIMEOUT', 600),
 
 ];

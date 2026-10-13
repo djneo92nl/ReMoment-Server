@@ -279,6 +279,21 @@ class AudioAnalysisTest extends TestCase
         $this->assertSame('1+ml', (new EssentiaStage)->version());
     }
 
+    public function test_mood_tags_under_the_cut_off_are_dropped(): void
+    {
+        config(['analysis.mood_min_score' => 0.7]);
+
+        $attributes = EssentiaStage::attributes(['mood_tags' => [
+            ['name' => 'party', 'score' => 0.83], ['name' => 'aggressive', 'score' => 0.62], ['name' => 'happy', 'score' => 0.7],
+        ]]);
+
+        $this->assertSame([['name' => 'party', 'score' => 0.83], ['name' => 'happy', 'score' => 0.7]], $attributes['mood_tags']);
+        $this->assertArrayNotHasKey('mood_tags', EssentiaStage::attributes(['mood_tags' => [['name' => 'sad', 'score' => 0.55]]]));
+
+        // Genres keep every score the sidecar sent.
+        $this->assertSame([['name' => 'Rock', 'score' => 0.2]], EssentiaStage::attributes(['genre_tags' => [['name' => 'Rock', 'score' => 0.2]]])['genre_tags']);
+    }
+
     public function test_features_the_sidecar_did_not_compute_are_left_out(): void
     {
         $this->assertSame(['bpm' => 120.0], EssentiaStage::attributes(['bpm' => 120, 'mode' => 'weird', 'mood_tags' => []]));

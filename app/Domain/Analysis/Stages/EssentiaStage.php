@@ -74,10 +74,11 @@ class EssentiaStage implements AnalysisStage
     public static function attributes(array $data): array
     {
         $unit = fn ($v) => is_numeric($v) ? max(0.0, min(1.0, (float) $v)) : null;
-        $tags = fn ($list) => array_values(array_map(
+        $tags = fn ($list, float $minimum = 0.0) => array_values(array_map(
             fn ($t) => ['name' => (string) $t['name'], 'score' => round((float) ($t['score'] ?? 0), 3)],
-            array_filter((array) $list, fn ($t) => is_array($t) && !empty($t['name'])),
+            array_filter((array) $list, fn ($t) => is_array($t) && !empty($t['name']) && (float) ($t['score'] ?? 0) >= $minimum),
         ));
+        $moods = $tags($data['mood_tags'] ?? [], (float) config('analysis.mood_min_score'));
 
         $mode = isset($data['mode']) ? strtolower((string) $data['mode']) : null;
 
@@ -90,7 +91,7 @@ class EssentiaStage implements AnalysisStage
             'arousal' => $unit($data['arousal'] ?? null),
             'valence' => $unit($data['valence'] ?? null),
             'instrumental' => $unit($data['instrumental'] ?? null),
-            'mood_tags' => !empty($data['mood_tags']) ? $tags($data['mood_tags']) : null,
+            'mood_tags' => $moods ?: null,
             'genre_tags' => !empty($data['genre_tags']) ? $tags($data['genre_tags']) : null,
         ], fn ($v) => $v !== null);
     }
