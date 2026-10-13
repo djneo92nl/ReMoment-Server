@@ -17,7 +17,9 @@
             repo: "{{ app_repo }}"
             dest: "{{ app_dir }}"
             version: "{{ app_branch }}"
-            force: false
+            # The server checkout is deploy-only: `npm run build` rewrites the tracked public/build/manifest.json,
+            # which would otherwise block every update. Untracked/ignored files (.env, database, storage) are kept.
+            force: true
             accept_hostkey: true   # first clone: github.com isn't in known_hosts yet
 
       - name: Ensure SQLite database file exists
@@ -102,6 +104,15 @@
                 php artisan db:seed --force
             chdir: "{{ app_dir }}"
         changed_when: true
+
+      # public/storage -> storage/app/public serves the processed artwork (/storage/artwork/...); without it every cover is a 404.
+      - name: Link the public storage directory
+        ansible.builtin.command:
+            cmd: >
+                docker compose -f docker-compose.prod.yml exec -T -u sail app
+                php artisan storage:link --force
+            chdir: "{{ app_dir }}"
+        changed_when: false
 
       - name: Optimize Laravel application
         ansible.builtin.command:
