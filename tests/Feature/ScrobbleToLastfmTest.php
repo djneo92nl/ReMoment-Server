@@ -126,4 +126,26 @@ class ScrobbleToLastfmTest extends TestCase
 
         Http::assertNothingSent();
     }
+
+    public function test_skips_a_streaming_source_switched_off(): void
+    {
+        \App\Domain\Lastfm\ScrobbleSources::setDisabled(['spotify']);
+        Http::fake();
+
+        (new ScrobbleToLastfm($this->makePlay(['source_type' => 'spotify'])))
+            ->handle(app(\App\Services\LastfmSessionService::class));
+
+        Http::assertNothingSent();
+    }
+
+    public function test_scrobbles_other_sources_when_one_is_switched_off(): void
+    {
+        \App\Domain\Lastfm\ScrobbleSources::setDisabled(['spotify']);
+        Http::fake(['*' => Http::response(['scrobbles' => []])]);
+
+        (new ScrobbleToLastfm($this->makePlay(['source_type' => 'dlna'])))
+            ->handle(app(\App\Services\LastfmSessionService::class));
+
+        Http::assertSentCount(1);
+    }
 }

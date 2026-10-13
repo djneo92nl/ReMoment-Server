@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Artwork\SdCardExport;
+use App\Domain\Lastfm\ScrobbleSources;
 use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibrarySettings;
 use App\Integrations\Spotify\MusicPlayerDriver as SpotifyDriver;
@@ -17,6 +18,7 @@ use App\Services\Dlna\DlnaLibraryScanner;
 use App\Services\Dlna\DlnaServerDiscovery;
 use App\Services\LastfmSessionService;
 use App\Services\SpotifyTokenService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class SettingsController extends Controller
@@ -50,7 +52,18 @@ class SettingsController extends Controller
         return view('settings.lastfm', [
             'connected' => $lastfm->isConnected(),
             'username' => $lastfm->username(),
+            'streamingSources' => ScrobbleSources::STREAMING,
+            'disabledSources' => ScrobbleSources::disabled(),
         ]);
+    }
+
+    public function lastfmSources(Request $request): RedirectResponse
+    {
+        $enabled = (array) $request->input('sources', []);
+
+        ScrobbleSources::setDisabled(array_diff(array_keys(ScrobbleSources::STREAMING), $enabled));
+
+        return back()->with('success', 'Scrobbling sources saved.');
     }
 
     public function library()

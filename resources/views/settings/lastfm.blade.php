@@ -40,6 +40,26 @@
                 <p class="text-sm text-gray-500 dark:text-gray-500 mb-6">
                     Plays are scrobbled to Last.fm as they finish, and artist bios/tags are pulled in the background.
                 </p>
+                <form method="POST" action="{{ route('settings.lastfm.sources') }}" class="mb-6">
+                    @csrf
+                    <h2 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">Scrobble streaming sources</h2>
+                    <p class="text-sm text-gray-500 dark:text-gray-500 mb-3">
+                        Turn a source off when the service scrobbles to Last.fm itself, so plays aren't counted twice.
+                    </p>
+                    <div class="space-y-2 mb-4">
+                        @foreach($streamingSources as $key => $label)
+                            <label class="flex items-center gap-3 text-sm text-gray-700 dark:text-gray-300">
+                                <input type="checkbox" name="sources[]" value="{{ $key }}"
+                                       @checked(!in_array($key, $disabledSources, true))
+                                       class="rounded border-gray-300 dark:border-stone-700">
+                                {{ $label }}
+                            </label>
+                        @endforeach
+                    </div>
+                    <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-xl transition-colors">
+                        Save
+                    </button>
+                </form>
                 <form method="POST" action="{{ route('lastfm.disconnect') }}">
                     @csrf
                     <button type="submit" class="text-sm text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors">

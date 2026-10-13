@@ -3,6 +3,7 @@
 namespace App\Listeners\Device;
 
 use App\Domain\Artwork\ArtworkCache;
+use App\Domain\Lastfm\ScrobbleSources;
 use App\Domain\Library\Enrichment;
 use App\Domain\Library\LibraryIdentity;
 use App\Domain\Library\LibrarySettings;
@@ -208,16 +209,20 @@ class StorePlaybackHistory implements ShouldQueue
         }
 
         // --- Record the play event ---
+        $sourceType = $npTrack->source ?? $nowPlaying->platform ?? $event->sourceType ?? 'music';
+
         Play::create([
             'device_id' => (int) $deviceId,
             'track_id' => $track->id,
-            'source_type' => $npTrack->source ?? $nowPlaying->platform ?? $event->sourceType ?? 'music',
+            'source_type' => $sourceType,
             'radio_name' => $radio?->name,
             'radio_station_id' => $radioStation?->id,
             'played_at' => now(),
         ]);
 
-        SendNowPlayingToLastfm::dispatch($track);
+        if (ScrobbleSources::enabled($sourceType)) {
+            SendNowPlayingToLastfm::dispatch($track);
+        }
 
         // --- Store metadata from the Track object (key/value) ---
         // Drivers send a list of key/value arrays (Spotify) or one flat key/value array (B&O ASE).
@@ -252,6 +257,8 @@ class StorePlaybackHistory implements ShouldQueue
         $radio = $nowPlaying->radio;
         $radioStation = $radio !== null ? $this->resolveRadioStation($radio->name, $radio->id, (int) $event->deviceId) : null;
 
+        $sourceType = $npTrack->source ?? $nowPlaying->platform ?? $event->sourceType ?? 'music';
+
         $play = Play::create([
             'device_id' => (int) $event->deviceId,
             'track_id' => null,
@@ -260,13 +267,15 @@ class StorePlaybackHistory implements ShouldQueue
             'album_name' => $albumName !== '' ? $albumName : null,
             'image_url' => $image,
             'duration' => $npTrack->duration,
-            'source_type' => $npTrack->source ?? $nowPlaying->platform ?? $event->sourceType ?? 'music',
+            'source_type' => $sourceType,
             'radio_name' => $radio?->name,
             'radio_station_id' => $radioStation?->id,
             'played_at' => now(),
         ]);
 
-        SendNowPlayingToLastfm::dispatch($play);
+        if (ScrobbleSources::enabled($sourceType)) {
+            SendNowPlayingToLastfm::dispatch($play);
+        }
     }
 
     private function enrichSpotifyAlbum(?Album $album, array $meta): void

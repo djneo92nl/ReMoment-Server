@@ -42,6 +42,8 @@ Two jobs, both `ShouldQueue` with `tries = 3` / `backoff = 60`, dispatched from 
 
 Both no-op silently (no job dispatched to Last.fm) if no account is connected. If `signedRequest` throws, the queue worker retries the job per `tries`/`backoff` before giving up — a non-transient error (e.g. a revoked session key) will still burn all retries, since retryable and permanent Last.fm error codes aren't currently distinguished.
 
+**Per-source switch:** `/settings/lastfm` lists the streaming sources (`ScrobbleSources::STREAMING`: Spotify, Deezer, Tidal, Qobuz); an unchecked source is stored in the setting `lastfm_disabled_sources` (JSON) and its plays (`plays.source_type`) are neither sent as now-playing nor scrobbled, for services that scrobble to Last.fm themselves. Default: all on.
+
 ## Artist Enrichment
 
 `EnrichArtistLastfm` (dispatched from `EnrichTrackMetadata::enrichFromLastfm()` the first time a track by a not-yet-enriched artist is played, and from the backfill command below) fetches `artist.getInfo` and stores:

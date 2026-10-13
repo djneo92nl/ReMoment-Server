@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Domain\Lastfm\ScrobbleSources;
 use App\Models\Play;
 use App\Services\LastfmSessionService;
 use Illuminate\Bus\Queueable;
@@ -29,6 +30,10 @@ class ScrobbleToLastfm implements ShouldQueue
         $play = $this->play->fresh(['track.artist', 'track.album']);
 
         if (!$play || !$play->ended_at || $play->skipped) {
+            return;
+        }
+
+        if (!ScrobbleSources::enabled($play->source_type)) {
             return;
         }
 

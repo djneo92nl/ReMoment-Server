@@ -115,6 +115,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/settings/lastfm/authorize', [LastfmAuthController::class, 'authorize'])->name('lastfm.authorize');
     Route::get('/settings/lastfm/callback', [LastfmAuthController::class, 'callback'])->name('lastfm.callback');
+    Route::post('/settings/lastfm/sources', [SettingsController::class, 'lastfmSources'])->name('settings.lastfm.sources');
     Route::post('/settings/lastfm/disconnect', [LastfmAuthController::class, 'disconnect'])->name('lastfm.disconnect');
 
     Route::get('/settings/clients', [SettingsController::class, 'clients'])->name('settings.clients');
