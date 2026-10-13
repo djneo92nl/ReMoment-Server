@@ -4,6 +4,8 @@
     'muted' => null,
     'fill' => 'bg-gray-400 dark:bg-stone-500',
     'track' => '',
+    // a color: the fill and the level use it, on the artwork colors of a playing card
+    'accent' => null,
 ])
 
 {{-- The volume row of a device card: speaker/mute icon, a slider that calls the component's setVolume(), the level. The
@@ -21,7 +23,7 @@
     @endif
     <div class="relative flex-1 {{ $track }}">
         <div class="h-1.5 bg-gray-200 dark:bg-stone-700 rounded-full overflow-hidden">
-            <div class="h-full {{ $fill }} rounded-full" :style="'width: ' + vol + '%'"></div>
+            <div class="h-full {{ $accent ? '' : $fill }} rounded-full" style="{{ $accent ? 'background:'.$accent : '' }}" :style="'width: ' + vol + '%'"></div>
         </div>
         <input type="range" min="0" max="100" x-model="vol" @change="$wire.setVolume(vol)"
                class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">

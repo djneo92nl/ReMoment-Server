@@ -108,6 +108,17 @@
         </ul>
     </nav>
 
+    {{-- With no player pinned the bar is gone: this opens the picker --}}
+    @unless(app(\App\Support\SelectedDevice::class)->device())
+        <div class="px-4 pb-4">
+            <button type="button" @click="$dispatch('open-player-panel')"
+                    class="flex items-center gap-3 px-5 py-3.5 rounded-xl w-full text-left text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-stone-800/50 transition-colors">
+                <i class="fa-solid fa-circle-play w-5 text-indigo-500"></i>
+                Select player
+            </button>
+        </div>
+    @endunless
+
     <div class="p-6 border-t border-gray-200 dark:border-stone-800 text-xs text-gray-400 space-y-1">
         <div>{{ config('app.name', 'ReMoment') }}</div>
         <div class="text-gray-300 dark:text-stone-600">{{ now()->format('M j, Y') }}</div>

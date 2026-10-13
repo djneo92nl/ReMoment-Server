@@ -67,16 +67,21 @@ class MultiRoomGroupsTest extends TestCase
     {
         $m3 = $this->makeDevice('Beoplay M3', 'm3');
         $m5 = $this->makeDevice('Beoplayer M5', 'm5');
-        $this->makeDevice('Woonkamer', 'wk');
+        $wk = $this->makeDevice('Woonkamer', 'wk');
+        $this->makeDevice('Garage', 'ga');
         DeviceCache::updateState($m3->id, State::Playing);
+        DeviceCache::updateState($wk->id, State::Standby);
         cache()->put("listener_running_{$m3->id}", true, 60);
-        FakePlayerDriver::$peers = ['m5', 'wk'];
+        cache()->put("listener_running_{$wk->id}", true, 60);
+        FakePlayerDriver::$peers = ['m5', 'wk', 'ga'];
         MultiRoom::put($m3->id, MultiRoomStatus::hosting(['m5']));
 
+        // Unreachable rooms (Garage: no listener) are not offered
         Livewire::test(DeviceCard::class, ['device' => $m3->fresh()])
             ->call('loadMultiRoomData')
             ->assertSee('Beoplay M3')
-            ->assertSee('Woonkamer');
+            ->assertSee('Woonkamer')
+            ->assertDontSee('Garage');
     }
 
     public function test_a_room_volume_is_set_from_the_session_panel(): void

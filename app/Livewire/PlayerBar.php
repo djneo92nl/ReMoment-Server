@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Domain\Artwork\LibraryItemArtwork;
 use App\Domain\Artwork\NowPlayingArtwork;
 use App\Domain\Device\Cache\Modes;
 use App\Domain\Device\Cache\MultiRoom;
@@ -12,6 +13,9 @@ use App\Domain\Device\RepeatMode;
 use App\Domain\Device\SpotifyRouting;
 use App\Domain\Device\State;
 use App\Events\Device\PlaybackModesUpdated;
+use App\Integrations\Contracts\LikeInterface;
+use App\Integrations\Contracts\QueueInterface;
+use App\Integrations\Contracts\QueueJumpInterface;
 use App\Integrations\Contracts\RepeatInterface;
 use App\Integrations\Contracts\ShuffleInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
@@ -27,6 +31,64 @@ class PlayerBar extends Component
 {
     use ControlsPlayback;
     use ManagesMultiroom;
+
+    /** The panel floating above the bar: 'queue', 'players' or 'multiroom'; null while closed. */
+    public ?string $panel = null;
+
+    public function togglePanel(string $panel): void
+    {
+        $this->panel === $panel ? $this->closePanel() : $this->openPanel($panel);
+    }
+
+    public function openPanel(string $panel): void
+    {
+        if (!in_array($panel, ['queue', 'players', 'multiroom'], true)) {
+            return;
+        }
+        // Queue and multiroom are about the pinned device: with none pinned only the picker exists.
+        if ($panel !== 'players' && $this->device() === null) {
+            return;
+        }
+        $this->panel = $panel;
+        if ($panel === 'multiroom') {
+            $this->loadMultiRoomData();
+        }
+    }
+
+    public function closePanel(): void
+    {
+        $this->panel = null;
+    }
+
+    /** Plays the queue entry `$position` places ahead (1 = the first of Up next). */
+    public function jumpToQueue(int $position): void
+    {
+        $this->control(QueueJumpInterface::class, fn ($d) => $d->skipToQueuePosition($position));
+    }
+
+    /** @return array{items: array<int, array<string, mixed>>, error: ?string} */
+    private function queue(Device $device, State $state): array
+    {
+        if ($state === State::Unreachable) {
+            return ['items' => [], 'error' => null];
+        }
+
+        try {
+            $driver = SpotifyRouting::driverFor($device, QueueInterface::class);
+            $items = $driver instanceof QueueInterface
+                ? array_map(function ($item) {
+                    $row = $item->toArray();
+                    $row['image'] = LibraryItemArtwork::proxy($row['image'], 120);
+
+                    return $row;
+                }, $driver->getUpNext(30))
+                : [];
+
+            return ['items' => $items, 'error' => null];
+        } catch (\Throwable) {
+            return ['items' => [], 'error' => 'Could not read the queue from the device.'];
+        }
+    }
 
     public function toggleShuffle(): void
     {
@@ -58,6 +120,19 @@ class PlayerBar extends Component
         $this->recordModes($modesId, $modes->withRepeat($repeat));
     }
 
+    public function toggleLike(): void
+    {
+        $device = $this->device();
+        if (!$device) {
+            return;
+        }
+        $modesId = SpotifyRouting::modesDeviceId($device);
+        $modes = Modes::get($modesId);
+        $liked = !($modes->liked ?? false);
+        $this->control(LikeInterface::class, fn ($d) => $d->setLiked($liked));
+        $this->recordModes($modesId, $modes->withLiked($liked));
+    }
+
     private function recordModes(int $modesId, \App\Domain\Device\PlaybackModes $modes): void
     {
         if ($this->controlError === null) {
@@ -84,7 +159,7 @@ class PlayerBar extends Component
     {
         $device = $this->device();
         if ($device === null) {
-            return view('livewire.player-bar', ['device' => null]);
+            return view('livewire.player-bar', ['device' => null, 'players' => $this->panel === 'players' ? $this->players() : null]);
         }
 
         $state = DeviceCache::isListenerRunning($device->id) ? $device->state : State::Unreachable;
@@ -102,8 +177,21 @@ class PlayerBar extends Component
             'volume' => $this->volume($device, $capabilities, $state),
             'muted' => Volume::getMuted($device->id) ?? false,
             'group' => $this->multiroomGroup($device),
+            'players' => $this->panel === 'players' ? $this->players() : null,
+            'queue' => $this->panel === 'queue' ? $this->queue($device, $state) : null,
             'supportsMultiRoom' => in_array('multi_room', $capabilities, true) && $state !== State::Unreachable,
         ]);
+    }
+
+    /** Players to pick: the pinned one first, then the playing ones, then the other reachable ones; unreachable ones are left out. */
+    private function players()
+    {
+        $pinned = $this->device()?->id;
+
+        return Device::where('hidden', false)->orderBy('device_name')->get()
+            ->reject(fn (Device $d) => $d->id !== $pinned && $d->liveState() === State::Unreachable)
+            ->sortBy(fn (Device $d) => $d->id === $pinned ? 0 : ($d->liveState() === State::Playing ? 1 : 2))
+            ->values();
     }
 
     /**

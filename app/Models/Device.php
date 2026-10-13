@@ -88,6 +88,14 @@ class Device extends Model
         return DeviceCache::getState($this->id);
     }
 
+    /** The cached state, but Unreachable while no listener is running for it (nothing keeps the state fresh). */
+    public function liveState(): \App\Domain\Device\State
+    {
+        return DeviceCache::isListenerRunning($this->id)
+            ? ($this->state ?? \App\Domain\Device\State::Unreachable)
+            : \App\Domain\Device\State::Unreachable;
+    }
+
     public function meta(): HasMany
     {
         return $this->hasMany(DeviceMeta::class);

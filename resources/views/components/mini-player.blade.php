@@ -17,6 +17,8 @@
     'volumeApi' => false,
     // Modal this row lives in: an unknown volume is read from the device when that modal opens (else at once)
     'modal' => null,
+    // On the player bar's panels: translucent white tile on the artwork colors instead of a light/dark card
+    'glass' => false,
 ])
 
 {{-- A small player in the Sonos style: name and battery, what is playing, a volume slider. Geometry is inline on purpose (lazy Tailwind classes). --}}
@@ -35,8 +37,8 @@
         && in_array('volume_control', \App\Domain\Device\DeviceCapabilities::for($device), true);
 @endphp
 
-<div {{ $attributes->merge(['class' => 'rounded-2xl bg-gray-100 dark:bg-stone-800 text-gray-900 dark:text-gray-100']) }}
-     style="padding:.85rem 1rem;{{ $selected ? 'box-shadow:0 0 0 2px #6366f1;' : '' }}{{ $state === \App\Domain\Device\State::Unreachable ? 'opacity:.55;' : '' }}">
+<div {{ $attributes->merge(['class' => 'rounded-2xl '.($glass ? '' : 'bg-gray-100 dark:bg-stone-800 text-gray-900 dark:text-gray-100')]) }}
+     style="padding:.85rem 1rem;{{ $glass ? 'background:rgba(255,255,255,.14);color:#fff;' : '' }}{{ $selected ? 'box-shadow:0 0 0 2px #6366f1;' : '' }}{{ $state === \App\Domain\Device\State::Unreachable ? 'opacity:.55;' : '' }}">
 
     @if($selectUrl)
         @php
@@ -85,7 +87,7 @@
              @if($modal) x-on:open-modal.window="$event.detail === '{{ $modal }}' && load()" @else x-init="load()" @endif
              x-show="vol !== null" style="margin-top:.7rem">
           <div style="display:flex;align-items:center;gap:.6rem">
-            <i class="fa-solid fa-volume-high text-gray-500 dark:text-gray-400" style="width:1.1rem;text-align:center;font-size:.85rem"></i>
+            <i class="fa-solid fa-volume-high {{ $glass ? '' : 'text-gray-500 dark:text-gray-400' }}" style="width:1.1rem;text-align:center;font-size:.85rem"></i>
             <div style="position:relative;flex:1;height:1.5rem;display:flex;align-items:center">
                 <div style="width:100%;height:.65rem;border-radius:9999px;overflow:hidden;background:rgba(107,114,128,.3)">
                     <div :style="{ width: (vol ?? 0) + '%' }" style="height:100%;border-radius:9999px;background:currentColor;width:{{ (int) $volume }}%"></div>
@@ -93,7 +95,7 @@
                 <input type="range" min="0" max="100" x-model="vol" @change="save()"
                        style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer">
             </div>
-            <span class="text-gray-500 dark:text-gray-400" style="width:1.6rem;text-align:right;font-size:.8rem" x-text="vol"></span>
+            <span class="{{ $glass ? '' : 'text-gray-500 dark:text-gray-400' }}" style="opacity:{{ $glass ? '.75' : '1' }};width:1.6rem;text-align:right;font-size:.8rem" x-text="vol"></span>
           </div>
         </div>
     @endif

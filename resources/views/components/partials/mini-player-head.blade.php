@@ -1,9 +1,9 @@
 <div style="display:flex;align-items:center;gap:.75rem">
-    <div class="bg-gray-200 dark:bg-stone-700" style="width:3rem;height:3rem;border-radius:.6rem;overflow:hidden;flex:none;display:flex;align-items:center;justify-content:center">
+    <div class="{{ $glass ? '' : 'bg-gray-200 dark:bg-stone-700' }}" style="{{ $glass ? 'background:rgba(255,255,255,.15);' : '' }}width:3rem;height:3rem;border-radius:.6rem;overflow:hidden;flex:none;display:flex;align-items:center;justify-content:center">
         @if($thumb)
             <img src="{{ $thumb }}" alt="" style="width:100%;height:100%;object-fit:cover">
         @else
-            <i class="fa-solid {{ $radio ? 'fa-tower-broadcast' : 'fa-music' }} text-gray-400 dark:text-stone-500"></i>
+            <i class="fa-solid {{ $radio ? 'fa-tower-broadcast' : 'fa-music' }} {{ $glass ? '' : 'text-gray-400 dark:text-stone-500' }}" style="{{ $glass ? 'opacity:.6' : '' }}"></i>
         @endif
     </div>
     <div style="min-width:0;flex:1">
@@ -14,9 +14,9 @@
                 <span style="font-size:.65rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;flex:none;color:{{ $tagColor }}"><i class="fa-solid fa-layer-group" style="font-size:.6rem"></i> {{ $tag }}</span>
             @endif
         </div>
-        <p class="truncate text-gray-600 dark:text-gray-300" style="font-size:.85rem">{{ $title }}</p>
+        <p class="truncate {{ $glass ? '' : 'text-gray-600 dark:text-gray-300' }}" style="font-size:.85rem;{{ $glass ? 'opacity:.85' : '' }}">{{ $title }}</p>
         @if($subtitle)
-            <p class="truncate text-gray-400 dark:text-gray-500" style="font-size:.75rem">{{ $subtitle }}</p>
+            <p class="truncate {{ $glass ? '' : 'text-gray-400 dark:text-gray-500' }}" style="font-size:.75rem;{{ $glass ? 'opacity:.55' : '' }}">{{ $subtitle }}</p>
         @endif
     </div>
     @if($inSession !== null)
@@ -26,8 +26,8 @@
         @if($toggle)
             <button type="button" wire:click="{{ $toggle }}" wire:loading.attr="disabled" @if($closeOnToggle) @click="$dispatch('close')" @endif
                     title="{{ $inSession ? 'Remove from this session' : 'Add to this session' }}"
-                    class="{{ $inSession ? '' : 'border border-gray-300 dark:border-stone-600' }}"
-                    style="{{ $circle }}cursor:pointer;{{ $inSession ? 'background:#fbbf24;border:0;' : 'background:none;' }}">
+                    class="{{ $inSession ? '' : ($glass ? 'border' : 'border border-gray-300 dark:border-stone-600') }}"
+                    style="{{ $circle }}cursor:pointer;{{ $inSession ? 'background:#fbbf24;border:0;' : 'background:none;'.($glass ? 'border-color:rgba(255,255,255,.5);' : '') }}">
                 @if($inSession)<i class="fa-solid fa-check" style="font-size:.8rem;color:#1f2937"></i>@endif
             </button>
         @else

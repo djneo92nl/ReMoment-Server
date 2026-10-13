@@ -23,14 +23,36 @@
     $gradientStyle = count($gradientColors) >= 2
         ? "background: linear-gradient(135deg, {$gradientColors[0]}55 0%, {$gradientColors[1]}33 100%);"
         : '';
+
+    // A playing card wears the same look as the sticky player bar: the artwork's colors under a dark scrim, an accent from the cover.
+    $dark = $isActive && $nowPlaying;
+    $accent = $dark ? \App\Domain\Artwork\AccentColor::for($gradientColors, $artwork['safe_colors'] ?? []) : null;
+    if ($dark) {
+        $base = count($gradientColors) >= 2
+            ? "linear-gradient(100deg, {$gradientColors[0]} 0%, {$gradientColors[1]} 100%)"
+            : 'linear-gradient(100deg, #3a3f4b 0%, #2a2d36 100%)';
+        $gradientStyle = "color:#fff;background:linear-gradient(rgba(0,0,0,.45), rgba(0,0,0,.45)), {$base};";
+    }
 @endphp
 
+@once
+    <style>
+        /* Quiet greys of the light card become translucent whites on the artwork colors. */
+        .np-dark .np-inner [class*="text-gray-"], .np-dark .np-inner [class*="text-stone-"] { color: rgba(255,255,255,.7) !important; }
+        .np-dark .np-inner [class*="hover:text-gray-"]:hover { color: #fff !important; }
+        .np-dark .np-inner [class*="bg-gray-"], .np-dark .np-inner [class*="bg-stone-"] { background-color: rgba(255,255,255,.14) !important; }
+        .np-dark .np-inner [class*="hover:bg-gray-"]:hover, .np-dark .np-inner [class*="hover:bg-stone-"]:hover { background-color: rgba(255,255,255,.22) !important; }
+        .np-dark .np-inner [class*="border-gray-"], .np-dark .np-inner [class*="border-stone-"] { border-color: rgba(255,255,255,.18) !important; }
+        .np-dark .np-inner [class*="text-blue-"], .np-dark .np-inner [class*="text-red-"] { color: #fff !important; }
+    </style>
+@endonce
+
 <div x-data="liveDevice({{ $device->id }})"
-     class="{{ $gradientStyle ? '' : 'bg-white dark:bg-stone-900' }} rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 overflow-hidden hover:shadow-xl transition-all {{ (!$standalone && $isActive) ? 'md:col-span-2' : '' }}"
+     class="{{ $gradientStyle ? '' : 'bg-white dark:bg-stone-900' }} {{ $dark ? 'np-dark' : '' }} rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 overflow-hidden hover:shadow-xl transition-all {{ (!$standalone && $isActive) ? 'md:col-span-2' : '' }}"
      style="{{ $gradientStyle }}">
 
     {{-- Inner wrapper handles click-to-navigate; buttons capture their own clicks first --}}
-    <div class="p-8 cursor-pointer"
+    <div class="np-inner p-8 cursor-pointer"
          onclick="if(!event.target.closest('button,a,input'))window.location='{{ $showUrl }}'">
 
         {{-- ── Header ── --}}
@@ -81,7 +103,7 @@
 
                     {{-- Artwork --}}
                     @if($artUrl)
-                        <div class="w-full lg:w-48 aspect-square rounded-2xl overflow-hidden shadow-lg ring-1 ring-gray-200 dark:ring-stone-800 flex-shrink-0">
+                        <div class="w-full lg:w-48 aspect-square rounded-2xl overflow-hidden shadow-lg flex-shrink-0">
                             <img src="{{ $artUrl }}" alt="Artwork" class="w-full h-full object-cover">
                         </div>
                     @else
@@ -137,41 +159,39 @@
                                                    :duration="(int) $nowPlaying->track->duration"
                                                    :playing="$isPlaying"
                                                    :seekable="$supportsSeek"
+                                                   :accent="$accent"
                                                    size="sm" />
                             </div>
                         @else
                             {{-- Radio / no duration: animated bar --}}
                             <div class="h-1.5 bg-gray-200 dark:bg-stone-700 rounded-full overflow-hidden">
-                                <div class="h-full w-full bg-gradient-to-r from-red-500 to-rose-600 rounded-full origin-left animate-pulse opacity-60"></div>
+                                <div class="h-full w-full rounded-full origin-left animate-pulse opacity-60" style="background:{{ $accent }}"></div>
                             </div>
                         @endif
 
-                        {{-- Playback controls --}}
-                        <div class="flex items-center gap-8">
-                            <button wire:click="previous"
-                                    class="text-gray-400 dark:text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 text-xl transition-colors">
-                                <i class="fa-solid fa-backward-step"></i>
-                            </button>
+                        {{-- Playback controls: the bar's round accent play button --}}
+                        @php
+                            $ctl = 'background:none;border:0;cursor:pointer;color:#fff;display:flex;align-items:center;justify-content:center;width:2.75rem;height:2.75rem;border-radius:9999px';
+                        @endphp
+                        <div class="flex items-center gap-3">
+                            <button wire:click="previous" title="Previous" style="{{ $ctl }}"><i class="fa-solid fa-backward-step text-xl"></i></button>
                             @if($isPlaying)
-                                <button wire:click="pause"
-                                        class="text-gray-900 dark:text-gray-100 hover:scale-110 transition-transform">
-                                    <i class="fa-solid fa-pause-circle text-5xl drop-shadow"></i>
+                                <button wire:click="pause" title="Pause" class="hover:scale-105 transition-transform"
+                                        style="{{ $ctl }};width:3.6rem;height:3.6rem;background:{{ $accent }};color:#111;box-shadow:0 4px 14px rgba(0,0,0,.3)">
+                                    <i class="fa-solid fa-pause text-xl"></i>
                                 </button>
                             @else
-                                <button wire:click="play"
-                                        class="text-gray-900 dark:text-gray-100 hover:scale-110 transition-transform">
-                                    <i class="fa-solid fa-play-circle text-5xl drop-shadow"></i>
+                                <button wire:click="play" title="Play" class="hover:scale-105 transition-transform"
+                                        style="{{ $ctl }};width:3.6rem;height:3.6rem;background:{{ $accent }};color:#111;box-shadow:0 4px 14px rgba(0,0,0,.3)">
+                                    <i class="fa-solid fa-play text-xl" style="margin-left:.2rem"></i>
                                 </button>
                             @endif
-                            <button wire:click="next"
-                                    class="text-gray-400 dark:text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 text-xl transition-colors">
-                                <i class="fa-solid fa-forward-step"></i>
-                            </button>
+                            <button wire:click="next" title="Next" style="{{ $ctl }}"><i class="fa-solid fa-forward-step text-xl"></i></button>
                         </div>
 
                         {{-- Volume --}}
                         @if($volume > 0)
-                            <x-card-volume :volume="$volume" :muted="$muted" fill="bg-gray-500 dark:bg-stone-400" track="max-w-xs" />
+                            <x-card-volume :volume="$volume" :muted="$muted" :accent="$accent" track="max-w-xs" />
                         @endif
 
                     </div>

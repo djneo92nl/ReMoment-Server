@@ -132,6 +132,12 @@
                         </a>
                     </li>
                 </ul>
+                @unless(app(\App\Support\SelectedDevice::class)->device())
+                    <button type="button" @click="mobileMenuOpen = false; $dispatch('open-player-panel')"
+                            class="mt-1 flex items-center gap-3 px-5 py-3.5 rounded-xl w-full text-left text-gray-600 dark:text-gray-400">
+                        <i class="fa-solid fa-circle-play w-5 text-indigo-500"></i>Select player
+                    </button>
+                @endunless
             </nav>
         </div>
 
@@ -175,17 +181,8 @@
         .player-progress { display: none !important; }
     }
 </style>
-<div style="position:sticky;bottom:0;z-index:40;box-shadow:0 -4px 20px rgba(0,0,0,.2)" class="bg-white dark:bg-stone-900">
+<div style="position:sticky;bottom:0;z-index:40;pointer-events:none">
     <livewire:player-bar />
 </div>
-<x-device-picker
-    name="select-player"
-    title="Choose a player"
-    description="Play buttons in the library play on this device."
-    :devices="\App\Models\Device::where('hidden', false)->orderBy('device_name')->get()"
-    :action-template="\App\Support\DeviceAction::template('player.select')"
-    :selected-id="app(\App\Support\SelectedDevice::class)->device()?->id"
-/>
-
 </body>
 </html>

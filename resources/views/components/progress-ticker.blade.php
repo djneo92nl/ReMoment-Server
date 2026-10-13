@@ -1,4 +1,4 @@
-@props(['deviceId', 'position', 'duration', 'playing' => false, 'seekable' => false, 'size' => 'md'])
+@props(['deviceId', 'position', 'duration', 'playing' => false, 'seekable' => false, 'size' => 'md', 'accent' => null])
 
 {{-- Progress bar that advances client-side between Livewire renders (see
      progressTicker in public/js/remoment-live.js). Keyed on the server
@@ -12,9 +12,9 @@
     <div @if($seekable) @click.stop="seekTo($event)" title="Click to seek" @endif
          class="{{ $seekable ? 'cursor-pointer py-1.5 -my-1.5' : '' }}">
         <div class="h-1.5 bg-gray-200 dark:bg-stone-700 rounded-full overflow-hidden">
-            <div class="h-full bg-gradient-to-r from-red-500 to-rose-600 rounded-full transition-[width] duration-1000 ease-linear"
+            <div class="h-full {{ $accent ? '' : 'bg-gradient-to-r from-red-500 to-rose-600' }} rounded-full transition-[width] duration-1000 ease-linear"
                  :style="'width: ' + pct + '%'"
-                 style="width: {{ $duration > 0 ? min(100, (int) ($position / $duration * 100)) : 0 }}%"></div>
+                 style="{{ $accent ? 'background:'.$accent.';' : '' }}width: {{ $duration > 0 ? min(100, (int) ($position / $duration * 100)) : 0 }}%"></div>
         </div>
     </div>
 </div>
