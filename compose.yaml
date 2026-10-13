@@ -77,10 +77,14 @@ services:
     # ANALYSIS_ENABLED=true and ANALYSIS_ESSENTIA_URL=http://analysis:8090 (docs/architecture/audio-analysis.md).
     analysis:
         profiles: [analysis]
+        # Essentia's PyPI wheels exist for x86_64 only (no aarch64), so on an Apple Silicon Mac the sidecar runs emulated.
+        platform: linux/amd64
         build:
             context: './docker/analysis'
             args:
                 ESSENTIA_ML: '${ANALYSIS_ESSENTIA_ML_BUILD:-0}'
+        ports:
+            - '${ANALYSIS_PORT:-8090}:8090'
         volumes:
             - 'sail-analysis-models:/models'
         networks:

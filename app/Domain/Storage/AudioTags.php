@@ -13,7 +13,7 @@ class AudioTags
     }
 
     /**
-     * @return array{artist:?string,album_artist:?string,album:?string,title:?string,year:?string,track_number:?int,disc_number:?int,genres:list<string>,mbid:?string,duration:?int,mime_type:?string,codec:?string,bitrate:?int,sample_rate:?int,bit_depth:?int,channels:?int,replaygain_track_gain:?float,replaygain_album_gain:?float}|null
+     * @return array{artist:?string,album_artist:?string,album:?string,title:?string,year:?string,track_number:?int,disc_number:?int,genres:list<string>,mbid:?string,duration:?int,mime_type:?string,codec:?string,bitrate:?int,sample_rate:?int,bit_depth:?int,channels:?int,replaygain_track_gain:?float,replaygain_album_gain:?float,picture:?array{mime:?string,data:string}}|null
      */
     public static function read(string $localPath): ?array
     {
@@ -27,6 +27,9 @@ class AudioTags
         $tag = fn (string $key) => trim((string) ($info['comments'][$key][0] ?? '')) ?: null;
         $audio = $info['audio'];
         $int = fn ($v) => isset($v) && is_numeric($v) ? (int) round($v) : null;
+        // The embedded cover: the front cover when the file says which one it is, else the first picture.
+        $pictures = array_values(array_filter($info['comments']['picture'] ?? [], fn ($p) => !empty($p['data'])));
+        $front = collect($pictures)->first(fn ($p) => stripos((string) ($p['picturetype'] ?? ''), 'front') !== false) ?? ($pictures[0] ?? null);
         $gain = fn ($v) => isset($v) && is_numeric($v) ? round((float) $v, 2) : null;
 
         return [
@@ -48,6 +51,7 @@ class AudioTags
             'channels' => $int($audio['channels'] ?? null),
             'replaygain_track_gain' => $gain($info['replay_gain']['track']['adjustment'] ?? null),
             'replaygain_album_gain' => $gain($info['replay_gain']['album']['adjustment'] ?? null),
+            'picture' => $front ? ['mime' => $front['image_mime'] ?? null, 'data' => $front['data']] : null,
         ];
     }
 }

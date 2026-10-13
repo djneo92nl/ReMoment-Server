@@ -94,6 +94,8 @@ class FileIndexer
         $album = LibraryIdentity::album($albumArtist, $tags['album'] ?? 'Unknown Album', 'dlna',
             $released ? ['released_at' => $released] : []);
 
+        app(CoverExtractor::class)->apply($album, $tags['picture'] ?? null);
+
         $track = LibraryIdentity::track($artist, $album, $tags['title'] ?? $fallbackTitle, 'local:file:'.$file->id, 'dlna', [
             'duration' => $tags['duration'],
         ]);

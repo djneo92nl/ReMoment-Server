@@ -21,6 +21,12 @@ A track made from a file gets source `dlna` and a `dlna_url` (metadata source `d
 
 A track whose last file is deleted is removed, unless another source (a real DLNA server, Spotify) still plays it; then only the local stream is unlinked.
 
+## Embedded covers
+
+`FileIndexer::attach` gives an album **without an image** the picture embedded in its file (`AudioTags::read()['picture']`: the front cover when the file says which, else the first). `App\Domain\Storage\CoverExtractor` keeps it once, by content, on the private `local` disk (`storage/app/private/covers/{sha1}`, `App\Domain\Artwork\LocalCover`) and sets `albums.images` to the pseudo URL `remoment:cover/{sha1}`; `ProcessArtwork` reads that from disk (no download), so it gets the same proxies, backgrounds and colours as any cover. An album that already has an image (Spotify, a DLNA server, the Cover Art Archive) keeps it. Pictures under 100 px, over 15 MB or not JPEG/PNG/GIF/WebP are ignored.
+
+Albums indexed before this existed, or retagged since, are filled by `php artisan library:extract-covers [--limit=50]`, which every file scan also runs. An album whose files carry no usable picture is marked (`cover_checked_at`, source `local`) and not read again; the Cover Art Archive lookup of the metadata enrichment can still fill it.
+
 ## Streaming
 
 `GET /stream/{track}` (unauthenticated, like the REST API) sends the track's primary original, or with `?profile=low` the proxy of that profile, falling back to the original. Local files get range support (seek). Remote files are redirected to a 30-minute temporary URL when the disk can sign one (S3), else streamed through the server. Missing files give `404`. Not tested yet on real speakers: whether Sonos/ASE follow the redirect.
@@ -66,4 +72,4 @@ POST            /api/admin/files/{id}/verify              → { result: ok | mis
 
 ## Not built yet
 
-ffmpeg proxies, embedded cover art, `X-Accel-Redirect`/sendfile handoff, S3 against a real bucket, a `local` entry in `LibrarySources`.
+ffmpeg proxies, `X-Accel-Redirect`/sendfile handoff, S3 against a real bucket, a `local` entry in `LibrarySources`.

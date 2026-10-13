@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Domain\Artwork\ArtworkBackgrounds;
 use App\Domain\Artwork\ArtworkCache;
+use App\Domain\Artwork\LocalCover;
 use App\Domain\Artwork\LogoRenderer;
 use App\Domain\Artwork\PlaylistArtwork;
 use App\Domain\Artwork\PlaylistCompositeRenderer;
@@ -53,7 +54,8 @@ class ProcessArtwork implements ShouldQueue
     private const BACKGROUND_BRIGHTNESS = 40;
 
     /**
-     * @param  string  $originalUrl  An image URL, a SourceLogo pseudo URL
+     * @param  string  $originalUrl  An image URL, a LocalCover pseudo URL (a cover embedded in an own file, read
+     *                               from disk), a SourceLogo pseudo URL
      *                               for a generated logo (drawn locally, not downloaded),
      *                               or a PlaylistArtwork composite pseudo URL.
      * @param  array<int, string>  $sources  For a composite: the 4 cover URLs it is made of
@@ -186,6 +188,10 @@ class ProcessArtwork implements ShouldQueue
     {
         if (PlaylistArtwork::isCompositeUrl($this->originalUrl)) {
             return PlaylistCompositeRenderer::render($this->sources);
+        }
+
+        if (LocalCover::isUrl($this->originalUrl)) {
+            return LocalCover::read($this->originalUrl) ?? throw new \RuntimeException("The embedded cover {$this->originalUrl} is no longer stored.");
         }
 
         $logo = SourceLogo::keyFromUrl($this->originalUrl);

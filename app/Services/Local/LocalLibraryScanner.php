@@ -4,6 +4,7 @@ namespace App\Services\Local;
 
 use App\Domain\Analysis\AudioAnalysis;
 use App\Domain\Library\Enrichment;
+use App\Domain\Storage\CoverExtractor;
 use App\Domain\Storage\FileIndexer;
 use App\Domain\Storage\FileStore;
 use App\Models\File;
@@ -48,6 +49,9 @@ class LocalLibraryScanner
 
         $missing = $location->files()->where('status', File::PRESENT)->whereNotIn('id', $seen)->update(['status' => File::MISSING]);
         $this->counts['missing'] = $missing;
+
+        // Albums indexed before covers were read, or whose picture was missing then.
+        app(CoverExtractor::class)->backfill();
 
         $location->update(['last_scanned_at' => now()]);
         Enrichment::queueBacklog(Enrichment::SCAN_BATCH);

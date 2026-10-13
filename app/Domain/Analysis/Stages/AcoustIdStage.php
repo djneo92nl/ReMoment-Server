@@ -22,7 +22,8 @@ class AcoustIdStage implements AnalysisStage
 
     public function enabled(): bool
     {
-        return (bool) config('analysis.acoustid_key');
+        // The lookup needs the fingerprint stage's output, so it only runs where fpcalc does.
+        return (bool) config('analysis.acoustid_key') && (new FingerprintStage)->enabled();
     }
 
     public function run(File $file, string $localPath, FileAnalysis $analysis): array

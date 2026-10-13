@@ -149,6 +149,20 @@ class AudioAnalysisTest extends TestCase
         $this->assertSame(0, AudioAnalysis::pending()->count());
     }
 
+    public function test_without_fpcalc_the_lookup_is_skipped_instead_of_failing(): void
+    {
+        Process::fake(fn (PendingProcess $process) => str_contains(implode(' ', (array) $process->command), 'fpcalc')
+            ? Process::result('', 'not found', 127)
+            : Process::result("tool version 1.0\n", self::EBUR128));
+        [$file] = $this->localTrack();
+
+        AnalyzeAudioFile::dispatchSync($file);
+
+        $analysis = $file->analysis()->first();
+        $this->assertSame([], $analysis->errors, 'no "no fingerprint" error');
+        $this->assertSame(['loudness'], array_keys($analysis->stages));
+    }
+
     public function test_a_weak_acoustid_match_is_no_match(): void
     {
         $this->fakeAcoustId(0.5);

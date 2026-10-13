@@ -103,6 +103,7 @@ php artisan library:merge-duplicates [--force]
 
 # Index audio files of the storage locations (local/S3), stream them from this server; see docs/architecture/file-storage.md
 php artisan library:scan-files [location]
+php artisan library:extract-covers [--limit=50]   # covers embedded in the own files → albums without an image (also run by every file scan)
 php artisan library:import                  # inbox → library, organized by artist/album
 php artisan library:reorganize [--dry-run]
 php artisan library:verify-files
