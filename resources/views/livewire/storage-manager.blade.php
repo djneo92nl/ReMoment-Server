@@ -163,6 +163,11 @@
                 <div>
                     <p class="text-xs font-medium text-gray-700 dark:text-gray-300">{{ $label }}</p>
                     <p class="text-xs text-gray-400 dark:text-gray-600 mt-0.5">{{ $help }}</p>
+                    @if($method === 'import')
+                        <label class="flex items-center gap-1.5 mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            <input type="checkbox" wire:model="keepInboxFiles"> Keep the originals in the inbox (copy and verify only)
+                        </label>
+                    @endif
                     @if($taskStatus)
                         <p class="text-xs mt-0.5 {{ $taskStatus['state'] === 'failed' ? 'text-red-500' : (in_array($taskStatus['state'], ['queued', 'running']) ? 'text-amber-500' : 'text-gray-400 dark:text-gray-600') }}">
                             @if(in_array($taskStatus['state'], ['queued', 'running']))<i class="fa-solid fa-spinner fa-spin mr-1"></i>{{ ucfirst($taskStatus['state']) }}…

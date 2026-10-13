@@ -50,11 +50,12 @@ class LibraryFiles
     }
 
     /**
-     * Indexes everything in the inbox and moves it into the library.
+     * Indexes everything in the inbox and moves it into the library. With $keepSource the files are copied
+     * and verified but stay in the inbox; a later import skips those whose content is already in the library.
      *
-     * @return int files moved
+     * @return int files moved (copied)
      */
-    public function importInbox(): int
+    public function importInbox(bool $keepSource = false): int
     {
         $library = StorageLocation::library() ?? throw new \InvalidArgumentException('Add a library storage location first.');
         $inbox = StorageLocation::inbox() ?? throw new \InvalidArgumentException('Add an inbox storage location first.');
@@ -63,9 +64,13 @@ class LibraryFiles
         $moved = 0;
 
         foreach ($store->files() as $path => $_) {
+            if ($keepSource && $this->inLibrary($library, $store, $path)) {
+                continue;
+            }
+
             [$file] = $this->indexer->index($inbox, $path, $store);
             if ($file && $file->storage_location_id === $inbox->id) {
-                $this->place($file, $library);
+                $this->place($file, $library, $keepSource);
                 $moved++;
             }
         }
@@ -227,9 +232,20 @@ class LibraryFiles
         return $hashes->map(fn ($hash) => File::where('hash', $hash)->get())->all();
     }
 
-    private function place(File $file, StorageLocation $library): File
+    private function place(File $file, StorageLocation $library, bool $keepSource = false): File
     {
-        return $this->organizer->organize($file, $library);
+        return $this->organizer->organize($file, $library, $keepSource);
+    }
+
+    /** Whether the library already holds a present file with this inbox file's content (an earlier kept import). */
+    private function inLibrary(StorageLocation $library, FileStore $inboxStore, string $path): bool
+    {
+        if (!AudioTags::isAudio($path)) {
+            return false;
+        }
+
+        return File::where('storage_location_id', $library->id)->where('status', File::PRESENT)
+            ->where('hash', $inboxStore->hash($path))->exists();
     }
 
     /**

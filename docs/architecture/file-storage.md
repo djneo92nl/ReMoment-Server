@@ -54,7 +54,7 @@ All locations are also scanned nightly at 03:30 (`library:scan-files --queue`).
 
 ```bash
 php artisan library:scan-files [location] [--queue]   # name or id; default all; --queue runs it on the queue
-php artisan library:import                  # inbox → library, organized
+php artisan library:import [--keep]        # inbox → library, organized; --keep copies and verifies but leaves the originals in the inbox
 php artisan library:reorganize [--dry-run]  # re-apply the layout
 php artisan library:verify-files            # re-hash, flag missing, report duplicates
 ```
@@ -66,7 +66,7 @@ GET|POST        /api/admin/storage/locations              list / create {name, d
 PUT|DELETE      /api/admin/storage/locations/{id}         update / delete (422 while it has files)
 POST            /api/admin/storage/locations/{id}/test    can it be listed (502 with the reason if not)
 POST            /api/admin/storage/locations/{id}/scan    → { changed, counts }; with ?queue=1 → 202 { status: queued } (409 while one is queued or running)
-POST            /api/admin/storage/import                 inbox → library
+POST            /api/admin/storage/import                 inbox → library (keep=true: copy and verify, originals stay in the inbox)
 POST            /api/admin/storage/reorganize             { dry_run? } → { moves: [{file_id, from, to}] }
 POST            /api/admin/files                          multipart `file` → { file, track_id }
 GET|DELETE      /api/admin/tracks/{id}/files              files of a track / delete the track and its files

@@ -176,6 +176,23 @@ class LocalLibraryScanTest extends TestCase
         );
     }
 
+    public function test_import_inbox_can_keep_the_originals_and_skips_them_next_time(): void
+    {
+        $library = $this->location('library', 'library');
+        $inbox = $this->location('inbox', 'inbox');
+        file_put_contents($this->base.'/inbox/x.wav', $this->wav(0));
+
+        $this->assertSame(1, app(LibraryFiles::class)->importInbox(keepSource: true));
+
+        $this->assertFileExists($this->base.'/inbox/x.wav');
+        $this->assertFileExists($this->base.'/library/Unknown Artist/Unknown Album/x.wav');
+        $this->assertSame(1, $library->files()->count());
+        $this->assertSame(0, $inbox->files()->count());
+
+        $this->assertSame(0, app(LibraryFiles::class)->importInbox(keepSource: true));
+        $this->assertSame(1, File::count());
+    }
+
     public function test_delete_track_removes_files_and_the_track(): void
     {
         $library = $this->location('library', 'library');

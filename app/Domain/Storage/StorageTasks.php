@@ -28,14 +28,14 @@ class StorageTasks
     }
 
     /** Queues the task; false when it is already queued or running. */
-    public static function queue(string $task, ?int $locationId = null): bool
+    public static function queue(string $task, ?int $locationId = null, bool $keepSource = false): bool
     {
         if (self::isActive($task, $locationId)) {
             return false;
         }
 
         self::put($task, $locationId, ['state' => 'queued']);
-        RunStorageTask::dispatch($task, $locationId);
+        RunStorageTask::dispatch($task, $locationId, $keepSource);
 
         return true;
     }

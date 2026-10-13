@@ -84,9 +84,9 @@ class StorageController extends Controller
         return response()->json(['status' => 'ok', 'changed' => $changed, 'counts' => $scanner->counts()]);
     }
 
-    public function import(): JsonResponse
+    public function import(Request $request): JsonResponse
     {
-        return $this->guard(fn () => ['status' => 'ok', 'imported' => $this->files->importInbox()]);
+        return $this->guard(fn () => ['status' => 'ok', 'imported' => $this->files->importInbox($request->boolean('keep'))]);
     }
 
     public function reorganize(Request $request): JsonResponse

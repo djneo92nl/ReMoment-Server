@@ -16,6 +16,9 @@ class StorageManager extends Component
 
     public string $name = '';
 
+    /** Import copies and verifies but leaves the originals in the inbox. */
+    public bool $keepInboxFiles = false;
+
     public string $driver = 'local';
 
     public string $role = StorageLocation::ROLE_LIBRARY;
@@ -148,7 +151,7 @@ class StorageManager extends Component
 
     public function import(): void
     {
-        $this->queueGlobal(StorageTasks::IMPORT, 'Import of the inbox queued.');
+        $this->queueGlobal(StorageTasks::IMPORT, 'Import of the inbox queued.', $this->keepInboxFiles);
     }
 
     public function reorganize(): void
@@ -156,9 +159,9 @@ class StorageManager extends Component
         $this->queueGlobal(StorageTasks::REORGANIZE, 'Reorganizing the library queued.');
     }
 
-    private function queueGlobal(string $task, string $message): void
+    private function queueGlobal(string $task, string $message, bool $keepSource = false): void
     {
-        StorageTasks::queue($task)
+        StorageTasks::queue($task, null, $keepSource)
             ? session()->flash('success', $message)
             : session()->flash('error', 'That is already queued or running.');
     }

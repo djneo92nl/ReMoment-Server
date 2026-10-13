@@ -44,7 +44,7 @@ class LibraryOrganizer
     }
 
     /** Moves the file to its layout path in $target (the library location); returns the updated file. */
-    public function organize(File $file, StorageLocation $target): File
+    public function organize(File $file, StorageLocation $target, bool $keepSource = false): File
     {
         $track = $file->tracks()->first();
         if ($track === null) {
@@ -58,11 +58,15 @@ class LibraryOrganizer
             return $file;
         }
 
-        return $this->relocate($file, $target, $path);
+        return $this->relocate($file, $target, $path, $keepSource);
     }
 
-    /** Moves a file to $path on $target, whatever location it is on now. */
-    public function relocate(File $file, StorageLocation $target, string $path): File
+    /**
+     * Moves a file to $path on $target, whatever location it is on now. With $keepSource a file that crosses
+     * locations is copied and verified but the original is left where it was (a move within one location
+     * cannot keep a source).
+     */
+    public function relocate(File $file, StorageLocation $target, string $path, bool $keepSource = false): File
     {
         $source = new FileStore($file->location);
         $targetStore = new FileStore($target);
@@ -75,7 +79,9 @@ class LibraryOrganizer
                 $targetStore->delete($path);
                 throw new \RuntimeException("Copy of {$file->path} did not match its hash; the original was kept.");
             }
-            $source->delete($file->path);
+            if (!$keepSource) {
+                $source->delete($file->path);
+            }
         }
 
         $file->update([

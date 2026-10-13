@@ -7,14 +7,14 @@ use Illuminate\Console\Command;
 
 class ImportLibraryFiles extends Command
 {
-    protected $signature = 'library:import';
+    protected $signature = 'library:import {--keep : Copy and verify the files but leave them in the inbox}';
 
-    protected $description = 'Move the audio files in the inbox storage location into the library, organized by artist and album';
+    protected $description = 'Move (or with --keep, copy) the audio files in the inbox storage location into the library, organized by artist and album';
 
     public function handle(LibraryFiles $files): int
     {
         try {
-            $this->line('  → '.$files->importInbox().' files imported.');
+            $this->line('  → '.$files->importInbox($this->option('keep')).' files imported.');
         } catch (\InvalidArgumentException $e) {
             $this->error($e->getMessage());
 

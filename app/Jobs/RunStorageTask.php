@@ -27,6 +27,7 @@ class RunStorageTask implements ShouldBeUnique, ShouldQueue
     public function __construct(
         public readonly string $task,
         public readonly ?int $locationId = null,
+        public readonly bool $keepSource = false,
     ) {}
 
     public function uniqueId(): string
@@ -40,7 +41,7 @@ class RunStorageTask implements ShouldBeUnique, ShouldQueue
 
         $message = match ($this->task) {
             StorageTasks::SCAN => $this->scan($scanner),
-            StorageTasks::IMPORT => $files->importInbox().' files imported.',
+            StorageTasks::IMPORT => $files->importInbox($this->keepSource).' files imported'.($this->keepSource ? ' (originals kept in the inbox).' : '.'),
             StorageTasks::REORGANIZE => count($files->reorganize()).' files moved.',
             default => throw new \InvalidArgumentException("Unknown storage task {$this->task}."),
         };
