@@ -19,6 +19,9 @@ services:
         volumes:
             - '.:/var/www/html'
             - './docker/8.4/supervisord.prod.conf:/etc/supervisor/conf.d/supervisord.conf'
+            # Own music files: add both paths as local storage locations (/settings/storage).
+            - '${MUSIC_DIR:-/srv/music}:${MUSIC_DIR:-/srv/music}'
+            - '${LIBRARY_DIR:-/srv/library}:${LIBRARY_DIR:-/srv/library}'
         depends_on:
             redis:
                 condition: service_healthy

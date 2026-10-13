@@ -1,6 +1,6 @@
 # Application settings
 app_dir: /opt/remoment
-app_repo: git@github.com:youruser/ReMomentServer.git   # Change to your repo URL
+app_repo: git@github.com:djneo92nl/ReMoment-Server.git   # Change to your repo URL
 app_branch: main
 app_url: http://remoment.local                          # Change to your server's URL or IP
 app_port: 80
@@ -24,7 +24,7 @@ mqtt_public_port: 1883
 
 # --- Proxmox (proxmox.yml) -------------------------------------------------
 # An unprivileged LXC container with nesting enabled (required for Docker).
-proxmox_ct_id: 200
+proxmox_ct_id: ''                      # empty = highest existing VM/CT id + 1; set a number to force one
 proxmox_ct_hostname: remoment
 proxmox_ct_ip: dhcp                   # 'dhcp', or a fixed address (then gateway/dns/cidr below apply); the playbook prints the address
 proxmox_ct_cidr: 24
@@ -40,27 +40,49 @@ proxmox_template_pattern: debian-13-standard   # pveam template to use (e.g. deb
 proxmox_template_storage: local       # storage holding container templates
 proxmox_ssh_public_key: ~/.ssh/id_rsa.pub   # key (on the control machine) installed for ansible_user
 
-# --- DLNA server (MiniDLNA, setup.yml) ---------------------------------------
-# Serves the music library inside the container; ReMoment discovers it via SSDP
-# and scans it from /settings/dlna.
-dlna_enabled: true
-dlna_friendly_name: ReMoment Music
-dlna_media_dir: /srv/media
-dlna_port: 8200
-# Where the music comes from (proxmox.yml). Set a PVE host path (e.g. an existing
-# music share) to bind-mount it read-only at dlna_media_dir; leave empty to get a
-# dedicated volume of proxmox_media_size GB instead.
-# Unprivileged containers see host uid 0 as 100000+, so the path must be world-readable.
-proxmox_media_host_path: ''
-proxmox_media_size: 200
+# --- Music files (proxmox.yml, setup.yml) -----------------------------------------
+# ReMoment serves its own files. Two folders are mounted into the container and from
+# there into the app container, at the same paths; add both as local storage locations
+# at /settings/storage:
+#   music_dir    the existing music (e.g. on the NAS), indexed in place
+#   library_dir  an empty folder ReMoment stores its own files in (imports, uploads)
+music_dir: /srv/music
+library_dir: /srv/library
+# Each comes from, in this order: an NFS export (proxmox.yml mounts it on the PVE host
+# and bind-mounts it into the container), a path that already exists on the PVE host, or,
+# when both are empty, a dedicated volume of the given size in GB.
+# NFS exports look like 192.168.1.50:/volume1/music. See docs/architecture/proxmox-deployment.md
+# for what the NAS has to allow.
+proxmox_music_nfs: 192.168.1.211:/mnt/Storage/Media/Music
+proxmox_library_nfs: 192.168.1.211:/mnt/Storage/Media/remoment
+proxmox_music_host_path: ''
+proxmox_library_host_path: ''
+proxmox_nfs_mount_base: /mnt/remoment    # on the PVE host: music/ and library/ below it
+proxmox_music_readonly: true      # false lets ReMoment move/reorganize the existing files
+proxmox_music_size: 200
+proxmox_library_size: 200
+# The PVE host path each one ends up at ('' = a dedicated volume). Derived, no need to edit.
+music_host_path: "{{ proxmox_music_host_path or ((proxmox_nfs_mount_base ~ '/music') if proxmox_music_nfs else '') }}"
+library_host_path: "{{ proxmox_library_host_path or ((proxmox_nfs_mount_base ~ '/library') if proxmox_library_nfs else '') }}"
+
+# --- Integrations (env.j2) ---------------------------------------------------------
+# User-Agent for MusicBrainz, Wikipedia and the other metadata APIs; they ask for a contact address.
+metadata_user_agent: "ReMoment/1.0 (remko@pionect.nl)"
+# Address the speakers fetch own files from; empty = app_url. Use the IP if speakers can't resolve .local.
+stream_base_url: ''
+# MQTT-over-WebSocket for the browser; leave empty to use the request host and port 9001.
+mqtt_public_ws_port: 9001
+mqtt_ws_url: ''
+# Secrets (Spotify, Last.fm, Discogs, TheAudioDB) live in vault.yml.
 
 # --- Audio analysis sidecar (deploy.yml) ----------------------------------------
 # Essentia container (BPM, key, mood), see docs/architecture/audio-analysis.md.
 # Adds the `analysis` compose profile and the ANALYSIS_* settings to .env.
-analysis_enabled: false
+analysis_enabled: true
 # true = the TensorFlow build (mood, arousal/valence, instrumental, genre): a large image,
 # ~1 GB of models and a lot of CPU/RAM. Raise proxmox_ct_memory (6144+) and proxmox_ct_cores for it.
-analysis_essentia_ml: false
+analysis_essentia_ml: true
 analysis_mood_min_score: 0.7
 # Free AcoustID key (https://acoustid.org/new-application) for fingerprint lookups; empty = skip that stage.
-acoustid_api_key: ''
+acoustid_api_key: '9qtx6EQ9hh'
+acoustid_min_score: 0.9

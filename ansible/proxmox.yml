@@ -12,15 +12,64 @@
       ct_public_key: "{{ lookup('ansible.builtin.file', proxmox_ssh_public_key | expanduser) }}"
 
   tasks:
+      # Re-runs find the container again by hostname; a new one gets the highest
+      # existing VM/CT id + 1 (or proxmox_ct_id when set).
+      - name: Look for an existing container with this hostname
+        ansible.builtin.shell:
+            cmd: set -o pipefail; pct list | awk -v n='{{ proxmox_ct_hostname }}' '$NF == n {print $1}' | head -n1
+            executable: /bin/bash
+        register: ct_existing
+        changed_when: false
+
+      - name: Pick the next free id
+        ansible.builtin.shell:
+            cmd: >-
+                set -o pipefail; pvesh get /cluster/resources --type vm --output-format json
+                | python3 -c 'import json,sys; print(max([int(r["vmid"]) for r in json.load(sys.stdin)] + [99]) + 1)'
+            executable: /bin/bash
+        register: ct_next
+        changed_when: false
+        when: ct_existing.stdout == '' and not proxmox_ct_id
+
+      - name: Settle on the container id
+        ansible.builtin.set_fact:
+            ct_id: "{{ ct_existing.stdout if ct_existing.stdout != '' else (proxmox_ct_id | default('', true) | string or ct_next.stdout) }}"
+
       - name: Check whether the container exists
-        ansible.builtin.command: pct status {{ proxmox_ct_id }}
+        ansible.builtin.command: pct status {{ ct_id }}
         register: ct_status
         failed_when: false
         changed_when: false
 
+      # NFS exports from the NAS are mounted on the PVE host (an unprivileged container can't
+      # mount NFS itself) and bind-mounted into the container below.
+      - name: Install the NFS client
+        ansible.builtin.apt:
+            name: nfs-common
+            state: present
+        when: (proxmox_music_nfs ~ proxmox_library_nfs) | length > 0
+
+      - name: Mount the music export on the PVE host
+        ansible.posix.mount:
+            src: "{{ proxmox_music_nfs }}"
+            path: "{{ proxmox_nfs_mount_base }}/music"
+            fstype: nfs
+            opts: "_netdev,nofail{{ ',ro' if proxmox_music_readonly | bool else '' }}"
+            state: mounted
+        when: proxmox_music_nfs | length > 0 and proxmox_music_host_path | length == 0
+
+      - name: Mount the library export on the PVE host
+        ansible.posix.mount:
+            src: "{{ proxmox_library_nfs }}"
+            path: "{{ proxmox_nfs_mount_base }}/library"
+            fstype: nfs
+            opts: _netdev,nofail
+            state: mounted
+        when: proxmox_library_nfs | length > 0 and proxmox_library_host_path | length == 0
+
       - name: Find the latest Debian template
         ansible.builtin.shell:
-            cmd: set -o pipefail; pveam available --section system | awk '/{{ proxmox_template_pattern }}/ {print $2}' | sort -V | tail -n1
+            cmd: set -o pipefail; pveam available --section system | awk -v arch="$(dpkg --print-architecture)" '$2 ~ /{{ proxmox_template_pattern }}/ && $2 ~ ("_" arch "[.]") {print $2}' | sort -V | tail -n1
             executable: /bin/bash
         register: ct_template
         changed_when: false
@@ -34,7 +83,7 @@
 
       - name: Create the container
         ansible.builtin.command: >-
-            pct create {{ proxmox_ct_id }} {{ proxmox_template_storage }}:vztmpl/{{ ct_template.stdout }}
+            pct create {{ ct_id }} {{ proxmox_template_storage }}:vztmpl/{{ ct_template.stdout }}
             --hostname {{ proxmox_ct_hostname }}
             --cores {{ proxmox_ct_cores }}
             --memory {{ proxmox_ct_memory }}
@@ -47,16 +96,19 @@
             --features nesting=1,keyctl=1
             --onboot 1
             --ostype debian
-            --mp0 {{ (proxmox_media_host_path ~ ',mp=' ~ dlna_media_dir ~ ',ro=1') if proxmox_media_host_path
-                     else (proxmox_ct_disk_storage ~ ':' ~ proxmox_media_size ~ ',mp=' ~ dlna_media_dir) }}
+            --mp0 {{ (music_host_path ~ ',mp=' ~ music_dir ~ (',ro=1' if proxmox_music_readonly | bool else ''))
+                     if music_host_path
+                     else (proxmox_ct_disk_storage ~ ':' ~ proxmox_music_size ~ ',mp=' ~ music_dir) }}
+            --mp1 {{ (library_host_path ~ ',mp=' ~ library_dir) if library_host_path
+                     else (proxmox_ct_disk_storage ~ ':' ~ proxmox_library_size ~ ',mp=' ~ library_dir) }}
         when: ct_status.rc != 0
 
       - name: Start the container
-        ansible.builtin.shell: pct status {{ proxmox_ct_id }} | grep -q running || pct start {{ proxmox_ct_id }}
+        ansible.builtin.shell: pct status {{ ct_id }} | grep -q running || pct start {{ ct_id }}
         changed_when: false
 
       - name: Wait for the container network
-        ansible.builtin.command: pct exec {{ proxmox_ct_id }} -- getent hosts deb.debian.org
+        ansible.builtin.command: pct exec {{ ct_id }} -- getent hosts deb.debian.org
         register: ct_net
         retries: 15
         delay: 2
@@ -66,7 +118,7 @@
       # Bootstrap SSH access so the other playbooks can reach the container.
       - name: Install SSH server, sudo and Python in the container
         ansible.builtin.command: >-
-            pct exec {{ proxmox_ct_id }} -- bash -c
+            pct exec {{ ct_id }} -- bash -c
             'DEBIAN_FRONTEND=noninteractive apt-get update -qq &&
             DEBIAN_FRONTEND=noninteractive apt-get install -y -qq openssh-server sudo python3'
         changed_when: false
@@ -76,7 +128,7 @@
             argv:
                 - pct
                 - exec
-                - "{{ proxmox_ct_id | string }}"
+                - "{{ ct_id }}"
                 - --
                 - bash
                 - -c
@@ -93,7 +145,7 @@
 
       - name: Read the container's IP address
         ansible.builtin.shell:
-            cmd: pct exec {{ proxmox_ct_id }} -- hostname -I | awk '{print $1}'
+            cmd: pct exec {{ ct_id }} -- hostname -I | awk '{print $1}'
         register: ct_addr
         retries: 15
         delay: 2
@@ -103,6 +155,6 @@
       - name: Report
         ansible.builtin.debug:
             msg: >-
-                Container {{ proxmox_ct_id }} is up at {{ ct_addr.stdout }}.
+                Container {{ ct_id }} is up at {{ ct_addr.stdout }}.
                 {{ 'It got this address from DHCP: reserve it in your router and ' if proxmox_ct_ip == 'dhcp' else '' }}
                 Set ansible_host of remoment_server in inventory.yml to it. Next: setup.yml, then deploy.yml.

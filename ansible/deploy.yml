@@ -18,6 +18,7 @@
             dest: "{{ app_dir }}"
             version: "{{ app_branch }}"
             force: false
+            accept_hostkey: true   # first clone: github.com isn't in known_hosts yet
 
       - name: Ensure SQLite database file exists
         ansible.builtin.file:

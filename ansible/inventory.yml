@@ -10,7 +10,9 @@ all:
                 remoment_server:
                     # IP of the container proxmox.yml creates (printed at the end of proxmox.yml when proxmox_ct_ip is dhcp),
                     # or of any existing Debian host/VM if you skip proxmox.yml.
-                    ansible_host: 192.168.1.127
+                    ansible_host: 192.168.1.109
                     ansible_user: debian              # created in the container by proxmox.yml
+                    # Forwards your local ssh-agent so the container can clone the private repo (run ssh-add first).
+                    ansible_ssh_common_args: '-o ForwardAgent=yes'
                     # ansible_ssh_private_key_file: ~/.ssh/id_rsa
                     # ansible_become_password: "secret"  # or use ansible-vault

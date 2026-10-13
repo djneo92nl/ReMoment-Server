@@ -1,17 +1,28 @@
 # Proxmox deployment (Ansible)
 
-Runs ReMoment in an unprivileged LXC container (nesting on, so Docker works) on an existing Proxmox VE host, with a MiniDLNA server in the same container.
+Runs ReMoment in an unprivileged LXC container (nesting on, so Docker works) on an existing Proxmox VE host. ReMoment serves the music itself (`/stream`); there is no separate DLNA server.
 
-1. `ansible/inventory.yml`: set the `pve` host (root SSH) and `remoment_server` (the container's IP; with `proxmox_ct_ip: dhcp` the default, step 2 prints the address to fill in here: reserve it in your router). `ansible/group_vars/all.yml`: the `proxmox_*` and `dlna_*` variables.
+1. `ansible/inventory.yml`: set the `pve` host (root SSH) and `remoment_server` (the container's IP; with `proxmox_ct_ip: dhcp` the default, step 2 prints the address to fill in here: reserve it in your router). `ansible/group_vars/all.yml`: the `proxmox_*` and `music_dir` variables.
 2. `ansible-playbook -i ansible/inventory.yml ansible/proxmox.yml` — downloads the Debian template (`proxmox_template_pattern`, default Debian 13), creates the container, installs sshd/sudo and the deploy user + your public key. Skips an existing container id.
-3. `ansible/setup.yml --ask-become-pass` — Docker, Avahi (`_remoment._tcp`) and MiniDLNA.
+3. `ansible/setup.yml --ask-become-pass` — Docker, Avahi (`_remoment._tcp`) and the music folder (removes MiniDLNA if an older run installed it).
 4. `ansible/deploy.yml --ask-vault-pass` — the app.
 
 Skip step 2 to use any existing Debian VM/host instead.
 
-## DLNA server
+## Music folders
 
-MiniDLNA runs on the container itself (not in Docker) so SSDP multicast works. It serves `dlna_media_dir` (`/srv/media`) as "`dlna_friendly_name`" on port `dlna_port` (8200). Media comes from `mp0`: either a dedicated volume (`proxmox_media_size` GB) or, with `proxmox_media_host_path`, a read-only bind mount of a PVE-host path (must be world-readable, since unprivileged containers map host uid 0 to 100000+). Copy music in, then add/scan the server at `/settings/dlna` (`php artisan library:scan`).
+Two folders are mounted into the container (`mp0`, `mp1`), and from there into the app container at the same paths (`MUSIC_DIR`, `LIBRARY_DIR` in `.env`, `docker-compose.prod.yml`):
+
+- `music_dir` (`/srv/music`): the existing music, e.g. on a NAS. Read-only by default (`proxmox_music_readonly`), so scanning indexes it in place and never touches it; set it to `false` to let ReMoment move or reorganize those files.
+- `library_dir` (`/srv/library`): an empty folder ReMoment stores its own files in (imports, uploads, the organized layout).
+
+Each comes from a PVE host path (`proxmox_music_host_path`, `proxmox_library_host_path`) or, when empty, a dedicated volume (`proxmox_music_size`, `proxmox_library_size`). After deploying, add both as local storage locations at `/settings/storage` (`docs/architecture/file-storage.md`).
+
+### NAS over NFS
+
+Set `proxmox_music_nfs` / `proxmox_library_nfs` (e.g. `192.168.1.50:/volume1/music`). `proxmox.yml` installs `nfs-common` on the PVE host, mounts them under `proxmox_nfs_mount_base` (`/mnt/remoment/music`, `/mnt/remoment/library`, in the host's fstab) and bind-mounts those into the container; an unprivileged container can't mount NFS itself. To use a path that is already mounted on the host, set `proxmox_music_host_path` / `proxmox_library_host_path` instead.
+
+On the NAS, export both folders to the **PVE host's IP**. Unprivileged containers shift uids by 100000, so the deploy user (uid 1000) is uid **101000** on the host. The library export must let that uid write: map every user to it, e.g. `/export/library 192.168.1.127(rw,sync,all_squash,anonuid=101000,anongid=101000,no_subtree_check)`. The music export only needs to be readable: `/export/music 192.168.1.127(ro,sync,all_squash,no_subtree_check)`.
 
 ## Audio analysis sidecar
 
