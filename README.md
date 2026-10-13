@@ -16,140 +16,142 @@
 
 ### A modular, network-based media controller layer
 
-ReMoment is a Laravel-based PHP service that acts as a **universal controller** for networked audio (and eventually video) devices. It is designed as an abstraction layer between user interfaces, automation systems, and a growing ecosystem of network media players.
+ReMoment is a Laravel-based PHP service that acts as a **universal controller** for networked audio and video devices. It is an abstraction layer between user interfaces, automation systems, and a growing ecosystem of network media players, and it doubles as a unified music library across DLNA, Spotify and your own files.
 
 The goal is not to replace native apps, but to provide a **consistent, extensible control surface** for heterogeneous devices that were never designed to work together.
 
-This project is still in development
+This project is still in development.
 
 ---
 
 ## What ReMoment Is
 
-ReMoment is intentionally **not** a media server and **not** a traditional remote.
+ReMoment runs *next to* media servers, streaming services, and playback devices as a **coordination and intelligence layer**. Media stays where it already lives; ReMoment provides the logic that decides how that media moves, appears, and is controlled. It can also serve your own music files itself (see [Own music server](#own-music-server)).
 
-It runs *next to* media servers, streaming services, and playback devices as a **coordination and intelligence layer**. Media stays where it already lives; ReMoment provides the logic that decides how that media moves, appears, and is controlled.
-
-ReMoment exposes a unified API for controlling and querying media players across brands and protocols. It normalizes common concepts such as:
+It exposes one REST API (and MQTT topics) for controlling and querying media players across brands and protocols, normalizing:
 
 * Power and availability
-* Source selection
-* Transport control (play, pause, stop, next, previous)
+* Source selection and per-source controls (CD changer, FM presets, TV digits)
+* Transport control (play, pause, stop, next, previous, seek)
 * Volume and mute
-* Now-playing metadata
+* Shuffle, repeat and like
+* Up next queue
+* Now-playing metadata and artwork
+* Device settings (bass/treble/loudness, Bluetooth, network, sleep timer, name)
 * Playback history and state transitions
 
-Under the hood, each supported ecosystem is implemented as a driver/interface that translates these generic commands into device-specific protocols.
+Each supported ecosystem is a driver that translates these generic commands into device-specific protocols. Always check a device's `capabilities` before calling a feature endpoint.
 
-In addition to real-time control, ReMoment **records playback activity** and enriches it with metadata to build a richer picture of what is being played across devices.
+---
+
+## Supported Devices
+
+| Ecosystem | Support |
+|-----------|---------|
+| **Bang & Olufsen ASE** (Beosound / Beolab / BeoPlay V1 and more) | Full: playback, sources, multiroom, power, sound, Bluetooth, network, WiSA and wired speaker setup, sleep timer, library playback |
+| **Bang & Olufsen Mozart** platform | Playback, volume, power (standby only), sound, device info, battery, multiroom, DLNA library playback |
+| **BeoLink Converter NL/ML** | Added as a device; FM presets of its tuner, join a converter's playing source |
+| **Sonos** | Playback, volume, radio, multiroom, library playback, seek, queue, shuffle, repeat, sources, sound adjustment, battery on portable models |
+| **Spotify** | Virtual device (Web API) with seek, queue, shuffle, repeat and like; routes to a mapped speaker via Spotify Connect |
+
+Planned / under investigation: Logitech Squeezebox, Bose SoundTouch, Deezer.
+
+Devices are found with `php artisan device:discover` (SSDP, mDNS, Sonos topology) or added by hand. Drivers are composable; Mozart support already ships as separate Composer packages (see `docs/architecture/plugin-architecture.md`).
+
+---
+
+## Features
+
+### Device control
+* Live device dashboard, per-device detail page, source manager (hide, reorder, activate)
+* **Multiroom** between ASE, Mozart and Sonos, with named presets and a role badge (host / listener) per device
+* **Spotify routing**: while a speaker mapped to a Spotify Connect name plays Spotify, speaker and Spotify behave as one device in web, REST and MQTT
+* **Per-device settings** pages and endpoints: sound adjustment, Bluetooth pairing, device name and firmware, network and Wi-Fi, WiSA and wired speaker types, sleep timer
+* **Radio**: BeoRadio / TuneIn stations per platform, household-wide favorites
+* **Battery** level and charging state for portable devices
+* Sticky **player bar** for a device pinned in the browser, with play buttons across the library
+
+### Music library
+* One record per artist, album and track across all sources (DLNA, Spotify, own files, plays); `library:merge-duplicates` cleans up existing duplicates
+* **Libraries** per source with a leading-source setting, scoped browsing (`local`, `streaming`, per library), genres, favorites, recently played, random album, sorting by name, year, added or most played
+* **Playback from the library** on any capable device: tracks, albums, artists and playlists, over DLNA first and Spotify second
+* **Playlists**: synced Spotify playlists, local playlists, and **smart playlists** built from rules with a live-preview editor and a daily refresh
+* Generated **playlist covers** (2×2 mosaics) and **logos** for sources without artwork
+
+### Own music server
+* Index your own audio files from local disk or **S3** storage locations, stream them from this server, and play them on your devices
+* Inbox import, organizer (`artist/album`), reorganize and verify commands, managed at `/settings/storage` with live status
+
+### Metadata and enrichment
+* Asynchronous, rate-limited enrichment from **MusicBrainz, Cover Art Archive, Wikipedia, Spotify, Last.fm, TheAudioDB, Discogs** and lyrics providers
+* Canonical genres, artist biographies and photos, album credits and mood, scheduled daily via `library:enrich`
+* **Last.fm**: scrobbling, now-playing updates, artist enrichment and backfill
+* Playback history, listening **stats** (top artists, devices, hourly heatmap)
+
+### Artwork
+* Every cover is downloaded once and served as baseline JPEG proxies (512 / 320 / 120) with blurred full-screen backgrounds for the 7" landscape, 3.5" portrait and square 480×480 client screens, plus dominant and text-safe colors
+* The web UI and API never hand out original image URLs
+* Pre-render and backfill commands, and an **SD card export** zip for touch clients
+
+### Clients and integration
+* **REST API** for native apps, documented in `docs/api/` with an OpenAPI contract (`docs/api/openapi.yaml`)
+* **MCP server** at `/mcp` so an AI agent can control devices and manage the library (admin tools need the admin token), see `docs/api/mcp.md`
+* **MQTT** topics per device (data, progress, state, volume, battery, multiroom, modes), retained where it matters
+* **Live updates**: the browser subscribes to MQTT over WebSocket and refreshes Livewire components on push, falling back to polling
+* **Client devices** (ESP32, Raspberry Pi, Squeezebox Touch, ...) self-register, are approved by an admin and see only their assigned devices
+* `GET /api/info` bootstrap endpoint, and the server announces itself over **mDNS** (`_remoment._tcp`) so clients find it
+* `/receiver`, a full-screen now-playing display
+
+### Administration
+* A **single shared admin login** gates setup and configuration; everything else is guest-accessible, matching the REST API. Apps sign in with the same password for a revocable bearer token (`POST /api/admin/login`). There are no user accounts, by design.
+* First-time **setup wizard** at `/setup`
+* **System health** page: MQTT broker, scheduler and queue heartbeats, failed jobs, per-device listener state
+* Ansible playbook for a Proxmox LXC deployment, plus Docker (Laravel Sail) for development
 
 ---
 
 ## Web Interface
 
-ReMoment includes a built-in web management interface accessible at `http://localhost`:
+Available at `http://localhost`, built with Blade, Livewire 3 and Alpine.js, styled with Tailwind CSS:
 
-- **Device dashboard** — live grid of all devices. Playing devices show a full now-playing card with playback controls and volume slider. Standby and unreachable devices show compact status cards.
-- **Device management** — add, edit, and remove devices. Driver selection cascades automatically from brand → product model using the `config/devices.php` registry.
-- **Device detail** — per-device view combining playback controls with device info and stored metadata.
-- **Settings** — user account management and a snapshot of integration configuration (MQTT, device counts).
-
-The UI is styled with Tailwind CSS and Font Awesome, matching the design established in the project mockup. Livewire provides real-time updates without page reloads.
+* `/devices`: live device grid; playing devices get a full now-playing card with controls, seek and volume
+* `/devices/{id}`: now playing, up next, sources, lyrics, "add to library", device settings
+* `/library`, `/albums`, `/artists`, genres, favorites, playlists and smart playlist editor
+* `/multiroom`, `/radio`, `/history`, `/stats`, `/receiver`, `/setup`
+* `/settings/*`: DLNA servers, storage, Spotify and Last.fm connections, Spotify Connect mapping, client devices, health
 
 ---
 
 ## Architecture Overview
 
-ReMoment is not only reactive, but **observant**. It captures now-playing events, device state changes, and media identifiers, then resolves and stores enriched metadata for later use.
+ReMoment is not only reactive, but **observant**. Device listeners poll or subscribe to each device and fire events (now playing, progress, state, volume, battery, modes); listeners on those events update a Redis cache, publish to MQTT, store playback history and queue artwork processing.
 
-* **Framework**: Laravel (PHP)
-* **Role**: Interface / orchestration layer
-* **Clients**: Web UIs, embedded devices (ESP32), automation systems, scripts
-* **Devices**: Network-connected speakers, TVs, and media players
+* **Framework**: Laravel 12 (PHP 8.4), Livewire 3
+* **Infrastructure**: Redis (cache, sessions, queue), Mosquitto (MQTT, WebSocket on 9001), Meilisearch
+* **Pattern**: `config/devices.php` maps brands and models to driver classes that implement small capability interfaces
+* **Clients**: web UIs, embedded devices (ESP32), native apps, automation systems, scripts
 
-ESP32-based controllers can connect to ReMoment over the network and act as physical control surfaces, displays, or sensors without needing to understand vendor-specific APIs.
+Because ReMoment persists enriched playback data, controllers can request **context-aware information** (track details, artwork, history) instead of raw device responses.
 
-Because ReMoment persists enriched playback data, these controllers can request **context-aware information** (track details, artwork references, source history) instead of raw device responses.
-
----
-
-## Current Support
-
-### Bang & Olufsen
-
-* **ASE (Audio / Video Engine)** devices
-
-### Sonos
-
-* Core playback and device control
+Detailed documentation lives in [`docs/`](docs): `api/` for integrators, `architecture/` for server internals, `frontend/` for the UI pages.
 
 ---
 
-## Media Sources & Playback Targets
+## Getting Started
 
-ReMoment does not store or stream media itself. Instead, it **orchestrates playback** by instructing capable devices to fetch, start, and route media from existing sources.
-
-This keeps responsibilities clean:
-
-* Media servers serve media
-* Streaming services stream
-* Devices decode and play
-* **ReMoment decides and connects**
-
-ReMoment is designed to evolve from a passive observer into an **active media selector**. Beyond device control, it aims to act as a source broker that can initiate playback across ecosystems.
-
-ReMoment is designed to evolve from a passive observer into an **active media selector**. Beyond device control, it aims to act as a source broker that can initiate playback across ecosystems.
-
-Planned capabilities include:
-
-* Selecting and starting tracks, albums, and playlists from **Spotify** and **Deezer** (via device-supported or indirect control paths)
-* Starting and switching **radio stations** (internet radio and device-native radio implementations)
-* Indexing **DLNA / UPnP media servers** and exposing their libraries in a normalized form
-* Routing local DLNA media to supported playback devices regardless of original vendor intent
-
-This allows client devices (UIs, ESP32 controllers, automations) to request *what* should be played without needing to know *how* a specific device achieves it.
-
----
-
-## Planned / Experimental Support
-
-### Bang & Olufsen
-
-* **Mozart** platform devices
-
-### Other Ecosystems
-
-* Logitech Squeezebox
-* Bose SoundTouch (under investigation)
-
-These targets may evolve depending on protocol accessibility and long-term device viability.
-
----
-
-## Metadata & Enrichment
-
-ReMoment tracks what is played over time and augments it with external or device-provided metadata where possible. This enables:
-
-* Playback history across devices and ecosystems
-* Normalized artist, album, and track data
-* Artwork and extended media descriptors
-* Smarter UI displays and future recommendation logic
-
-Metadata enrichment is designed to be asynchronous and non-blocking, so device control remains fast and reliable.
+```bash
+composer setup      # install, env, key, migrate
+composer dev        # Laravel, queue, Vite and log viewer
+composer test       # run the test suite
+php artisan device:discover   # find devices on your network
+php artisan library:scan      # import DLNA libraries
+```
 
 ---
 
 ## Native & Restored Device Capabilities
 
-Many networked audio products lose functionality over time as companion apps change or disappear. ReMoment intentionally reintroduces and preserves **native-like features** by talking directly to device protocols.
-
-Examples include:
-
-* Speaker grouping for **Bang & Olufsen ASE televisions**
-* Reconnecting and managing **WiSA speakers** with Beosound Moment-class devices
-* Accessing configuration and routing features removed from official apps
-
-These functions are exposed in a consistent, API-driven way so they can be reused by modern UIs and physical controllers.
+Many networked audio products lose functionality over time as companion apps change or disappear. ReMoment reintroduces and preserves **native-like features** by talking directly to device protocols, such as speaker grouping for **Bang & Olufsen ASE televisions**, reconnecting and managing **WiSA speakers** on Beosound Moment-class devices, Bluetooth and network settings, and FM presets of BeoLink converters. The `ase:map` command crawls a B&O device's REST API to discover what else it offers.
 
 ---
 
@@ -159,7 +161,7 @@ ReMoment is under active development and is intentionally opinionated:
 
 * Focused on **local network control**
 * Designed to be **headless-first** (API before UI)
-* Optimized for **long-lived hardware projects** rather than cloud dependency
+* Optimized for **long-lived hardware projects** rather than cloud dependency; a Raspberry Pi 2/3 is the minimum hardware
 
 Expect breaking changes while interfaces are refined and new device families are added.
 
@@ -176,5 +178,5 @@ Expect breaking changes while interfaces are refined and new device families are
 License and contribution guidelines will be defined once the core interfaces stabilize.
 
 ## Usage of AI
-___
-Some code has been build with the help of AI
+
+Some code has been built with the help of AI.
