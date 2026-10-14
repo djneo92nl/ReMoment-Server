@@ -13,7 +13,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 
 /**
- * Takes a file dropped in the browser (already stored in the inbox by LibraryUploadController) through
+ * Takes a file dropped in the browser (already staged in the library's `_uploads/` folder by LibraryUploadController) through
  * parsing its tags, copying it into the library layout and queueing its enrichment, recording each step in
  * LibraryUploads for the table on /settings/storage.
  */

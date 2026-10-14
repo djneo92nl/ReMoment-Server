@@ -49,6 +49,11 @@ class LibraryUploadController extends Controller
             LibraryUploads::fail($id, $e->getMessage());
 
             return response()->json(['message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) { // e.g. the library folder is not writable: say so in the table instead of a bare 500
+            report($e);
+            LibraryUploads::fail($id, 'Could not store the file in the library: '.$e->getMessage());
+
+            return response()->json(['message' => $e->getMessage()], 500);
         } finally {
             fclose($stream);
         }

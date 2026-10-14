@@ -57,6 +57,12 @@ class FileStore
         $this->disk()->delete($path);
     }
 
+    /** Removes a directory and everything in it. */
+    public function deleteDirectory(string $directory): void
+    {
+        $this->disk()->deleteDirectory($directory);
+    }
+
     public function move(string $from, string $to): void
     {
         $this->disk()->move($from, $to);

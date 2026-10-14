@@ -97,7 +97,18 @@
                         xhr.setRequestHeader('Accept', 'application/json');
                         xhr.upload.onprogress = (e) => { if (e.lengthComputable) { this.progress[row.id] = Math.round(e.loaded / e.total * 100); } };
                         xhr.onloadend = () => {
-                            if (xhr.status === 0) { this.$wire.uploadFailed(row.id); } else { this.$wire.$refresh(); }
+                            if (xhr.status === 0) {
+                                this.$wire.uploadFailed(row.id);
+                            } else if (xhr.status >= 400) {
+                                // the server did not get to record why (too large for the web server, session expired, ...)
+                                let message = 'The server answered ' + xhr.status + '.';
+                                if (xhr.status === 413) { message = 'Too large for the server (upload_max_filesize / post_max_size, or the proxy in front).'; }
+                                if (xhr.status === 419) { message = 'The page expired: reload it and try again.'; }
+                                try { message = JSON.parse(xhr.responseText).message || message; } catch (e) {}
+                                this.$wire.uploadFailed(row.id, message);
+                            } else {
+                                this.$wire.$refresh();
+                            }
                             resolve();
                         };
                         const form = new FormData();

@@ -36,7 +36,9 @@ class LibraryFiles
     }
 
     /**
-     * First step of an upload: stores the bytes in the inbox (or the library when there is no inbox).
+     * First step of an upload: stores the bytes in the library location, under `_uploads/`. Not in the inbox:
+     * that is often the existing music, mounted read-only, and the file is moved into the library layout
+     * within the same location afterwards (a rename, not a copy).
      *
      * @param  resource  $stream
      * @return array{0: StorageLocation, 1: string} where the file now is
@@ -44,7 +46,6 @@ class LibraryFiles
     public function stageUpload(string $filename, $stream): array
     {
         $library = StorageLocation::library() ?? throw new \InvalidArgumentException('Add a library storage location first.');
-        $inbox = StorageLocation::inbox() ?? $library;
 
         $filename = basename(str_replace('\\', '/', $filename));
         if (!AudioTags::isAudio($filename)) {
@@ -52,9 +53,9 @@ class LibraryFiles
         }
 
         $path = '_uploads/'.Str::ulid().'/'.$filename;
-        (new FileStore($inbox))->put($path, $stream);
+        (new FileStore($library))->put($path, $stream);
 
-        return [$inbox, $path];
+        return [$library, $path];
     }
 
     /** Second step: reads the staged file's tags and attaches it to its track; an unreadable file is removed again. */
@@ -75,8 +76,16 @@ class LibraryFiles
     public function placeInLibrary(File $file): File
     {
         $library = StorageLocation::library() ?? throw new \InvalidArgumentException('Add a library storage location first.');
+        $staged = $file->path;
 
-        return $this->place($file, $library);
+        $file = $this->place($file, $library);
+
+        // The staging folder is empty once its file has been moved to the layout path.
+        if (str_starts_with($staged, '_uploads/') && $file->path !== $staged) {
+            (new FileStore($library))->deleteDirectory(dirname($staged));
+        }
+
+        return $file;
     }
 
     /**

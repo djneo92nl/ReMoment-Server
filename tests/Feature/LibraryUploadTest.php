@@ -62,7 +62,7 @@ class LibraryUploadTest extends TestCase
         Bus::assertDispatched(ProcessLibraryUpload::class);
         $this->assertSame(LibraryUploads::PARSING, LibraryUploads::find($id)['state']);
 
-        (new ProcessLibraryUpload($id, StorageLocation::inbox()->id, collect(Fs::allFiles($this->base.'/inbox'))->first()->getRelativePathname()))
+        (new ProcessLibraryUpload($id, StorageLocation::library()->id, '_uploads/'.basename(dirname(collect(Fs::allFiles($this->base.'/library/_uploads'))->first()->getPathname())).'/song.wav'))
             ->handle(app(\App\Domain\Storage\LibraryFiles::class));
 
         $row = LibraryUploads::find($id);
@@ -72,6 +72,7 @@ class LibraryUploadTest extends TestCase
         $this->assertSame(1, Track::count());
         $this->assertSame(StorageLocation::library()->id, File::firstOrFail()->storage_location_id);
         $this->assertSame([], Fs::allFiles($this->base.'/inbox'));
+        $this->assertSame([], glob($this->base.'/library/_uploads/*') ?: []);
     }
 
     public function test_a_non_audio_file_is_refused_at_once(): void
@@ -103,7 +104,7 @@ class LibraryUploadTest extends TestCase
         $row = LibraryUploads::find($id);
         $this->assertSame(LibraryUploads::FAILED, $row['state']);
         $this->assertSame(LibraryUploads::PARSING, $row['failed_at']);
-        $this->assertSame([], Fs::allFiles($this->base.'/inbox'));
+        $this->assertSame([], Fs::allFiles($this->base.'/library/_uploads'));
     }
 
     public function test_the_table_shows_the_steps_and_clears_finished_rows(): void
