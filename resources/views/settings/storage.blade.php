@@ -11,6 +11,7 @@
 
     <div class="max-w-4xl space-y-6">
         <livewire:storage-manager />
+        <livewire:library-uploader />
         <livewire:storage-files />
     </div>
 </x-app-layout>

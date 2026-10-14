@@ -39,6 +39,18 @@ Scanning, importing the inbox and reorganizing can take long, so the web UI and 
 - add/edit/remove locations (local folder must exist on the server; S3 key and secret are never sent back to the browser: leave blank to keep), test reachability;
 - Scan per location, Import inbox, Reorganize library — each queued, with live status (the page polls every 2 s while something is active);
 - file browser: search by path, filter by location/status, verify, move/rename, delete.
+- **Add music** (`LibraryUploader`): a drop zone for audio files, with a table of each file's step.
+
+### Browser upload
+
+Files dropped on `/settings/storage` go through `App\Http\Controllers\LibraryUploadController` (session login, CSRF) and `App\Jobs\ProcessLibraryUpload`. The page sends two requests per file, two files at a time:
+
+1. `POST /settings/storage/uploads` `{name, size}` registers a row (`LibraryUploads`, cache, newest first, 100 kept) and refuses non-audio names at once.
+2. `POST /settings/storage/uploads/{id}` sends the bytes (XHR, so the page shows the percentage). `LibraryFiles::stageUpload()` stores them in the inbox under `_uploads/{ulid}/` (the library when there is no inbox) and queues `ProcessLibraryUpload`.
+
+The job runs the steps of `LibraryFiles::upload()` one by one and records each: **parsing** (`indexStaged`: tags, track, cover; an unreadable file is removed again), **copying** (`placeInLibrary`: organized layout, copy, hash check, source removed), **enriching** (`Enrichment::queue()` for the track, plus audio analysis for the file when enabled). The table calls a file *done* when every source the job queued is fetched (`Enrichment::pendingSources()`), or after 15 minutes, naming the sources that did not answer (rate limited or nothing found). A failure keeps the step it failed in; a file that failed after parsing stays in the inbox for `library:import`. Rows are progress, not data: they expire after a day and a row without progress for two hours shows as failed.
+
+The size limit is PHP's `upload_max_filesize` / `post_max_size` (100M in `docker/*/php.ini`) and any proxy in front; a larger file fails at the upload step.
 
 All locations are also scanned nightly at 03:30 (`library:scan-files --queue`).
 

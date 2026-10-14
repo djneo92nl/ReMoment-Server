@@ -195,6 +195,16 @@ class Enrichment
         return $queued;
     }
 
+    /** The sources a queued track enrichment still has to fetch (jobs that are possible and not done). @return list<string> */
+    public static function pendingSources(Track $track): array
+    {
+        if (!self::eligible($track)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_keys(self::trackJobs($track)), fn (string $source) => !self::isDone($track, $source)));
+    }
+
     /** Queues the artist-level jobs whose data is available and not yet fetched; returns how many. */
     public static function queueArtist(Artist $artist): int
     {

@@ -30,6 +30,19 @@ class LibraryFiles
      */
     public function upload(string $filename, $stream): File
     {
+        [$location, $path] = $this->stageUpload($filename, $stream);
+
+        return $this->placeInLibrary($this->indexStaged($location, $path));
+    }
+
+    /**
+     * First step of an upload: stores the bytes in the inbox (or the library when there is no inbox).
+     *
+     * @param  resource  $stream
+     * @return array{0: StorageLocation, 1: string} where the file now is
+     */
+    public function stageUpload(string $filename, $stream): array
+    {
         $library = StorageLocation::library() ?? throw new \InvalidArgumentException('Add a library storage location first.');
         $inbox = StorageLocation::inbox() ?? $library;
 
@@ -38,15 +51,30 @@ class LibraryFiles
             throw new \InvalidArgumentException('Not an audio file.');
         }
 
-        $store = new FileStore($inbox);
         $path = '_uploads/'.Str::ulid().'/'.$filename;
-        $store->put($path, $stream);
+        (new FileStore($inbox))->put($path, $stream);
 
-        [$file] = $this->indexer->index($inbox, $path, $store);
+        return [$inbox, $path];
+    }
+
+    /** Second step: reads the staged file's tags and attaches it to its track; an unreadable file is removed again. */
+    public function indexStaged(StorageLocation $location, string $path): File
+    {
+        $store = new FileStore($location);
+
+        [$file] = $this->indexer->index($location, $path, $store);
         if ($file === null) {
             $store->delete($path);
             throw new \InvalidArgumentException('The file could not be read as audio.');
         }
+
+        return $file;
+    }
+
+    /** Third step: moves the file to its place in the library layout. */
+    public function placeInLibrary(File $file): File
+    {
+        $library = StorageLocation::library() ?? throw new \InvalidArgumentException('Add a library storage location first.');
 
         return $this->place($file, $library);
     }

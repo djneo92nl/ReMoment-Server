@@ -93,6 +93,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/settings/dlna/{server}/scan', [SettingsController::class, 'dlnaScan'])->name('settings.dlna.scan');
 
     Route::get('/settings/storage', fn () => view('settings.storage'))->name('settings.storage');
+    Route::post('/settings/storage/uploads', [\App\Http\Controllers\LibraryUploadController::class, 'start'])->name('settings.storage.uploads.start');
+    Route::post('/settings/storage/uploads/{id}', [\App\Http\Controllers\LibraryUploadController::class, 'receive'])->name('settings.storage.uploads.receive');
 
     Route::get('/settings/library', [SettingsController::class, 'library'])->name('settings.library');
     Route::post('/settings/library', [SettingsController::class, 'librarySave'])->name('settings.library.save');
