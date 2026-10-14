@@ -13,133 +13,14 @@
 <body class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 text-gray-900 dark:text-gray-300 dark:bg-stone-950 dark:from-stone-950 dark:to-stone-900 antialiased"
       x-data="{ mobileMenuOpen: false }">
 
+<x-nav-mobile />
+
 <div class="flex min-h-screen">
 
     <x-nav-sidebar />
 
     <!-- Main Content -->
     <main class="flex-1 pt-5 pb-12 px-5 sm:px-8 lg:px-12 min-w-0">
-
-        <!-- Mobile top bar -->
-        <div class="md:hidden flex items-center justify-between mb-8 bg-white/80 dark:bg-stone-900/80 backdrop-blur-lg p-4 -mx-5 -mt-5 border-b border-gray-200 dark:border-stone-800 sticky top-0 z-10">
-            <div class="flex items-center gap-3">
-                <span class="text-xl font-medium tracking-tight">Re<span class="font-light text-red-600">Moment</span></span>
-            </div>
-            <button @click="mobileMenuOpen = !mobileMenuOpen" class="text-gray-600 dark:text-gray-400">
-                <i class="fa-solid fa-bars text-xl"></i>
-            </button>
-        </div>
-
-        <!-- Mobile menu overlay -->
-        <div x-show="mobileMenuOpen"
-             x-transition:enter="transition ease-out duration-200"
-             x-transition:enter-start="opacity-0"
-             x-transition:enter-end="opacity-100"
-             x-transition:leave="transition ease-in duration-150"
-             x-transition:leave-start="opacity-100"
-             x-transition:leave-end="opacity-0"
-             @click="mobileMenuOpen = false"
-             class="md:hidden fixed inset-0 bg-black/40 z-20"></div>
-
-        <div x-show="mobileMenuOpen"
-             x-transition:enter="transition ease-out duration-200"
-             x-transition:enter-start="opacity-0 -translate-x-full"
-             x-transition:enter-end="opacity-100 translate-x-0"
-             x-transition:leave="transition ease-in duration-150"
-             x-transition:leave-start="opacity-100 translate-x-0"
-             x-transition:leave-end="opacity-0 -translate-x-full"
-             class="md:hidden fixed top-0 left-0 h-full w-72 bg-white dark:bg-stone-900 z-30 shadow-xl flex flex-col">
-            <div class="p-8 border-b border-gray-200 dark:border-stone-800">
-                <div class="flex items-center gap-3">
-                    <div class="text-2xl font-medium tracking-tight text-gray-900 dark:text-gray-100">Re</div>
-                    <div class="text-base text-gray-400">×</div>
-                    <div class="text-2xl font-light text-red-600">Moment</div>
-                </div>
-            </div>
-            <nav class="flex-1 px-4 py-6">
-                <ul class="space-y-1">
-                    <li>
-                        <a href="{{ route('devices.index') }}" @click="mobileMenuOpen = false"
-                           class="flex items-center gap-3 px-5 py-3.5 rounded-xl transition-colors {{ request()->routeIs('devices.*') ? 'bg-gray-100 dark:bg-stone-800 font-medium text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400' }}">
-                            <i class="fa-solid fa-tv w-5"></i>Devices
-                        </a>
-                    </li>
-                    <li>
-                        <a href="{{ route('history.index') }}" @click="mobileMenuOpen = false"
-                           class="flex items-center gap-3 px-5 py-3.5 rounded-xl transition-colors {{ request()->routeIs('history.*') ? 'bg-gray-100 dark:bg-stone-800 font-medium text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400' }}">
-                            <i class="fa-solid fa-clock-rotate-left w-5"></i>History
-                        </a>
-                    </li>
-                    <li>
-                        @php
-                            $libraryActiveMobile = request()->routeIs('library.*') || request()->routeIs('artists.*') || request()->routeIs('albums.*') || request()->routeIs('genres.*') || request()->routeIs('radio.*') || request()->routeIs('playlists.*');
-                        @endphp
-                        <a href="{{ route('library.index') }}" @click="mobileMenuOpen = false"
-                           class="flex items-center gap-3 px-5 py-3.5 rounded-xl transition-colors {{ $libraryActiveMobile ? 'bg-gray-100 dark:bg-stone-800 font-medium text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400' }}">
-                            <i class="fa-solid fa-microphone-lines w-5"></i>Library
-                        </a>
-                        @if($libraryActiveMobile)
-                            <ul class="mt-1 ml-4 space-y-1">
-                                <li>
-                                    <a href="{{ route('artists.index') }}" @click="mobileMenuOpen = false"
-                                       class="flex items-center gap-3 px-5 py-2.5 rounded-xl text-sm transition-colors {{ request()->routeIs('artists.*') ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-500 dark:text-gray-500' }}">
-                                        <i class="fa-solid fa-microphone-lines w-4 text-xs"></i>Artists
-                                    </a>
-                                </li>
-                                <li>
-                                    <a href="{{ route('albums.index') }}" @click="mobileMenuOpen = false"
-                                       class="flex items-center gap-3 px-5 py-2.5 rounded-xl text-sm transition-colors {{ request()->routeIs('albums.*') ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-500 dark:text-gray-500' }}">
-                                        <i class="fa-solid fa-compact-disc w-4 text-xs"></i>Albums
-                                    </a>
-                                </li>
-                                <li>
-                                    <a href="{{ route('playlists.index') }}" @click="mobileMenuOpen = false"
-                                       class="flex items-center gap-3 px-5 py-2.5 rounded-xl text-sm transition-colors {{ request()->routeIs('playlists.*') ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-500 dark:text-gray-500' }}">
-                                        <i class="fa-solid fa-list-ul w-4 text-xs"></i>Playlists
-                                    </a>
-                                </li>
-                                <li>
-                                    <a href="{{ route('radio.index') }}" @click="mobileMenuOpen = false"
-                                       class="flex items-center gap-3 px-5 py-2.5 rounded-xl text-sm transition-colors {{ request()->routeIs('radio.*') ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-500 dark:text-gray-500' }}">
-                                        <i class="fa-solid fa-radio w-4 text-xs"></i>Radio
-                                    </a>
-                                </li>
-                                <li>
-                                    <a href="{{ route('genres.index') }}" @click="mobileMenuOpen = false"
-                                       class="flex items-center gap-3 px-5 py-2.5 rounded-xl text-sm transition-colors {{ request()->routeIs('genres.*') ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-500 dark:text-gray-500' }}">
-                                        <i class="fa-solid fa-tags w-4 text-xs"></i>Genres
-                                    </a>
-                                </li>
-                            </ul>
-                        @endif
-                    </li>
-                    <li>
-                        <a href="{{ route('multiroom.index') }}" @click="mobileMenuOpen = false"
-                           class="flex items-center gap-3 px-5 py-3.5 rounded-xl transition-colors {{ request()->routeIs('multiroom.*') ? 'bg-gray-100 dark:bg-stone-800 font-medium text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400' }}">
-                            <i class="fa-solid fa-layer-group w-5"></i>Multiroom
-                        </a>
-                    </li>
-                    <li>
-                        <a href="{{ route('stats.index') }}" @click="mobileMenuOpen = false"
-                           class="flex items-center gap-3 px-5 py-3.5 rounded-xl transition-colors {{ request()->routeIs('stats.*') ? 'bg-gray-100 dark:bg-stone-800 font-medium text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400' }}">
-                            <i class="fa-solid fa-chart-simple w-5"></i>Insights
-                        </a>
-                    </li>
-                    <li>
-                        <a href="{{ route('settings.index') }}" @click="mobileMenuOpen = false"
-                           class="flex items-center gap-3 px-5 py-3.5 rounded-xl transition-colors {{ request()->routeIs('settings.*') ? 'bg-gray-100 dark:bg-stone-800 font-medium text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400' }}">
-                            <i class="fa-solid fa-sliders w-5"></i>Settings
-                        </a>
-                    </li>
-                </ul>
-                @unless(app(\App\Support\SelectedDevice::class)->device())
-                    <button type="button" @click="mobileMenuOpen = false; $dispatch('open-player-panel')"
-                            class="mt-1 flex items-center gap-3 px-5 py-3.5 rounded-xl w-full text-left text-gray-600 dark:text-gray-400">
-                        <i class="fa-solid fa-circle-play w-5 text-indigo-500"></i>Select player
-                    </button>
-                @endunless
-            </nav>
-        </div>
 
         <!-- Global search -->
         <div class="mb-6">
@@ -172,16 +53,8 @@
     </main>
 </div>
 
-<!-- Sticky player: the pinned device, and the default target of every play button. Sticky (not fixed) at the end of the page, so content ends above it instead of hiding behind it. -->
-<style>
-    /* Narrow screens keep the essentials: art, title, transport. Geometry is inline/plain CSS on purpose (lazy Tailwind classes). */
-    @media (max-width: 767px) {
-        .player-extra { display: none !important; }
-        .player-center { flex: 0 0 auto !important; }
-        .player-progress { display: none !important; }
-    }
-</style>
-<div style="position:sticky;bottom:0;z-index:40;pointer-events:none">
+<!-- Sticky player: the pinned device, and the default target of every play button. Sticky (not fixed) at the end of the page, so content ends above it instead of hiding behind it. Geometry: .player-dock in app.css. -->
+<div class="player-dock">
     <livewire:player-bar />
 </div>
 </body>

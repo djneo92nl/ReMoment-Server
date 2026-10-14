@@ -41,7 +41,7 @@
 
     {{-- A–Z index --}}
     @if($sort === 'name' && count($letters) > 0)
-        <nav class="sticky top-0 z-20 -mx-1 mb-5 px-1 py-2 bg-gray-50/90 dark:bg-stone-950/90 backdrop-blur flex flex-wrap gap-1 text-xs" aria-label="Alphabet">
+        <nav class="sticky top-14 md:top-0 z-20 -mx-1 mb-5 px-1 py-2 bg-gray-50/90 dark:bg-stone-950/90 backdrop-blur flex flex-wrap gap-1 text-xs" aria-label="Alphabet">
             <a href="{{ route('artists.index', $keep(['letter' => null])) }}"
                @class(['px-2 py-1 rounded-md font-medium', 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900' => !$letter, 'text-gray-500 hover:bg-gray-200 dark:hover:bg-stone-800' => $letter])>All</a>
             @foreach(array_merge(['#'], range('A', 'Z')) as $l)

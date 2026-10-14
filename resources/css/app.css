@@ -20,3 +20,19 @@
         background: #e5e7eb;
     }
 }
+
+/* Sticky player dock (layouts/app). Plain CSS on purpose: the bar is a Livewire component and
+   Tailwind classes first seen after a lazy load are not generated. Stacking scale: DESIGN.md §6. */
+.player-dock {
+    position: sticky;
+    bottom: 0;
+    z-index: 40;
+    pointer-events: none;
+}
+
+/* Narrow screens keep the essentials: art, title, transport. */
+@media (max-width: 767px) {
+    .player-extra { display: none !important; }
+    .player-center { flex: 0 0 auto !important; }
+    .player-progress { display: none !important; }
+}

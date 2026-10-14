@@ -7,12 +7,7 @@
 
     <title>{{ config('app.name', 'ReMoment') }}</title>
 
-    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;500;600;700&display=swap');
-        body { font-family: 'SF Pro Display', system-ui, -apple-system, sans-serif; }
-    </style>
     @livewireScriptConfig
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -21,11 +16,7 @@
 
         <!-- Branding -->
         <div class="mb-8 text-center">
-            <div class="flex items-center justify-center gap-3 mb-1">
-                <span class="text-3xl font-medium tracking-tight text-gray-900 dark:text-gray-100">Re</span>
-                <span class="text-xl text-gray-400">×</span>
-                <span class="text-3xl font-light text-red-600">Moment</span>
-            </div>
+            <x-wordmark size="xl" class="justify-center mb-1" />
             <p class="text-xs text-gray-400 tracking-wide">Universal Device Controller</p>
         </div>
 
