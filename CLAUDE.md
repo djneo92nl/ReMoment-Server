@@ -707,7 +707,7 @@ Client devices find the server via mDNS (`_remoment._tcp`, TXT `path=/api`, `api
 
 ## Frontend
 
-Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interactivity. Rendering stays in Livewire: `public/js/remoment-live.js` only listens to MQTT over WebSockets and triggers `$wire.$refresh()`, falling back to 1s polling when the broker is unreachable (see `docs/architecture/live-updates.md`). Tailwind CSS and Font Awesome loaded via CDN (not compiled). The layout (`resources/views/layouts/app.blade.php`) provides a persistent sidebar navigation.
+Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interactivity. Rendering stays in Livewire: `public/js/remoment-live.js` only listens to MQTT over WebSockets and triggers `$wire.$refresh()`, falling back to 1s polling when the broker is unreachable (see `docs/architecture/live-updates.md`). Tailwind CSS 3 is compiled by Vite (PostCSS); only Font Awesome comes from a CDN. The layout (`resources/views/layouts/app.blade.php`) provides a persistent sidebar navigation (top bar + drawer below `md`) and the sticky bottom player bar. **Read `DESIGN.md` before changing any view**: it defines the colour roles, radius scale, components and sticky stacking order every page must follow.
 
 ### Livewire Components
 

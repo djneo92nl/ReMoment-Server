@@ -11,6 +11,10 @@ export default {
 
     theme: {
         extend: {
+            colors: {
+                // Favourite / highlight badge (album-card, artist-card, room-tile, mini-player-head)
+                fav: { DEFAULT: '#fbbf24', soft: '#fcd34d', ink: '#1f2937' },
+            },
             fontFamily: {
                 sans: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'system-ui', 'sans-serif'],
             },
