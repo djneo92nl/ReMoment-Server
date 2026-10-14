@@ -28,18 +28,11 @@
         </div>
 
         <!-- Flash messages -->
-        @if(session('success'))
-            <div class="mb-6 flex items-center gap-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 rounded-2xl px-6 py-4 text-sm">
-                <i class="fa-solid fa-circle-check"></i>
-                {{ session('success') }}
-            </div>
-        @endif
-        @if(session('error'))
-            <div class="mb-6 flex items-center gap-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 rounded-2xl px-6 py-4 text-sm">
-                <i class="fa-solid fa-circle-exclamation"></i>
-                {{ session('error') }}
-            </div>
-        @endif
+        @foreach(['success', 'error'] as $flash)
+            @if(session($flash))
+                <x-alert :type="$flash" class="mb-6">{{ session($flash) }}</x-alert>
+            @endif
+        @endforeach
 
         <!-- Page Heading -->
         @isset($header)

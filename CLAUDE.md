@@ -46,6 +46,7 @@ docs/
   frontend/
     receiver.md             /receiver view: JS globals, DOM structure, browser targets
     player-bar.md           Sticky bottom player: pinned device cookie, <x-play-button> default play target
+    components.md           Shared Blade components (x-card, x-page-header, x-alert, x-badge, x-empty-state, x-table, nav) and their props; rules in DESIGN.md at the repo root
 ```
 
 When adding a significant feature, add a matching doc in the relevant subfolder (`api/` for new REST endpoints, `architecture/` for server-side systems, `frontend/` for complex UI pages).
