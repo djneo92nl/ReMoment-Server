@@ -1,23 +1,20 @@
 <div class="space-y-6">
 
     @if(session('success'))
-        <div class="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-2xl px-6 py-4 text-sm text-emerald-800 dark:text-emerald-300">
-            <i class="fa-solid fa-circle-check mr-2"></i>{{ session('success') }}
-        </div>
+        <x-alert type="success">{{ session('success') }}</x-alert>
     @endif
 
     @foreach($groups as $driverName => $group)
-        <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 overflow-hidden">
+        <x-card flush>
 
             <div class="flex items-center justify-between gap-4 px-8 py-6 border-b border-gray-100 dark:border-stone-800">
                 <div>
                     <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">{{ $driverName }}</h2>
-                    <p class="text-sm text-gray-500 dark:text-gray-500">{{ $group['devices']->count() }} {{ $group['devices']->count() === 1 ? 'device' : 'devices' }} registered</p>
+                    <p class="text-sm text-gray-500">{{ $group['devices']->count() }} {{ $group['devices']->count() === 1 ? 'device' : 'devices' }} registered</p>
                 </div>
 
                 @if($group['discoverable'])
-                    <button wire:click="discover('{{ $driverName }}')" wire:loading.attr="disabled" wire:target="discover('{{ $driverName }}')"
-                            class="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-sm font-medium transition-colors disabled:opacity-60">
+                    <x-primary-button type="button" wire:click="discover('{{ $driverName }}')" wire:loading.attr="disabled" wire:target="discover('{{ $driverName }}')">
                         <span wire:loading.remove wire:target="discover('{{ $driverName }}')">
                             <i class="fa-solid fa-magnifying-glass"></i>
                             <span class="hidden sm:inline">Discover</span>
@@ -29,7 +26,7 @@
                             </svg>
                             Scanning&hellip;
                         </span>
-                    </button>
+                    </x-primary-button>
                 @endif
             </div>
 
@@ -51,12 +48,12 @@
                             <div class="flex items-center gap-1">
                                 <button wire:click="toggleHidden({{ $device->id }})"
                                         title="{{ $device->hidden ? 'Unhide' : 'Hide' }}"
-                                        class="flex items-center justify-center w-8 h-8 rounded-xl text-gray-500 dark:text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-stone-800 transition-colors">
+                                        class="flex items-center justify-center w-8 h-8 rounded-xl text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-stone-800 transition-colors">
                                     <i class="fa-solid {{ $device->hidden ? 'fa-eye' : 'fa-eye-slash' }} text-xs"></i>
                                 </button>
                                 <button wire:click="deleteDevice({{ $device->id }})"
                                         wire:confirm="Remove {{ addslashes($device->device_name) }}? This cannot be undone."
-                                        class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors">
+                                        class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors">
                                     <i class="fa-solid fa-trash-can"></i>
                                     <span class="hidden sm:inline">Remove</span>
                                 </button>
@@ -68,19 +65,18 @@
 
             {{-- Discovered but not yet added --}}
             @if(!empty($discovered[$driverName]))
-                <div class="px-8 py-5 bg-indigo-50/50 dark:bg-indigo-900/10 border-t border-indigo-100 dark:border-indigo-900/30 space-y-3">
-                    <p class="text-xs font-medium uppercase tracking-wider text-indigo-500 dark:text-indigo-400">Found on network</p>
+                <div class="px-8 py-5 bg-gray-50/50 dark:bg-stone-800/20 border-t border-gray-100 dark:border-stone-800 space-y-3">
+                    <p class="text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600">Found on network</p>
                     @forelse($discovered[$driverName] as $i => $row)
                         <div class="flex items-center justify-between gap-4">
                             <div>
                                 <span class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ $row['name'] }}</span>
-                                <span class="text-xs text-gray-500 dark:text-gray-500 font-mono ml-2">{{ $row['ip'] }}</span>
+                                <span class="text-xs text-gray-500 font-mono ml-2">{{ $row['ip'] }}</span>
                                 <span class="text-xs text-gray-400 dark:text-gray-600 ml-2">{{ $row['brand'] }} {{ $row['product'] }}</span>
                             </div>
-                            <button wire:click="addDiscovered('{{ $driverName }}', {{ $i }})"
-                                    class="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 rounded-xl text-xs font-medium transition-colors">
+                            <x-secondary-button size="sm" wire:click="addDiscovered('{{ $driverName }}', {{ $i }})">
                                 <i class="fa-solid fa-plus"></i>Add
-                            </button>
+                            </x-secondary-button>
                         </div>
                     @empty
                         <p class="text-sm text-gray-400 dark:text-gray-600">All found devices have been added.</p>
@@ -96,24 +92,23 @@
             @if(!$group['virtual'])
                 <form wire:submit="addManual('{{ $driverName }}')" class="flex flex-wrap items-end gap-3 px-8 py-5 border-t border-gray-100 dark:border-stone-800">
                     <div class="flex-1 min-w-[10rem]">
-                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-500 mb-1.5">Name</label>
-                        <input type="text" wire:model="manualForm.{{ $driverName }}.name" placeholder="e.g. Living Room"
-                               class="w-full rounded-xl border {{ $errors->has("manualForm.$driverName.name") ? 'border-red-400' : 'border-gray-200 dark:border-stone-700' }} dark:bg-stone-800 dark:text-gray-100 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-stone-500 focus:border-transparent">
+                        <x-input-label value="Name" class="mb-1.5" />
+                        <x-text-input type="text" wire:model="manualForm.{{ $driverName }}.name" placeholder="e.g. Living Room"
+                                      :invalid="$errors->has('manualForm.'.$driverName.'.name')" class="w-full" />
                     </div>
                     <div class="flex-1 min-w-[10rem]">
-                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-500 mb-1.5">IP address</label>
-                        <input type="text" wire:model="manualForm.{{ $driverName }}.ip" placeholder="192.168.1.x"
-                               class="w-full rounded-xl border {{ $errors->has("manualForm.$driverName.ip") ? 'border-red-400' : 'border-gray-200 dark:border-stone-700' }} dark:bg-stone-800 dark:text-gray-100 px-3.5 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-stone-500 focus:border-transparent">
+                        <x-input-label value="IP address" class="mb-1.5" />
+                        <x-text-input type="text" wire:model="manualForm.{{ $driverName }}.ip" placeholder="192.168.1.x"
+                                      :invalid="$errors->has('manualForm.'.$driverName.'.ip')" class="w-full font-mono" />
                     </div>
                     <div class="flex-1 min-w-[10rem]">
-                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-500 mb-1.5">Product</label>
-                        <select wire:model="manualForm.{{ $driverName }}.product_key"
-                                class="w-full rounded-xl border {{ $errors->has("manualForm.$driverName.product_key") ? 'border-red-400' : 'border-gray-200 dark:border-stone-700' }} dark:bg-stone-800 dark:text-gray-100 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-stone-500 focus:border-transparent">
+                        <x-input-label value="Product" class="mb-1.5" />
+                        <x-select wire:model="manualForm.{{ $driverName }}.product_key" class="w-full py-2.5" :invalid="$errors->has('manualForm.'.$driverName.'.product_key')">
                             <option value="">Select product&hellip;</option>
                             @foreach($group['products'] as $product)
                                 <option value="{{ $product['key'] }}">{{ $product['brand'] }} {{ $product['product'] }}</option>
                             @endforeach
-                        </select>
+                        </x-select>
                     </div>
                     <x-primary-button type="submit">
                         <i class="fa-solid fa-plus"></i>
@@ -123,7 +118,7 @@
             @else
                 <div class="px-8 py-5 border-t border-gray-100 dark:border-stone-800 text-sm text-gray-400 dark:text-gray-600">
                     Virtual devices are provisioned automatically — see
-                    <a href="{{ route('settings.spotify-connect') }}" class="text-indigo-600 dark:text-indigo-400 hover:underline">Spotify Connect</a>.
+                    <a href="{{ route('settings.spotify-connect') }}" class="text-gray-900 dark:text-gray-100 underline">Spotify Connect</a>.
                 </div>
             @endif
         </div>

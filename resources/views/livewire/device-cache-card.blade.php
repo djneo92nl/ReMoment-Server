@@ -3,7 +3,7 @@
     $np = $nowPlaying;
 @endphp
 
-<div wire:poll.2s class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8 space-y-5">
+<x-card wire:poll.2s class="p-8 space-y-5">
 
     <div class="flex items-center justify-between">
         <h2 class="text-base font-medium tracking-tight text-gray-900 dark:text-gray-100">Cache</h2>
@@ -13,7 +13,7 @@
     {{-- State + Listener --}}
     <dl class="space-y-3 text-sm">
         <div class="flex justify-between gap-4">
-            <dt class="text-gray-500 dark:text-gray-500">State</dt>
+            <dt class="text-gray-500">State</dt>
             <dd>
                 @if($stateEnum === \App\Domain\Device\State::Playing)
                     <span class="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-500 font-medium">
@@ -36,7 +36,7 @@
         </div>
 
         <div class="flex justify-between gap-4">
-            <dt class="text-gray-500 dark:text-gray-500">Listener</dt>
+            <dt class="text-gray-500">Listener</dt>
             <dd>
                 @if($listenerRunning)
                     <span class="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-500 font-medium">
@@ -54,12 +54,7 @@
             </dd>
         </div>
 
-        <div class="flex justify-between gap-4">
-            <dt class="text-gray-500 dark:text-gray-500">Last seen</dt>
-            <dd class="font-medium text-gray-800 dark:text-gray-200 text-right text-xs">
-                {{ $lastSeen ? \Carbon\Carbon::parse($lastSeen)->diffForHumans() : '—' }}
-            </dd>
-        </div>
+        <x-detail-row label="Last seen" class="text-xs">{{ $lastSeen ? \Carbon\Carbon::parse($lastSeen)->diffForHumans() : '—' }}</x-detail-row>
     </dl>
 
     @if($np)
@@ -71,18 +66,13 @@
 
                 {{-- Platform / type --}}
                 @if($np->platform || $np->type)
-                    <div class="flex justify-between gap-4">
-                        <dt class="text-gray-500 dark:text-gray-500">Platform</dt>
-                        <dd class="font-mono text-xs text-gray-700 dark:text-gray-300">
-                            {{ $np->platform }}{{ $np->type ? ' / ' . $np->type : '' }}
-                        </dd>
-                    </div>
+                    <x-detail-row label="Platform" class="font-mono text-xs text-gray-600 dark:text-gray-400 font-normal">{{ $np->platform }}{{ $np->type ? ' / ' . $np->type : '' }}</x-detail-row>
                 @endif
 
                 {{-- Source --}}
                 @if($np->source)
                     <div class="flex justify-between gap-4">
-                        <dt class="text-gray-500 dark:text-gray-500">Source</dt>
+                        <dt class="text-gray-500">Source</dt>
                         <dd class="text-right text-xs">
                             <span class="font-medium text-gray-800 dark:text-gray-200">{{ $np->source->name ?? '—' }}</span>
                             @if($np->source->sourceType)
@@ -100,46 +90,28 @@
 
                 {{-- Radio --}}
                 @if($np->radio)
-                    <div class="flex justify-between gap-4">
-                        <dt class="text-gray-500 dark:text-gray-500">Radio</dt>
-                        <dd class="font-medium text-gray-800 dark:text-gray-200 text-right text-xs">{{ $np->radio->name }}</dd>
-                    </div>
+                    <x-detail-row label="Radio" class="text-xs">{{ $np->radio->name }}</x-detail-row>
                 @endif
 
                 {{-- Track --}}
                 @if($np->track)
-                    <div class="flex justify-between gap-4">
-                        <dt class="text-gray-500 dark:text-gray-500">Track</dt>
-                        <dd class="font-medium text-gray-800 dark:text-gray-200 text-right text-xs max-w-48 truncate">{{ $np->track->name ?? '—' }}</dd>
-                    </div>
+                    <x-detail-row label="Track" class="text-xs max-w-48 truncate">{{ $np->track->name ?? '—' }}</x-detail-row>
                     @if($np->track->artist)
-                        <div class="flex justify-between gap-4">
-                            <dt class="text-gray-500 dark:text-gray-500">Artist</dt>
-                            <dd class="font-medium text-gray-800 dark:text-gray-200 text-right text-xs max-w-48 truncate">{{ $np->track->artist->name }}</dd>
-                        </div>
+                        <x-detail-row label="Artist" class="text-xs max-w-48 truncate">{{ $np->track->artist->name }}</x-detail-row>
                     @endif
                     @if(($np->track->duration ?? 0) > 0)
-                        <div class="flex justify-between gap-4">
-                            <dt class="text-gray-500 dark:text-gray-500">Duration</dt>
-                            <dd class="font-mono text-xs text-gray-600 dark:text-gray-400">{{ \App\Domain\Helpers\TimeHelper::secondsToMinutes($np->track->duration) }}</dd>
-                        </div>
+                        <x-detail-row label="Duration" class="font-mono text-xs text-gray-600 dark:text-gray-400 font-normal">{{ \App\Domain\Helpers\TimeHelper::secondsToMinutes($np->track->duration) }}</x-detail-row>
                     @endif
                 @endif
 
                 {{-- Album --}}
                 @if($np->album)
-                    <div class="flex justify-between gap-4">
-                        <dt class="text-gray-500 dark:text-gray-500">Album</dt>
-                        <dd class="font-medium text-gray-800 dark:text-gray-200 text-right text-xs max-w-48 truncate">{{ $np->album->name }}</dd>
-                    </div>
+                    <x-detail-row label="Album" class="text-xs max-w-48 truncate">{{ $np->album->name }}</x-detail-row>
                 @endif
 
                 {{-- Position --}}
                 @if($np->position > 0)
-                    <div class="flex justify-between gap-4">
-                        <dt class="text-gray-500 dark:text-gray-500">Position</dt>
-                        <dd class="font-mono text-xs text-gray-600 dark:text-gray-400">{{ \App\Domain\Helpers\TimeHelper::secondsToMinutes($np->position) }}</dd>
-                    </div>
+                    <x-detail-row label="Position" class="font-mono text-xs text-gray-600 dark:text-gray-400 font-normal">{{ \App\Domain\Helpers\TimeHelper::secondsToMinutes($np->position) }}</x-detail-row>
                 @endif
 
             </dl>
@@ -150,4 +122,4 @@
         </div>
     @endif
 
-</div>
+</x-card>

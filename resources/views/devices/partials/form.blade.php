@@ -40,33 +40,31 @@
 
     <!-- Device Name -->
     <div>
-        <label for="device_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Device Name</label>
-        <input type="text" name="device_name" id="device_name"
-               value="{{ old('device_name', $device?->device_name ?? '') }}"
-               placeholder="e.g. Living Room Speaker"
-               required
-               class="w-full rounded-xl border {{ $errors->has('device_name') ? 'border-red-400' : 'border-gray-200 dark:border-stone-700' }} dark:bg-stone-800 dark:text-gray-100 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-stone-500 focus:border-transparent transition-shadow">
-        @error('device_name')
-            <p class="mt-1.5 text-xs text-red-500">{{ $message }}</p>
-        @enderror
+        <x-input-label for="device_name" value="Device Name" class="mb-2" />
+        <x-text-input type="text" name="device_name" id="device_name"
+                       value="{{ old('device_name', $device?->device_name ?? '') }}"
+                       placeholder="e.g. Living Room Speaker"
+                       required
+                       :invalid="$errors->has('device_name')"
+                       class="w-full py-3" />
+        <x-input-error :messages="$errors->get('device_name')" class="mt-1.5" />
     </div>
 
     <!-- IP Address (hidden for virtual devices) -->
     <div x-show="!virtual">
-        <label for="ip_address" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">IP Address</label>
-        <input type="text" name="ip_address" id="ip_address"
-               value="{{ old('ip_address', $device?->ip_address ?? '') }}"
-               placeholder="192.168.1.x"
-               :required="!virtual"
-               class="w-full rounded-xl border {{ $errors->has('ip_address') ? 'border-red-400' : 'border-gray-200 dark:border-stone-700' }} dark:bg-stone-800 dark:text-gray-100 px-4 py-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-stone-500 focus:border-transparent transition-shadow">
-        @error('ip_address')
-            <p class="mt-1.5 text-xs text-red-500">{{ $message }}</p>
-        @enderror
+        <x-input-label for="ip_address" value="IP Address" class="mb-2" />
+        <x-text-input type="text" name="ip_address" id="ip_address"
+                       value="{{ old('ip_address', $device?->ip_address ?? '') }}"
+                       placeholder="192.168.1.x"
+                       x-bind:required="!virtual"
+                       :invalid="$errors->has('ip_address')"
+                       class="w-full py-3 font-mono" />
+        <x-input-error :messages="$errors->get('ip_address')" class="mt-1.5" />
     </div>
 
     <!-- Brand Selection -->
     <div>
-        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Brand</label>
+        <x-input-label value="Brand" class="mb-2" />
         <div class="flex flex-wrap gap-2">
             <template x-for="b in brands" :key="b">
                 <button type="button"
@@ -79,14 +77,12 @@
             </template>
         </div>
         <input type="hidden" name="device_brand_name" :value="brand">
-        @error('device_brand_name')
-            <p class="mt-1.5 text-xs text-red-500">{{ $message }}</p>
-        @enderror
+        <x-input-error :messages="$errors->get('device_brand_name')" class="mt-1.5" />
     </div>
 
     <!-- Product Selection -->
     <div x-show="brand" x-cloak>
-        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Product Model</label>
+        <x-input-label value="Product Model" class="mb-2" />
         <div class="flex flex-wrap gap-2">
             <template x-for="option in products" :key="option.product">
                 <button type="button"
@@ -101,14 +97,12 @@
         <input type="hidden" name="device_product_type" :value="product">
         <input type="hidden" name="device_driver" :value="driver">
         <input type="hidden" name="device_driver_name" :value="driver_name">
-        @error('device_product_type')
-            <p class="mt-1.5 text-xs text-red-500">{{ $message }}</p>
-        @enderror
+        <x-input-error :messages="$errors->get('device_product_type')" class="mt-1.5" />
     </div>
 
     <!-- Driver Info (read-only display) -->
     <div x-show="driver" x-cloak>
-        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Driver</label>
+        <x-input-label value="Driver" class="mb-2" />
         <div class="bg-gray-50 dark:bg-stone-800/50 rounded-xl border border-gray-200 dark:border-stone-700 px-4 py-3">
             <div class="flex items-center justify-between gap-4">
                 <span class="text-sm font-medium text-gray-700 dark:text-gray-300" x-text="driver_name"></span>

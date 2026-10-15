@@ -72,7 +72,7 @@
                     <span class="text-sm font-medium uppercase tracking-wider text-red-600 dark:text-red-500 truncate">Standby</span>
                 @else
                     <span class="w-3.5 h-3.5 rounded-full bg-gray-400 flex-shrink-0"></span>
-                    <span class="text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-500 truncate">Unreachable</span>
+                    <span class="text-sm font-medium uppercase tracking-wider text-gray-500 truncate">Unreachable</span>
                 @endif
             </div>
 
@@ -81,13 +81,13 @@
                 <x-battery :device-id="$device->id" />
                 <span class="text-sm text-gray-500 dark:text-gray-400 hidden sm:block truncate max-w-40">{{ $device->device_name }}</span>
                 <a href="/receiver?device={{ $device->id }}" target="_blank"
-                   class="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 dark:text-gray-600 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-stone-800 transition-colors"
+                   class="flex items-center justify-center w-7 h-7 rounded-xl text-gray-400 dark:text-gray-600 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-stone-800 transition-colors"
                    title="Open receiver">
                     <i class="fa-solid fa-expand text-xs"></i>
                 </a>
                 @if(!$standalone)
                     <a href="{{ $showUrl }}"
-                       class="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 dark:text-gray-600 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-stone-800 transition-colors"
+                       class="flex items-center justify-center w-7 h-7 rounded-xl text-gray-400 dark:text-gray-600 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-stone-800 transition-colors"
                        title="Open {{ $device->device_name }}">
                         <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
                     </a>
@@ -300,14 +300,14 @@
             <div class="flex items-center gap-3">
                 @if($supportsMultiRoom && $state !== \App\Domain\Device\State::Unreachable)
                     <button x-data @click.stop="$wire.loadMultiRoomData(); $dispatch('open-modal', 'multiroom-{{ $device->id }}')"
-                            class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
+                            class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
                         <i class="fa-solid fa-layer-group"></i>
                         <span>Multiroom</span>
                     </button>
                 @endif
                 @if($state !== \App\Domain\Device\State::Unreachable)
                     <button wire:click="standby"
-                            class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                            class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
                         <i class="fa-solid fa-power-off"></i>
                         <span>Standby</span>
                     </button>

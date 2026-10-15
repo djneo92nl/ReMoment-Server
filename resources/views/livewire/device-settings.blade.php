@@ -1,32 +1,27 @@
 @php
-    $card = 'bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8';
-    $heading = 'text-base font-medium tracking-tight text-gray-900 dark:text-gray-100 mb-5';
-    $muted = 'text-sm text-gray-500 dark:text-gray-500';
+    $muted = 'text-sm text-gray-500';
     $row = 'flex items-center justify-between gap-4 py-3';
     $skeleton = '<div class="space-y-3"><div class="h-10 bg-gray-100 dark:bg-stone-800 rounded-xl animate-pulse"></div><div class="h-10 bg-gray-100 dark:bg-stone-800 rounded-xl animate-pulse"></div></div>';
 @endphp
 
 <div wire:init="load" class="space-y-6">
     @if(empty($capabilities))
-        <div class="{{ $card }}">
+        <x-card class="p-8">
             <p class="{{ $muted }}">This device has no settings ReMoment can change.</p>
-        </div>
+        </x-card>
     @endif
 
     {{-- Device info --}}
     @if(in_array('device_info', $capabilities))
-        <section class="{{ $card }}">
-            <h2 class="{{ $heading }}">Device</h2>
+        <x-card tag="section" class="p-8" title="Device">
             @include('livewire.partials.settings-messages', ['section' => 'device_info', 'problems' => $problems, 'notices' => $notices])
             @if(!$ready)
                 {!! $skeleton !!}
             @elseif($info)
                 @if($info['renamable'])
                     <form wire:submit="rename" class="flex items-center gap-3">
-                        <input type="text" wire:model="name" maxlength="64" aria-label="Device name"
-                               class="flex-1 text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 text-gray-700 dark:text-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-stone-600">
-                        <button type="submit" wire:loading.attr="disabled" wire:target="rename"
-                                class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-sm font-medium disabled:opacity-50">Rename</button>
+                        <x-text-input type="text" wire:model="name" maxlength="64" aria-label="Device name" class="flex-1" />
+                        <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="rename">Rename</x-primary-button>
                     </form>
                 @else
                     <div class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ $info['name'] }}</div>
@@ -40,13 +35,12 @@
                     @endforeach
                 </dl>
             @endif
-        </section>
+        </x-card>
     @endif
 
     {{-- Sound adjustment --}}
     @if(in_array('sound_adjustment', $capabilities))
-        <section class="{{ $card }}">
-            <h2 class="{{ $heading }}">Sound</h2>
+        <x-card tag="section" class="p-8" title="Sound">
             @include('livewire.partials.settings-messages', ['section' => 'sound_adjustment', 'problems' => $problems, 'notices' => $notices])
             @if(!$ready)
                 {!! $skeleton !!}
@@ -72,13 +66,12 @@
                     @endif
                 </div>
             @endif
-        </section>
+        </x-card>
     @endif
 
     {{-- Sleep timer --}}
     @if(in_array('sleep_timer', $capabilities))
-        <section class="{{ $card }}">
-            <h2 class="{{ $heading }}">Sleep timer</h2>
+        <x-card tag="section" class="p-8" title="Sleep timer">
             @include('livewire.partials.settings-messages', ['section' => 'sleep_timer', 'problems' => $problems, 'notices' => $notices])
             @if(!$ready)
                 {!! $skeleton !!}
@@ -104,13 +97,12 @@
                     @endif
                 </div>
             @endif
-        </section>
+        </x-card>
     @endif
 
     {{-- Number keys for the active TV / set-top box source --}}
     @if(in_array('digits', $capabilities))
-        <section class="{{ $card }}">
-            <h2 class="{{ $heading }}">Number keys</h2>
+        <x-card tag="section" class="p-8" title="Number keys">
             @include('livewire.partials.settings-messages', ['section' => 'digits', 'problems' => $problems, 'notices' => $notices])
             <p class="{{ $muted }} mb-4">Sent to the active TV or set-top box source, e.g. to pick a channel.</p>
             <div class="grid grid-cols-3 gap-3 max-w-xs">
@@ -121,13 +113,12 @@
                 <button type="button" wire:click="pressDigit(0)" wire:loading.attr="disabled" wire:target="pressDigit"
                         class="col-start-2 py-3 bg-gray-100 dark:bg-stone-800 hover:bg-gray-200 dark:hover:bg-stone-700 text-gray-800 dark:text-gray-200 rounded-xl text-lg font-medium disabled:opacity-50">0</button>
             </div>
-        </section>
+        </x-card>
     @endif
 
     {{-- Wired speakers: only models with external speakers (Essence, Moment) --}}
     @if(in_array('wired_speakers', $capabilities))
-        <section class="{{ $card }}">
-            <h2 class="{{ $heading }}">Speakers</h2>
+        <x-card tag="section" class="p-8" title="Speakers">
             @include('livewire.partials.settings-messages', ['section' => 'wired_speakers', 'problems' => $problems, 'notices' => $notices])
             @if(!$ready)
                 {!! $skeleton !!}
@@ -154,13 +145,12 @@
                     @endforeach
                 </div>
             @endif
-        </section>
+        </x-card>
     @endif
 
     {{-- Bluetooth --}}
     @if(in_array('bluetooth', $capabilities))
-        <section class="{{ $card }}">
-            <h2 class="{{ $heading }}">Bluetooth</h2>
+        <x-card tag="section" class="p-8" title="Bluetooth">
             @include('livewire.partials.settings-messages', ['section' => 'bluetooth', 'problems' => $problems, 'notices' => $notices])
             @if(!$ready)
                 {!! $skeleton !!}
@@ -209,11 +199,11 @@
                     <p class="{{ $muted }}">No devices paired.</p>
                 @endforelse
             @endif
-        </section>
+        </x-card>
     @endif
     {{-- Network --}}
     @if(in_array('network_settings', $capabilities))
-        <section class="{{ $card }}">
+        <x-card tag="section" class="p-8">
             <div class="flex items-center justify-between mb-5">
                 <h2 class="text-base font-medium tracking-tight text-gray-900 dark:text-gray-100">Network</h2>
                 <button type="button" wire:click="reload('network_settings')" class="text-xs text-gray-400 hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-400">
@@ -268,14 +258,12 @@
                             @foreach(['address' => 'IP address', 'subnet_mask' => 'Subnet mask', 'gateway' => 'Gateway', 'preferred_dns' => 'DNS', 'alternative_dns' => 'DNS (alt.)'] as $key => $name)
                                 <div class="flex items-center gap-3">
                                     <label for="wired-{{ $key }}" class="w-28 text-sm text-gray-700 dark:text-gray-300">{{ $name }}</label>
-                                    <input id="wired-{{ $key }}" type="text" wire:model="wired.{{ $key }}" inputmode="decimal" autocomplete="off"
-                                           class="flex-1 text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 text-gray-700 dark:text-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-stone-600">
+                                    <x-text-input id="wired-{{ $key }}" type="text" wire:model="wired.{{ $key }}" inputmode="decimal" autocomplete="off" class="flex-1" />
                                 </div>
                             @endforeach
                         @endunless
-                        <button type="submit" wire:loading.attr="disabled" wire:target="saveWired"
-                                onclick="return confirm('Change the wired address? The device can come back on a different address.')"
-                                class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-sm font-medium disabled:opacity-50">Apply</button>
+                        <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveWired"
+                                onclick="return confirm('Change the wired address? The device can come back on a different address.')">Apply</x-primary-button>
                     </form>
                 @endif
 
@@ -293,29 +281,28 @@
                     <form wire:submit="joinWifi" class="space-y-3">
                         <div class="flex items-center gap-3">
                             <label for="wifi-ssid" class="w-28 text-sm text-gray-700 dark:text-gray-300">Network name</label>
-                            <input id="wifi-ssid" type="text" wire:model="wifiSsid" maxlength="32" autocomplete="off" class="flex-1 text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 text-gray-700 dark:text-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-stone-600">
+                            <x-text-input id="wifi-ssid" type="text" wire:model="wifiSsid" maxlength="32" autocomplete="off" class="flex-1" />
                         </div>
                         <div class="flex items-center gap-3">
                             <label for="wifi-pass" class="w-28 text-sm text-gray-700 dark:text-gray-300">Passphrase</label>
-                            <input id="wifi-pass" type="password" wire:model="wifiPassphrase" maxlength="63" autocomplete="new-password" class="flex-1 text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 text-gray-700 dark:text-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-stone-600">
+                            <x-text-input id="wifi-pass" type="password" wire:model="wifiPassphrase" maxlength="63" autocomplete="new-password" class="flex-1" />
                         </div>
                         <div class="flex items-center gap-3">
                             <label for="wifi-security" class="w-28 text-sm text-gray-700 dark:text-gray-300">Security</label>
-                            <input id="wifi-security" type="text" wire:model="wifiSecurity" maxlength="32" placeholder="optional, e.g. wpa2PskTkip" autocomplete="off" class="flex-1 text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 text-gray-700 dark:text-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-stone-600">
+                            <x-text-input id="wifi-security" type="text" wire:model="wifiSecurity" maxlength="32" placeholder="optional, e.g. wpa2PskTkip" autocomplete="off" class="flex-1" />
                         </div>
-                        <button type="submit" wire:loading.attr="disabled" wire:target="joinWifi"
-                                onclick="return confirm('Join this network? The device can come back on a different address.')"
-                                class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-sm font-medium disabled:opacity-50">Join</button>
+                        <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="joinWifi"
+                                onclick="return confirm('Join this network? The device can come back on a different address.')">Join</x-primary-button>
                     </form>
                 @endif
             @endif
-        </section>
+        </x-card>
     @endif
 
     {{-- Wireless speakers (WiSA): only models with the hardware get this section --}}
     @if(in_array('wireless_speakers', $capabilities))
-        <section class="{{ $card }}" @if($wirelessSpeakers && $wirelessSpeakers['scanning']) wire:poll.3s="reload('wireless_speakers')" @endif>
-            <h2 class="{{ $heading }}">Wireless speakers</h2>
+        <x-card tag="section" class="p-8" title="Wireless speakers">
+            <div @if($wirelessSpeakers && $wirelessSpeakers['scanning']) wire:poll.3s="reload('wireless_speakers')" @endif>
             @include('livewire.partials.settings-messages', ['section' => 'wireless_speakers', 'problems' => $problems, 'notices' => $notices])
             @if(!$ready)
                 {!! $skeleton !!}
@@ -327,7 +314,7 @@
                     @if($wirelessSpeakers['scanning'])
                         <button type="button" wire:click="stopScan" class="px-4 py-2 bg-gray-100 dark:bg-stone-800 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-medium">Stop</button>
                     @else
-                        <button type="button" wire:click="startScan" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-sm font-medium disabled:opacity-50">Scan</button>
+                        <x-primary-button type="button" wire:click="startScan">Scan</x-primary-button>
                     @endif
                 </div>
                 @forelse($wirelessSpeakers['speakers'] as $speaker)
@@ -339,13 +326,14 @@
                     <p class="{{ $muted }}">No wireless speakers found.</p>
                 @endforelse
             @endif
-        </section>
+
+            </div>
+        </x-card>
     @endif
 
     {{-- Inputs --}}
     @if(in_array('source_activation', $capabilities) && (!$ready || $inputs))
-        <section class="{{ $card }}">
-            <h2 class="{{ $heading }}">Input</h2>
+        <x-card tag="section" class="p-8" title="Input">
             @include('livewire.partials.settings-messages', ['section' => 'source_activation', 'problems' => $problems, 'notices' => $notices])
             @if(!$ready)
                 {!! $skeleton !!}
@@ -371,6 +359,6 @@
                     </div>
                 </div>
             @endif
-        </section>
+        </x-card>
     @endif
 </div>

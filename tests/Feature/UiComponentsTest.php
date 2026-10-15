@@ -2,12 +2,19 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\DeviceCacheCard;
+use App\Livewire\DeviceQueue;
+use App\Models\Device;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Blade;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 /** The shared Blade components of DESIGN.md: what a page gets when it uses them. */
 class UiComponentsTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_card_is_the_standard_surface_and_can_be_compact_or_a_link(): void
     {
         $this->assertStringContainsString('rounded-3xl', Blade::render('<x-card class="p-6">x</x-card>'));
@@ -72,5 +79,17 @@ class UiComponentsTest extends TestCase
         $this->assertStringContainsString('hidden md:table-cell', $html);
         $this->assertStringContainsString('Kitchen', $html);
         $this->assertStringContainsString('overflow-hidden', $html);
+    }
+
+    /** Livewire puts wire:id on the first tag it finds: a card at the root of a component must be that tag, not an inner heading. */
+    public function test_a_card_can_be_the_root_of_a_livewire_component(): void
+    {
+        $device = Device::factory()->create();
+
+        foreach ([DeviceQueue::class, DeviceCacheCard::class] as $component) {
+            $html = Livewire::test($component, ['device' => $device])->html();
+
+            $this->assertMatchesRegularExpression('/<div [^>]*wire:id="[^"]+"[^>]*rounded-3xl/', $html, $component);
+        }
     }
 }

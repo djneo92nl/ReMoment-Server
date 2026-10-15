@@ -1,6 +1,6 @@
 <div wire:poll.10s>
     @if($plays->isNotEmpty())
-        <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8">
+        <x-card class="p-6 md:p-8">
 
             <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">Recently Played</h2>
 
@@ -48,6 +48,6 @@
                 @endforeach
 
             </div>
-        </div>
+        </x-card>
     @endif
 </div>

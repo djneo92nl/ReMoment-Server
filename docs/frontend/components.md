@@ -4,13 +4,17 @@ The building blocks of `DESIGN.md` (`resources/views/components/`). Use them ins
 
 | Component | Props / slots | Use for |
 |---|---|---|
-| `<x-card>` | `compact` (rounded-2xl), `flush` (clip children), `href` (link card); caller adds padding | Every surface. One radius, border, shadow |
+| `<x-card>` | `compact` (rounded-2xl), `flush` (clip children), `href` (link card), `title` (heading inside), `tag` (root element, e.g. `section`); caller adds padding | Every surface. One radius, border, shadow |
 | `<x-page-header>` | `title`, `subtitle`, `back` (url); slot `actions`; default slot under the subtitle | Inside `<x-slot name="header">` of every page |
 | `<x-alert>` | `type` success\|error\|warning\|info, `icon`; slot `action` | Flash messages (the layout uses it) and inline notices |
 | `<x-badge>` | `variant` neutral\|outline\|success\|warning\|danger\|info | Genre/format/status pills |
 | `<x-empty-state>` | `icon`, `title`, `text`, `bare`; default slot = call to action | Lists with nothing in them |
-| `<x-table>` + `<x-table.th hide="sm\|md">` | slot `head` (the `<th>` cells), default slot = `<tr>` rows | Data tables (scrolls sideways inside its card) |
+| `<x-table>` + `<x-table.th hide="sm\|md\|lg">` | slot `head` (the `<th>` cells), default slot = `<tr>` rows | Data tables (scrolls sideways inside its card) |
+| `<x-detail-row>` | `label`, `mono`; default slot = value | Label/value lines in a `<dl class="space-y-4 text-sm">` |
+| `<x-text-input>` / `<x-select>` | `invalid` (red border), `disabled` | Every text field and select; never a raw `<input>` |
 
 Navigation: `<x-nav-list>` (the one list behind sidebar and drawer), `<x-nav-item>`, `<x-nav-mobile>` (top bar + drawer), `<x-wordmark>`. Existing: `primary|secondary|danger-button`, `text-input`, `select`, `toggle`, `back-button`, `modal`, `settings-group`/`settings-row`, `album-grid`.
+
+**Livewire roots:** a component whose Blade view starts with `<x-card>` works (the card's root tag is dynamic on purpose; `tests/Feature/UiComponentsTest` guards it). Do not add an `@if`/`@foreach` before the root tag of a shared component: Livewire would put `wire:id` on the wrong element.
 
 Tailwind only generates classes it sees as whole strings, so variants are literal maps inside each component. Never build a class with string interpolation (`bg-{{ $color }}-50`).

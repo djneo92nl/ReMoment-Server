@@ -1,50 +1,35 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-start justify-between gap-4">
-            <div class="flex items-start gap-4">
-                <x-back-button href="{{ route('devices.index') }}" class="mt-1" />
-                <div>
-                    <h1 class="text-3xl md:text-4xl font-medium tracking-tight dark:text-gray-100 text-gray-900">{{ $device->device_name }}</h1>
-                    <p class="mt-1.5 text-gray-500 dark:text-gray-500">
-                        {{ $device->device_brand_name }}
-                        @if($device->device_product_type)
-                            · {{ $device->device_product_type }}
-                        @endif
-                    </p>
-                </div>
-            </div>
-
-            <div class="flex items-center gap-3 flex-shrink-0">
+        <x-page-header :title="$device->device_name"
+                       :subtitle="$device->device_brand_name.($device->device_product_type ? ' · '.$device->device_product_type : '')"
+                       :back="route('devices.index')">
+            <x-slot name="actions">
                 <form method="POST" action="{{ route('devices.standby', $device) }}">
                     @csrf
-                    <button type="submit"
-                            class="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-stone-800 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-medium hover:bg-gray-200 dark:hover:bg-stone-700 transition-colors">
+                    <x-secondary-button size="md" type="submit">
                         <i class="fa-solid fa-power-off"></i>
                         <span class="hidden sm:inline">Standby</span>
-                    </button>
+                    </x-secondary-button>
                 </form>
                 <form method="POST" action="{{ route('devices.toggle-hidden', $device) }}">
                     @csrf
-                    <button type="submit"
-                            class="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-stone-800 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-medium hover:bg-gray-200 dark:hover:bg-stone-700 transition-colors">
+                    <x-secondary-button size="md" type="submit">
                         <i class="fa-solid {{ $device->hidden ? 'fa-eye' : 'fa-eye-slash' }}"></i>
                         <span class="hidden sm:inline">{{ $device->hidden ? 'Unhide' : 'Hide' }}</span>
-                    </button>
+                    </x-secondary-button>
                 </form>
                 @auth
                     @if(array_intersect(\App\Livewire\DeviceSettings::SECTIONS, $capabilities))
-                        <a href="{{ route('devices.settings', $device) }}"
-                           class="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-stone-800 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-medium hover:bg-gray-200 dark:hover:bg-stone-700 transition-colors">
+                        <x-secondary-button size="md" href="{{ route('devices.settings', $device) }}">
                             <i class="fa-solid fa-gear"></i>
                             <span class="hidden sm:inline">Settings</span>
-                        </a>
+                        </x-secondary-button>
                     @endif
                 @endauth
-                <a href="{{ route('devices.edit', $device) }}"
-                   class="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-stone-800 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-medium hover:bg-gray-200 dark:hover:bg-stone-700 transition-colors">
+                <x-secondary-button size="md" href="{{ route('devices.edit', $device) }}">
                     <i class="fa-solid fa-pen-to-square"></i>
                     <span class="hidden sm:inline">Edit</span>
-                </a>
+                </x-secondary-button>
                 <form method="POST" action="{{ route('devices.destroy', $device) }}"
                       onsubmit="return confirm('Remove {{ addslashes($device->device_name) }}? This cannot be undone.')">
                     @csrf
@@ -54,8 +39,8 @@
                         <span class="hidden sm:inline">Remove</span>
                     </x-danger-button>
                 </form>
-            </div>
-        </div>
+            </x-slot>
+        </x-page-header>
     </x-slot>
 
     <div class="grid gap-6 lg:grid-cols-3">
@@ -77,32 +62,17 @@
 
             <livewire:device-cache-card :device="$device" :key="'cache-'.$device->id" />
 
-            <!-- Stats Card -->
             @if($stats['total_plays'] > 0)
-                <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8">
-                    <h2 class="text-base font-medium tracking-tight text-gray-900 dark:text-gray-100 mb-5">Playback Stats</h2>
+                <x-card title="Playback Stats" class="p-8">
                     <dl class="space-y-4 text-sm">
-                        <div class="flex justify-between gap-4">
-                            <dt class="text-gray-500 dark:text-gray-500">Total plays</dt>
-                            <dd class="font-medium text-gray-800 dark:text-gray-200 text-right">{{ number_format($stats['total_plays']) }}</dd>
-                        </div>
+                        <x-detail-row label="Total plays">{{ number_format($stats['total_plays']) }}</x-detail-row>
                         @if($stats['total_seconds'] > 0)
-                            <div class="flex justify-between gap-4">
-                                <dt class="text-gray-500 dark:text-gray-500">Listening time</dt>
-                                <dd class="font-medium text-gray-800 dark:text-gray-200 text-right">
-                                    {{ \App\Domain\Helpers\TimeHelper::humanDuration((int) $stats['total_seconds']) }}
-                                </dd>
-                            </div>
+                            <x-detail-row label="Listening time">{{ \App\Domain\Helpers\TimeHelper::humanDuration((int) $stats['total_seconds']) }}</x-detail-row>
                         @endif
                         @if($stats['top_artist'])
-                            <div class="flex justify-between gap-4">
-                                <dt class="text-gray-500 dark:text-gray-500">Top artist</dt>
-                                <dd class="font-medium text-gray-800 dark:text-gray-200 text-right truncate max-w-32">
-                                    <a href="{{ route('artists.show', $stats['top_artist']->id) }}" class="hover:underline">
-                                        {{ $stats['top_artist']->name }}
-                                    </a>
-                                </dd>
-                            </div>
+                            <x-detail-row label="Top artist" class="truncate max-w-32">
+                                <a href="{{ route('artists.show', $stats['top_artist']->id) }}" class="hover:underline">{{ $stats['top_artist']->name }}</a>
+                            </x-detail-row>
                         @endif
                     </dl>
                     <div class="mt-5 pt-4 border-t border-gray-100 dark:border-stone-800">
@@ -111,10 +81,9 @@
                             View full history &rarr;
                         </a>
                     </div>
-                </div>
+                </x-card>
             @endif
 
-            <!-- Capabilities Card -->
             @if(!empty($capabilities))
                 @php
                     $capMap = [
@@ -135,60 +104,34 @@
                         'device_info'    => ['fa-circle-info', 'Device Info'],
                     ];
                 @endphp
-                <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8">
-                    <h2 class="text-base font-medium tracking-tight text-gray-900 dark:text-gray-100 mb-5">Capabilities</h2>
+                <x-card title="Capabilities" class="p-8">
                     <div class="flex flex-wrap gap-2">
                         @foreach($capabilities as $cap)
                             @php [$icon, $label] = $capMap[$cap] ?? ['fa-circle-check', $cap]; @endphp
-                            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-stone-800 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-medium">
+                            <x-badge>
                                 <i class="fa-solid {{ $icon }} text-gray-400 dark:text-gray-500"></i>
                                 {{ $label }}
-                            </span>
+                            </x-badge>
                         @endforeach
                     </div>
-                </div>
+                </x-card>
             @endif
 
-            <!-- Device Info Card -->
-            <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8">
-                <h2 class="text-base font-medium tracking-tight text-gray-900 dark:text-gray-100 mb-5">Device Info</h2>
-
+            <x-card title="Device Info" class="p-8">
                 <dl class="space-y-4 text-sm">
-                    <div class="flex justify-between gap-4">
-                        <dt class="text-gray-500 dark:text-gray-500">IP Address</dt>
-                        <dd class="font-medium text-gray-800 dark:text-gray-200 text-right font-mono">{{ $device->ip_address }}</dd>
-                    </div>
-                    <div class="flex justify-between gap-4">
-                        <dt class="text-gray-500 dark:text-gray-500">Brand</dt>
-                        <dd class="font-medium text-gray-800 dark:text-gray-200 text-right">{{ $device->device_brand_name ?: '—' }}</dd>
-                    </div>
-                    <div class="flex justify-between gap-4">
-                        <dt class="text-gray-500 dark:text-gray-500">Product</dt>
-                        <dd class="font-medium text-gray-800 dark:text-gray-200 text-right">{{ $device->device_product_type ?: '—' }}</dd>
-                    </div>
-                    <div class="flex justify-between gap-4">
-                        <dt class="text-gray-500 dark:text-gray-500">Driver</dt>
-                        <dd class="font-medium text-gray-800 dark:text-gray-200 text-right">{{ $device->device_driver_name ?: '—' }}</dd>
-                    </div>
-                    <div class="flex justify-between gap-4">
-                        <dt class="text-gray-500 dark:text-gray-500">UUID</dt>
-                        <dd class="font-medium text-gray-600 dark:text-gray-400 text-right font-mono text-xs break-all">{{ $device->uuid }}</dd>
-                    </div>
-                    <div class="flex justify-between gap-4">
-                        <dt class="text-gray-500 dark:text-gray-500">Added</dt>
-                        <dd class="font-medium text-gray-800 dark:text-gray-200 text-right">
-                            {{ $device->created_at->format('M j, Y') }}
-                        </dd>
-                    </div>
+                    <x-detail-row label="IP Address" mono>{{ $device->ip_address }}</x-detail-row>
+                    <x-detail-row label="Brand">{{ $device->device_brand_name ?: '—' }}</x-detail-row>
+                    <x-detail-row label="Product">{{ $device->device_product_type ?: '—' }}</x-detail-row>
+                    <x-detail-row label="Driver">{{ $device->device_driver_name ?: '—' }}</x-detail-row>
+                    <x-detail-row label="UUID" mono class="text-gray-600 dark:text-gray-400">{{ $device->uuid }}</x-detail-row>
+                    <x-detail-row label="Added">{{ $device->created_at->format('M j, Y') }}</x-detail-row>
                 </dl>
-            </div>
+            </x-card>
 
-            <!-- MQTT Card -->
-            <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8">
-                <h2 class="text-base font-medium tracking-tight text-gray-900 dark:text-gray-100 mb-5">MQTT</h2>
+            <x-card title="MQTT" class="p-8">
                 <dl class="space-y-3 text-sm">
                     <div>
-                        <dt class="text-gray-500 dark:text-gray-500 mb-1.5">Topic prefix</dt>
+                        <dt class="text-gray-500 mb-1.5">Topic prefix</dt>
                         <dd class="font-mono text-xs text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-stone-800 rounded-xl px-3 py-2 break-all">{{ $mqttTopic }}</dd>
                     </div>
                     <div class="pt-1 space-y-1.5">
@@ -197,28 +140,21 @@
                         @endforeach
                     </div>
                 </dl>
-            </div>
+            </x-card>
 
-            <!-- Metadata Card -->
             @if($device->meta->isNotEmpty())
-                <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8">
-                    <h2 class="text-base font-medium tracking-tight text-gray-900 dark:text-gray-100 mb-5">Metadata</h2>
+                <x-card title="Metadata" class="p-8">
                     <dl class="space-y-3 text-sm">
                         @foreach($device->meta as $meta)
-                            <div class="flex justify-between gap-4">
-                                <dt class="text-gray-500 dark:text-gray-500 font-mono text-xs">{{ $meta->key }}</dt>
-                                <dd class="font-medium text-gray-800 dark:text-gray-200 text-right font-mono text-xs break-all">{{ $meta->value }}</dd>
-                            </div>
+                            <x-detail-row :label="$meta->key" mono>{{ $meta->value }}</x-detail-row>
                         @endforeach
                     </dl>
-                </div>
+                </x-card>
             @endif
 
-            <!-- Driver Details Card -->
-            <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8">
-                <h2 class="text-base font-medium tracking-tight text-gray-900 dark:text-gray-100 mb-5">Driver Class</h2>
+            <x-card title="Driver Class" class="p-8">
                 <p class="text-xs text-gray-400 dark:text-gray-600 font-mono break-all leading-relaxed">{{ $device->device_driver ?: '—' }}</p>
-            </div>
+            </x-card>
 
         </div>
     </div>

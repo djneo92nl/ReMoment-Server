@@ -11,12 +11,12 @@
 <div>
 @if($allSources->isNotEmpty())
 {{-- ── Inline card ── --}}
-<div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8">
+<x-card class="p-8">
 
     <div class="flex items-center justify-between mb-5">
         <h2 class="text-base font-medium tracking-tight text-gray-900 dark:text-gray-100">Sources</h2>
         <button x-data @click.stop="$dispatch('open-modal', '{{ $modalName }}')"
-                class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-stone-800 transition-colors">
+                class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-stone-800 transition-colors">
             <i class="fa-solid fa-sliders text-xs"></i>
             Manage
         </button>
@@ -45,7 +45,7 @@
             <p class="mt-3 text-xs text-gray-400 dark:text-gray-600">{{ $hiddenCount }} hidden</p>
         @endif
     @endif
-</div>
+</x-card>
 
 {{-- ── Management modal ── --}}
 <x-modal name="{{ $modalName }}" maxWidth="md">
@@ -62,12 +62,12 @@
             </div>
             <div class="flex items-center gap-2">
                 <button wire:click="$toggle('editMode')"
-                        class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors {{ $editMode ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-stone-800' }}">
+                        class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium transition-colors {{ $editMode ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-stone-800' }}">
                     <i class="fa-solid fa-sliders text-xs"></i>
                     <span>{{ $editMode ? 'Done' : 'Edit' }}</span>
                 </button>
                 <button @click="$dispatch('close')"
-                        class="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-stone-800 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                        class="flex items-center justify-center w-7 h-7 rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-stone-800 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
                     <i class="fa-solid fa-xmark text-xs"></i>
                 </button>
             </div>
@@ -100,7 +100,7 @@
                             <span class="text-xs text-gray-400 dark:text-gray-600 flex-shrink-0">{{ $source['type'] }}</span>
                             <button wire:click="toggleHidden({{ $source['id'] }})"
                                     title="{{ $source['hidden'] ? 'Show' : 'Hide' }}"
-                                    class="flex items-center justify-center w-7 h-7 rounded-lg hover:bg-gray-100 dark:hover:bg-stone-800 transition-colors flex-shrink-0 {{ $source['hidden'] ? 'text-gray-300 dark:text-stone-600' : 'text-gray-500 dark:text-gray-400' }}">
+                                    class="flex items-center justify-center w-7 h-7 rounded-xl hover:bg-gray-100 dark:hover:bg-stone-800 transition-colors flex-shrink-0 {{ $source['hidden'] ? 'text-gray-300 dark:text-stone-600' : 'text-gray-500 dark:text-gray-400' }}">
                                 <i class="fa-solid {{ $source['hidden'] ? 'fa-eye-slash' : 'fa-eye' }} text-xs"></i>
                             </button>
                         </li>
@@ -122,7 +122,7 @@
                                 <span class="text-xs text-gray-400 dark:text-gray-600 flex-shrink-0">{{ $source['type'] }}</span>
                                 <button wire:click="toggleHidden({{ $source['id'] }})"
                                         title="{{ $source['hidden'] ? 'Show' : 'Hide' }}"
-                                        class="flex items-center justify-center w-7 h-7 rounded-lg hover:bg-gray-100 dark:hover:bg-stone-800 transition-colors flex-shrink-0 {{ $source['hidden'] ? 'text-gray-300 dark:text-stone-600' : 'text-gray-500 dark:text-gray-400' }}">
+                                        class="flex items-center justify-center w-7 h-7 rounded-xl hover:bg-gray-100 dark:hover:bg-stone-800 transition-colors flex-shrink-0 {{ $source['hidden'] ? 'text-gray-300 dark:text-stone-600' : 'text-gray-500 dark:text-gray-400' }}">
                                     <i class="fa-solid {{ $source['hidden'] ? 'fa-eye-slash' : 'fa-eye' }} text-xs"></i>
                                 </button>
                             </li>
