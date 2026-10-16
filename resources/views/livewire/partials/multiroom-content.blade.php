@@ -9,7 +9,7 @@
         <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1rem">
             <div>
                 <h3 class="{{ $inPanel ? '' : 'text-gray-900 dark:text-gray-100' }}" style="font-size:1.25rem;font-weight:700;letter-spacing:.01em">Multiroom</h3>
-                <p style="font-size:.9rem;font-weight:600;color:#d99a00">{{ $subtitle }}</p>
+                <p class="text-sm font-semibold text-amber-600">{{ $subtitle }}</p>
             </div>
             <x-modal-close :class="$inPanel ? '!text-white/70' : ''" />
         </div>

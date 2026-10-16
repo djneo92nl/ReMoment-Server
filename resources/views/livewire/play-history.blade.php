@@ -1,6 +1,6 @@
 <div>
     {{-- Filter bar --}}
-    <div class="bg-white dark:bg-stone-900 rounded-3xl border border-gray-200/70 dark:border-stone-800/80 shadow-sm p-4 mb-6 space-y-3">
+    <x-card class="p-4 mb-6 space-y-3">
 
         {{-- Row 1: Search + Device + Dates --}}
         <div class="flex flex-wrap gap-3 items-center">
@@ -8,14 +8,11 @@
             {{-- Search --}}
             <div class="relative flex-1 min-w-48">
                 <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 dark:text-stone-600 text-xs pointer-events-none"></i>
-                <input wire:model.live.debounce.300ms="search"
-                       type="text"
-                       placeholder="Search track, artist or album…"
-                       class="w-full text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 text-gray-700 dark:text-gray-300 rounded-xl pl-8 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-stone-600 placeholder-gray-300 dark:placeholder-stone-600">
+                <x-text-input size="sm" wire:model.live.debounce.300ms="search" type="text" placeholder="Search track, artist or album…" class="w-full pl-8" />
             </div>
 
             {{-- Device filter --}}
-            <x-select wire:model.live="deviceId">
+            <x-select size="sm" wire:model.live="deviceId">
                 <option value="">All devices</option>
                 @foreach($devices as $device)
                     <option value="{{ $device->id }}">{{ $device->device_name }}</option>
@@ -23,11 +20,9 @@
             </x-select>
 
             {{-- Date range --}}
-            <input wire:model.live="dateFrom" type="date"
-                   class="text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 text-gray-700 dark:text-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-stone-600 cursor-pointer">
+            <x-text-input size="sm" wire:model.live="dateFrom" type="date" />
             <span class="text-xs text-gray-300 dark:text-stone-600">–</span>
-            <input wire:model.live="dateTo" type="date"
-                   class="text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 text-gray-700 dark:text-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-stone-600 cursor-pointer">
+            <x-text-input size="sm" wire:model.live="dateTo" type="date" />
 
             @if($search !== '' || $deviceId || $sourceFilter !== null || $dateFrom !== '' || $dateTo !== '')
                 <button wire:click="clearFilters" class="text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors whitespace-nowrap">
@@ -78,13 +73,10 @@
                 </button>
             @endforeach
         </div>
-    </div>
+    </x-card>
 
     @if($plays->isEmpty())
-        <div class="bg-white dark:bg-stone-900 rounded-3xl border border-gray-200/70 dark:border-stone-800/80 shadow-sm p-16 text-center">
-            <i class="fa-solid fa-clock-rotate-left text-4xl text-gray-200 dark:text-stone-700 mb-4"></i>
-            <p class="text-gray-400 dark:text-gray-600 text-sm">No history yet</p>
-        </div>
+        <x-empty-state icon="clock-rotate-left" text="No history yet" />
     @else
         {{-- Group plays by day --}}
         @php
@@ -149,7 +141,7 @@
 
                                     {{-- Time column --}}
                                     <div class="w-20 flex-shrink-0 pt-3 text-right pr-3">
-                                        <span class="text-xs font-medium text-gray-500 dark:text-gray-500">
+                                        <span class="text-xs font-medium text-gray-500">
                                             {{ $play->played_at->format('H:i') }}
                                         </span>
                                         @if($play->ended_at)
@@ -266,7 +258,7 @@
 
                                             @if(($play->track_id === null && $play->track_name !== null) || $play->track?->isRadioStub())
                                                 <button wire:click="openMatch({{ $play->id }})" type="button" title="Match to a library track"
-                                                        class="flex-shrink-0 text-[11px] px-2 py-1 rounded-lg bg-gray-100 dark:bg-stone-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-stone-700 transition-colors">
+                                                        class="flex-shrink-0 text-[11px] px-2 py-1 rounded-xl bg-gray-100 dark:bg-stone-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-stone-700 transition-colors">
                                                     <i class="fa-solid fa-link mr-1"></i>Match
                                                 </button>
                                             @endif
@@ -281,7 +273,7 @@
                                             {{-- Device badge --}}
                                             @if($play->device)
                                                 <div class="flex-shrink-0 ml-auto pl-2">
-                                                    <span class="text-[10px] bg-gray-100 dark:bg-stone-800 text-gray-400 dark:text-stone-500 px-2 py-1 rounded-lg whitespace-nowrap">
+                                                    <span class="text-[10px] bg-gray-100 dark:bg-stone-800 text-gray-400 dark:text-stone-500 px-2 py-1 rounded-xl whitespace-nowrap">
                                                         {{ $play->device->device_name }}
                                                     </span>
                                                 </div>
@@ -337,10 +329,8 @@
                 </div>
 
                 <div class="grid grid-cols-2 gap-2 mb-4">
-                    <input wire:model.live.debounce.400ms="matchName" type="text" placeholder="Track"
-                           class="text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 text-gray-700 dark:text-gray-300 rounded-xl px-3 py-2">
-                    <input wire:model.live.debounce.400ms="matchArtist" type="text" placeholder="Artist"
-                           class="text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 text-gray-700 dark:text-gray-300 rounded-xl px-3 py-2">
+                    <x-text-input size="sm" wire:model.live.debounce.400ms="matchName" type="text" placeholder="Track" />
+                    <x-text-input size="sm" wire:model.live.debounce.400ms="matchArtist" type="text" placeholder="Artist" />
                 </div>
 
                 @if($matchError)

@@ -1,7 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <h1 class="text-3xl md:text-4xl font-medium tracking-tight dark:text-gray-100 text-gray-900">Insights</h1>
-        <p class="mt-1.5 text-gray-500 dark:text-gray-500">Your listening stats across all devices</p>
+        <x-page-header title="Insights" subtitle="Your listening stats across all devices" />
     </x-slot>
 
     @php
@@ -11,36 +10,36 @@
 
     {{-- Overview numbers --}}
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
-        <div class="bg-white dark:bg-stone-900 rounded-2xl border border-gray-200/70 dark:border-stone-800/80 shadow-sm p-6 text-center">
+        <x-card compact class="p-6 text-center">
             <p class="text-3xl font-medium text-gray-900 dark:text-gray-100">{{ number_format($totalPlays) }}</p>
             <p class="text-xs text-gray-400 dark:text-gray-600 mt-1 uppercase tracking-wider">Total plays</p>
-        </div>
-        <div class="bg-white dark:bg-stone-900 rounded-2xl border border-gray-200/70 dark:border-stone-800/80 shadow-sm p-6 text-center">
+        </x-card>
+        <x-card compact class="p-6 text-center">
             <p class="text-3xl font-medium text-gray-900 dark:text-gray-100">{{ number_format($totalTracks) }}</p>
             <p class="text-xs text-gray-400 dark:text-gray-600 mt-1 uppercase tracking-wider">Tracks</p>
-        </div>
-        <div class="bg-white dark:bg-stone-900 rounded-2xl border border-gray-200/70 dark:border-stone-800/80 shadow-sm p-6 text-center">
+        </x-card>
+        <x-card compact class="p-6 text-center">
             <p class="text-3xl font-medium text-gray-900 dark:text-gray-100">{{ number_format($totalArtists) }}</p>
             <p class="text-xs text-gray-400 dark:text-gray-600 mt-1 uppercase tracking-wider">Artists</p>
-        </div>
-        <div class="bg-white dark:bg-stone-900 rounded-2xl border border-gray-200/70 dark:border-stone-800/80 shadow-sm p-6 text-center">
+        </x-card>
+        <x-card compact class="p-6 text-center">
             <p class="text-3xl font-medium text-gray-900 dark:text-gray-100">{{ $listeningLabel }}</p>
             <p class="text-xs text-gray-400 dark:text-gray-600 mt-1 uppercase tracking-wider">Listened</p>
-        </div>
-        <div class="bg-white dark:bg-stone-900 rounded-2xl border border-gray-200/70 dark:border-stone-800/80 shadow-sm p-6 text-center">
+        </x-card>
+        <x-card compact class="p-6 text-center">
             <p class="text-3xl font-medium text-gray-900 dark:text-gray-100">{{ $skipRate }}%</p>
             <p class="text-xs text-gray-400 dark:text-gray-600 mt-1 uppercase tracking-wider">Skipped</p>
-        </div>
+        </x-card>
     </div>
 
     {{-- Last 30 days trend --}}
     @php $trendMax = $last30Days->max() ?: 1; @endphp
-    <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8 mb-6">
+    <x-card class="p-6 md:p-8 mb-6">
         <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">Last 30 Days</h2>
         <div class="flex items-end gap-0.5 h-16">
             @foreach($last30Days as $day => $count)
-                <div class="flex-1 rounded-t-sm transition-all"
-                     style="height: {{ $trendMax > 0 ? round($count / $trendMax * 100) : 0 }}%; min-height: {{ $count > 0 ? '2px' : '0' }}; background: {{ $count > 0 ? '#111827' : '#f3f4f6' }};"
+                <div @class(['flex-1 rounded-t-sm transition-all', 'bg-gray-900 dark:bg-gray-300' => $count > 0, 'bg-gray-100 dark:bg-stone-800' => $count <= 0])
+                     style="height: {{ $trendMax > 0 ? round($count / $trendMax * 100) : 0 }}%; min-height: {{ $count > 0 ? '2px' : '0' }};"
                      title="{{ $day }} — {{ number_format($count) }} plays"></div>
             @endforeach
         </div>
@@ -53,12 +52,12 @@
                 </div>
             @endforeach
         </div>
-    </div>
+    </x-card>
 
     <div class="grid gap-6 lg:grid-cols-2">
 
         {{-- Top Artists --}}
-        <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8">
+        <x-card class="p-6 md:p-8">
             <div class="flex items-center justify-between mb-5">
                 <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600">Top Artists</h2>
                 <a href="{{ route('artists.index') }}" class="text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors">
@@ -92,10 +91,10 @@
                     @endforeach
                 </div>
             @endif
-        </div>
+        </x-card>
 
         {{-- Top Albums --}}
-        <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8">
+        <x-card class="p-6 md:p-8">
             <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">Top Albums</h2>
             @if($topAlbums->isEmpty())
                 <p class="text-sm text-gray-400 dark:text-gray-600">No data yet</p>
@@ -106,7 +105,7 @@
                         @php $artUrl = \App\Domain\Artwork\LibraryItemArtwork::proxy(\App\Domain\Artwork\LibraryArtwork::coverUrl($album->images), 120); $colors = $album->colors ?? []; @endphp
                         <div class="flex items-center gap-3">
                             <span class="w-5 text-center text-xs text-gray-300 dark:text-stone-600 flex-shrink-0">{{ $i + 1 }}</span>
-                            <div class="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 shadow-sm"
+                            <div class="w-8 h-8 rounded-xl overflow-hidden flex-shrink-0 shadow-sm"
                                  @if(count($colors) >= 2) style="background: linear-gradient(135deg, {{ $colors[0] }}, {{ $colors[1] }})" @else class="bg-gray-100 dark:bg-stone-800" @endif>
                                 @if($artUrl)
                                     <img src="{{ $artUrl }}" alt="" class="w-full h-full object-cover">
@@ -136,10 +135,10 @@
                     @endforeach
                 </div>
             @endif
-        </div>
+        </x-card>
 
         {{-- Top Tracks --}}
-        <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8">
+        <x-card class="p-6 md:p-8">
             <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">Top Tracks</h2>
             @if($topTracks->isEmpty())
                 <p class="text-sm text-gray-400 dark:text-gray-600">No data yet</p>
@@ -176,10 +175,10 @@
                     @endforeach
                 </div>
             @endif
-        </div>
+        </x-card>
 
         {{-- Source distribution --}}
-        <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8">
+        <x-card class="p-6 md:p-8">
             <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">By Source</h2>
             @if($sourceDistribution->isEmpty())
                 <p class="text-sm text-gray-400 dark:text-gray-600">No data yet</p>
@@ -204,17 +203,17 @@
                     @endforeach
                 </div>
             @endif
-        </div>
+        </x-card>
 
         {{-- Plays by hour --}}
-        <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8">
+        <x-card class="p-6 md:p-8">
             <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">Listening by Hour</h2>
             @php $maxHour = max($playsByHour) ?: 1; @endphp
             <div class="flex items-end gap-1 h-24">
                 @foreach($playsByHour as $hour => $count)
                     <div class="flex-1 flex flex-col items-center gap-1 group">
-                        <div class="w-full rounded-t-sm transition-all"
-                             style="height: {{ $maxHour > 0 ? round($count / $maxHour * 100) : 0 }}%; min-height: {{ $count > 0 ? '2px' : '0' }}; background: {{ $count > 0 ? '#111827' : '#f3f4f6' }};"
+                        <div @class(['w-full rounded-t-sm transition-all', 'bg-gray-900 dark:bg-gray-300' => $count > 0, 'bg-gray-100 dark:bg-stone-800' => $count <= 0])
+                             style="height: {{ $maxHour > 0 ? round($count / $maxHour * 100) : 0 }}%; min-height: {{ $count > 0 ? '2px' : '0' }};"
                              title="{{ $hour }}:00 — {{ number_format($count) }} plays"></div>
                     </div>
                 @endforeach
@@ -228,10 +227,10 @@
                     </div>
                 @endforeach
             </div>
-        </div>
+        </x-card>
 
         {{-- Plays by day of week --}}
-        <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8">
+        <x-card class="p-6 md:p-8">
             <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">Listening by Day</h2>
             @php
                 $dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -240,8 +239,8 @@
             <div class="flex items-end gap-3 h-24">
                 @foreach($playsByDay as $dow => $count)
                     <div class="flex-1 flex flex-col items-center gap-1">
-                        <div class="w-full rounded-t-sm"
-                             style="height: {{ $maxDay > 0 ? round($count / $maxDay * 100) : 0 }}%; min-height: {{ $count > 0 ? '2px' : '0' }}; background: #111827;"
+                        <div class="w-full rounded-t-sm bg-gray-900 dark:bg-gray-300"
+                             style="height: {{ $maxDay > 0 ? round($count / $maxDay * 100) : 0 }}%; min-height: {{ $count > 0 ? '2px' : '0' }};"
                              title="{{ $dayNames[$dow] }} — {{ number_format($count) }} plays"></div>
                     </div>
                 @endforeach
@@ -253,11 +252,11 @@
                     </div>
                 @endforeach
             </div>
-        </div>
+        </x-card>
 
         {{-- Device activity --}}
         @if($deviceStats->isNotEmpty())
-            <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8 lg:col-span-2">
+            <x-card class="p-6 md:p-8 lg:col-span-2">
                 <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">Device Activity</h2>
                 @php $maxDevicePlays = $deviceStats->first()['plays']; @endphp
                 <div class="grid sm:grid-cols-2 gap-4">
@@ -284,7 +283,7 @@
                         </div>
                     @endforeach
                 </div>
-            </div>
+            </x-card>
         @endif
 
     </div>
