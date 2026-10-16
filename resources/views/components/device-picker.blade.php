@@ -10,7 +10,7 @@
 ])
 
 <x-modal :name="$name" maxWidth="md">
-    <div class="bg-white dark:bg-stone-900 rounded-lg overflow-hidden">
+    <div class="bg-white dark:bg-stone-900 rounded-xl overflow-hidden">
         {{-- Header --}}
         <div class="flex items-start justify-between px-6 pt-6 pb-4">
             <div>

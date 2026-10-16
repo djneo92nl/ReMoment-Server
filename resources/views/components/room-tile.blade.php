@@ -35,13 +35,13 @@
     <span style="position:absolute;left:.9rem;right:.9rem;bottom:.7rem;z-index:2;pointer-events:none;font-weight:600;line-height:1.2" class="truncate">{{ $name }}</span>
 
     @if($role === 'host')
-        <span style="{{ $badge }}background:#fbbf24;pointer-events:none" title="Hosts this session"><i class="fa-solid fa-layer-group" style="font-size:.75rem;color:#1f2937"></i></span>
+        <span style="{{ $badge }}background:var(--fav);pointer-events:none" title="Hosts this session"><i class="fa-solid fa-layer-group" style="font-size:.75rem;color:var(--fav-ink)"></i></span>
     @elseif($role === 'member')
         @if($toggle)
             <button type="button" wire:click="{{ $toggle }}" wire:loading.attr="disabled" title="Remove {{ $name }} from this session"
-                    style="{{ $badge }}background:#fbbf24;cursor:pointer"><i class="fa-solid fa-check" style="font-size:.75rem;color:#1f2937"></i></button>
+                    style="{{ $badge }}background:var(--fav);cursor:pointer"><i class="fa-solid fa-check" style="font-size:.75rem;color:var(--fav-ink)"></i></button>
         @else
-            <span style="{{ $badge }}background:#fbbf24;pointer-events:none"><i class="fa-solid fa-check" style="font-size:.75rem;color:#1f2937"></i></span>
+            <span style="{{ $badge }}background:var(--fav);pointer-events:none"><i class="fa-solid fa-check" style="font-size:.75rem;color:var(--fav-ink)"></i></span>
         @endif
     @else
         <span class="border border-gray-300 dark:border-stone-600" style="{{ $badge }}pointer-events:none"></span>

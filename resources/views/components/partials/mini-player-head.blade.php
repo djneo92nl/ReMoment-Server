@@ -27,11 +27,11 @@
             <button type="button" wire:click="{{ $toggle }}" wire:loading.attr="disabled" @if($closeOnToggle) @click="$dispatch('close')" @endif
                     title="{{ $inSession ? 'Remove from this session' : 'Add to this session' }}"
                     class="{{ $inSession ? '' : ($glass ? 'border' : 'border border-gray-300 dark:border-stone-600') }}"
-                    style="{{ $circle }}cursor:pointer;{{ $inSession ? 'background:#fbbf24;border:0;' : 'background:none;'.($glass ? 'border-color:rgba(255,255,255,.5);' : '') }}">
-                @if($inSession)<i class="fa-solid fa-check" style="font-size:.8rem;color:#1f2937"></i>@endif
+                    style="{{ $circle }}cursor:pointer;{{ $inSession ? 'background:var(--fav);border:0;' : 'background:none;'.($glass ? 'border-color:rgba(255,255,255,.5);' : '') }}">
+                @if($inSession)<i class="fa-solid fa-check" style="font-size:.8rem;color:var(--fav-ink)"></i>@endif
             </button>
         @else
-            <span style="{{ $circle }}background:#fbbf24" title="Hosts this session"><i class="fa-solid fa-layer-group" style="font-size:.8rem;color:#1f2937"></i></span>
+            <span style="{{ $circle }}background:var(--fav)" title="Hosts this session"><i class="fa-solid fa-layer-group" style="font-size:.8rem;color:var(--fav-ink)"></i></span>
         @endif
     @elseif($isPlaying)
         <span class="bg-emerald-500" style="width:.55rem;height:.55rem;border-radius:9999px;flex:none" title="Playing"></span>

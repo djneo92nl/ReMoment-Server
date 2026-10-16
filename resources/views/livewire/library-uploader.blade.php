@@ -9,7 +9,7 @@
         </p>
 
         <label class="mt-4 flex flex-col items-center justify-center gap-1 px-6 py-8 rounded-2xl border-2 border-dashed cursor-pointer text-sm transition-colors"
-               :class="over ? 'border-gray-900 dark:border-stone-400 bg-gray-50 dark:bg-stone-800/50 text-gray-900 dark:text-gray-200' : 'border-gray-200 dark:border-stone-700 text-gray-500 dark:text-gray-400 hover:border-indigo-400'"
+               :class="over ? 'border-gray-900 dark:border-stone-400 bg-gray-50 dark:bg-stone-800/50 text-gray-900 dark:text-gray-200' : 'border-gray-200 dark:border-stone-700 text-gray-500 dark:text-gray-400 hover:border-gray-400 dark:hover:border-stone-500'"
                x-on:dragover.prevent="over = true" x-on:dragleave.prevent="over = false" x-on:drop.prevent="over = false; add($event.dataTransfer.files)">
             <i class="fa-solid fa-cloud-arrow-up text-2xl"></i>
             <span>Drop files here or <span class="underline">choose files</span></span>

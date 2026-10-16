@@ -24,7 +24,7 @@
                 <span x-text="lyricsOpen ? 'Hide lyrics' : 'Show lyrics'">Show lyrics</span>
                 <i class="fa-solid fa-chevron-down text-xs transition-transform duration-200" :class="lyricsOpen ? 'rotate-180' : ''"></i>
             </button>
-            <div x-show="lyricsOpen" x-transition class="mt-4 max-h-72 overflow-y-auto rounded-lg bg-gray-50 dark:bg-stone-800 p-4">
+            <div x-show="lyricsOpen" x-transition class="mt-4 max-h-72 overflow-y-auto rounded-xl bg-gray-50 dark:bg-stone-800 p-4">
                 <pre class="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap font-sans leading-relaxed">{{ $lyricsDisplay }}</pre>
             </div>
         </div>

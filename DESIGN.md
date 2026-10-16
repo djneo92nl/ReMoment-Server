@@ -24,10 +24,12 @@ Neutral scale is **stone** in dark, **gray** in light. Do not mix `gray-*` into 
 | Text faint (labels) | `gray-400` | `gray-600` |
 | Primary action | `gray-900` fill, white text | `stone-700` fill, white text |
 | Accent | `red-600` (wordmark, destructive) | same |
-| Success / error / info | `emerald` / `red` / `indigo`-`sky` 50/200/800 tints, `/20` fills in dark |
+| Success / error / warning / info | `emerald` / `red` / `amber` / `sky` 50/200/800 tints, `/20` fills in dark (`<x-alert>`, `<x-badge>`) |
 | Favourite badge | `fav` token (amber) | same |
 
-Colours that appear in more than one view live in `tailwind.config.js` (`theme.extend.colors`), never as hex literals in views. Artwork-derived colours (`safe_colors`) are the only runtime colours.
+Colours that appear in more than one view live in `tailwind.config.js` (`theme.extend.colors`: `fav`) or, for components that style inline, as CSS variables in `resources/css/app.css` (`--fav`, `--fav-ink`, `--glass-from`, `--glass-to`, `--accent-fallback`, `--on-glass-error`, `--tag-ink`, `--tag-on-glass`, `--select-ring`, `--genre-fallback`). **No 6-digit hex literal in a view** (a test enforces it). Artwork-derived colours (`safe_colors`) are the only runtime colours.
+
+**Exceptions, on purpose:** the artwork-driven "now playing" surfaces (`player-bar`, `device-card`, `mini-player`) draw white and near-black directly (`#fff`, `#111`, `rgba(...)`), because they always sit on a darkened cover; and `/receiver` is a kiosk page with its own full-screen theme (`receiver.blade.php`, excluded from the hex test).
 
 ## 3. Typography
 

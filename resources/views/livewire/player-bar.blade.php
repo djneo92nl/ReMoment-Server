@@ -1,5 +1,5 @@
 @php
-    $panelStyle = 'background:linear-gradient(100deg, #3a3f4b 0%, #2a2d36 100%);color:#fff';
+    $panelStyle = 'background:linear-gradient(100deg, var(--glass-from) 0%, var(--glass-to) 100%);color:#fff';
 @endphp
 @if(!$device)
     {{-- Nothing pinned: no bar. Only the picker, floating bottom right, when it is opened from the sidebar. --}}
@@ -43,8 +43,8 @@
         $hasColors = count($colors) >= 2;
         $background = $hasColors
             ? "linear-gradient(100deg, {$colors[0]} 0%, {$colors[1]} 100%)"
-            : 'linear-gradient(100deg, #3a3f4b 0%, #2a2d36 100%)';
-        $accent = $hasColors ? \App\Domain\Artwork\AccentColor::for($colors, $artwork['safe_colors'] ?? []) : '#22c55e';
+            : 'linear-gradient(100deg, var(--glass-from) 0%, var(--glass-to) 100%)';
+        $accent = $hasColors ? \App\Domain\Artwork\AccentColor::for($colors, $artwork['safe_colors'] ?? []) : 'var(--accent-fallback)';
 
         $duration = (int) ($track?->duration ?? 0);
         $position = (int) ($nowPlaying?->position ?? 0);
@@ -218,7 +218,7 @@
                 @endif
                 @if($supportsMultiRoom)
                     <button type="button" wire:click="togglePanel('multiroom')" title="Multiroom"
-                            style="{{ $icon }};{{ count($group) > 1 ? 'background:#fbbf24;color:#1f2937' : '' }}">
+                            style="{{ $icon }};{{ count($group) > 1 ? 'background:var(--fav);color:var(--fav-ink)' : '' }}">
                         <i class="fa-solid fa-layer-group" style="font-size:.85rem"></i>
                     </button>
                 @endif
@@ -236,7 +236,7 @@
         </div>
 
         @if($controlError)
-            <p style="position:relative;padding:0 1rem .4rem;font-size:.75rem;color:#fecaca">{{ $controlError }}</p>
+            <p style="position:relative;padding:0 1rem .4rem;font-size:.75rem;color:var(--on-glass-error)">{{ $controlError }}</p>
         @endif
 
     </div>

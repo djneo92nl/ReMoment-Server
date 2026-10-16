@@ -348,7 +348,7 @@
                                     <span class="block text-sm text-gray-800 dark:text-gray-200 truncate">{{ $candidate['name'] }}</span>
                                     <span class="block text-xs text-gray-400 dark:text-gray-600 truncate">{{ $candidate['artist'] }}{{ $candidate['album'] ? ' · '.$candidate['album'] : '' }}</span>
                                 </span>
-                                <span class="text-xs text-indigo-600 dark:text-indigo-400">Use</span>
+                                <span class="text-xs text-gray-900 dark:text-gray-100 underline">Use</span>
                             </button>
                         @empty
                             <p class="px-3 py-2 text-sm text-gray-400 dark:text-gray-600">No match in the library.</p>
@@ -366,7 +366,7 @@
                                         <span class="block text-sm text-gray-800 dark:text-gray-200 truncate">{{ $candidate['name'] }}</span>
                                         <span class="block text-xs text-gray-400 dark:text-gray-600 truncate">{{ $candidate['artist'] }}{{ $candidate['album'] ? ' · '.$candidate['album'] : '' }}</span>
                                     </span>
-                                    <span class="text-xs text-indigo-600 dark:text-indigo-400">Add &amp; use</span>
+                                    <span class="text-xs text-gray-900 dark:text-gray-100 underline">Add &amp; use</span>
                                 </button>
                             @endforeach
                         </div>

@@ -30,7 +30,7 @@
     if ($dark) {
         $base = count($gradientColors) >= 2
             ? "linear-gradient(100deg, {$gradientColors[0]} 0%, {$gradientColors[1]} 100%)"
-            : 'linear-gradient(100deg, #3a3f4b 0%, #2a2d36 100%)';
+            : 'linear-gradient(100deg, var(--glass-from) 0%, var(--glass-to) 100%)';
         $gradientStyle = "color:#fff;background:linear-gradient(rgba(0,0,0,.45), rgba(0,0,0,.45)), {$base};";
     }
 @endphp
@@ -274,7 +274,7 @@
         @endphp
         @if($group && $group['role'] === 'host' && $group['listeners'])
             <div class="mt-5 rounded-2xl border px-4 py-3" style="background: rgba(14,165,233,.12); border-color: rgba(14,165,233,.4);">
-                <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider" style="color:#0369a1;">
+                <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider" style="color:var(--tag-ink);">
                     <i class="fa-solid fa-layer-group"></i>
                     <span>Multiroom · {{ count($group['listeners']) + 1 }} rooms</span>
                 </div>

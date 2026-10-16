@@ -7,7 +7,7 @@
     'selectMethod' => 'POST',
     'selected' => false,
     'tag' => null,
-    'tagColor' => '#0369a1',
+    'tagColor' => 'var(--tag-ink)',
     // multiroom rows: true = in the session (yellow check), false = can be added (empty circle), null = no control
     'inSession' => null,
     // Full Livewire call run when the check/circle is tapped, e.g. removeListener(4)
@@ -38,7 +38,7 @@
 @endphp
 
 <div {{ $attributes->merge(['class' => 'rounded-2xl '.($glass ? '' : 'bg-gray-100 dark:bg-stone-800 text-gray-900 dark:text-gray-100')]) }}
-     style="padding:.85rem 1rem;{{ $glass ? 'background:rgba(255,255,255,.14);color:#fff;' : '' }}{{ $selected ? 'box-shadow:0 0 0 2px #6366f1;' : '' }}{{ $state === \App\Domain\Device\State::Unreachable ? 'opacity:.55;' : '' }}">
+     style="padding:.85rem 1rem;{{ $glass ? 'background:rgba(255,255,255,.14);color:#fff;' : '' }}{{ $selected ? 'box-shadow:0 0 0 2px var(--select-ring);' : '' }}{{ $state === \App\Domain\Device\State::Unreachable ? 'opacity:.55;' : '' }}">
 
     @if($selectUrl)
         @php

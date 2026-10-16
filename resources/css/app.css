@@ -3,7 +3,19 @@
 @tailwind utilities;
 
 @layer base {
-    :root { --genre-fallback: #9ca3af; } /* dot of a genre with no cover colours */
+    /* Colours shared by components that style inline (the artwork-driven player surfaces); names in DESIGN.md §2. */
+    :root {
+        --genre-fallback: #9ca3af;   /* dot of a genre with no cover colours */
+        --fav: #fbbf24;              /* favourite / "in session" badge fill */
+        --fav-ink: #1f2937;          /* icon on that badge */
+        --glass-from: #3a3f4b;       /* player surface when the cover has no colours */
+        --glass-to: #2a2d36;
+        --accent-fallback: #22c55e;  /* play-button accent when the cover has no colours */
+        --on-glass-error: #fecaca;   /* error text on the player surface */
+        --tag-ink: #0369a1;          /* multiroom label on a light surface */
+        --tag-on-glass: #fde68a;     /* the same label on the player surface */
+        --select-ring: #fff;         /* selected row ring in the player picker */
+    }
     [x-cloak] { display: none !important; }
 
     input[type=range]::-webkit-slider-thumb {

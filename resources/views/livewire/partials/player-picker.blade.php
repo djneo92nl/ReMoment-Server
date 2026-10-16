@@ -26,7 +26,7 @@
                     default => null,
                 };
             @endphp
-            <x-mini-player :glass="true" :device="$candidate" :tag="$tag" tag-color="#fde68a" :volume-api="true"
+            <x-mini-player :glass="true" :device="$candidate" :tag="$tag" tag-color="var(--tag-on-glass)" :volume-api="true"
                            :selected="($device?->id ?? null) === $candidate->id"
                            :select-url="route('player.select', $candidate)" wire:key="pick-{{ $candidate->id }}" />
         @endforeach

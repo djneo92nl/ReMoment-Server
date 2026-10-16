@@ -36,6 +36,7 @@ class UiComponentsTest extends TestCase
         $this->assertStringContainsString('bg-emerald-50', Blade::render('<x-alert type="success">ok</x-alert>'));
         $this->assertStringContainsString('bg-sky-50', Blade::render('<x-alert type="bogus">?</x-alert>'));
         $this->assertStringContainsString('Retry', Blade::render('<x-alert type="warning">w<x-slot name="action">Retry</x-slot></x-alert>'));
+        $this->assertSame('', trim(Blade::render('<x-alert type="success">{{ session("missing") }}</x-alert>')), 'an alert with no message renders nothing');
     }
 
     public function test_page_header_renders_title_subtitle_back_and_actions(): void
@@ -125,6 +126,45 @@ class UiComponentsTest extends TestCase
                 $closes = substr_count($source, '</'.$tag.'>');
                 if ($opens !== $closes) {
                     $problems[] = "{$file->getRelativePathname()}: <{$tag}> opened {$opens}x, closed {$closes}x";
+                }
+            }
+        }
+
+        $this->assertSame([], $problems);
+    }
+
+    /** Shared colours are tokens (tailwind.config.js) or CSS variables (app.css), not literals pasted into views. */
+    public function test_views_hold_no_hex_colours_and_no_cdn_tailwind(): void
+    {
+        $problems = [];
+
+        foreach (File::allFiles(resource_path('views')) as $file) {
+            $source = $file->getContents();
+
+            if ($file->getFilename() !== 'receiver.blade.php' && preg_match_all('/#[0-9a-fA-F]{6}\b/', $source, $found)) {
+                $problems[] = $file->getRelativePathname().': '.implode(' ', array_unique($found[0]));
+            }
+            if (str_contains($source, 'cdn.tailwindcss.com')) {
+                $problems[] = $file->getRelativePathname().': loads Tailwind from the CDN';
+            }
+        }
+
+        $this->assertSame([], $problems);
+    }
+
+    /** A flash alert must sit inside @if(session(...)), or an empty banner shows on every page load. */
+    public function test_flash_alerts_are_guarded_by_their_session_key(): void
+    {
+        $problems = [];
+
+        foreach (File::allFiles(resource_path('views')) as $file) {
+            foreach (preg_split('/\R/', $file->getContents()) as $i => $line) {
+                if (!preg_match("/<x-alert[^>]*>\\{\\{ session\\('(\\w+)'\\) \\}\\}/", $line, $m)) {
+                    continue;
+                }
+                $before = implode("\n", array_slice(preg_split('/\R/', $file->getContents()), max(0, $i - 2), 2));
+                if (!str_contains($before, "session('{$m[1]}')")) {
+                    $problems[] = $file->getRelativePathname().':'.($i + 1);
                 }
             }
         }
