@@ -74,6 +74,7 @@ class PlayerApiTest extends TestCase
         $this->assertSame('play', $command['op']);
         $this->assertSame($tracks[0]->id, $command['track']['id']);
         $this->assertSame('/stream/'.$tracks[0]->id, $command['track']['url']);
+        $this->assertSame([], $command['track']['images']); // the cover is not processed yet; never a remoment:cover pseudo URL
         $this->assertSame([$tracks[1]->id, $tracks[2]->id], PlayerQueue::for($id)->upNext(10));
 
         $tracks[0]->album->update(['images' => [['url' => 'https://img.test/cover.jpg']]]);

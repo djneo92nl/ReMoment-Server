@@ -59,7 +59,9 @@
         $('title').textContent = track ? track.name : 'Nothing playing';
         $('artist').textContent = track ? [track.artist, track.album].filter(Boolean).join(' · ') : '';
         const image = track && track.images && track.images[0];
-        $('art').style.backgroundImage = image ? 'url("' + image + '")' : '';
+        setArt(image);
+        // The cover may still be processing when the track starts: ask the device for it a few times.
+        if (track && !image) fetchArt(track.id, 5);
         document.title = track ? track.name + ' · ReMoment Player' : 'ReMoment Player';
 
         if ('mediaSession' in navigator) {
@@ -68,6 +70,28 @@
                 artwork: image ? [{ src: image }] : [],
             }) : null;
         }
+    }
+
+    function setArt(image) {
+        $('art').style.backgroundImage = image ? 'url("' + image + '")' : '';
+        if (current && image) current.images = [image];
+        if ('mediaSession' in navigator && navigator.mediaSession.metadata && image) {
+            const m = navigator.mediaSession.metadata;
+            navigator.mediaSession.metadata = new MediaMetadata({ title: m.title, artist: m.artist, album: m.album, artwork: [{ src: image }] });
+        }
+    }
+
+    function fetchArt(trackId, tries) {
+        setTimeout(() => {
+            if (!current || current.id !== trackId) return;
+            api('/devices/' + deviceId).then(r => {
+                const artwork = r.data && r.data.now_playing && r.data.now_playing.artwork;
+                const path = artwork && (artwork.proxy_512 || artwork.proxy_320);
+                const i = path ? path.indexOf('/storage/') : -1;
+                if (i >= 0) setArt(path.slice(i));
+                else if (tries > 1) fetchArt(trackId, tries - 1);
+            }).catch(() => {});
+        }, 3000);
     }
 
     function handle(command) {

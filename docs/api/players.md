@@ -26,7 +26,7 @@ MQTT topic `remoment/playercmd/{device_id}` (QoS 1, not retained), or poll `GET 
 
 | op | fields |
 |---|---|
-| `play` | `track: { id, url, name, artist, album, duration, images }`; `url` is a path (`/stream/42`), prefix the server's address |
+| `play` | `track: { id, url, name, artist, album, duration, images }`; `url` and `images[0]` are paths (`/stream/42`, `/storage/artwork/…/320.jpg`), prefix the server's address; `images` is empty until the cover is processed |
 | `resume`, `pause`, `stop` | |
 | `seek` | `position` (seconds) |
 | `volume` | `volume` (0–100) |

@@ -2,6 +2,7 @@
 
 namespace App\Integrations\ReMoment;
 
+use App\Domain\Artwork\LibraryItemArtwork;
 use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\QueueItem;
 use App\Domain\Device\RepeatMode;
@@ -236,7 +237,7 @@ class PlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, 
             'artist' => $track->artist?->name,
             'album' => $track->album?->name,
             'duration' => $track->duration,
-            'images' => array_values(array_filter([PlayerDevice::cover($track)])),
+            'images' => array_values(array_filter([LibraryItemArtwork::proxy(PlayerDevice::cover($track), 320)])),
         ]]);
     }
 
