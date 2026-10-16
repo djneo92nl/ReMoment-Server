@@ -184,7 +184,7 @@ class Track extends Model
 
         $depth = $this->metaValue('bit_depth');
         $rate = $this->metaValue('sample_rate');
-        $bitrate = $this->metaValue('bitrate');
+        $bitrate = $this->bitrateKbps();
         $channels = $this->metaValue('channels');
         $size = $this->metaValue('file_size');
 
@@ -201,6 +201,14 @@ class Track extends Model
         return $parts ? implode(' · ', $parts) : null;
     }
 
+    /** The bitrate in kbps: servers report it as kbps (320) or as bits per second (320000). */
+    private function bitrateKbps(): ?int
+    {
+        $bitrate = (int) $this->metaValue('bitrate');
+
+        return $bitrate <= 0 ? null : ($bitrate > 10000 ? (int) round($bitrate / 1000) : $bitrate);
+    }
+
     /**
      * A short badge for tracks worth flagging: lossless files ("FLAC 24/96", "FLAC") and high-bitrate lossy ones
      * ("320 kbps", from 256); null for everything else.
@@ -211,7 +219,7 @@ class Track extends Model
         $format = $mime ? (self::FORMATS[$mime] ?? null) : null;
         $depth = (int) $this->metaValue('bit_depth');
         $rate = (int) $this->metaValue('sample_rate');
-        $bitrate = (int) $this->metaValue('bitrate');
+        $bitrate = $this->bitrateKbps() ?? 0;
 
         if (in_array($format, ['FLAC', 'WAV', 'AIFF'], true)) {
             $hiRes = $depth > 16 || $rate > 48000;

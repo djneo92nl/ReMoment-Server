@@ -133,6 +133,11 @@ class AlbumPageTest extends TestCase
         $this->assertSame('FLAC 24/96', Track::find($flac->id)->qualityBadge());
         $this->assertNull(Track::find($mp3->id)->qualityBadge());
 
+        // Bits per second (320000) are read as kbps.
+        $mp3->metadata()->where('key', 'bitrate')->update(['value' => '320000']);
+        $this->assertSame('320 kbps', Track::find($mp3->id)->qualityBadge());
+        $this->assertStringContainsString('320 kbps', Track::find($mp3->id)->audioQuality());
+
         $this->get(route('albums.show', $album))->assertOk()
             ->assertSee('FLAC 24/96')->assertSee('1,234 listeners on Last.fm')->assertSee('Add to playlist')
             ->assertDontSee('data-strip-links', false);
