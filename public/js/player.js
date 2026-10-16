@@ -146,6 +146,7 @@
     async function init() {
         $('name').value = store.get(NAME_KEY) || (navigator.platform || 'Browser') + ' browser';
         const info = await register();
+        lastCommand = info.last_command_id || 0;
         setupMediaSession();
         connectMqtt(info);
 

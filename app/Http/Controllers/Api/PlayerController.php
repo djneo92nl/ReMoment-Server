@@ -46,6 +46,7 @@ class PlayerController extends Controller
             'player_token' => $token,
             'device_id' => $device->id,
             'command_topic' => PlayerCommands::topic($device->id),
+            'last_command_id' => PlayerCommands::lastId($device->id),
             'mqtt' => [
                 'host' => config('mqtt.public_host') ?? $request->getHost(),
                 'port' => (int) config('mqtt.public_port'),

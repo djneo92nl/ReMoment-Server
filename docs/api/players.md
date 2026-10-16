@@ -14,7 +14,7 @@ Only tracks with a file of the server's own (`GET /stream/{track}`) and a MIME t
 
 `kind`: `web` | `ios` | `esp32` (display only). `token` is omitted the first time; send it afterwards (it identifies the device, keep it in `localStorage`, keychain or flash). `capabilities` lists the optional controls the player supports out of the box (`seek`, `queue`, `queue_jump`, `shuffle`, `repeat`, `volume_control`; default all); `media_controls` and `library_playback` are always on. `formats` are the MIME types it decodes (default: mp3, aac, flac, ogg, wav).
 
-Response `201`: `{ player_token, device_id, command_topic, mqtt: { host, port, ws_port } }`. `player_token` is secret: it is the only credential of the player endpoints.
+Response `201`: `{ player_token, device_id, command_topic, last_command_id, mqtt: { host, port, ws_port } }`. Start polling commands after `last_command_id`, so a reloaded player does not replay old ones. `player_token` is secret: it is the only credential of the player endpoints.
 
 ## Commands (server → player)
 

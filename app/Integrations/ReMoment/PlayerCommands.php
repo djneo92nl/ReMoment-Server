@@ -50,6 +50,12 @@ class PlayerCommands
         ));
     }
 
+    /** The id of the newest command, 0 when there is none: a player starts after it instead of replaying old ones. */
+    public static function lastId(int $deviceId): int
+    {
+        return (int) Cache::get("player:{$deviceId}:command_seq", 0);
+    }
+
     private static function nextId(int $deviceId): int
     {
         $key = "player:{$deviceId}:command_seq";

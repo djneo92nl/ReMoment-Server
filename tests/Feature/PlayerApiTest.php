@@ -46,6 +46,7 @@ class PlayerApiTest extends TestCase
         $this->assertSame($first['player_token'], $again['player_token']);
         $this->assertSame(1, Device::count());
         $this->assertSame("remoment/playercmd/{$first['device_id']}", $first['command_topic']);
+        $this->assertSame(0, $first['last_command_id']);
     }
 
     public function test_player_reports_only_the_capabilities_it_registered_with(): void
