@@ -408,19 +408,23 @@
   #queue-panel, #multi-panel, #switch-panel {
     display: none;
     position: fixed;
-    z-index: 5;
+    z-index: 1; /* under the bar (later in the DOM), so it slides out from behind it */
     right: 0; bottom: 0;
     width: 26rem; max-width: calc(100vw - 24px);
     max-height: 60vh;
     flex-direction: column;
     box-sizing: border-box;
-    padding: 16px 8px 12px 16px;
+    padding: 16px 8px 28px 16px; /* the bottom 16px sit behind the bar */
     border-radius: 16px 16px 0 0;
     overflow: hidden;
     color: #fff;
-    background: #1c1f25;
-    box-shadow: 0 -8px 30px rgba(0,0,0,0.35);
+    background: var(--bar-bg, linear-gradient(100deg, #2a2e36 0%, #1c1f25 100%));
+    box-shadow: 0 -8px 30px rgba(0,0,0,0.25);
   }
+  /* the artwork colours, darkened like the bar */
+  .fpanel::before { content: ''; position: absolute; inset: 0; background: rgba(0,0,0,0.45); pointer-events: none; }
+  .fpanel > * { position: relative; }
+  #bar.panel-open { border-top-right-radius: 0; }
   .fpanel h3 { font-size: 17px; font-weight: 700; margin: 0 0 10px; flex: none; }
   .fpanel .q-row {
     display: flex; align-items: center; gap: 10px; width: 100%;
@@ -1190,9 +1194,8 @@ function setAccent(accent, colors) {
   const root = document.documentElement.style;
   root.setProperty('--accent', accent || '#e8a46b');
   if (accent) root.setProperty('--title', accent); else root.removeProperty('--title');
-  const bar = document.getElementById('bar');
-  if (colors && colors.length >= 2) bar.style.setProperty('--bar-bg', `linear-gradient(100deg, ${colors[0]} 0%, ${colors[1]} 100%)`);
-  else bar.style.removeProperty('--bar-bg');
+  if (colors && colors.length >= 2) root.setProperty('--bar-bg', `linear-gradient(100deg, ${colors[0]} 0%, ${colors[1]} 100%)`);
+  else root.removeProperty('--bar-bg');
 }
 
 let currentWaveKey = null;
@@ -1459,6 +1462,7 @@ function togglePanel(name, e, force) {
   if (e) { e.stopPropagation(); resetAmbient(); }
   const open = force === false ? null : (force === true || openPanel !== name ? name : null);
   openPanel = open;
+  document.getElementById('bar').classList.toggle('panel-open', !!open);
   Object.keys(PANELS).forEach(k => {
     const on = k === open;
     document.getElementById(PANELS[k].el).classList.toggle('open', on);
@@ -1468,7 +1472,11 @@ function togglePanel(name, e, force) {
     const panel = document.getElementById(PANELS[open].el);
     const bar = document.getElementById('bar').getBoundingClientRect();
     panel.style.right = Math.max(0, window.innerWidth - bar.right) + 'px';
-    panel.style.bottom = (window.innerHeight - bar.top - 16) + 'px';
+    // the same slice of the artwork gradient as the bar's right end, so panel and bar read as one
+    panel.style.backgroundSize = bar.width + 'px 100%';
+    panel.style.backgroundPosition = 'right top';
+    panel.style.backgroundRepeat = 'no-repeat';
+    panel.style.bottom = (window.innerHeight - bar.top - 16) + 'px'; // 16px behind the bar
     PANELS[open].load();
   }
 }
