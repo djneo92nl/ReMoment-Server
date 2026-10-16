@@ -198,16 +198,16 @@
     overflow: hidden;
     color: #fff;
     background: var(--bar-bg, linear-gradient(100deg, #2a2e36 0%, #1c1f25 100%));
-    border: 1px solid transparent;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.35);
-    transition: border-color 0.8s, box-shadow 0.8s;
+    /* no real border: the gradient would tile into it and draw a light edge */
+    box-shadow: 0 8px 30px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0);
+    transition: box-shadow 0.8s;
   }
   /* idle: the bar turns into frosted glass over the blurred cover */
   body.ambient #bar {
     background: rgba(255,255,255,0.07) !important;
     -webkit-backdrop-filter: blur(28px) saturate(1.3);
     backdrop-filter: blur(28px) saturate(1.3);
-    border-color: rgba(255,255,255,0.12);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.12);
   }
   body.ambient #bar::before { background: transparent; }
   #bar::before {
