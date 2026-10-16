@@ -2,7 +2,13 @@
 
 @php
     $group = \App\Domain\Library\LeadingSource::group($scope);
-    $services = $group === 'streaming' ? \App\Domain\Library\LibrarySources::libraryIdsOfKind('streaming') : [];
+    // Only services that hold something (plus the one being viewed), so an empty Spotify/DLNA isn't offered.
+    $services = $group === 'streaming'
+        ? array_values(array_filter(
+            \App\Domain\Library\LibrarySources::libraryIdsOfKind('streaming'),
+            fn ($id) => $id === $scope || \App\Domain\Library\LibrarySources::availableFrom(\App\Models\Media\Track::query(), $id)->exists(),
+        ))
+        : [];
 @endphp
 
 <div>

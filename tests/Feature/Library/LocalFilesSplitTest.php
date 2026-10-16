@@ -121,4 +121,11 @@ class LocalFilesSplitTest extends TestCase
 
         $this->get('/albums?scope=local')->assertOk()->assertDontSee('Streaming service', false);
     }
+
+    public function test_service_filter_lists_only_services_with_content(): void
+    {
+        $this->makeLibraryTrack($this->album('Only Nas'), 'a', streamSource: 'dlna:1');
+
+        $this->get('/albums?scope=streaming')->assertOk()->assertDontSee('Streaming service', false);
+    }
 }
