@@ -5,8 +5,13 @@
 @php
     $album = $page->album;
     $pinned = app(\App\Support\SelectedDevice::class)->device();
-    $direct = $pinned !== null && $devices->contains('id', $pinned->id);
-    $playable = $page->tracks->isNotEmpty() && $devices->isNotEmpty();
+    // Play follows the selected source and the pinned player: it plays where that player can play the source,
+    // is hidden where it can't (a Spotify device can only do Spotify), and opens the player panel while none is pinned.
+    $source = $page->source;
+    $sourceName = $source ? \App\Domain\Library\LibrarySources::LIBRARIES[$source]['name'] : null;
+    $direct = $pinned !== null && $source !== null && \App\Domain\Library\LibrarySources::playableOn($source, $pinned);
+    $hasSomething = $page->tracks->isNotEmpty() || $page->spotifyAlbum;
+    $playable = $hasSomething && ($pinned === null ? $devices->isNotEmpty() : $direct);
     $action = fn (bool $shuffle) => \App\Support\DeviceAction::template('albums.play', ['album' => $album, 'source' => $page->source, 'shuffle' => $shuffle ? 1 : null]);
     $primary = 'inline-flex items-center justify-center gap-2 rounded-full bg-gray-900 px-6 py-3 text-base font-medium text-white shadow-sm transition hover:bg-gray-700 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200';
     $secondary = 'inline-flex items-center justify-center gap-2 rounded-full border border-black/20 bg-black/5 dark:border-white/25 px-6 py-3 text-base font-medium transition hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10';
@@ -68,9 +73,6 @@
                                 @csrf
                                 <button type="submit" class="{{ $class }}" title="{{ $text }} on {{ $pinned->device_name }}"><i class="fa-solid fa-{{ $icon }} text-sm"></i>{{ $text }}</button>
                             </form>
-                        @elseif($pinned)
-                            <button type="button" class="{{ $class }}" title="{{ $text }} on a device that can play it"
-                                    @click="$dispatch('play-on-device', {{ \Illuminate\Support\Js::from(['action' => $action($shuffle), 'label' => $album->name]) }})"><i class="fa-solid fa-{{ $icon }} text-sm"></i>{{ $text }}</button>
                         @else
                             <button type="button" class="{{ $class }}" title="Choose a player to {{ strtolower($text) }} on" @click="$dispatch('open-player-panel')"><i class="fa-solid fa-{{ $icon }} text-sm"></i>{{ $text }}</button>
                         @endif
@@ -107,8 +109,10 @@
                     @else
                         <button type="button" class="underline hover:opacity-100" @click="$dispatch('open-player-panel')">Choose a player</button>
                     @endif
-                    @if($label && count($page->sources) > 1) · from {{ $label }} @endif
+                    @if($sourceName && count($page->sources) > 1) · from {{ $sourceName }} @endif
                 </p>
+            @elseif($hasSomething && $pinned && $sourceName)
+                <p class="mt-3 text-sm opacity-70">{{ $pinned->device_name }} can't play {{ $sourceName }}. <button type="button" class="underline hover:opacity-100" @click="$dispatch('open-player-panel')">Choose another player</button></p>
             @endif
         </div>
     </div>

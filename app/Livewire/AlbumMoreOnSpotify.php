@@ -9,8 +9,8 @@ use App\Domain\Library\Normalizer;
 use App\Domain\Library\SpotifyCatalog;
 use App\Domain\Library\SpotifyUri;
 use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
-use App\Models\Device;
 use App\Models\Media\Album;
+use App\Support\SelectedDevice;
 use Livewire\Component;
 
 /**
@@ -127,11 +127,14 @@ class AlbumMoreOnSpotify extends Component
     {
         $available = app(SpotifyCatalog::class)->available();
         $rows = $available && $this->loaded ? $this->rows() : [];
+        $pinned = app(SelectedDevice::class)->device();
 
         return view('livewire.album-more-on-spotify', [
             'available' => $available,
             'rows' => $rows,
-            'devices' => Device::libraryCapable(),
+            'pinned' => $pinned,
+            // A play button only where the pinned player can play Spotify; without a pinned player it opens the player panel.
+            'canPlay' => $pinned === null || LibraryPlayback::canPlaySpotify($pinned),
             'missing' => is_array($rows) ? count(array_filter($rows, fn ($r) => $r['local'] === null)) : 0,
         ]);
     }

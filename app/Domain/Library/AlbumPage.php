@@ -77,7 +77,7 @@ final class AlbumPage
             source: $source,
             tracks: $tracks,
             allTracks: $all,
-            playable: self::playableOn($pinned, $tracks),
+            playable: self::playableOn($pinned, $tracks, $source),
             totalSeconds: $seconds,
             metaLine: self::metaLine($album, $details, $genres, $tracks->count(), $seconds),
             genres: $genres,
@@ -129,19 +129,20 @@ final class AlbumPage
     }
 
     /**
-     * Whether the pinned player can play each track, judged once per album: the two library paths are
+     * Whether the pinned player can play each track from the selected source, judged once per album: the two library paths are
      * checked once for the device, not once per track.
      *
      * @return array<int, bool>
      */
-    private static function playableOn(?Device $device, Collection $tracks): array
+    private static function playableOn(?Device $device, Collection $tracks, ?string $source): array
     {
         if ($device === null) {
             return [];
         }
 
-        $dlna = LibraryPlayback::canPlayDlna($device);
-        $spotify = LibraryPlayback::canPlaySpotify($device);
+        // Only the selected source counts: a Spotify-only device gets no play buttons on the Local list, and the other way round.
+        $dlna = $source !== 'spotify' && LibraryPlayback::canPlayDlna($device);
+        $spotify = $source !== 'dlna' && LibraryPlayback::canPlaySpotify($device);
 
         return $tracks->mapWithKeys(fn (Track $t) => [
             $t->id => ($dlna && $t->getDlnaUrl()) || ($spotify && LibraryPlayback::spotifyUri($t) !== null),

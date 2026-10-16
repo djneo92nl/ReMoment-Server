@@ -4,6 +4,7 @@ namespace App\Domain\Library;
 
 use App\Domain\Device\SpotifyRouting;
 use App\Integrations\Contracts\LibraryPlaybackInterface;
+use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
 use App\Models\Device;
 use App\Models\DeviceMeta;
 use App\Models\Media\Album;
@@ -189,7 +190,36 @@ class LibraryPlayback
     /** @param  string|null  $source  `dlna` | `spotify`: play from that path only (see playTracks) */
     public function playAlbum(Device $device, Album $album, ?Track $start = null, bool $shuffle = false, ?string $source = null): PlaybackResult
     {
+        if ($source === 'spotify') {
+            return $this->playSpotifyAlbum($device, $album, $start, $shuffle);
+        }
+
         return $this->playTracks($device, self::albumTracks($album), $start, $shuffle, $album, $source);
+    }
+
+    /**
+     * Plays the album as Spotify has it (its album context), whatever of it the library holds: the Spotify side of
+     * the album page. Needs a device that plays Spotify and an album Spotify knows.
+     */
+    private function playSpotifyAlbum(Device $device, Album $album, ?Track $start, bool $shuffle): PlaybackResult
+    {
+        if (!self::canPlaySpotify($device)) {
+            throw new NotPlayableException("\"{$album->name}\" can't be played from Spotify on {$device->device_name}.");
+        }
+
+        try {
+            $albumId = app(SpotifyLibraryImporter::class)->findAlbumId($album);
+        } catch (\Throwable $e) {
+            throw new PlaybackFailedException('Spotify did not answer: '.$e->getMessage(), previous: $e);
+        }
+
+        if ($albumId === null) {
+            throw new NotPlayableException("\"{$album->name}\" isn't on Spotify.");
+        }
+
+        $this->playOnSpotify($device, collect(), $start ? self::spotifyUri($start) : null, $shuffle, context: 'spotify:album:'.$albumId);
+
+        return new PlaybackResult(PlaybackResult::VIA_SPOTIFY, 1, 1);
     }
 
     public function playArtist(Device $device, Artist $artist, bool $shuffle = false): PlaybackResult

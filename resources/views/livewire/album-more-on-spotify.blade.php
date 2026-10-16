@@ -22,28 +22,18 @@
         @endif
         <div class="divide-y divide-gray-100 dark:divide-stone-800/70">
             @foreach($rows as $row)
-                @php
-                    // A track we have plays from the library when it can, else by its Spotify id like the others.
-                    $viaLibrary = $row['local'] && \App\Domain\Library\LibraryPlayback::trackPlayable($row['local']);
-                    $rowDevices = $viaLibrary
-                        ? $devices->filter(fn ($d) => \App\Domain\Library\LibraryPlayback::trackPlayable($row['local'], $d))->values()
-                        : $devices->filter(fn ($d) => \App\Domain\Library\LibraryPlayback::canPlaySpotify($d))->values();
-                @endphp
                 <div class="group flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-gray-50 sm:px-5 dark:hover:bg-stone-800/30">
                     <div class="relative h-8 w-8 flex-none">
-                        <span class="absolute inset-0 flex items-center justify-center text-sm tabular-nums text-gray-400 dark:text-stone-500 {{ $rowDevices->isNotEmpty() ? 'group-hover:hidden group-focus-within:hidden [@media(hover:none)]:hidden' : '' }}">{{ $row['number'] ?: '' }}</span>
-                        @if($rowDevices->isNotEmpty())
-                            <x-play-button
-                                name="spotify-row-{{ $row['id'] }}"
-                                title="Play track"
-                                :description="$row['name']"
-                                :devices="$rowDevices"
-                                :action-template="$viaLibrary ? \App\Support\DeviceAction::template('tracks.play', ['track' => $row['local']]) : \App\Support\DeviceAction::template('spotify.tracks.play', ['spotifyTrackId' => $row['id']])"
-                                :elsewhere="false"
-                                wrapper-class="hidden group-hover:block group-focus-within:block [@media(hover:none)]:block"
-                                class="flex h-8 w-8 items-center justify-center rounded-full text-gray-900 hover:bg-gray-200 dark:text-gray-100 dark:hover:bg-stone-700">
-                                <i class="fa-solid fa-play text-xs"></i>
-                            </x-play-button>
+                        <span class="absolute inset-0 flex items-center justify-center text-sm tabular-nums text-gray-400 dark:text-stone-500 {{ $canPlay ? 'group-hover:hidden group-focus-within:hidden [@media(hover:none)]:hidden' : '' }}">{{ $row['number'] ?: '' }}</span>
+                        @if($canPlay)
+                            @if($pinned)
+                                <form method="POST" action="{{ str_replace('{id}', $pinned->id, \App\Support\DeviceAction::template('spotify.tracks.play', ['spotifyTrackId' => $row['id']])) }}" class="hidden group-hover:block group-focus-within:block [@media(hover:none)]:block">
+                                    @csrf
+                                    <button type="submit" class="flex h-8 w-8 items-center justify-center rounded-full text-gray-900 hover:bg-gray-200 dark:text-gray-100 dark:hover:bg-stone-700" title="Play on {{ $pinned->device_name }}" aria-label="Play {{ $row['name'] }} on {{ $pinned->device_name }}"><i class="fa-solid fa-play text-xs"></i></button>
+                                </form>
+                            @else
+                                <button type="button" class="hidden h-8 w-8 items-center justify-center rounded-full text-gray-900 hover:bg-gray-200 group-hover:flex group-focus-within:flex dark:text-gray-100 dark:hover:bg-stone-700 [@media(hover:none)]:flex" @click="$dispatch('open-player-panel')" title="Choose a player to play on" aria-label="Choose a player to play {{ $row['name'] }} on"><i class="fa-solid fa-play text-xs"></i></button>
+                            @endif
                         @endif
                     </div>
                     <p class="flex min-w-0 flex-1 items-center gap-2 text-sm text-gray-900 dark:text-gray-100">

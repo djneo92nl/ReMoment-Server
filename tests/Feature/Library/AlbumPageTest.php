@@ -280,4 +280,41 @@ class AlbumPageTest extends TestCase
         $this->get(route('albums.show', [$album, 'source' => 'spotify']))->assertOk()
             ->assertSee('album-more-on-spotify', false)->assertDontSee('Local Song');
     }
+
+    public function test_play_follows_what_the_pinned_player_can_play_from_the_selected_source(): void
+    {
+        $album = $this->album();
+        $this->track($album, 'Local Song');
+        $api = \Mockery::mock(\SpotifyWebAPI\SpotifyWebAPI::class);
+        $this->connectSpotify($api);
+        $spotifyDevice = Device::factory()->create(['device_name' => 'Spotify Connect', 'device_driver' => \App\Integrations\Spotify\MusicPlayerDriver::class, 'device_driver_name' => 'Spotify']);
+        $play = "/albums/{$album->id}/play/{$spotifyDevice->id}";
+
+        // A Spotify device only does Spotify: nothing to play on the Local side, and rows have no play button.
+        $this->app->forgetScopedInstances();
+        $this->withCookie(SelectedDevice::COOKIE, (string) $spotifyDevice->id)->get(route('albums.show', [$album, 'source' => 'dlna']))->assertOk()
+            ->assertDontSee($play, false)->assertSee("Spotify Connect can't play Local", false)->assertDontSee('Play Local Song on', false);
+
+        // On the Spotify side it plays the album from Spotify.
+        $this->app->forgetScopedInstances();
+        $this->withCookie(SelectedDevice::COOKIE, (string) $spotifyDevice->id)->get(route('albums.show', [$album, 'source' => 'spotify']))->assertOk()
+            ->assertSee($play.'?source=spotify', false)->assertSee('Plays on Spotify Connect');
+
+        // Without a pinned player the buttons open the player panel instead.
+        $this->app->forgetScopedInstances();
+        $this->get(route('albums.show', [$album, 'source' => 'spotify']))->assertOk()->assertSee('open-player-panel', false);
+    }
+
+    public function test_playing_the_spotify_side_starts_the_album_on_spotify_even_without_library_tracks(): void
+    {
+        $album = $this->album();
+        $album->metadata()->create(['key' => 'spotify_album_uri', 'value' => 'spotify:album:sa1', 'type' => 'string', 'source' => 'spotify']);
+        $api = \Mockery::mock(\SpotifyWebAPI\SpotifyWebAPI::class);
+        $api->shouldReceive('play')->once()->with('', ['context_uri' => 'spotify:album:sa1']);
+        $api->shouldReceive('shuffle')->once();
+        $this->connectSpotify($api);
+        $device = Device::factory()->create(['device_name' => 'Spotify Connect', 'device_driver' => \App\Integrations\Spotify\MusicPlayerDriver::class, 'device_driver_name' => 'Spotify']);
+
+        $this->post(route('albums.play', [$album, $device, 'source' => 'spotify']))->assertSessionHas('success');
+    }
 }
