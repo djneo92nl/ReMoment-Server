@@ -197,26 +197,32 @@
     border-radius: 16px;
     overflow: hidden;
     color: #fff;
-    background: var(--bar-bg, linear-gradient(100deg, #2a2e36 0%, #1c1f25 100%));
+    isolation: isolate;
+    background-color: rgba(255,255,255,0);
+    -webkit-backdrop-filter: blur(0px) saturate(1);
+    backdrop-filter: blur(0px) saturate(1);
     /* no real border: the gradient would tile into it and draw a light edge */
     box-shadow: 0 8px 30px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0);
-    transition: box-shadow 0.8s;
+    transition: box-shadow 1.5s ease, background-color 1.5s ease, -webkit-backdrop-filter 1.5s ease, backdrop-filter 1.5s ease;
   }
   /* idle: the bar turns into frosted glass over the blurred cover */
   body.ambient #bar {
-    background: rgba(255,255,255,0.07) !important;
+    background-color: rgba(255,255,255,0.07);
     -webkit-backdrop-filter: blur(28px) saturate(1.3);
     backdrop-filter: blur(28px) saturate(1.3);
     box-shadow: 0 8px 30px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.12);
   }
-  body.ambient #bar::before { background: transparent; }
-  #bar::before {
+  body.ambient #bar::after, body.ambient #bar::before { opacity: 0; }
+  /* two fading layers (a gradient can't be transitioned into the glass): the artwork gradient, and a scrim on it */
+  #bar::after, #bar::before {
     content: '';
     position: absolute;
     inset: 0;
-    background: rgba(0,0,0,0.45);
     pointer-events: none;
+    transition: opacity 1.5s ease;
   }
+  #bar::after { z-index: -2; background: var(--bar-bg, linear-gradient(100deg, #2a2e36 0%, #1c1f25 100%)); }
+  #bar::before { z-index: -1; background: rgba(0,0,0,0.45); }
   #bar > * { position: relative; }
 
   #controls { display: none; align-items: center; gap: 4px; flex: none; }
@@ -235,7 +241,7 @@
     align-items: center;
     justify-content: center;
     flex: none;
-    transition: background 0.15s, transform 0.1s, opacity 0.15s;
+    transition: background 0.15s, transform 0.1s, opacity 1s ease;
     -webkit-tap-highlight-color: transparent;
   }
   .ctrl-btn:hover { background: rgba(255,255,255,0.12); }
@@ -292,6 +298,7 @@
   #progress-bar-bg.has-wave #wf-base, #progress-bar-bg.has-wave #wf-played { display: block; }
   #progress-bar-bg.has-wave #progress-line { display: none; }
 
+  #vol-row { transition: opacity 1s ease; }
   #bar-right { display: flex; align-items: center; gap: 2px; margin-left: auto; flex: none; }
   #bar-right > .ctrl-btn { display: none; }
   #vol-row {
