@@ -1,98 +1,148 @@
 <x-app-layout>
-    <x-slot name="header">
-        <x-page-header title="Library" subtitle="What's new and what's playing">
-            <x-slot name="actions"><x-library-scope :scope="$scope" /></x-slot>
-        </x-page-header>
-    </x-slot>
+    @php
+        $chips = [
+            ['Albums', 'compact-disc', route('albums.index'), $counts['albums']],
+            ['Artists', 'microphone-lines', route('artists.index'), $counts['artists']],
+            ['Playlists', 'list-ul', route('playlists.index'), $counts['playlists']],
+            ['Genres', 'tags', route('genres.index'), $counts['genres']],
+            ['Radio', 'radio', route('radio.index'), $counts['radio']],
+            ['Favorites', 'heart', route('library.favorites'), $counts['favorites']],
+        ];
+    @endphp
 
-    <div class="space-y-8">
+    <div class="space-y-9">
+        <x-library-hero :hero="$hero" :scope="$scope" />
 
-        {{-- Genres of the library (canonical genres of the artists, tinted by the covers' colours) --}}
-        @if($genres->isNotEmpty())
-            <div>
-                <x-section-heading title="Browse by Genre" :href="route('genres.index')" link="All genres →" class="mb-3" />
-                <div class="flex flex-wrap gap-2.5">
-                    @foreach($genres as $genre)
-                        <x-chip :href="route('genres.show', $genre->slug)">
-                            <span class="w-2 h-2 rounded-full flex-none" style="background:{{ $genre->colors[0] ?? 'var(--genre-fallback)' }}"></span>
-                            {{ $genre->name }}
-                            <span class="text-xs text-gray-400 dark:text-gray-600">{{ number_format($genre->artists) }}</span>
-                        </x-chip>
-                    @endforeach
-                </div>
-            </div>
+        {{-- Where to go: the other library pages --}}
+        <nav class="no-scrollbar -mx-5 flex gap-2.5 overflow-x-auto px-5 sm:-mx-8 sm:px-8 lg:-mx-12 lg:px-12" aria-label="Library sections">
+            @foreach($chips as [$label, $icon, $href, $count])
+                <x-chip :href="$href" class="shrink-0 py-2">
+                    <i class="fa-solid fa-{{ $icon }} text-xs text-gray-400 dark:text-gray-500"></i>{{ $label }}
+                    @if($count > 0)<span class="text-xs text-gray-400 dark:text-gray-600">{{ number_format($count) }}</span>@endif
+                </x-chip>
+            @endforeach
+        </nav>
+
+        {{-- What was played last: albums, playlists and radio stations together --}}
+        @if($recentPlayed->isNotEmpty())
+            <x-shelf title="Recently played" :href="route('history.index')">
+                @foreach($recentPlayed as $item)
+                    @if($item['album'])
+                        <x-album-card :album="$item['album']" tinted />
+                    @elseif($item['playlist'])
+                        @php
+                            $choice = $playedArtwork[$item['playlist']->id] ?? null;
+                            $art = $choice ? \App\Domain\Artwork\LibraryItemArtwork::forUrl($choice['url'], $choice['sources']) : null;
+                        @endphp
+                        <x-media-card :href="route('playlists.show', $item['playlist'])" :src="$art['proxy_320'] ?? null" :colors="$art['colors'] ?? null"
+                                      :title="$item['playlist']->name" :subtitle="'Playlist · '.number_format($item['playlist']->tracks_count).' '.Str::plural('track', $item['playlist']->tracks_count)"
+                                      icon="fa-solid fa-list-ul" :play="\App\Support\DeviceAction::template('playlists.play', ['playlist' => $item['playlist']])" />
+                    @else
+                        @php $art = \App\Domain\Artwork\LibraryItemArtwork::forUrl($item['station']->image_url); @endphp
+                        <x-media-card :href="route('radio.index')" :src="$art['proxy_320'] ?? null" :colors="$art['colors'] ?? null"
+                                      :title="$item['station']->name" subtitle="Radio" icon="fa-solid fa-radio"
+                                      :play="\App\Support\DeviceAction::template('radio.play', ['radio' => $item['station']])" />
+                    @endif
+                @endforeach
+            </x-shelf>
         @endif
 
-        {{-- Recently added albums --}}
-        <div>
-            <x-section-heading title="Recently Added" :href="route('albums.index', ['sort' => 'recent'])" link="All albums →" />
+        @if($recentAdded->isNotEmpty())
+            <x-shelf title="Recently added" :href="route('albums.index', ['sort' => 'recent'])">
+                @foreach($recentAdded as $album)
+                    <x-album-card :album="$album" tinted />
+                @endforeach
+            </x-shelf>
+        @else
+            <x-empty-state icon="compact-disc" text="No albums yet — start listening to build your library" />
+        @endif
 
-            @if($recentAlbums->isEmpty())
-                <x-empty-state icon="compact-disc" text="No albums yet — start listening to build your library" />
-            @else
-                <x-album-grid>
-                    @foreach($recentAlbums as $album)
-                        <x-album-card :album="$album" detail />
-                    @endforeach
-                </x-album-grid>
-            @endif
-        </div>
+        @if($topArtists->isNotEmpty())
+            <x-shelf title="Most played artists" :href="route('artists.index', ['sort' => 'plays'])">
+                @foreach($topArtists as $artist)
+                    <x-artist-card :artist="$artist" round />
+                @endforeach
+            </x-shelf>
+        @endif
+
+        @if($playlists->isNotEmpty())
+            <x-shelf title="Playlists" :href="route('playlists.index')">
+                @foreach($playlists as $playlist)
+                    @php
+                        $choice = $playlistArtwork[$playlist->id] ?? null;
+                        $art = $choice ? \App\Domain\Artwork\LibraryItemArtwork::forUrl($choice['url'], $choice['sources']) : null;
+                    @endphp
+                    <x-media-card :href="route('playlists.show', $playlist)" :src="$art['proxy_320'] ?? null" :colors="$art['colors'] ?? null"
+                                  :title="$playlist->name" :subtitle="number_format($playlist->tracks_count).' '.Str::plural('track', $playlist->tracks_count)"
+                                  icon="fa-solid fa-list-ul" :play="\App\Support\DeviceAction::template('playlists.play', ['playlist' => $playlist])" />
+                @endforeach
+            </x-shelf>
+        @endif
+
+        @if($genres->isNotEmpty())
+            <x-shelf title="Genres" :href="route('genres.index')">
+                @foreach($genres as $genre)
+                    <x-genre-tile :genre="$genre" :albums="$genreAlbums[$genre->id] ?? null" />
+                @endforeach
+            </x-shelf>
+        @endif
+
+        @if($favoriteAlbums->isNotEmpty())
+            <x-shelf title="Favorite albums" :href="route('library.favorites')">
+                @foreach($favoriteAlbums as $album)
+                    <x-album-card :album="$album" tinted />
+                @endforeach
+            </x-shelf>
+        @endif
+
+        @if($favoriteArtists->isNotEmpty())
+            <x-shelf title="Favorite artists" :href="route('library.favorites')">
+                @foreach($favoriteArtists as $artist)
+                    <x-artist-card :artist="$artist" round />
+                @endforeach
+            </x-shelf>
+        @endif
 
         {{-- Discover: what the enrichment says about what you could play next --}}
-        @if($similarArtists->isNotEmpty() || $sound['moods'] || $sound['tempos'] || $topRated->isNotEmpty())
-            <div class="space-y-6">
-                <x-section-heading title="Discover" class="mb-0" />
+        @if($similarArtists->isNotEmpty())
+            <x-shelf title="Similar to what you play most">
+                @foreach($similarArtists as $artist)
+                    <x-artist-card :artist="$artist" round />
+                @endforeach
+            </x-shelf>
+        @endif
 
-                @if($similarArtists->isNotEmpty())
-                    <div>
-                        <p class="text-xs text-gray-400 dark:text-gray-600 mb-3">Similar to what you play most <span class="opacity-70">(Last.fm)</span></p>
-                        <x-album-grid>
-                            @foreach($similarArtists as $artist)
-                                <x-artist-card :artist="$artist" />
+        @if($topRated->isNotEmpty())
+            <x-shelf title="Highest rated" :href="route('albums.index', ['sort' => 'rating'])">
+                @foreach($topRated as $album)
+                    <x-album-card :album="$album" tinted detail />
+                @endforeach
+            </x-shelf>
+        @endif
+
+        @if($sound['moods'] || $sound['tempos'])
+            <div class="grid gap-7 md:grid-cols-2">
+                @if($sound['moods'])
+                    <section>
+                        <h2 class="mb-3 text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">By mood</h2>
+                        <div class="flex flex-wrap gap-2.5">
+                            @foreach($sound['moods'] as $mood => $count)
+                                <x-chip :href="route('albums.index', ['mood' => $mood])">{{ ucfirst($mood) }} <span class="text-xs text-gray-400 dark:text-gray-600">{{ $count }}</span></x-chip>
                             @endforeach
-                        </x-album-grid>
-                    </div>
-                @endif
-
-                @if($sound['moods'] || $sound['tempos'])
-                    <div class="grid gap-6 md:grid-cols-2">
-                        @if($sound['moods'])
-                            <div>
-                                <p class="text-xs text-gray-400 dark:text-gray-600 mb-3">By mood <span class="opacity-70">(analysed own files)</span></p>
-                                <div class="flex flex-wrap gap-2.5">
-                                    @foreach($sound['moods'] as $mood => $count)
-                                        <x-chip :href="route('albums.index', ['mood' => $mood])">{{ ucfirst($mood) }} <span class="text-xs text-gray-400 dark:text-gray-600">{{ $count }}</span></x-chip>
-                                    @endforeach
-                                </div>
-                            </div>
-                        @endif
-                        @if($sound['tempos'])
-                            <div>
-                                <p class="text-xs text-gray-400 dark:text-gray-600 mb-3">By tempo <span class="opacity-70">(analysed own files)</span></p>
-                                <div class="flex flex-wrap gap-2.5">
-                                    @foreach(['slow' => 'Slow · under 90 BPM', 'steady' => 'Steady · 90–125', 'fast' => 'Fast · over 125'] as $key => $label)
-                                        @if(isset($sound['tempos'][$key]))
-                                            <x-chip :href="route('albums.index', ['tempo' => $key])">{{ $label }} <span class="text-xs text-gray-400 dark:text-gray-600">{{ $sound['tempos'][$key] }}</span></x-chip>
-                                        @endif
-                                    @endforeach
-                                </div>
-                            </div>
-                        @endif
-                    </div>
-                @endif
-
-                @if($topRated->isNotEmpty())
-                    <div>
-                        <div class="flex items-center justify-between mb-3">
-                            <p class="text-xs text-gray-400 dark:text-gray-600">Highest rated <span class="opacity-70">(TheAudioDB)</span></p>
-                            <a href="{{ route('albums.index', ['sort' => 'rating']) }}" class="text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors">More &rarr;</a>
                         </div>
-                        <x-album-grid>
-                            @foreach($topRated as $album)
-                                <x-album-card :album="$album" detail />
+                    </section>
+                @endif
+                @if($sound['tempos'])
+                    <section>
+                        <h2 class="mb-3 text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">By tempo</h2>
+                        <div class="flex flex-wrap gap-2.5">
+                            @foreach(['slow' => 'Slow · under 90 BPM', 'steady' => 'Steady · 90–125', 'fast' => 'Fast · over 125'] as $key => $label)
+                                @if(isset($sound['tempos'][$key]))
+                                    <x-chip :href="route('albums.index', ['tempo' => $key])">{{ $label }} <span class="text-xs text-gray-400 dark:text-gray-600">{{ $sound['tempos'][$key] }}</span></x-chip>
+                                @endif
                             @endforeach
-                        </x-album-grid>
-                    </div>
+                        </div>
+                    </section>
                 @endif
             </div>
         @endif
@@ -151,79 +201,5 @@
                 </div>
             </div>
         </x-card>
-
-        <div class="grid gap-6 lg:grid-cols-2">
-            {{-- Recently played --}}
-            <x-card class="p-6 md:p-8">
-                <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">Recently Played</h2>
-                @if($recentPlays->isEmpty())
-                    <p class="text-sm text-gray-400 dark:text-gray-600">Nothing played yet.</p>
-                @else
-                    <div class="space-y-3">
-                        @foreach($recentPlays as $play)
-                            @php $track = $play->track; @endphp
-                            <div class="flex items-center gap-3">
-                                <x-artwork-thumb
-                                    :src="$track?->images[0]['url'] ?? $track?->album?->images[0]['url'] ?? $play->image_url"
-                                    :colors="$track?->album?->colors"
-                                    :seed="$play->trackTitle().$play->id"
-                                    icon="fa-solid fa-music"
-                                    size="w-10 h-10"
-                                    rounded="rounded-xl"
-                                />
-                                <div class="flex-1 min-w-0">
-                                    @if($track?->album)
-                                        <a href="{{ route('albums.show', $track->album) }}#track-{{ $track->id }}" class="block text-sm text-gray-800 dark:text-gray-200 truncate hover:underline">{{ $track->name }}</a>
-                                    @else
-                                        <p class="text-sm text-gray-800 dark:text-gray-200 truncate">{{ $play->trackTitle() }}</p>
-                                    @endif
-                                    <p class="text-xs text-gray-400 dark:text-gray-600 truncate mt-0.5">
-                                        @if($track?->artist)
-                                            <a href="{{ route('artists.show', $track->artist) }}" class="hover:underline">{{ $track->artist->name }}</a>
-                                        @endif
-                                        @if(!$track?->artist)
-                                            {{ $play->artistTitle() }}
-                                        @endif
-                                        @if($play->device)
-                                            &middot; {{ $play->device->device_name }}
-                                        @endif
-                                    </p>
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                @endif
-            </x-card>
-
-            {{-- Top artists --}}
-            <x-card class="p-6 md:p-8">
-                <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">Top Artists</h2>
-                @if($topArtists->isEmpty())
-                    <p class="text-sm text-gray-400 dark:text-gray-600">No plays yet.</p>
-                @else
-                    <div class="space-y-3">
-                        @foreach($topArtists as $artist)
-                            @php($coverAlbum = $artist->coverAlbum())
-                            <a href="{{ route('artists.show', $artist) }}" class="flex items-center gap-3 group">
-                                <x-artwork-thumb
-                                    :src="$coverAlbum?->images[0]['url'] ?? null"
-                                    :colors="$coverAlbum?->colors"
-                                    :seed="$artist->name"
-                                    icon="fa-solid fa-microphone-lines"
-                                    size="w-10 h-10"
-                                    rounded="rounded-xl"
-                                />
-                                <div class="flex-1 min-w-0">
-                                    <p class="text-sm text-gray-800 dark:text-gray-200 truncate group-hover:underline">{{ $artist->name }}</p>
-                                    <p class="text-xs text-gray-400 dark:text-gray-600 mt-0.5">
-                                        {{ number_format($artist->plays_count) }} {{ Str::plural('play', $artist->plays_count) }}
-                                    </p>
-                                </div>
-                            </a>
-                        @endforeach
-                    </div>
-                @endif
-            </x-card>
-        </div>
     </div>
 </x-app-layout>

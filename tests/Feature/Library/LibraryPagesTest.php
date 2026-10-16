@@ -69,32 +69,26 @@ class LibraryPagesTest extends TestCase
         $this->get('/library')->assertOk()->assertSee('Parachutes');
     }
 
-    public function test_recently_played_links_track_to_its_album_and_artist(): void
+    public function test_recently_played_shelf_links_the_played_album(): void
     {
         $album = $this->release('Coldplay', 'Parachutes');
         $track = $album->tracks()->first();
-        $device = \App\Models\Device::factory()->create([
-            'device_name' => 'Speaker',
-            'ip_address' => '10.0.0.1',
-        ]);
+        $device = \App\Models\Device::factory()->create(['device_name' => 'Speaker', 'ip_address' => '10.0.0.1']);
         \App\Models\Play::create(['device_id' => $device->id, 'track_id' => $track->id, 'source_type' => 'dlna', 'played_at' => now()]);
 
-        $this->get('/library')
-            ->assertSee(route('albums.show', $album).'#track-'.$track->id, false)
-            ->assertSee(route('artists.show', $album->artist_id), false);
+        $page = $this->get('/library')->assertOk()->assertSee('Recently played');
+        $page->assertSee(route('albums.show', $album), false)->assertSee(route('artists.show', $album->artist_id), false);
     }
 
-    public function test_recently_played_includes_plays_of_tracks_not_in_the_library(): void
+    public function test_plays_of_tracks_not_in_the_library_stay_in_the_history_not_the_shelf(): void
     {
-        $device = \App\Models\Device::factory()->create([
-            'device_name' => 'Speaker',
-            'ip_address' => '10.0.0.1',
-        ]);
+        $device = \App\Models\Device::factory()->create(['device_name' => 'Speaker', 'ip_address' => '10.0.0.1']);
         \App\Models\Play::create([
             'device_id' => $device->id, 'track_name' => 'Stranger', 'artist_name' => 'Nobody',
             'image_url' => 'https://img.test/c.jpg', 'source_type' => 'spotify', 'played_at' => now(),
         ]);
 
-        $this->get('/library')->assertSee('Stranger')->assertSee('Nobody')->assertDontSee('https://img.test/c.jpg', false);
+        $this->get('/library')->assertOk()->assertDontSee('Stranger')->assertDontSee('https://img.test/c.jpg', false);
+        $this->get('/history')->assertOk()->assertSee('Stranger')->assertSee('Nobody')->assertDontSee('https://img.test/c.jpg', false);
     }
 }

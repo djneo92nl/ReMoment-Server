@@ -59,6 +59,21 @@ final class LibraryOverview
     }
 
     /**
+     * How many albums of the scope each of these genres has (the album's own or its artist's: whereGenre()), by genre id.
+     *
+     * @param  Collection<int, object{id: int, slug: string}>  $genres  topGenres()
+     * @return array<int, int>
+     */
+    public static function genreAlbumCounts(array $hidden, Collection $genres): array
+    {
+        return Cache::remember('library:genre-albums:'.self::key($hidden).':'.md5($genres->pluck('id')->join(',')), self::TTL, function () use ($hidden, $genres) {
+            return $genres->mapWithKeys(fn ($genre) => [
+                $genre->id => self::whereGenre(self::albums($hidden), $genre->slug)->count(),
+            ])->all();
+        });
+    }
+
+    /**
      * Totals and completeness of the scope.
      *
      * @return array{artists: int, albums: int, tracks: int, hours: float, decades: array<string, int>, coverage: list<array{label: string, have: int, of: int}>}
@@ -119,7 +134,7 @@ final class LibraryOverview
             ->whereIn('artists.name', $names)
             ->whereNotIn('artists.id', $topArtists->pluck('id'))
             ->withCount(['albums', 'plays'])
-            ->with(['albums' => fn ($q) => $q->withCount('plays')->orderByDesc('plays_count')->orderByDesc('created_at')])
+            ->with(['metadata' => fn ($q) => $q->whereIn('key', Artist::PHOTO_METADATA), 'albums' => fn ($q) => $q->withCount('plays')->orderByDesc('plays_count')->orderByDesc('created_at')])
             ->orderByDesc('plays_count')
             ->limit($limit)
             ->get();

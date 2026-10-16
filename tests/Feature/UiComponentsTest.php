@@ -98,7 +98,7 @@ class UiComponentsTest extends TestCase
     /** A shared component opened but never closed (or closed with </div>) renders as broken nesting that no page test notices. */
     public function test_every_view_closes_the_components_it_opens(): void
     {
-        $tags = ['x-card', 'x-table', 'x-empty-state', 'x-alert', 'x-page-header', 'x-badge', 'x-chip', 'x-primary-button', 'x-secondary-button', 'x-danger-button', 'x-select'];
+        $tags = ['x-card', 'x-table', 'x-empty-state', 'x-alert', 'x-page-header', 'x-badge', 'x-chip', 'x-shelf', 'x-media-card', 'x-primary-button', 'x-secondary-button', 'x-danger-button', 'x-select'];
         $problems = [];
 
         foreach (File::allFiles(resource_path('views')) as $file) {

@@ -1,6 +1,8 @@
-@props(['album', 'showPlays' => false, 'detail' => false])
+@props(['album', 'showPlays' => false, 'detail' => false, 'tinted' => false, 'quick' => null])
 
 @php
+    // `tinted`: a shelf card (fixed width, footer tinted by the cover, quick-play); otherwise a grid cell.
+    $quick ??= $tinted;
     $cover = \App\Domain\Artwork\LibraryItemArtwork::proxy(\App\Domain\Artwork\LibraryArtwork::coverUrl($album->images));
     // The enrichment (genres, release type and label, Last.fm listeners, the audio analysis of own files) only where the
     // list loaded it: `genreRelation`, the card metadata and `sound` (AlbumSound::attach).
@@ -19,8 +21,10 @@
     ])->filter()->implode(' · ');
 @endphp
 
-<x-card compact flush class="group min-w-0 transition-colors hover:border-gray-300 dark:hover:border-stone-600">
-    <a href="{{ route('albums.show', $album) }}" class="block relative aspect-square">
+<x-card compact flush class="group {{ $tinted ? 'tint w-40 shrink-0 snap-start' : 'min-w-0 transition-colors hover:border-gray-300 dark:hover:border-stone-600' }}"
+        style="{{ $tinted ? \App\Domain\Artwork\ArtworkTint::style($album->colors) : '' }}">
+    <div class="relative aspect-square">
+    <a href="{{ route('albums.show', $album) }}" class="block h-full">
         <x-artwork-thumb
             :src="$cover"
             :colors="$album->colors"
@@ -37,13 +41,17 @@
             <x-fav-badge />
         @endif
     </a>
+    @if($quick)
+        <x-quick-play :action="\App\Support\DeviceAction::template('albums.play', ['album' => $album])" />
+    @endif
+    </div>
     <div class="px-2.5 py-2">
-        <a href="{{ route('albums.show', $album) }}" class="block text-[13px] font-medium leading-tight text-gray-900 dark:text-gray-100 truncate hover:underline" title="{{ $album->name }}">{{ $album->name }}</a>
+        <a href="{{ route('albums.show', $album) }}" class="block text-[13px] font-medium leading-tight {{ $tinted ? '' : 'text-gray-900 dark:text-gray-100' }} truncate hover:underline" title="{{ $album->name }}">{{ $album->name }}</a>
         @if($album->artist)
-            <a href="{{ route('artists.show', $album->artist) }}" class="block text-xs leading-tight text-gray-500 truncate hover:underline mt-0.5" title="{{ $album->artist->name }}">{{ $album->artist->name }}</a>
+            <a href="{{ route('artists.show', $album->artist) }}" class="block text-xs leading-tight {{ $tinted ? 'tint-muted' : 'text-gray-500' }} truncate hover:underline mt-0.5" title="{{ $album->artist->name }}">{{ $album->artist->name }}</a>
         @endif
         @if($meta !== '')
-            <p class="text-[11px] leading-tight text-gray-400 dark:text-gray-600 truncate mt-0.5" title="{{ $meta }}">{{ $meta }}</p>
+            <p class="text-[11px] leading-tight {{ $tinted ? 'tint-muted' : 'text-gray-400 dark:text-gray-600' }} truncate mt-0.5" title="{{ $meta }}">{{ $meta }}</p>
         @endif
         @if($genres)
             <div class="flex flex-wrap gap-1 mt-1.5">

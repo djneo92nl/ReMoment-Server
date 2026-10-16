@@ -46,7 +46,8 @@ docs/
   frontend/
     receiver.md             /receiver view: JS globals, DOM structure, browser targets
     player-bar.md           Sticky bottom player: pinned device cookie, <x-play-button> default play target
-    components.md           Shared Blade components (x-card, x-page-header, x-alert, x-badge, x-empty-state, x-table, nav) and their props; rules in DESIGN.md at the repo root
+    components.md           Shared Blade components (x-card, x-page-header, x-alert, x-badge, x-empty-state, x-table, x-shelf, nav ...) and their props; rules in DESIGN.md at the repo root
+    library.md              /library hub: LibraryHome data, shelves, shuffle, favourites, tinted cards (ArtworkTint)
 ```
 
 When adding a significant feature, add a matching doc in the relevant subfolder (`api/` for new REST endpoints, `architecture/` for server-side systems, `frontend/` for complex UI pages).
@@ -735,6 +736,7 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 - `/stats` — listening statistics (top artists, devices, hourly heatmap)
 - `/multiroom` — multiroom session management and presets
 - `/receiver` — full-screen now-playing display; fetches `GET /api/devices`, lets user pick device (or auto-selects if only one); re-fetches `GET /api/devices/{id}` on MQTT push (polling every 3s without a broker) and supports play/pause/next/previous, seek and mute via the REST API. Accepts `?device={id}` query parameter to skip the picker.
+- `/library` — listening hub: hero + Shuffle, section chips, shelves (recently played/added, most played artists, playlists, genres, favourites, discover), library at a glance (see `docs/frontend/library.md`); `/library/favorites`
 - `/artists` — artist library browser
 - `/albums/{id}` — album detail with track listing
 - `/settings` — overview of listeners, MQTT config

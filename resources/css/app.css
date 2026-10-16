@@ -49,3 +49,28 @@
     .player-center { flex: 0 0 auto !important; }
     .player-progress { display: none !important; }
 }
+
+/* A card tinted by its cover (App\Domain\Artwork\ArtworkTint sets --tint-* and --ink-* inline; no tint = plain surface).
+   Light mode: pastel; dark mode: deep. The page follows prefers-color-scheme. */
+.tint {
+    background: var(--tint-light, #ffffff);
+    color: var(--ink-light, #1c1917);
+    border-color: transparent;
+}
+@media (prefers-color-scheme: dark) {
+    .tint {
+        background: var(--tint-dark, #1c1917);
+        color: var(--ink-dark, #f5f5f4);
+    }
+}
+.tint .tint-muted { opacity: .7; }
+
+/* Library hub (DESIGN.md §10): shelves scroll sideways without a scrollbar; the hero fades from the cover tint. */
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+.tint-hero { background: linear-gradient(115deg, var(--tint-light, #f3f4f6) 0%, transparent 80%); }
+@media (prefers-color-scheme: dark) {
+    .tint-hero { background: linear-gradient(115deg, var(--tint-dark, #292524) 0%, transparent 80%); }
+}
+.hero-collage { -webkit-mask-image: linear-gradient(to left, #000 35%, transparent); mask-image: linear-gradient(to left, #000 35%, transparent); }

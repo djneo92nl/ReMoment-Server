@@ -80,7 +80,7 @@ class LibraryEnrichmentViewTest extends TestCase
         Enrichment::save($a->artist, 'similar_artists', json_encode(['Cousin', 'Nobody']), 'json', Enrichment::LASTFM);
 
         $this->get('/library')->assertOk()
-            ->assertSee('Browse by Genre')->assertSee('Trip Hop')
+            ->assertSee('Genres')->assertSee('Trip Hop')
             ->assertSee('Library at a Glance')->assertSee('1990s')->assertSee('2010s')
             ->assertSee('Similar to what you play most')->assertSee('Cousin')
             ->assertSee('By mood')->assertSee('Party')->assertSee('Sad')
@@ -94,7 +94,7 @@ class LibraryEnrichmentViewTest extends TestCase
         $this->album('Band', 'Plain');
 
         $this->get('/library')->assertOk()
-            ->assertDontSee('Browse by Genre')->assertDontSee('Discover')->assertDontSee('By mood')->assertSee('Library at a Glance');
+            ->assertDontSee('Trip Hop')->assertDontSee('Highest rated')->assertDontSee('Similar to what you play most')->assertDontSee('By mood')->assertSee('Library at a Glance');
     }
 
     public function test_the_albums_list_filters_by_genre_mood_and_tempo_and_sorts_by_rating(): void

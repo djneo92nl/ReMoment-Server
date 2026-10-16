@@ -8,6 +8,8 @@ A calm household control panel, not a streaming app. Quiet stone neutrals, gener
 
 Not Spotify, not a template: no hero banners, no centred marketing layouts, no decorative icons-in-circles. Every element earns its place by being something you can read or operate.
 
+**Exception: the library hub.** `/library` takes its look from the native app: a hero with a tilted cover collage, a chip row, and sideways shelves of cards tinted by their cover (§10). Artwork-derived colour is allowed as a surface there, as on the player surfaces; everything else about the page follows this document.
+
 ## 2. Colour roles
 
 Neutral scale is **stone** in dark, **gray** in light. Do not mix `gray-*` into dark variants.
@@ -81,3 +83,15 @@ Mobile first at 375px, no horizontal page scroll. Breakpoint `md` (768px) switch
 ## 9. Agent prompt guide
 
 > Read `DESIGN.md`. Build/modify the view using existing `x-*` components; stone dark / gray light; radius scale only; no hex literals; reuse `<x-page-header>`, `<x-card>`, `<x-alert>`. Before finishing, run the pre-flight: light+dark parity, contrast, focus/hover/disabled states, 375px no horizontal scroll, nothing hidden behind the sticky player bar, no placeholder or half-migrated markup.
+
+## 10. Library hub (`/library`)
+
+Dark is the reference (the app is dark); light must hold the same hierarchy.
+
+- **Hero** (`<x-library-hero>`): the scope's name in a round icon tile, `N albums · N artists · N playlists`, a Shuffle pill, and a tilted collage of the newest covers that fades out to the left. The background is the first cover's tint fading into the page (`.tint-hero`).
+- **Chips** (`<x-chip>`): one scrolling row linking to Albums, Artists, Playlists, Genres, Radio, Favorites, with counts.
+- **Shelves** (`<x-shelf>`): a bold `text-xl` heading (a link with `›` when it has a destination) over a sideways scroller that bleeds to the page edges, snap points, no scrollbar. Cards are fixed width (`w-40`, artists `w-36`, genre tiles `w-44`).
+- **Tinted cards:** `ArtworkTint` turns a cover's first colour into two surfaces, deep for dark mode and pastel for light mode, plus an ink that always reaches AA contrast (the tint is nudged until it does). The `.tint` class in `app.css` picks the variant from `prefers-color-scheme`; a cover without colours keeps the plain surface. Applies to album cards (`tinted`), `<x-media-card>` (playlists, radio, mixed recents) and `<x-genre-tile>`.
+- **Quick play** (`<x-quick-play>`): a white round button on a cover. Pinned player: it posts to the item's play route; none pinned: it opens the player picker. Shown on hover/focus, always on touch screens.
+- Artists are round photos with two lines of text, no card. Favourites and "Highest rated" keep the fav star and the enrichment details respectively.
+- Heading sizes here are the one place `text-xl` section headings replace the small uppercase label (§3); the Library at a Glance block keeps the label style.

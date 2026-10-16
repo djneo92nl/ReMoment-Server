@@ -115,6 +115,9 @@ class Artist extends Model
         return static::query()->whereIn('name', $names)->get()->keyBy('name');
     }
 
+    /** Metadata keys photoUrl() reads: eager load just these for a list of artist cards (ReadsMetadata uses the loaded relation). */
+    public const PHOTO_METADATA = ['images', 'spotify_image'];
+
     /** The artist's own photo: TheAudioDB's, else Spotify's; null when neither is known. */
     public function photoUrl(): ?string
     {

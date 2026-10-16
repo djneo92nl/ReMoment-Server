@@ -2,56 +2,63 @@
 
 namespace App\Http\Controllers;
 
-use App\Domain\Library\AlbumSound;
+use App\Domain\Artwork\LibraryItemArtwork;
 use App\Domain\Library\LeadingSource;
-use App\Domain\Library\LibraryOverview;
+use App\Domain\Library\LibraryHome;
+use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\LibrarySources;
+use App\Domain\Library\RandomAlbum;
+use App\Http\Controllers\Concerns\FlashesLibraryPlayback;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
-use App\Models\Play;
+use App\Support\SelectedDevice;
 use Illuminate\Http\Request;
 
 class LibraryController extends Controller
 {
+    use FlashesLibraryPlayback;
+
     public function index(Request $request)
+    {
+        $scope = LeadingSource::forRequest($request);
+
+        return view('library.index', LibraryHome::build($scope, LeadingSource::hidden($scope)) + ['scope' => $scope]);
+    }
+
+    /** The hero's Shuffle: a random album of the scope, shuffled, on the player pinned in this browser. */
+    public function shuffle(Request $request, LibraryPlayback $library)
+    {
+        $device = app(SelectedDevice::class)->device();
+        if ($device === null) {
+            return back()->with('error', 'Pick a player in the bar below first.');
+        }
+
+        $album = RandomAlbum::pick(LeadingSource::hidden(LeadingSource::forRequest($request)), $device);
+        if ($album === null) {
+            return back()->with('error', 'There are no albums in this library yet.');
+        }
+
+        return $this->flashPlayback(fn () => $library->playAlbum($device, $album, shuffle: true), $device, $album->name);
+    }
+
+    /** Favourite albums and artists of the scope, most recently favourited first. */
+    public function favorites(Request $request)
     {
         $scope = LeadingSource::forRequest($request);
         $hidden = LeadingSource::hidden($scope);
 
-        $recentAlbums = LibrarySources::albums(Album::query(), $hidden)
-            ->whereHas('tracks')
-            ->with(['artist', 'genreRelation', 'metadata' => fn ($q) => $q->whereIn('key', Album::CARD_METADATA)])
-            ->withSourceFlags()
-            ->latest()
-            ->limit(18)
-            ->get();
-        AlbumSound::attach($recentAlbums);
+        $albums = LibrarySources::albums(Album::query()->whereNotNull('favorited_at'), $hidden)
+            ->with('artist')->orderByDesc('favorited_at')->orderByDesc('id')->get();
+        $artists = LibrarySources::artists(Artist::query()->whereNotNull('favorited_at'), $hidden)
+            ->withCount(['albums' => fn ($q) => LibrarySources::albums($q, $hidden), 'plays'])
+            ->with(['metadata' => fn ($q) => $q->whereIn('key', Artist::PHOTO_METADATA), 'albums' => fn ($q) => LibrarySources::albums($q, $hidden)->withCount('plays')->orderByDesc('plays_count')->orderByDesc('created_at')])
+            ->orderByDesc('favorited_at')->get();
 
-        $recentPlays = Play::where(fn ($q) => $q->whereNotNull('track_id')->orWhereNotNull('track_name'))
-            ->with(['track.album', 'track.artist', 'device'])
-            ->orderByDesc('played_at')
-            ->limit(10)
-            ->get();
+        LibraryItemArtwork::preload([
+            ...LibraryItemArtwork::urlsOfAlbums($albums),
+            ...LibraryItemArtwork::urlsOfAlbums($artists->map->coverAlbum()),
+        ]);
 
-        $topArtists = LibrarySources::artists(Artist::query(), $hidden)
-            ->whereHas('plays')
-            ->withCount('plays')
-            ->with(['albums' => fn ($q) => $q->withCount('plays')->orderByDesc('plays_count')->orderByDesc('created_at')])
-            ->orderByDesc('plays_count')
-            ->limit(10)
-            ->get();
-
-        $genres = LibraryOverview::topGenres($hidden);
-        $glance = LibraryOverview::glance($hidden);
-        $similarArtists = LibraryOverview::similarArtists($hidden, $topArtists);
-        $sound = LibraryOverview::soundBuckets($hidden);
-        $topRated = LibraryOverview::topRated($hidden)
-            ->with(['artist', 'genreRelation', 'metadata' => fn ($q) => $q->whereIn('key', Album::CARD_METADATA)])
-            ->withSourceFlags()
-            ->limit(6)
-            ->get();
-        AlbumSound::attach($topRated);
-
-        return view('library.index', compact('recentAlbums', 'recentPlays', 'topArtists', 'scope', 'genres', 'glance', 'similarArtists', 'sound', 'topRated'));
+        return view('library.favorites', compact('albums', 'artists', 'scope'));
     }
 }
