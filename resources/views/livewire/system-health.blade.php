@@ -12,7 +12,7 @@
 
     {{-- Background processes --}}
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6">
+        <x-card class="p-6">
             <div class="text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-3">Supervisor</div>
             @if($supervisor === null)
                 <span class="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500"><span class="w-2 h-2 rounded-full bg-gray-400"></span>Unknown</span>
@@ -21,9 +21,9 @@
                 {!! $badge($supervisor, 'Running', 'Not running') !!}
                 <div class="mt-2 text-xs text-gray-500">Keeps the queue, scheduler and listeners alive</div>
             @endif
-        </div>
+        </x-card>
 
-        <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6">
+        <x-card class="p-6">
             <div class="text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-3">MQTT broker</div>
             {!! $badge($broker['ok'], 'Reachable', 'Unreachable') !!}
             <div class="mt-2 text-xs font-mono text-gray-500">{{ $broker['address'] }}</div>
@@ -31,17 +31,17 @@
             @if($broker['error'])
                 <div class="mt-1 text-xs text-red-500">{{ $broker['error'] }}</div>
             @endif
-        </div>
+        </x-card>
 
-        <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6">
+        <x-card class="p-6">
             <div class="text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-3">Scheduler</div>
             {!! $badge($scheduler['ok'], 'Running', $scheduler['last'] ? 'Stalled' : 'Never ran') !!}
             <div class="mt-2 text-xs text-gray-500">
                 Last beat {{ $scheduler['last']?->diffForHumans() ?? '—' }}
             </div>
-        </div>
+        </x-card>
 
-        <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6">
+        <x-card class="p-6">
             <div class="text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-3">Queue worker</div>
             @if(!$scheduler['ok'])
                 <span class="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500"><span class="w-2 h-2 rounded-full bg-gray-400"></span>Unknown</span>
@@ -53,23 +53,22 @@
             <div class="mt-1 text-xs text-gray-500">
                 {{ $queue['pending'] ?? '?' }} pending · {{ $queue['failed'] ?? '?' }} failed
             </div>
-        </div>
+        </x-card>
     </div>
 
     @if($queue['last_failure'])
-        <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl px-6 py-4 text-sm text-red-800 dark:text-red-300">
+        <x-alert type="error">
             <div class="font-medium">
-                <i class="fa-solid fa-triangle-exclamation mr-2"></i>
                 Last failed job: {{ $queue['last_failure']['job'] }} · {{ $queue['last_failure']['at']->diffForHumans() }}
             </div>
             <div class="mt-1 font-mono text-xs break-all">{{ \Illuminate\Support\Str::limit($queue['last_failure']['message'], 300) }}</div>
             <div class="mt-2 text-xs">Retry with <code class="font-mono">php artisan queue:retry all</code></div>
-        </div>
+        </x-alert>
     @endif
 
     {{-- Pending jobs --}}
     @if($pendingJobs)
-        <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 overflow-hidden">
+        <x-card flush>
             <div class="px-8 py-5 border-b border-gray-100 dark:border-stone-800 flex items-center justify-between">
                 <h2 class="text-base font-medium text-gray-900 dark:text-gray-100">Pending jobs</h2>
                 <span class="text-sm text-gray-500">{{ number_format($pendingJobs['total']) }} in queue</span>
@@ -93,11 +92,11 @@
                     Grouped from the oldest {{ number_format($pendingJobs['scanned']) }} of {{ number_format($pendingJobs['total']) }} jobs.
                 </div>
             @endif
-        </div>
+        </x-card>
     @endif
 
     {{-- Devices --}}
-    <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 overflow-hidden">
+    <x-card flush>
         <div class="px-8 py-5 border-b border-gray-100 dark:border-stone-800">
             <h2 class="text-base font-medium text-gray-900 dark:text-gray-100">Devices</h2>
         </div>
@@ -129,5 +128,5 @@
         @empty
             <div class="px-8 py-12 text-center text-sm text-gray-500">No devices registered yet.</div>
         @endforelse
-    </div>
+    </x-card>
 </div>

@@ -1,9 +1,7 @@
 <div class="space-y-6">
 
     @if(session('success'))
-        <div class="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-2xl px-6 py-4 text-sm text-emerald-800 dark:text-emerald-300">
-            <i class="fa-solid fa-circle-check mr-2"></i>{{ session('success') }}
-        </div>
+        <x-alert type="success">{{ session('success') }}</x-alert>
     @endif
 
     {{-- Pending registrations --}}
@@ -36,7 +34,7 @@
                                         <span class="text-xs text-gray-400 dark:text-gray-600 font-mono">{{ $client->hardware_id }}</span>
                                     @endif
                                 </div>
-                                <div class="mt-1 flex flex-wrap gap-3 text-xs text-gray-500 dark:text-gray-500">
+                                <div class="mt-1 flex flex-wrap gap-3 text-xs text-gray-500">
                                     @if($client->firmware_version)
                                         <span>fw {{ $client->firmware_version }}</span>
                                     @endif
@@ -72,24 +70,21 @@
                             <div class="bg-white dark:bg-stone-900 rounded-2xl border border-gray-200 dark:border-stone-700 p-5 space-y-4">
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
-                                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-500 mb-1.5">Name <span class="font-normal">(optional)</span></label>
-                                        <input type="text" wire:model="approveName" placeholder="e.g. Kitchen Controller"
-                                               class="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                                        <x-input-label class="mb-1.5">Name <span class="font-normal">(optional)</span></x-input-label>
+                                        <x-text-input size="sm" type="text" wire:model="approveName" placeholder="e.g. Kitchen Controller" class="w-full" />
                                     </div>
                                     <div>
-                                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-500 mb-1.5">Client Type</label>
-                                        <select wire:model="approveType"
-                                                class="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 rounded-xl text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                        <x-input-label class="mb-1.5">Client Type</x-input-label>
+                                        <x-select size="sm" wire:model="approveType" class="w-full">
                                             <option value="single">Single device (ESP8266 / simple)</option>
                                             <option value="multi">Multi device (ESP32-S3 / Pi / software)</option>
-                                        </select>
+                                        </x-select>
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-3 pt-1">
-                                    <button wire:click="approve"
-                                            class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-xl transition-colors">
+                                    <x-primary-button size="md" wire:click="approve">
                                         Approve &amp; Issue Token
-                                    </button>
+                                    </x-primary-button>
                                     <button wire:click="$set('approvingId', null)"
                                             class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
                                         Cancel
@@ -105,10 +100,10 @@
 
     {{-- Approved clients --}}
     @php($approved = $clients->where('status', 'approved'))
-    <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 overflow-hidden">
+    <x-card flush>
         <div class="px-8 py-6 border-b border-gray-100 dark:border-stone-800">
             <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">Registered Clients</h2>
-            <p class="text-sm text-gray-500 dark:text-gray-500 mt-0.5">{{ $approved->count() }} {{ $approved->count() === 1 ? 'client' : 'clients' }} approved</p>
+            <p class="text-sm text-gray-500 mt-0.5">{{ $approved->count() }} {{ $approved->count() === 1 ? 'client' : 'clients' }} approved</p>
         </div>
 
         @if($approved->isEmpty())
@@ -123,17 +118,16 @@
                             <div class="flex flex-wrap items-start justify-between gap-4">
                                 <div class="min-w-0">
                                     <div class="flex items-center gap-2.5 flex-wrap">
-                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium
-                                            {{ $client->type === 'single' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400' : 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400' }}">
+                                        <x-badge :variant="$client->type === 'single' ? 'neutral' : 'outline'">
                                             <i class="fa-solid {{ $client->type === 'single' ? 'fa-microchip' : 'fa-layer-group' }} text-[10px]"></i>
                                             {{ $client->type }}
-                                        </span>
+                                        </x-badge>
                                         <span class="text-base font-medium text-gray-900 dark:text-gray-100">
                                             {{ $client->name ?? "Client #{$client->id}" }}
                                         </span>
                                     </div>
 
-                                    <div class="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-500">
+                                    <div class="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
                                         @if($client->ip_address)
                                             <span class="font-mono">{{ $client->ip_address }}</span>
                                         @endif
@@ -159,10 +153,10 @@
                                     <div class="mt-2 flex flex-wrap gap-2 items-center">
                                         @if($client->devices->isNotEmpty())
                                             @foreach($client->devices as $device)
-                                                <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 dark:bg-stone-800 rounded-lg text-xs text-gray-600 dark:text-gray-400">
+                                                <x-badge>
                                                     <i class="fa-solid fa-tv text-[9px] opacity-60"></i>
                                                     {{ $device->device_name }}
-                                                </span>
+                                                </x-badge>
                                             @endforeach
                                         @elseif($client->type === 'multi')
                                             <span class="text-xs text-gray-400 dark:text-gray-600 italic">All devices</span>
@@ -206,22 +200,20 @@
                             <div class="space-y-5">
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
-                                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-500 mb-1.5">Name</label>
-                                        <input type="text" wire:model="editName" placeholder="e.g. Kitchen Controller"
-                                               class="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                                        <x-input-label class="mb-1.5">Name</x-input-label>
+                                        <x-text-input size="sm" type="text" wire:model="editName" placeholder="e.g. Kitchen Controller" class="w-full" />
                                     </div>
                                     <div>
-                                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-500 mb-1.5">Type</label>
-                                        <select wire:model.live="editType"
-                                                class="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 rounded-xl text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                        <x-input-label class="mb-1.5">Type</x-input-label>
+                                        <x-select size="sm" wire:model.live="editType" class="w-full">
                                             <option value="single">Single device</option>
                                             <option value="multi">Multi device</option>
-                                        </select>
+                                        </x-select>
                                     </div>
                                 </div>
 
                                 <div>
-                                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-500 mb-2">
+                                    <label class="block text-xs font-medium text-gray-500 mb-2">
                                         Assigned Devices
                                         @if($editType === 'single')
                                             <span class="font-normal text-gray-400 dark:text-gray-600">(pick one)</span>
@@ -232,10 +224,10 @@
                                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                                         @foreach($allDevices as $device)
                                             <label class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border cursor-pointer transition-colors
-                                                {{ in_array($device->id, $editDeviceIds) ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50/50 dark:bg-indigo-900/10' : 'border-gray-200 dark:border-stone-700 hover:border-gray-300 dark:hover:border-stone-600' }}">
+                                                {{ in_array($device->id, $editDeviceIds) ? 'border-gray-900 dark:border-stone-500 bg-gray-50 dark:bg-stone-800/50' : 'border-gray-200 dark:border-stone-700 hover:border-gray-300 dark:hover:border-stone-600' }}">
                                                 <input type="checkbox" wire:model.live="editDeviceIds"
                                                        value="{{ $device->id }}"
-                                                       class="rounded border-gray-300 dark:border-stone-600 text-indigo-600 focus:ring-indigo-500" />
+                                                       class="rounded border-gray-300 dark:border-stone-600 text-gray-900 dark:text-stone-500 focus:ring-gray-400" />
                                                 <span class="text-sm text-gray-700 dark:text-gray-300">{{ $device->device_name }}</span>
                                             </label>
                                         @endforeach
@@ -246,17 +238,17 @@
                                 </div>
 
                                 <div>
-                                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-500 mb-2">
+                                    <label class="block text-xs font-medium text-gray-500 mb-2">
                                         Hide from library
                                         <span class="font-normal text-gray-400 dark:text-gray-600">(sources this client doesn't see; requests carry <code>?client=</code> with its API token)</span>
                                     </label>
                                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                                         @foreach($librarySources as $key => $label)
                                             <label class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border cursor-pointer transition-colors
-                                                {{ in_array($key, $editHiddenSources) ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50/50 dark:bg-indigo-900/10' : 'border-gray-200 dark:border-stone-700 hover:border-gray-300 dark:hover:border-stone-600' }}">
+                                                {{ in_array($key, $editHiddenSources) ? 'border-gray-900 dark:border-stone-500 bg-gray-50 dark:bg-stone-800/50' : 'border-gray-200 dark:border-stone-700 hover:border-gray-300 dark:hover:border-stone-600' }}">
                                                 <input type="checkbox" wire:model.live="editHiddenSources"
                                                        value="{{ $key }}"
-                                                       class="rounded border-gray-300 dark:border-stone-600 text-indigo-600 focus:ring-indigo-500" />
+                                                       class="rounded border-gray-300 dark:border-stone-600 text-gray-900 dark:text-stone-500 focus:ring-gray-400" />
                                                 <span class="text-sm text-gray-700 dark:text-gray-300">{{ $label }}</span>
                                             </label>
                                         @endforeach
@@ -264,10 +256,9 @@
                                 </div>
 
                                 <div class="flex items-center gap-3 pt-1">
-                                    <button wire:click="saveEdit"
-                                            class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-xl transition-colors">
+                                    <x-primary-button size="md" wire:click="saveEdit">
                                         Save
-                                    </button>
+                                    </x-primary-button>
                                     <button wire:click="cancelEdit"
                                             class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
                                         Cancel
@@ -279,12 +270,12 @@
                 @endforeach
             </div>
         @endif
-    </div>
+    </x-card>
 
     {{-- API reference --}}
-    <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8">
+    <x-card class="p-8">
         <h2 class="text-base font-medium text-gray-900 dark:text-gray-100 mb-4">Client API Reference</h2>
-        <div class="space-y-3 text-xs font-mono text-gray-500 dark:text-gray-500">
+        <div class="space-y-3 text-xs font-mono text-gray-500">
             <div class="flex flex-wrap gap-2 items-baseline">
                 <span class="text-emerald-600 dark:text-emerald-400 font-semibold">POST</span>
                 <span class="text-gray-700 dark:text-gray-300">/api/clients/register</span>
@@ -311,6 +302,6 @@
             Use <span class="font-mono">hardware_id</span> (MAC / chip ID) for idempotent re-registration on reboot.
             Clients should show the returned <span class="font-mono">pairing_code</span> on screen so it can be matched here before approving.
         </p>
-    </div>
+    </x-card>
 
 </div>

@@ -7,12 +7,9 @@
 
         <!-- Password -->
         <div>
-            <label for="password" class="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">
-                {{ __('Password') }}
-            </label>
-            <input id="password" type="password" name="password"
-                   class="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-stone-700 bg-gray-50 dark:bg-stone-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-stone-500 focus:border-transparent"
-                   required autofocus autocomplete="current-password" />
+            <x-input-label for="password" :value="__('Password')" class="mb-1.5" />
+            <x-text-input id="password" type="password" name="password" class="w-full"
+                          required autofocus autocomplete="current-password" />
             <x-input-error :messages="$errors->get('password')" class="mt-2" />
         </div>
 
@@ -26,10 +23,7 @@
         </div>
 
         <div class="mt-6 flex justify-end">
-            <button type="submit"
-                    class="px-5 py-2.5 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-sm font-medium rounded-xl hover:bg-gray-700 dark:hover:bg-white transition-colors">
-                {{ __('Sign in') }}
-            </button>
+            <x-primary-button>{{ __('Sign in') }}</x-primary-button>
         </div>
     </form>
 </x-guest-layout>

@@ -1,28 +1,23 @@
 <div class="space-y-6" @if($polling) wire:poll.2s @endif>
 
     @if(session('success'))
-        <div class="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-2xl px-6 py-4 text-sm text-emerald-800 dark:text-emerald-300">
-            <i class="fa-solid fa-circle-check mr-2"></i>{{ session('success') }}
-        </div>
+        <x-alert type="success">{{ session('success') }}</x-alert>
     @endif
     @if(session('error'))
-        <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl px-6 py-4 text-sm text-red-800 dark:text-red-300">
-            <i class="fa-solid fa-circle-exclamation mr-2"></i>{{ session('error') }}
-        </div>
+        <x-alert type="error">{{ session('error') }}</x-alert>
     @endif
 
-    <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 overflow-hidden">
+    <x-card flush>
         <div class="px-8 py-6 border-b border-gray-100 dark:border-stone-800 flex items-center justify-between gap-4">
             <div>
                 <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">Storage locations</h2>
-                <p class="text-sm text-gray-500 dark:text-gray-500 mt-0.5">
+                <p class="text-sm text-gray-500 mt-0.5">
                     The <strong>library</strong> location holds the organized files; an <strong>inbox</strong> location is where imports arrive.
                 </p>
             </div>
-            <button wire:click="newLocation" data-test="new-location"
-                    class="flex shrink-0 items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-sm font-medium transition-colors">
+            <x-primary-button size="md" wire:click="newLocation" data-test="new-location">
                 <i class="fa-solid fa-plus"></i><span class="hidden sm:inline">Add location</span>
-            </button>
+            </x-primary-button>
         </div>
 
         @if($editing !== null)
@@ -32,29 +27,29 @@
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                         <label class="block text-xs font-medium text-gray-500 mb-1.5">Name</label>
-                        <input type="text" wire:model="name" placeholder="e.g. Music NAS" class="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                        <x-text-input size="sm" type="text" wire:model="name" placeholder="e.g. Music NAS" class="w-full" />
                         @error('name')<p class="text-xs text-red-500 mt-1">{{ $message }}</p>@enderror
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-500 mb-1.5">Type</label>
-                        <select wire:model.live="driver" class="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <x-select size="sm" wire:model.live="driver" class="w-full">
                             <option value="local">Local or mounted folder</option>
                             <option value="s3">S3-compatible</option>
-                        </select>
+                        </x-select>
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-500 mb-1.5">Role</label>
-                        <select wire:model="role" class="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <x-select size="sm" wire:model="role" class="w-full">
                             <option value="library">Library (organized files)</option>
                             <option value="inbox">Inbox (files to import)</option>
-                        </select>
+                        </x-select>
                     </div>
                 </div>
 
                 @if($driver === 'local')
                     <div>
                         <label class="block text-xs font-medium text-gray-500 mb-1.5">Folder on the server</label>
-                        <input type="text" wire:model="root" placeholder="/mnt/music" class="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono" />
+                        <x-text-input size="sm" type="text" wire:model="root" placeholder="/mnt/music" class="w-full" />
                         @error('root')<p class="text-xs text-red-500 mt-1">{{ $message }}</p>@enderror
                         <p class="text-xs text-gray-400 dark:text-gray-600 mt-1">A NAS share works once the operating system has mounted it (SMB/NFS).</p>
                     </div>
@@ -62,28 +57,28 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1.5">Bucket</label>
-                            <input type="text" wire:model="bucket" class="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                            <x-text-input size="sm" type="text" wire:model="bucket" class="w-full" />
                             @error('bucket')<p class="text-xs text-red-500 mt-1">{{ $message }}</p>@enderror
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1.5">Folder in the bucket <span class="font-normal">(optional)</span></label>
-                            <input type="text" wire:model="prefix" placeholder="music" class="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                            <x-text-input size="sm" type="text" wire:model="prefix" placeholder="music" class="w-full" />
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1.5">Endpoint <span class="font-normal">(MinIO, B2, … leave empty for AWS)</span></label>
-                            <input type="text" wire:model="endpoint" placeholder="http://minio:9000" class="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                            <x-text-input size="sm" type="text" wire:model="endpoint" placeholder="http://minio:9000" class="w-full" />
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1.5">Region</label>
-                            <input type="text" wire:model="region" placeholder="us-east-1" class="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                            <x-text-input size="sm" type="text" wire:model="region" placeholder="us-east-1" class="w-full" />
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1.5">Access key</label>
-                            <input type="text" wire:model="key" autocomplete="off" placeholder="{{ is_int($editing) ? 'unchanged' : '' }}" class="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono" />
+                            <x-text-input size="sm" type="text" wire:model="key" autocomplete="off" placeholder="{{ is_int($editing) ? 'unchanged' : '' }}" class="w-full" />
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1.5">Secret key</label>
-                            <input type="password" wire:model="secret" autocomplete="new-password" placeholder="{{ is_int($editing) ? 'unchanged' : '' }}" class="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono" />
+                            <x-text-input size="sm" type="password" wire:model="secret" autocomplete="new-password" placeholder="{{ is_int($editing) ? 'unchanged' : '' }}" class="w-full" />
                         </div>
                     </div>
                     <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
@@ -93,7 +88,7 @@
                 @endif
 
                 <div class="flex items-center gap-3">
-                    <button wire:click="save" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-xl transition-colors">Save</button>
+                    <x-primary-button size="md" wire:click="save">Save</x-primary-button>
                     <button wire:click="cancel" class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">Cancel</button>
                 </div>
             </div>
@@ -103,7 +98,7 @@
         @if($locations->isEmpty())
             <div class="flex flex-col items-center justify-center py-16 text-center px-8">
                 <i class="fa-solid fa-hard-drive text-4xl text-gray-200 dark:text-stone-700 mb-4"></i>
-                <p class="text-gray-500 dark:text-gray-500">No storage locations yet.</p>
+                <p class="text-gray-500">No storage locations yet.</p>
                 <p class="text-xs text-gray-400 dark:text-gray-600 mt-1">Add the folder or bucket your music lives in.</p>
             </div>
         @else
@@ -113,7 +108,7 @@
                     <div class="px-8 py-5 flex flex-wrap items-center justify-between gap-4" data-test="location-{{ $location->id }}">
                         <div class="min-w-0">
                             <div class="flex items-center gap-2.5 flex-wrap">
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium {{ $location->role === 'library' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400' }}">
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-xl text-xs font-medium {{ $location->role === 'library' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400' }}">
                                     {{ $location->role }}
                                 </span>
                                 <span class="text-base font-medium text-gray-900 dark:text-gray-100">{{ $location->name }}</span>
@@ -154,9 +149,9 @@
                 @endforeach
             </div>
         @endif
-    </div>
+    </x-card>
 
-    <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 px-8 py-6 space-y-4">
+    <x-card class="px-8 py-6 space-y-4">
         <p class="text-sm font-medium text-gray-900 dark:text-gray-100"><i class="fa-solid fa-folder-tree mr-1.5 text-gray-400"></i>Library tasks</p>
         @foreach([
             ['import', 'Import inbox', 'Moves the audio files in the inbox into the library, organized by artist and album.', $importStatus, $hasInbox],
@@ -184,5 +179,5 @@
                 </button>
             </div>
         @endforeach
-    </div>
+    </x-card>
 </div>

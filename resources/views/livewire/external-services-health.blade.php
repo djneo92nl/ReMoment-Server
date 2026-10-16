@@ -4,7 +4,7 @@
     $label = ['ok' => 'OK', 'warning' => 'Warning', 'error' => 'Failing', 'disabled' => 'Not set up'];
 @endphp
 
-<div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 overflow-hidden">
+<x-card flush>
     <div class="px-8 py-5 border-b border-gray-100 dark:border-stone-800 flex items-center justify-between gap-4">
         <div>
             <h2 class="text-base font-medium text-gray-900 dark:text-gray-100">External services</h2>
@@ -17,10 +17,10 @@
                 @endif
             </div>
         </div>
-        <button wire:click="check" wire:loading.attr="disabled" class="px-4 py-2 rounded-xl text-sm font-medium bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900 disabled:opacity-50">
+        <x-primary-button size="md" type="button" wire:click="check" wire:loading.attr="disabled">
             <span wire:loading.remove wire:target="check"><i class="fa-solid fa-rotate mr-1.5"></i>Check now</span>
             <span wire:loading wire:target="check"><i class="fa-solid fa-spinner fa-spin mr-1.5"></i>Checking…</span>
-        </button>
+        </x-primary-button>
     </div>
 
     @forelse($groups as $group => $services)
@@ -37,4 +37,4 @@
     @empty
         <div class="px-8 py-6 text-sm text-gray-500">Press “Check now” to test every service and credential.</div>
     @endforelse
-</div>
+</x-card>

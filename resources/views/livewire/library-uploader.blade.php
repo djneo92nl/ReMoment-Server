@@ -4,12 +4,12 @@
 
     <div class="px-8 py-6 border-b border-gray-100 dark:border-stone-800">
         <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">Add music</h2>
-        <p class="text-sm text-gray-500 dark:text-gray-500 mt-0.5">
+        <p class="text-sm text-gray-500 mt-0.5">
             Drop audio files here. Each one is uploaded, its tags are read, it is copied into the library layout and its enrichment is queued.
         </p>
 
         <label class="mt-4 flex flex-col items-center justify-center gap-1 px-6 py-8 rounded-2xl border-2 border-dashed cursor-pointer text-sm transition-colors"
-               :class="over ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' : 'border-gray-200 dark:border-stone-700 text-gray-500 dark:text-gray-400 hover:border-indigo-400'"
+               :class="over ? 'border-gray-900 dark:border-stone-400 bg-gray-50 dark:bg-stone-800/50 text-gray-900 dark:text-gray-200' : 'border-gray-200 dark:border-stone-700 text-gray-500 dark:text-gray-400 hover:border-indigo-400'"
                x-on:dragover.prevent="over = true" x-on:dragleave.prevent="over = false" x-on:drop.prevent="over = false; add($event.dataTransfer.files)">
             <i class="fa-solid fa-cloud-arrow-up text-2xl"></i>
             <span>Drop files here or <span class="underline">choose files</span></span>

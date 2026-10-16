@@ -1,8 +1,6 @@
-<div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80" data-test="storage-files">
+<x-card data-test="storage-files">
     @php
-        $input = 'px-3 py-2 text-sm bg-gray-50 dark:bg-stone-800 border border-gray-200 dark:border-stone-700 rounded-xl text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500';
-        $chip = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium whitespace-nowrap';
-        $menuItem = 'block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-stone-700';
+                $menuItem = 'block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-stone-700';
     @endphp
 
     @if(session('files-success') || session('files-error'))
@@ -24,22 +22,22 @@
             </p>
         </div>
         <div class="mt-4 flex flex-wrap gap-3">
-            <input type="search" wire:model.live.debounce.300ms="search" placeholder="Search path…" data-test="file-search" class="flex-1 min-w-48 {{ $input }}" />
-            <select wire:model.live="locationId" class="{{ $input }}" data-test="location-select">
+            <x-text-input size="sm" type="search" wire:model.live.debounce.300ms="search" placeholder="Search path…" data-test="file-search" class="flex-1 min-w-48" />
+            <x-select size="sm" wire:model.live="locationId"  data-test="location-select">
                 @foreach($locations as $loc)<option value="{{ $loc->id }}" @selected($location && $location->id === $loc->id)>{{ $loc->name }}</option>@endforeach
-            </select>
-            <select wire:model.live="statusFilter" class="{{ $input }}" data-test="status-select">
+            </x-select>
+            <x-select size="sm" wire:model.live="statusFilter"  data-test="status-select">
                 <option value="">All files</option>
                 @foreach(\App\Livewire\StorageFiles::STATUSES as $value => $label)<option value="{{ $value }}">{{ $label }}</option>@endforeach
-            </select>
+            </x-select>
         </div>
 
         @if(!$flat && $location)
             <nav class="mt-4 flex flex-wrap items-center gap-1.5 text-sm" data-test="breadcrumbs">
-                <button wire:click="open('')" class="font-medium {{ $crumbs === [] ? 'text-gray-900 dark:text-gray-100' : 'text-indigo-600 dark:text-indigo-400 hover:underline' }}"><i class="fa-solid fa-hard-drive mr-1"></i>{{ $location->name }}</button>
+                <button wire:click="open('')" class="font-medium {{ $crumbs === [] ? 'text-gray-900 dark:text-gray-100' : 'text-gray-900 dark:text-gray-100 underline' }}"><i class="fa-solid fa-hard-drive mr-1"></i>{{ $location->name }}</button>
                 @foreach($crumbs as $crumb)
                     <span class="text-gray-300 dark:text-stone-600">/</span>
-                    <button wire:click="open(@js($crumb['path']))" class="{{ $loop->last ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-indigo-600 dark:text-indigo-400 hover:underline' }}">{{ $crumb['name'] }}</button>
+                    <button wire:click="open(@js($crumb['path']))" class="{{ $loop->last ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-900 dark:text-gray-100 underline' }}">{{ $crumb['name'] }}</button>
                 @endforeach
             </nav>
         @endif
@@ -65,7 +63,7 @@
                         @php($folderPath = ltrim($this->dir.'/'.$folder->name, '/'))
                         <tr class="hover:bg-gray-50 dark:hover:bg-stone-800/40" wire:key="folder-{{ $folderPath }}" data-test="folder-{{ $folder->name }}">
                             <td class="px-6 py-2.5">
-                                <button wire:click="open(@js($folderPath))" class="flex items-center gap-2.5 text-left text-gray-900 dark:text-gray-100 hover:text-indigo-600 dark:hover:text-indigo-400">
+                                <button wire:click="open(@js($folderPath))" class="flex items-center gap-2.5 text-left text-gray-900 dark:text-gray-100 hover:underline">
                                     <i class="fa-solid fa-folder text-amber-400"></i><span class="truncate">{{ $folder->name }}</span>
                                 </button>
                             </td>
@@ -73,12 +71,12 @@
                             <td class="px-3 py-2.5 hidden sm:table-cell text-xs text-gray-500">{{ \Illuminate\Support\Number::fileSize((int) $folder->bytes) }}</td>
                             <td class="px-3 py-2.5 hidden lg:table-cell"></td>
                             <td class="px-3 py-2.5 space-x-1">
-                                @if($folder->missing > 0)<span class="{{ $chip }} bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">{{ $folder->missing }} missing</span>@endif
-                                @if($folder->hidden > 0)<span class="{{ $chip }} bg-gray-100 dark:bg-stone-800 text-gray-500">{{ $folder->hidden == $folder->files ? 'hidden' : $folder->hidden.' hidden' }}</span>@endif
+                                @if($folder->missing > 0)<x-badge variant="warning" class="whitespace-nowrap">{{ $folder->missing }} missing</x-badge>@endif
+                                @if($folder->hidden > 0)<x-badge class="whitespace-nowrap">{{ $folder->hidden == $folder->files ? 'hidden' : $folder->hidden.' hidden' }}</x-badge>@endif
                             </td>
                             <td class="px-3 py-2.5 text-right">
                                 <div class="relative inline-block" x-data="{ open: false }" @click.outside="open = false">
-                                    <button @click="open = !open" class="w-8 h-8 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded-lg" aria-label="Folder actions"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+                                    <button @click="open = !open" class="w-8 h-8 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded-xl" aria-label="Folder actions"><i class="fa-solid fa-ellipsis-vertical"></i></button>
                                     <div x-show="open" x-cloak @click="open = false" style="position: absolute; right: 0; z-index: 40; min-width: 14rem;"
                                          class="mt-1 py-1 text-left bg-white dark:bg-stone-800 rounded-xl shadow-xl border border-gray-200 dark:border-stone-700">
                                         <button wire:click="setFolderHidden(@js($folderPath), true)" class="{{ $menuItem }}"><i class="fa-regular fa-eye-slash w-5"></i>Hide folder from library</button>
@@ -109,29 +107,29 @@
                             <td class="px-3 py-2.5">
                                 <div class="flex flex-wrap gap-1">
                                     @if($file->status === 'missing')
-                                        <span class="{{ $chip }} bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400" data-test="chip-missing">missing</span>
+                                        <x-badge variant="warning" class="whitespace-nowrap" data-test="chip-missing">missing</x-badge>
                                     @endif
                                     @if($track)
-                                        <span class="{{ $chip }} bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400" title="Tags read and matched to a track" data-test="chip-parsed"><i class="fa-solid fa-check"></i>parsed</span>
+                                        <x-badge variant="success" class="whitespace-nowrap" title="Tags read and matched to a track" data-test="chip-parsed"><i class="fa-solid fa-check"></i>parsed</x-badge>
                                         @if($info['pending'] === [])
-                                            <span class="{{ $chip }} bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400" data-test="chip-enriched"><i class="fa-solid fa-check"></i>enriched</span>
+                                            <x-badge variant="success" class="whitespace-nowrap" data-test="chip-enriched"><i class="fa-solid fa-check"></i>enriched</x-badge>
                                         @else
-                                            <span class="{{ $chip }} bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-400" title="Waiting for: {{ implode(', ', $info['pending']) }}" data-test="chip-enriched"><i class="fa-solid fa-hourglass-half"></i>{{ count($info['pending']) }} to fetch</span>
+                                            <x-badge variant="info" class="whitespace-nowrap" title="Waiting for: {{ implode(', ', $info['pending']) }}" data-test="chip-enriched"><i class="fa-solid fa-hourglass-half"></i>{{ count($info['pending']) }} to fetch</x-badge>
                                         @endif
                                     @else
-                                        <span class="{{ $chip }} bg-gray-100 dark:bg-stone-800 text-gray-500" data-test="chip-parsed">not parsed</span>
+                                        <x-badge class="whitespace-nowrap" data-test="chip-parsed">not parsed</x-badge>
                                     @endif
                                     @if($file->analysis && !empty($file->analysis->stages))
-                                        <span class="{{ $chip }} bg-gray-100 dark:bg-stone-800 text-gray-500" title="Loudness / fingerprint analysis done">analysed</span>
+                                        <x-badge class="whitespace-nowrap" title="Loudness / fingerprint analysis done">analysed</x-badge>
                                     @endif
                                     @if($file->isHidden())
-                                        <span class="{{ $chip }} bg-gray-100 dark:bg-stone-800 text-gray-500" data-test="chip-hidden"><i class="fa-regular fa-eye-slash"></i>hidden</span>
+                                        <x-badge class="whitespace-nowrap" data-test="chip-hidden"><i class="fa-regular fa-eye-slash"></i>hidden</x-badge>
                                     @endif
                                 </div>
                             </td>
                             <td class="px-3 py-2.5 text-right">
                                 <div class="relative inline-block" x-data="{ open: false }" @click.outside="open = false">
-                                    <button @click="open = !open" class="w-8 h-8 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded-lg" aria-label="File actions" data-test="menu-{{ $file->id }}"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+                                    <button @click="open = !open" class="w-8 h-8 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded-xl" aria-label="File actions" data-test="menu-{{ $file->id }}"><i class="fa-solid fa-ellipsis-vertical"></i></button>
                                     <div x-show="open" x-cloak @click="open = false" style="position: absolute; right: 0; z-index: 40; min-width: 14rem;"
                                          class="mt-1 py-1 text-left bg-white dark:bg-stone-800 rounded-xl shadow-xl border border-gray-200 dark:border-stone-700">
                                         <button wire:click="startEdit({{ $file->id }})" class="{{ $menuItem }}"><i class="fa-solid fa-tags w-5"></i>Edit tags…</button>
@@ -163,15 +161,15 @@
                     @foreach(['title' => 'Title', 'artist' => 'Artist', 'album' => 'Album', 'album_artist' => 'Album artist', 'year' => 'Year', 'genre' => 'Genre', 'track_number' => 'Track number', 'disc_number' => 'Disc number'] as $key => $label)
                         <div class="{{ in_array($key, ['title']) ? 'sm:col-span-2' : '' }}">
                             <label class="block text-xs font-medium text-gray-500 mb-1">{{ $label }}</label>
-                            <input type="text" wire:model="tags.{{ $key }}" wire:keydown.enter="saveTags" class="w-full {{ $input }}" data-test="tag-{{ $key }}" />
+                            <x-text-input size="sm" type="text" wire:model="tags.{{ $key }}" wire:keydown.enter="saveTags" data-test="tag-{{ $key }}" class="w-full" />
                         </div>
                     @endforeach
                 </div>
                 <div class="flex items-center justify-end gap-2 pt-2">
                     <button wire:click="cancelEdit" class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-200">Cancel</button>
-                    <button wire:click="saveTags" wire:loading.attr="disabled" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-xl">Write tags</button>
+                    <x-primary-button size="md" wire:click="saveTags" wire:loading.attr="disabled">Write tags</x-primary-button>
                 </div>
             </div>
         </div>
     @endif
-</div>
+</x-card>
