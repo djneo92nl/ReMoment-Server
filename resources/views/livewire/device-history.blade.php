@@ -12,9 +12,10 @@
                     @php
                         $track = $play->track;
                         $artUrl = $play->artUrl(320);
+                        $trackUrl = \App\Domain\Library\TrackLink::for($track);
                     @endphp
 
-                    <div class="flex-shrink-0 w-28 group cursor-default">
+                    <{{ $trackUrl ? 'a href='.chr(34).$trackUrl.chr(34) : 'div' }} class="flex-shrink-0 w-28 group {{ $trackUrl ? '' : 'cursor-default' }} block">
 
                         {{-- Album art --}}
                         <div class="w-28 h-28 rounded-2xl overflow-hidden shadow-md ring-1 ring-gray-100 dark:ring-stone-800 mb-3 bg-gray-100 dark:bg-stone-800 relative">
@@ -44,7 +45,7 @@
                            title="{{ $play->trackTitle() }}">{{ $play->trackTitle() }}</p>
                         <p class="text-xs text-gray-400 dark:text-gray-600 truncate mt-0.5 leading-snug"
                            title="{{ $play->artistTitle() }}">{{ $play->artistTitle() }}</p>
-                    </div>
+                    </{{ $trackUrl ? 'a' : 'div' }}>
                 @endforeach
 
             </div>

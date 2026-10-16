@@ -197,7 +197,7 @@
                     @endif
                 </div>
                 <div style="min-width:0">
-                    <p class="truncate" style="font-size:.9rem;font-weight:600;line-height:1.3">{{ $title }}</p>
+                    <p class="truncate" style="font-size:.9rem;font-weight:600;line-height:1.3">@if($track && ($trackUrl = \App\Domain\Library\TrackLink::forNowPlaying($nowPlaying)))<a href="{{ $trackUrl }}" style="color:inherit">{{ $title }}</a>@else{{ $title }}@endif</p>
                     @if($line2)<p class="truncate" style="font-size:.78rem;line-height:1.3;{{ $dim }}">{{ $line2 }}</p>@endif
                     @if(!empty($isOfflinePlayer))<p class="truncate" style="font-size:.78rem;line-height:1.3;opacity:.7">Offline · <a href="{{ route('player') }}" target="_blank" rel="noopener" style="text-decoration:underline">open the player</a></p>
                     @elseif($line3)<p class="truncate" style="font-size:.78rem;line-height:1.3;opacity:.5">{{ $line3 }}</p>@endif

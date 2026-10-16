@@ -17,6 +17,8 @@
     :root:active-view-transition-type(receiver)::view-transition-old(root), :root:active-view-transition-type(receiver)::view-transition-new(root) { animation-duration: 0.8s; animation-timing-function: ease; }
 ::view-transition-group(np-cover) { z-index: 2; }
 ::view-transition-group(np-cover), ::view-transition-group(np-bar) { animation-duration: 0.8s; animation-timing-function: cubic-bezier(0.3, 0.7, 0.2, 1); }
+    /* a track linked from now playing / history */
+    [id^="track-"]:target > div:first-child { background: rgb(16 185 129 / .15); box-shadow: inset 3px 0 0 rgb(16 185 129); }
     </style>
     <script>
         // To and from the receiver the page behind cross-fades too: tag those view transitions
