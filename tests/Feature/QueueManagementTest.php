@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Jobs\QueueHeartbeat;
-use App\Livewire\SystemHealth;
+use App\Livewire\QueueManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -32,7 +32,7 @@ class QueueManagementTest extends TestCase
     {
         $id = $this->failedJob();
 
-        Livewire::test(SystemHealth::class)
+        Livewire::test(QueueManager::class)
             ->assertSee('Failed jobs')
             ->assertSee('EnrichTrackLyrics')
             ->assertSee('status code 429')
@@ -44,10 +44,10 @@ class QueueManagementTest extends TestCase
         $one = $this->failedJob();
         $this->failedJob();
 
-        Livewire::test(SystemHealth::class)->call('forgetFailed', $one);
+        Livewire::test(QueueManager::class)->call('forgetFailed', $one);
         $this->assertSame(1, DB::table('failed_jobs')->count());
 
-        Livewire::test(SystemHealth::class)->call('flushFailed');
+        Livewire::test(QueueManager::class)->call('flushFailed');
         $this->assertSame(0, DB::table('failed_jobs')->count());
     }
 
@@ -56,7 +56,7 @@ class QueueManagementTest extends TestCase
         config(['queue.default' => 'database']);
         $id = $this->failedJob();
 
-        Livewire::test(SystemHealth::class)->call('retryFailed', $id);
+        Livewire::test(QueueManager::class)->call('retryFailed', $id);
 
         $this->assertSame(0, DB::table('failed_jobs')->count());
         $this->assertSame(1, DB::table('jobs')->count());
@@ -64,7 +64,7 @@ class QueueManagementTest extends TestCase
 
     public function test_workers_can_be_restarted_from_the_page(): void
     {
-        Livewire::test(SystemHealth::class)->call('restartWorkers')->assertSee('Workers told to restart');
+        Livewire::test(QueueManager::class)->call('restartWorkers')->assertSee('Workers told to restart');
 
         $this->assertNotNull(cache()->get('illuminate:queue:restart'));
     }

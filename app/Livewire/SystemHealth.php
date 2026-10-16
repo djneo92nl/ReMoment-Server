@@ -5,7 +5,6 @@ namespace App\Livewire;
 use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Health\Heartbeat;
-use App\Domain\Health\QueueInspector;
 use App\Models\Device;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -24,8 +23,6 @@ class SystemHealth extends Component
             'scheduler' => $this->heartbeat(Heartbeat::SCHEDULER),
             'queueWorker' => $this->heartbeat(Heartbeat::QUEUE),
             'queue' => $this->queue(),
-            'pendingJobs' => app(QueueInspector::class)->pending(),
-            'failedJobs' => app(QueueInspector::class)->failed(),
             'devices' => $this->devices(),
         ]);
     }
@@ -90,46 +87,6 @@ class SystemHealth extends Component
         }
 
         return ['pending' => $pending, 'failed' => $failedCount];
-    }
-
-    public function retryFailed(string $id, QueueInspector $inspector): void
-    {
-        $inspector->retry($id);
-        $this->toast('Job put back on the queue.');
-    }
-
-    public function retryAllFailed(QueueInspector $inspector): void
-    {
-        $inspector->retry('all');
-        $this->toast('All failed jobs put back on the queue.');
-    }
-
-    public function forgetFailed(string $id, QueueInspector $inspector): void
-    {
-        $inspector->forget($id);
-    }
-
-    public function flushFailed(QueueInspector $inspector): void
-    {
-        $inspector->flushFailed();
-        $this->toast('Failed jobs cleared.');
-    }
-
-    public function restartWorkers(QueueInspector $inspector): void
-    {
-        $inspector->restartWorkers();
-        $this->toast('Workers told to restart after their current job.');
-    }
-
-    public function queueMissingEnrichment(QueueInspector $inspector): void
-    {
-        $records = $inspector->queueMissingEnrichment();
-        $this->toast($records > 0 ? "Looked at {$records} tracks and queued what they still miss." : 'Nothing left to fetch.');
-    }
-
-    private function toast(string $message): void
-    {
-        session()->flash('health-success', $message);
     }
 
     private function devices(): array

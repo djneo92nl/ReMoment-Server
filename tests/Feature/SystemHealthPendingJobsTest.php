@@ -2,13 +2,13 @@
 
 namespace Tests\Feature;
 
-use App\Livewire\SystemHealth;
+use App\Livewire\QueueManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Tests\TestCase;
 
-class SystemHealthPendingJobsTest extends TestCase
+class QueueManagerPendingJobsTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -35,7 +35,7 @@ class SystemHealthPendingJobsTest extends TestCase
             $this->job('App\\Jobs\\ScrobbleToLastfm', ['available_at' => now()->addHour()->timestamp]),
         ]);
 
-        Livewire::test(SystemHealth::class)
+        Livewire::test(QueueManager::class)
             ->assertSee('Pending jobs')
             ->assertSee('4 in queue')
             ->assertSee('ProcessArtwork')
