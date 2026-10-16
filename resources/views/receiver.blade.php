@@ -6,6 +6,10 @@
 <title>ReMoment Receiver</title>
 <x-live-scripts />
 <style>
+  @view-transition { navigation: auto; }
+  /* only the named parts (cover, bar) morph between pages; the rest of a page switches as before */
+  ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+  ::view-transition-group(np-cover), ::view-transition-group(np-bar) { animation-duration: 0.5s; animation-timing-function: cubic-bezier(0.3, 0.7, 0.2, 1); }
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
@@ -56,6 +60,7 @@
     overflow: hidden;
     background: #1a1a1a;
     position: relative;
+    view-transition-name: np-cover;
     box-shadow: 0 30px 80px rgba(0,0,0,0.55), 0 6px 20px rgba(0,0,0,0.35);
     transition: transform 10s ease;
   }
@@ -198,6 +203,7 @@
     overflow: hidden;
     color: #fff;
     isolation: isolate;
+    view-transition-name: np-bar;
     background-color: rgba(255,255,255,0);
     -webkit-backdrop-filter: blur(0px) saturate(1);
     backdrop-filter: blur(0px) saturate(1);
@@ -392,6 +398,25 @@
     min-height: 16px;
     text-align: center;
   }
+
+  /* back to where the receiver was opened from (only shown when it was opened from this site) */
+  #btn-back {
+    display: none;
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 10;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 10px;
+    border-radius: 8px;
+    color: rgba(255,255,255,0.25);
+    transition: color 0.15s, background 0.15s;
+    line-height: 0;
+  }
+  #btn-back:hover { color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.08); }
+  body.ambient #btn-back { opacity: 0 !important; pointer-events: none; transition: opacity 2.5s ease !important; }
 
   #btn-fullscreen {
     position: fixed;
@@ -633,6 +658,10 @@
   <div id="picker-devices"></div>
   <div id="picker-status">Loading…</div>
 </div>
+
+<button id="btn-back" onclick="history.back()" title="Back">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+</button>
 
 <button id="btn-fullscreen" onclick="toggleFullscreen()" title="Toggle fullscreen">
   <svg id="icon-expand" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -1640,6 +1669,17 @@ document.getElementById('multi-body').addEventListener('click', async e => {
   } catch(err) {}
   setTimeout(() => { loadMulti(); pollNow(); }, 500);
 });
+
+// Outside click / Escape close the open panel
+document.addEventListener('click', () => togglePanel(null, null, false));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') togglePanel(null, null, false); });
+
+// Opened from a page of this site (the sticky bar): offer the way back
+try {
+  if (document.referrer && new URL(document.referrer).origin === location.origin && history.length > 1) {
+    document.getElementById('btn-back').style.display = 'block';
+  }
+} catch(e) {}
 
 // Easter egg: ↑↑↓↓←→←→BA toggles vinyl mode.
 const KONAMI = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];

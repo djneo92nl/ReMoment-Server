@@ -94,7 +94,7 @@
         @endif
 
     {{-- Dark scrim over the artwork colors keeps white text readable whatever the cover --}}
-    <div style="position:relative;z-index:1;overflow:hidden;border-radius:{{ $panel ? '.9rem 0 .9rem .9rem' : '.9rem' }};box-shadow:0 8px 30px rgba(0,0,0,.35);color:#fff;background:{{ $background }}">
+    <div style="view-transition-name:np-bar;position:relative;z-index:1;overflow:hidden;border-radius:{{ $panel ? '.9rem 0 .9rem .9rem' : '.9rem' }};box-shadow:0 8px 30px rgba(0,0,0,.35);color:#fff;background:{{ $background }}">
         <div style="position:absolute;inset:0;background:rgba(0,0,0,.45);pointer-events:none"></div>
 
         <div style="position:relative;display:flex;align-items:center;gap:1rem;padding:.65rem 1rem;width:100%;box-sizing:border-box">
@@ -189,7 +189,7 @@
 
             {{-- Artwork + what is playing --}}
             <a href="{{ route('devices.show', $device) }}" style="display:flex;align-items:center;gap:.75rem;flex:1 1 0;min-width:0;max-width:20rem;color:inherit;text-decoration:none">
-                <div style="width:3rem;height:3rem;border-radius:.4rem;overflow:hidden;flex:none;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.35)">
+                <div style="view-transition-name:np-cover;width:3rem;height:3rem;border-radius:.4rem;overflow:hidden;flex:none;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.35)">
                     @if($thumb)
                         <img src="{{ $thumb }}" alt="" style="width:100%;height:100%;object-fit:cover">
                     @else
@@ -224,7 +224,7 @@
                         <i class="fa-solid fa-layer-group" style="font-size:.85rem"></i>
                     </button>
                 @endif
-                <a href="/receiver?device={{ $device->id }}" target="_blank" title="Open receiver" class="player-extra" style="{{ $icon }};text-decoration:none">
+                <a href="/receiver?device={{ $device->id }}" title="Open receiver" class="player-extra" style="{{ $icon }};text-decoration:none">
                     <i class="fa-solid fa-expand" style="font-size:.8rem"></i>
                 </a>
                 <span class="player-extra" style="width:1px;height:1.8rem;background:rgba(255,255,255,.25);margin:0 .4rem"></span>
