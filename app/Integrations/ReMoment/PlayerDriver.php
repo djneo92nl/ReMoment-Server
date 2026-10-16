@@ -76,6 +76,7 @@ class PlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, 
                 name: $track->name,
                 artist: $track->artist?->name,
                 album: $track->album?->name,
+                image: ($track->album?->images ?? [])[0] ?? ($track->images ?? [])[0] ?? null,
                 duration: $track->duration,
                 uri: StreamUrl::for($track->id),
             );

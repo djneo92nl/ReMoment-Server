@@ -74,6 +74,9 @@ class PlayerApiTest extends TestCase
         $this->assertSame($tracks[0]->id, $command['track']['id']);
         $this->assertSame('/stream/'.$tracks[0]->id, $command['track']['url']);
         $this->assertSame([$tracks[1]->id, $tracks[2]->id], PlayerQueue::for($id)->upNext(10));
+
+        $tracks[0]->album->update(['images' => ['https://img.test/cover.jpg']]);
+        $this->assertSame('https://img.test/cover.jpg', $device->driver->getUpNext(5)[0]->image);
     }
 
     public function test_track_end_advances_the_queue_and_polling_returns_the_commands(): void
