@@ -8,7 +8,9 @@
 <style>
   @view-transition { navigation: auto; }
   /* only the named parts (cover, bar) morph between pages; the rest of a page switches as before */
-  ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+  ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0s; }
+  /* going to or coming from the receiver, the page behind cross-fades as well */
+  :root:active-view-transition-type(receiver)::view-transition-old(root), :root:active-view-transition-type(receiver)::view-transition-new(root) { animation-duration: 0.8s; animation-timing-function: ease; }
   ::view-transition-group(np-cover), ::view-transition-group(np-bar) { animation-duration: 0.8s; animation-timing-function: cubic-bezier(0.3, 0.7, 0.2, 1); }
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -1673,6 +1675,16 @@ document.getElementById('multi-body').addEventListener('click', async e => {
 // Outside click / Escape close the open panel
 document.addEventListener('click', () => togglePanel(null, null, false));
 document.addEventListener('keydown', e => { if (e.key === 'Escape') togglePanel(null, null, false); });
+
+// Cross-fade the page behind when arriving and when leaving (the page left for reads the flag)
+window.addEventListener('pagereveal', e => {
+  try { sessionStorage.removeItem('fromReceiver'); } catch (x) {}
+  if (e.viewTransition) e.viewTransition.types.add('receiver');
+});
+window.addEventListener('pageswap', e => {
+  try { sessionStorage.setItem('fromReceiver', '1'); } catch (x) {}
+  if (e.viewTransition) e.viewTransition.types.add('receiver');
+});
 
 // Opened from a page of this site (the sticky bar): offer the way back
 try {

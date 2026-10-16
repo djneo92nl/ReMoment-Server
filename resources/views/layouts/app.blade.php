@@ -12,9 +12,24 @@
     <style>
 @view-transition { navigation: auto; }
 /* only the named parts (cover, bar) morph between pages; the rest of a page switches as before */
-::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0s; }
+    /* going to or coming from the receiver, the page behind cross-fades as well */
+    :root:active-view-transition-type(receiver)::view-transition-old(root), :root:active-view-transition-type(receiver)::view-transition-new(root) { animation-duration: 0.8s; animation-timing-function: ease; }
 ::view-transition-group(np-cover), ::view-transition-group(np-bar) { animation-duration: 0.8s; animation-timing-function: cubic-bezier(0.3, 0.7, 0.2, 1); }
     </style>
+    <script>
+        // To and from the receiver the page behind cross-fades too: tag those view transitions
+        // (the receiver sets the flag when it is left, so the page it returns to knows).
+        window.addEventListener('pageswap', e => {
+            const to = e.activation && e.activation.entry && e.activation.entry.url;
+            if (e.viewTransition && to && /\/receiver(\?|$)/.test(to)) e.viewTransition.types.add('receiver');
+        });
+        window.addEventListener('pagereveal', e => {
+            let back = false;
+            try { back = sessionStorage.getItem('fromReceiver') === '1'; sessionStorage.removeItem('fromReceiver'); } catch (x) {}
+            if (e.viewTransition && back) e.viewTransition.types.add('receiver');
+        });
+    </script>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 text-gray-900 dark:text-gray-300 dark:bg-stone-950 dark:from-stone-950 dark:to-stone-900 antialiased"
       x-data="{ mobileMenuOpen: false }">

@@ -27,7 +27,7 @@ A standalone Blade template with no Livewire dependency — plain JS fetching `G
 | Marquee | Long track names and long current lyric lines scroll via CSS animation |
 | Ambient mode | After 30s idle, UI fades out; auto-switches to lyrics view if lyrics exist |
 | Idle clock | Shown when no device is playing |
-| Back button | Top-left `#btn-back`, only when opened from a page of this site (referrer): `history.back()`. The sticky bar opens the receiver in the same tab and the bar's cover and bar morph into the receiver's via cross-document View Transitions (`np-cover`, `np-bar`; Chrome/Edge 126+, Safari 18.2+, elsewhere a plain navigation) |
+| Back button | Top-left `#btn-back`, only when opened from a page of this site (referrer): `history.back()`. The sticky bar opens the receiver in the same tab and the bar's cover and bar morph into the receiver's via cross-document View Transitions (`np-cover`, `np-bar`, and the page behind cross-fades over 0.8s via the `receiver` transition type; Chrome/Edge 126+, Safari 18.2+, elsewhere a plain navigation) |
 | Fullscreen button | `requestFullscreen()` API |
 
 ## Ambient Mode
