@@ -25,23 +25,24 @@
         <x-tabs :tabs="$tabs">
         <x-tabs.panel name="tracks" class="space-y-6">
 
-        {{-- Source: the album's tracks are never merged across sources; with several, a switch picks the list (and what Play plays) --}}
-        @if(count($page->sources) > 1)
-            <nav class="inline-flex max-w-full gap-1 rounded-full bg-gray-100 p-1 dark:bg-stone-800" aria-label="Source">
-                @foreach($sourceNames as $key => $name)
-                    <a href="{{ route('albums.show', [$album, 'source' => $key]) }}" data-test="source-{{ $key }}" @if($page->source === $key) aria-current="page" @endif
-                       class="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition-colors {{ $page->source === $key ? 'bg-white text-gray-900 shadow dark:bg-stone-900 dark:text-gray-100' : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-200' }}">
-                        <x-source-icon :source="$key" />{{ $name }}
-                    </a>
-                @endforeach
-            </nav>
-        @elseif($page->source)
-            <p class="flex items-center gap-2 text-sm text-gray-500"><x-source-icon :source="$page->source" />In {{ $sourceNames[$page->source] }}</p>
-        @endif
-
         {{-- Tracklist --}}
         @if($page->tracks->isNotEmpty())
-            <x-card flush class="divide-y divide-gray-100 dark:divide-stone-800/70">
+            <x-card flush>
+                {{-- Source: tracks are never merged across sources; with several, the switch in the table header picks the list (and what Play plays) --}}
+                @if(count($page->sources) > 1)
+                    <nav class="flex gap-1 border-b border-gray-100 p-2 dark:border-stone-800/70" aria-label="Source">
+                        @foreach($sourceNames as $key => $name)
+                            <a href="{{ route('albums.show', [$album, 'source' => $key]) }}" data-test="source-{{ $key }}" @if($page->source === $key) aria-current="page" @endif
+                               class="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition-colors {{ $page->source === $key ? 'bg-gray-100 text-gray-900 dark:bg-stone-800 dark:text-gray-100' : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-200' }}">
+                                <x-source-icon :source="$key" />{{ $name }}
+                                <span class="text-xs font-normal text-gray-400 dark:text-gray-600">{{ $page->allTracks->filter(fn ($t) => in_array($key, $t->sources(), true))->count() }}</span>
+                            </a>
+                        @endforeach
+                    </nav>
+                @elseif($page->source)
+                    <p class="flex items-center gap-2 border-b border-gray-100 px-5 py-3 text-sm text-gray-500 dark:border-stone-800/70"><x-source-icon :source="$page->source" />In {{ $sourceNames[$page->source] }}</p>
+                @endif
+                <div class="divide-y divide-gray-100 dark:divide-stone-800/70">
                 @foreach($page->tracks as $i => $track)
                     @php
                         $lyrics = $track->lyricsPlain();
@@ -194,6 +195,7 @@
                         @endif
                     </div>
                 @endforeach
+                </div>
             </x-card>
         @else
             <x-empty-state icon="music" title="No tracks here" text="This album has no tracks from {{ $page->source ? $sourceNames[$page->source] : 'any source' }} yet." />
