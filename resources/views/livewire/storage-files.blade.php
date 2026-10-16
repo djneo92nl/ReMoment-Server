@@ -165,6 +165,39 @@
                         </div>
                     @endforeach
                 </div>
+                <div class="rounded-2xl border border-gray-200 dark:border-stone-700 p-4 space-y-3" data-test="suggestions">
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100">What could this be?</h4>
+                        <p class="text-xs text-gray-500 mt-0.5">Give a hint and pick a candidate: it fills the tags above, nothing is written until you press Write tags.</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <x-text-input size="sm" type="text" wire:model="cueTitle" wire:keydown.enter="suggest" placeholder="Title" data-test="cue-title" class="flex-1 min-w-40" />
+                        <x-text-input size="sm" type="text" wire:model="cueArtist" wire:keydown.enter="suggest" placeholder="Artist (optional)" data-test="cue-artist" class="flex-1 min-w-40" />
+                        <x-secondary-button size="sm" wire:click="suggest" wire:loading.attr="disabled" data-test="suggest"><i class="fa-solid fa-magnifying-glass mr-2"></i>Search</x-secondary-button>
+                    </div>
+                    @if($suggestions['error'])<p class="text-xs text-red-500">{{ $suggestions['error'] }}</p>@endif
+                    @foreach(['library' => 'In your library', 'musicbrainz' => 'MusicBrainz'] as $kind => $heading)
+                        @if($suggestions[$kind] !== [])
+                            <div>
+                                <div class="text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-1">{{ $heading }}</div>
+                                <ul class="divide-y divide-gray-100 dark:divide-stone-800">
+                                    @foreach($suggestions[$kind] as $i => $candidate)
+                                        <li class="flex items-center gap-3 py-1.5" data-test="candidate-{{ $kind }}-{{ $i }}">
+                                            <div class="min-w-0 flex-1 text-sm">
+                                                <div class="truncate text-gray-900 dark:text-gray-100">{{ $candidate['title'] }} <span class="text-gray-500">· {{ $candidate['artist'] }}</span></div>
+                                                <div class="truncate text-xs text-gray-500">{{ $candidate['album'] ?? 'No album' }}@if($candidate['year']) · {{ $candidate['year'] }}@endif · {{ $candidate['detail'] }}</div>
+                                            </div>
+                                            <button wire:click="useSuggestion('{{ $kind }}', {{ $i }})" class="text-xs text-gray-900 dark:text-gray-100 underline whitespace-nowrap">Use</button>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endif
+                    @endforeach
+                    @if($suggestions['library'] === [] && $suggestions['musicbrainz'] === [] && $suggestions['searched'])
+                        <p class="text-xs text-gray-500">Nothing found. Try a shorter title or leave the artist out.</p>
+                    @endif
+                </div>
                 <div class="flex items-center justify-end gap-2 pt-2">
                     <button wire:click="cancelEdit" class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-200">Cancel</button>
                     <x-primary-button size="md" wire:click="saveTags" wire:loading.attr="disabled">Write tags</x-primary-button>

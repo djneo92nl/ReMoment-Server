@@ -5,8 +5,8 @@ namespace App\Livewire;
 use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Health\Heartbeat;
+use App\Domain\Health\QueueInspector;
 use App\Models\Device;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Component;
@@ -16,8 +16,6 @@ class SystemHealth extends Component
     /** Heartbeats older than this are shown as down (scheduler beats every 60s). */
     private const STALE_SECONDS = 180;
 
-    private const SCAN_LIMIT = 5000;
-
     public function render()
     {
         return view('livewire.system-health', [
@@ -26,7 +24,8 @@ class SystemHealth extends Component
             'scheduler' => $this->heartbeat(Heartbeat::SCHEDULER),
             'queueWorker' => $this->heartbeat(Heartbeat::QUEUE),
             'queue' => $this->queue(),
-            'pendingJobs' => $this->pendingJobs(),
+            'pendingJobs' => app(QueueInspector::class)->pending(),
+            'failedJobs' => app(QueueInspector::class)->failed(),
             'devices' => $this->devices(),
         ]);
     }
@@ -86,69 +85,51 @@ class SystemHealth extends Component
 
         try {
             $failedCount = DB::table('failed_jobs')->count();
-            $lastFailure = DB::table('failed_jobs')->latest('failed_at')->first(['payload', 'exception', 'failed_at']);
         } catch (\Throwable) {
             $failedCount = null;
-            $lastFailure = null;
         }
 
-        return [
-            'pending' => $pending,
-            'failed' => $failedCount,
-            'last_failure' => $lastFailure ? [
-                'job' => class_basename(json_decode($lastFailure->payload, true)['displayName'] ?? 'Unknown job'),
-                'message' => strtok($lastFailure->exception, "\n"),
-                'at' => Carbon::parse($lastFailure->failed_at),
-            ] : null,
-        ];
+        return ['pending' => $pending, 'failed' => $failedCount];
     }
 
-    /**
-     * Pending jobs grouped by class, from the `jobs` table (database queue driver only).
-     * Scans at most SCAN_LIMIT rows so a huge backlog can't slow the page down.
-     *
-     * @return array{total: int, scanned: int, groups: list<array{job: string, count: int, waiting: int, running: int, delayed: int, oldest: ?Carbon}>}|null
-     */
-    private function pendingJobs(): ?array
+    public function retryFailed(string $id, QueueInspector $inspector): void
     {
-        if (config('queue.default') !== 'database') {
-            return null;
-        }
+        $inspector->retry($id);
+        $this->toast('Job put back on the queue.');
+    }
 
-        try {
-            $table = config('queue.connections.database.table', 'jobs');
-            $total = DB::table($table)->count();
-            $rows = DB::table($table)->orderBy('id')->limit(self::SCAN_LIMIT)->get(['payload', 'available_at', 'reserved_at', 'created_at']);
-        } catch (\Throwable) {
-            return null;
-        }
+    public function retryAllFailed(QueueInspector $inspector): void
+    {
+        $inspector->retry('all');
+        $this->toast('All failed jobs put back on the queue.');
+    }
 
-        $now = now()->timestamp;
-        $groups = [];
+    public function forgetFailed(string $id, QueueInspector $inspector): void
+    {
+        $inspector->forget($id);
+    }
 
-        foreach ($rows as $row) {
-            $name = class_basename(json_decode($row->payload, true)['displayName'] ?? 'Unknown job');
-            $group = &$groups[$name];
-            $group ??= ['job' => $name, 'count' => 0, 'waiting' => 0, 'running' => 0, 'delayed' => 0, 'oldest' => null];
+    public function flushFailed(QueueInspector $inspector): void
+    {
+        $inspector->flushFailed();
+        $this->toast('Failed jobs cleared.');
+    }
 
-            $group['count']++;
-            if ($row->reserved_at) {
-                $group['running']++;
-            } elseif ($row->available_at > $now) {
-                $group['delayed']++;
-            } else {
-                $group['waiting']++;
-            }
-            $created = Carbon::createFromTimestamp($row->created_at);
-            if ($group['oldest'] === null || $created->lt($group['oldest'])) {
-                $group['oldest'] = $created;
-            }
-            unset($group);
-        }
+    public function restartWorkers(QueueInspector $inspector): void
+    {
+        $inspector->restartWorkers();
+        $this->toast('Workers told to restart after their current job.');
+    }
 
-        usort($groups, fn ($a, $b) => $b['count'] <=> $a['count']);
+    public function queueMissingEnrichment(QueueInspector $inspector): void
+    {
+        $records = $inspector->queueMissingEnrichment();
+        $this->toast($records > 0 ? "Looked at {$records} tracks and queued what they still miss." : 'Nothing left to fetch.');
+    }
 
-        return ['total' => $total, 'scanned' => $rows->count(), 'groups' => $groups];
+    private function toast(string $message): void
+    {
+        session()->flash('health-success', $message);
     }
 
     private function devices(): array

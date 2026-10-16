@@ -6,6 +6,7 @@ use App\Domain\Library\Enrichment;
 use App\Domain\Storage\AudioTags;
 use App\Domain\Storage\FileStore;
 use App\Domain\Storage\LibraryFiles;
+use App\Domain\Storage\TrackSuggestions;
 use App\Models\File;
 use App\Models\StorageLocation;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -53,6 +54,14 @@ class StorageFiles extends Component
     /** @var array<string, string> */
     public array $tags = [];
 
+    /** Hint for the suggestions: what the file could be. */
+    public string $cueTitle = '';
+
+    public string $cueArtist = '';
+
+    /** @var array{library: list<array<string, ?string>>, musicbrainz: list<array<string, ?string>>, searched: bool, error: ?string} */
+    public array $suggestions = ['library' => [], 'musicbrainz' => [], 'searched' => false, 'error' => null];
+
     public function updated(string $property): void
     {
         if (in_array($property, ['search', 'locationId', 'statusFilter'], true)) {
@@ -95,6 +104,44 @@ class StorageFiles extends Component
             'disc_number' => (string) ($read['disc_number'] ?? ''),
             'genre' => implode('; ', $read['genres'] ?? []),
         ];
+
+        $this->cueTitle = $this->tags['title'] !== '' ? $this->tags['title'] : (string) preg_replace('/^\d+\s*[-._)]*\s*/', '', pathinfo($file->path, PATHINFO_FILENAME));
+        $this->cueArtist = $this->tags['artist'] !== '' && strcasecmp($this->tags['artist'], 'Unknown Artist') !== 0 ? $this->tags['artist'] : '';
+        $this->suggestions = ['library' => [], 'musicbrainz' => [], 'searched' => false, 'error' => null];
+        $this->suggest(app(TrackSuggestions::class), online: false);
+    }
+
+    /** Looks for candidates for the hint: the library always, MusicBrainz when asked. */
+    public function suggest(TrackSuggestions $suggestions, bool $online = true): void
+    {
+        $this->suggestions['library'] = $suggestions->library($this->cueTitle, $this->cueArtist);
+        $this->suggestions['error'] = null;
+
+        if (!$online) {
+            return;
+        }
+
+        try {
+            $this->suggestions['musicbrainz'] = $suggestions->musicbrainz($this->cueTitle, $this->cueArtist);
+        } catch (\Throwable $e) {
+            $this->suggestions['musicbrainz'] = [];
+            $this->suggestions['error'] = 'MusicBrainz did not answer: '.$e->getMessage();
+        }
+        $this->suggestions['searched'] = true;
+    }
+
+    /** Fills the tag form from a candidate; nothing is written until "Write tags". */
+    public function useSuggestion(string $kind, int $index): void
+    {
+        $candidate = $this->suggestions[$kind][$index] ?? null;
+        if ($candidate === null) {
+            return;
+        }
+
+        $this->tags['title'] = (string) $candidate['title'];
+        $this->tags['artist'] = (string) $candidate['artist'];
+        $this->tags['album'] = (string) ($candidate['album'] ?? $this->tags['album']);
+        $this->tags['year'] = (string) ($candidate['year'] ?? $this->tags['year']);
     }
 
     public function cancelEdit(): void

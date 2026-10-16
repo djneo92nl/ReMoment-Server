@@ -13,6 +13,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File as Fs;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -279,6 +280,7 @@ class StorageSettingsTest extends TestCase
 
     public function test_editing_tags_writes_them_and_matches_the_file_again(): void
     {
+        Http::fake();   // the sync queue runs the enrichment jobs right away
         $this->actingAs($this->admin());
         $location = $this->library();
         file_put_contents($this->base.'/library/a.mp3', $this->mp3());

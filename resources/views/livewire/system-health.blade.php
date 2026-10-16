@@ -10,6 +10,15 @@
 
 <div wire:poll.5s class="space-y-6">
 
+    @if(session('health-success'))
+        <div x-data="{ show: true }" x-init="setTimeout(() => show = false, 6000)" x-show="show" x-transition
+             style="position: fixed; right: 1.5rem; bottom: 1.5rem; z-index: 60; max-width: 24rem;"
+             class="px-5 py-3 text-sm rounded-2xl shadow-xl border text-emerald-800 dark:text-emerald-200 bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-800"
+             data-test="health-toast">
+            <i class="fa-solid fa-circle-check mr-2"></i>{{ session('health-success') }}
+        </div>
+    @endif
+
     {{-- Background processes --}}
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <x-card class="p-6">
@@ -51,24 +60,51 @@
                 <div class="mt-2 text-xs text-gray-500">Last job {{ $queueWorker['last']?->diffForHumans() ?? '—' }}</div>
             @endif
             <div class="mt-1 text-xs text-gray-500">
-                {{ $queue['pending'] ?? '?' }} pending · {{ $queue['failed'] ?? '?' }} failed
+                {{ $pendingJobs['total'] ?? $queue['pending'] ?? '?' }} pending · {{ $queue['failed'] ?? '?' }} failed
             </div>
         </x-card>
     </div>
 
-    @if($queue['last_failure'])
-        <x-alert type="error">
-            <div class="font-medium">
-                Last failed job: {{ $queue['last_failure']['job'] }} · {{ $queue['last_failure']['at']->diffForHumans() }}
+    {{-- Queue actions --}}
+    <div class="flex flex-wrap gap-2" data-test="queue-actions">
+        <x-secondary-button size="sm" wire:click="queueMissingEnrichment" wire:loading.attr="disabled" data-test="queue-missing"><i class="fa-solid fa-wand-magic-sparkles mr-2"></i>Queue missing metadata</x-secondary-button>
+        <x-secondary-button size="sm" wire:click="restartWorkers" wire:confirm="Restart the queue workers? They finish their current job first." data-test="restart-workers"><i class="fa-solid fa-rotate mr-2"></i>Restart workers</x-secondary-button>
+    </div>
+
+    {{-- Failed jobs --}}
+    @if($failedJobs)
+        <x-card flush data-test="failed-jobs">
+            <div class="px-8 py-5 border-b border-gray-100 dark:border-stone-800 flex flex-wrap items-center justify-between gap-3">
+                <h2 class="text-base font-medium text-gray-900 dark:text-gray-100">Failed jobs <span class="text-sm font-normal text-gray-500">· {{ number_format($queue['failed'] ?? count($failedJobs)) }}</span></h2>
+                <div class="flex gap-2">
+                    <x-secondary-button size="sm" wire:click="retryAllFailed" data-test="retry-all">Retry all</x-secondary-button>
+                    <x-secondary-button size="sm" wire:click="flushFailed" wire:confirm="Remove all failed jobs without retrying them?" data-test="flush-failed">Clear all</x-secondary-button>
+                </div>
             </div>
-            <div class="mt-1 font-mono text-xs break-all">{{ \Illuminate\Support\Str::limit($queue['last_failure']['message'], 300) }}</div>
-            <div class="mt-2 text-xs">Retry with <code class="font-mono">php artisan queue:retry all</code></div>
-        </x-alert>
+
+            @foreach($failedJobs as $failed)
+                <div class="grid grid-cols-2 sm:grid-cols-12 gap-x-4 gap-y-1 items-start px-8 py-3 border-b border-gray-50 dark:border-stone-800/50 last:border-0 text-sm" wire:key="failed-{{ $failed['id'] }}" data-test="failed-{{ $failed['id'] }}">
+                    <div class="col-span-2 sm:col-span-3 min-w-0">
+                        <div class="font-medium text-gray-900 dark:text-gray-100 truncate">{{ $failed['job'] }}</div>
+                        <div class="text-xs text-gray-500">{{ $failed['queue'] }} · {{ $failed['at']->diffForHumans() }}</div>
+                    </div>
+                    <div class="col-span-2 sm:col-span-7 font-mono text-xs text-red-600 dark:text-red-400 break-all">{{ \Illuminate\Support\Str::limit($failed['message'], 200) }}</div>
+                    <div class="col-span-2 sm:col-span-2 flex gap-3 sm:justify-end text-xs">
+                        <button wire:click="retryFailed('{{ $failed['id'] }}')" class="text-gray-900 dark:text-gray-100 underline">Retry</button>
+                        <button wire:click="forgetFailed('{{ $failed['id'] }}')" class="text-gray-500 hover:underline">Forget</button>
+                    </div>
+                </div>
+            @endforeach
+
+            @if(($queue['failed'] ?? 0) > count($failedJobs))
+                <div class="px-8 py-3 text-xs text-gray-400 border-t border-gray-100 dark:border-stone-800">Showing the latest {{ count($failedJobs) }}.</div>
+            @endif
+        </x-card>
     @endif
 
     {{-- Pending jobs --}}
     @if($pendingJobs)
-        <x-card flush>
+        <x-card flush data-test="pending-jobs">
             <div class="px-8 py-5 border-b border-gray-100 dark:border-stone-800 flex items-center justify-between">
                 <h2 class="text-base font-medium text-gray-900 dark:text-gray-100">Pending jobs</h2>
                 <span class="text-sm text-gray-500">{{ number_format($pendingJobs['total']) }} in queue</span>
