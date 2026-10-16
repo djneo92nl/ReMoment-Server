@@ -2,7 +2,7 @@
 
 <a href="{{ $href }}"
    {{ $attributes->merge(['class' => 'flex items-center gap-3.5 px-5 py-3.5 hover:bg-gray-50/70 dark:hover:bg-stone-800/40 transition-colors']) }}>
-    <div class="w-8 h-8 rounded-lg {{ $iconBg }} flex items-center justify-center flex-shrink-0">
+    <div class="w-8 h-8 rounded-xl {{ $iconBg }} flex items-center justify-center flex-shrink-0">
         <i class="{{ $icon }} {{ $iconColor }} text-sm"></i>
     </div>
     <div class="flex-1 min-w-0 text-[15px] text-gray-900 dark:text-gray-100">{{ $label }}</div>

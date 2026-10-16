@@ -1,16 +1,10 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center gap-4">
-            <x-back-button href="{{ route('settings.index') }}" />
-            <div>
-                <h1 class="text-3xl md:text-4xl font-medium tracking-tight dark:text-gray-100 text-gray-900">Users</h1>
-                <p class="mt-1.5 text-gray-500 dark:text-gray-500">{{ $users->count() }} {{ $users->count() === 1 ? 'user' : 'users' }}</p>
-            </div>
-        </div>
+        <x-page-header title="Users" :subtitle="($users->count()) . ' ' . ($users->count() === 1 ? 'user' : 'users')" :back="route('settings.index')" />
     </x-slot>
 
     <div class="max-w-4xl">
-        <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 overflow-hidden">
+        <x-card flush>
 
             <!-- Table header -->
             <div class="grid grid-cols-12 gap-4 px-8 py-4 border-b border-gray-100 dark:border-stone-800">
@@ -26,12 +20,12 @@
                         </div>
                         <div class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ $user->name }}</div>
                     </div>
-                    <div class="col-span-4 text-sm text-gray-500 dark:text-gray-500">{{ $user->created_at->format('M j, Y') }}</div>
+                    <div class="col-span-4 text-sm text-gray-500">{{ $user->created_at->format('M j, Y') }}</div>
                 </div>
             @endforeach
-        </div>
+        </x-card>
 
-        <div class="mt-8 bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 overflow-hidden">
+        <x-card flush class="mt-8">
             <div class="px-8 py-5 border-b border-gray-100 dark:border-stone-800">
                 <h2 class="text-sm font-medium text-gray-900 dark:text-gray-100">Signed-in apps</h2>
                 <p class="mt-1 text-sm text-gray-500">Apps that signed in with the admin password. Changing the password signs them all out.</p>
@@ -55,6 +49,6 @@
             @empty
                 <div class="px-8 py-6 text-sm text-gray-500">No apps are signed in.</div>
             @endforelse
-        </div>
+        </x-card>
     </div>
 </x-app-layout>

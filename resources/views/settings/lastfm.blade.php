@@ -1,32 +1,18 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center gap-4">
-            <x-back-button href="{{ route('settings.index') }}" />
-            <div>
-                <h1 class="text-3xl md:text-4xl font-medium tracking-tight dark:text-gray-100 text-gray-900">Last.fm</h1>
-                <p class="mt-1.5 text-gray-500 dark:text-gray-500">Scrobble plays and enrich artist metadata</p>
-            </div>
-        </div>
+        <x-page-header title="Last.fm" subtitle="Scrobble plays and enrich artist metadata" :back="route('settings.index')" />
     </x-slot>
 
     <div class="max-w-2xl space-y-6">
 
-        @if(session('success'))
-            <div class="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-2xl px-6 py-4 text-sm text-emerald-800 dark:text-emerald-300">
-                <i class="fa-solid fa-circle-check mr-2"></i>{{ session('success') }}
-            </div>
-        @endif
+        <x-alert type="success">{{ session('success') }}</x-alert>
 
-        @if(session('error'))
-            <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl px-6 py-4 text-sm text-red-800 dark:text-red-300">
-                <i class="fa-solid fa-triangle-exclamation mr-2"></i>{{ session('error') }}
-            </div>
-        @endif
+        <x-alert type="error">{{ session('error') }}</x-alert>
 
-        <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8">
+        <x-card class="p-8">
             <div class="flex items-center gap-4 mb-6">
-                <div class="w-12 h-12 bg-red-50 dark:bg-red-900/20 rounded-2xl flex items-center justify-center">
-                    <i class="fa-brands fa-lastfm text-red-600 text-xl"></i>
+                <div class="w-12 h-12 bg-gray-100 dark:bg-stone-800 rounded-2xl flex items-center justify-center">
+                    <i class="fa-brands fa-lastfm text-gray-500 text-xl"></i>
                 </div>
                 @if($connected)
                     <span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
@@ -37,13 +23,13 @@
             </div>
 
             @if($connected)
-                <p class="text-sm text-gray-500 dark:text-gray-500 mb-6">
+                <p class="text-sm text-gray-500 mb-6">
                     Plays are scrobbled to Last.fm as they finish, and artist bios/tags are pulled in the background.
                 </p>
                 <form method="POST" action="{{ route('settings.lastfm.sources') }}" class="mb-6">
                     @csrf
                     <h2 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">Scrobble streaming sources</h2>
-                    <p class="text-sm text-gray-500 dark:text-gray-500 mb-3">
+                    <p class="text-sm text-gray-500 mb-3">
                         Turn a source off when the service scrobbles to Last.fm itself, so plays aren't counted twice.
                     </p>
                     <div class="space-y-2 mb-4">
@@ -56,9 +42,7 @@
                             </label>
                         @endforeach
                     </div>
-                    <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-xl transition-colors">
-                        Save
-                    </button>
+                    <x-primary-button size="md">Save</x-primary-button>
                 </form>
                 <form method="POST" action="{{ route('lastfm.disconnect') }}">
                     @csrf
@@ -67,14 +51,11 @@
                     </button>
                 </form>
             @else
-                <p class="text-sm text-gray-500 dark:text-gray-500 mb-6">
+                <p class="text-sm text-gray-500 mb-6">
                     Connect your Last.fm account to scrobble plays and enrich artist metadata.
                 </p>
-                <a href="{{ route('lastfm.authorize') }}"
-                   class="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-xl transition-colors">
-                    <i class="fa-brands fa-lastfm"></i> Connect Last.fm
-                </a>
+                <x-primary-button size="md" href="{{ route('lastfm.authorize') }}"><i class="fa-brands fa-lastfm"></i> Connect Last.fm</x-primary-button>
             @endif
-        </div>
+        </x-card>
     </div>
 </x-app-layout>

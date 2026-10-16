@@ -1,12 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center gap-4">
-            <x-back-button href="{{ route('settings.index') }}" />
-            <div>
-                <h1 class="text-3xl md:text-4xl font-medium tracking-tight dark:text-gray-100 text-gray-900">File Storage</h1>
-                <p class="mt-1.5 text-gray-500 dark:text-gray-500">Where your own music files live (see docs/architecture/file-storage.md)</p>
-            </div>
-        </div>
+        <x-page-header title="File Storage" subtitle="Where your own music files live (see docs/architecture/file-storage.md)" :back="route('settings.index')" />
     </x-slot>
 
     @php($tabs = ['files' => ['Files', 'fa-folder-tree'], 'upload' => ['Upload', 'fa-cloud-arrow-up'], 'locations' => ['Locations & tasks', 'fa-hard-drive']])
