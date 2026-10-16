@@ -46,4 +46,4 @@ MQTT topic `remoment/playercmd/{device_id}` (QoS 1, not retained), or poll `GET 
 
 ## Web player
 
-`/player` is the browser implementation (`public/js/player.js`): `<audio>` on `/stream/{id}`, Media Session for lock screen and media keys, one "Start player" tap for autoplay. Playback lasts while the tab is open; pin the player in the bar to control it from every page. Not done yet: a second tab with the same token does not stop the first; no sync between players.
+`/player` is the browser implementation (`public/js/player.js`): `<audio>` on `/stream/{id}`, Media Session for lock screen and media keys, one click anywhere on the page to allow audio (asked right at load; a browser that already allows autoplay for the site never asks). Playback lasts while the tab is open; pin the player in the bar to control it from every page. Not done yet: a second tab with the same token does not stop the first; no sync between players.

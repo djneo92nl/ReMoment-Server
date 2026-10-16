@@ -121,11 +121,40 @@
         report();
     }
 
+    // Browsers only allow audio in a tab after a click or key press in it. So the page asks for one up front,
+    // on the same <audio> element (Safari unlocks per element), and every later play() just works.
+    const SILENCE = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+    let unlocked = false;
+    let ignoreEventsUntil = 0; // the silent unlock sound must not look like a track that ended
+
+    function showLocked(locked) {
+        $('start').style.display = locked ? 'inline-block' : 'none';
+        if (locked) status('Click anywhere on this page once to allow audio.');
+    }
+
+    function unlock() {
+        if (unlocked) return Promise.resolve();
+        ignoreEventsUntil = Date.now() + 1500;
+        const keep = audio.getAttribute('src');
+        const wasPlaying = !audio.paused;
+        if (!wasPlaying) audio.src = SILENCE;
+        return audio.play().then(() => {
+            unlocked = true;
+            document.removeEventListener('pointerdown', unlock);
+            document.removeEventListener('keydown', unlock);
+            if (!wasPlaying) {
+                audio.pause();
+                if (keep) audio.src = keep; else audio.removeAttribute('src');
+            }
+            showLocked(false);
+            if (pendingPlay && current) play();
+        }).catch(() => { if (!wasPlaying && keep) audio.src = keep; showLocked(true); });
+    }
+
     function play() {
-        audio.play().then(() => { pendingPlay = null; $('start').style.display = 'none'; }).catch(() => {
+        audio.play().then(() => { pendingPlay = null; }).catch(() => {
             pendingPlay = true;
-            $('start').style.display = 'inline-block';
-            status('Press "Start player" to allow audio.');
+            showLocked(true);
         });
     }
 
@@ -212,11 +241,17 @@
         setupMediaSession();
         connectMqtt(info);
 
-        $('start').addEventListener('click', () => { if (current) play(); });
+        document.addEventListener('pointerdown', unlock);
+        document.addEventListener('keydown', unlock);
+        unlock();
         $('name').addEventListener('change', () => register().catch(() => {}));
-        audio.addEventListener('ended', () => { ended = true; report({ ended: true }); });
-        audio.addEventListener('play', () => report());
-        audio.addEventListener('pause', () => { if (!ended) report(); });
+        audio.addEventListener('ended', () => {
+            if (!current || Date.now() < ignoreEventsUntil || audio.src.startsWith('data:')) return;
+            ended = true;
+            report({ ended: true });
+        });
+        audio.addEventListener('play', () => { if (Date.now() >= ignoreEventsUntil) report(); });
+        audio.addEventListener('pause', () => { if (!ended && Date.now() >= ignoreEventsUntil) report(); });
         audio.addEventListener('seeked', () => report());
         audio.addEventListener('volumechange', () => report());
         // A second tab with the same token takes over: nothing to do here beyond reporting; the newest

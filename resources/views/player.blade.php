@@ -28,7 +28,7 @@
   <div id="title">Nothing playing</div>
   <div id="artist"></div>
   <div id="bar"><i></i></div>
-  <button id="start" type="button">Start player</button>
+  <button id="start" type="button">Allow audio</button>
   <div id="choose" style="display:none;margin-bottom:16px"><p style="color:#aaa;font-size:14px;margin-bottom:8px">Use an existing player or add this browser as a new one:</p><select id="existing"></select> <button id="use" type="button" style="padding:8px 18px;font-size:14px">Use</button></div>
   <div><input id="name" aria-label="Player name" maxlength="60"></div>
   <div id="status">Connecting…</div>
