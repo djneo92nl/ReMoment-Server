@@ -24,6 +24,14 @@
         set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* private mode */ } },
     };
 
+    /** "Safari on Mac": the platform alone is the same in every browser. */
+    function defaultName() {
+        const ua = navigator.userAgent;
+        const browser = /Edg\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Browser';
+        const os = /iPhone|iPad/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android' : /Mac/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : '';
+        return os ? browser + ' on ' + os : browser;
+    }
+
     function status(text) { $('status').textContent = text; }
 
     async function api(path, options) {
@@ -144,7 +152,7 @@
     }
 
     async function init() {
-        $('name').value = store.get(NAME_KEY) || (navigator.platform || 'Browser') + ' browser';
+        $('name').value = store.get(NAME_KEY) || defaultName();
         const info = await register();
         lastCommand = info.last_command_id || 0;
         setupMediaSession();
