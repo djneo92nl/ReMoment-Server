@@ -22,8 +22,8 @@ final class PlaylistMode
 
     public const LOCAL = 'local';
 
-    /** The id of the Local (DLNA) library. */
-    public const LOCAL_LIBRARY = 'dlna';
+    /** The id of the Local (own files) library. */
+    public const LOCAL_LIBRARY = 'files';
 
     public function __construct(
         public readonly string $mode,

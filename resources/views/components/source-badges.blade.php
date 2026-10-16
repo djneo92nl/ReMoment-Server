@@ -1,4 +1,4 @@
-@props(['dlna' => false, 'spotify' => false, 'labels' => false, 'light' => false])
+@props(['files' => false, 'dlna' => false, 'spotify' => false, 'labels' => false, 'light' => false])
 
 {{-- `light`: on a light surface; default: on a cover (dark chip, white text). --}}
 @php
@@ -7,8 +7,13 @@
     $green = $light ? 'text-emerald-600' : 'text-emerald-400';
 @endphp
 
-@if($dlna || $spotify)
+@if($files || $dlna || $spotify)
     <span {{ $attributes->merge(['class' => 'inline-flex items-center gap-1']) }}>
+        @if($files)
+            <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] leading-none {{ $chip }} {{ $plain }}" title="In the Local library">
+                <i class="fa-solid fa-hard-drive"></i>@if($labels)<span>Local</span>@endif
+            </span>
+        @endif
         @if($dlna)
             <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] leading-none {{ $chip }} {{ $plain }}" title="In the DLNA library">
                 <i class="fa-solid fa-server"></i>@if($labels)<span>DLNA</span>@endif

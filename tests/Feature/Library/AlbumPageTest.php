@@ -110,8 +110,8 @@ class AlbumPageTest extends TestCase
         $this->withCookie(SelectedDevice::COOKIE, (string) $speaker->id)
             ->get(route('albums.show', $album))->assertOk()
             ->assertSee('Plays on Kitchen Speaker')
-            ->assertSee("/albums/{$album->id}/play/{$speaker->id}?source=dlna", false)
-            ->assertSee("/albums/{$album->id}/play/{$speaker->id}?source=dlna&amp;shuffle=1", false);
+            ->assertSee("/albums/{$album->id}/play/{$speaker->id}?source=files", false)
+            ->assertSee("/albums/{$album->id}/play/{$speaker->id}?source=files&amp;shuffle=1", false);
     }
 
     public function test_the_hero_carries_the_metadata_and_flags_high_quality_tracks(): void
@@ -185,8 +185,8 @@ class AlbumPageTest extends TestCase
         $this->track($album, 'Local Song');
         $this->spotifyTrack($album, 'Streamed Song', 'abc');
 
-        $this->get(route('albums.show', [$album, 'source' => 'dlna']))->assertOk()
-            ->assertSee('data-test="source-spotify"', false)->assertSee('data-test="source-dlna"', false)
+        $this->get(route('albums.show', [$album, 'source' => 'files']))->assertOk()
+            ->assertSee('data-test="source-spotify"', false)->assertSee('data-test="source-files"', false)
             ->assertSee('Local Song')->assertDontSee('Streamed Song');
 
         $this->get(route('albums.show', [$album, 'source' => 'spotify']))->assertOk()
@@ -198,7 +198,7 @@ class AlbumPageTest extends TestCase
         $single = $this->album('Single');
         $this->track($single, 'Only Song');
         $this->get(route('albums.show', $single))->assertOk()
-            ->assertDontSee('data-test="source-dlna"', false)->assertSee('In Local');
+            ->assertDontSee('data-test="source-files"', false)->assertSee('In Local');
     }
 
     public function test_the_scope_picks_the_default_source(): void
@@ -219,10 +219,10 @@ class AlbumPageTest extends TestCase
         $this->spotifyTrack($album, 'Streamed', 'abc');
         $playlist = Playlist::create(['name' => 'Mine', 'source' => 'local']);
 
-        $this->post(route('playlists.tracks.add', $playlist), ['album_id' => $album->id, 'source' => 'dlna'])->assertSessionHas('success');
+        $this->post(route('playlists.tracks.add', $playlist), ['album_id' => $album->id, 'source' => 'files'])->assertSessionHas('success');
         $this->assertSame([$first->id, $second->id], $playlist->tracks()->orderBy('playlist_track.position')->pluck('tracks.id')->all());
 
-        $this->post(route('playlists.tracks.add', $playlist), ['album_id' => $album->id, 'source' => 'dlna'])
+        $this->post(route('playlists.tracks.add', $playlist), ['album_id' => $album->id, 'source' => 'files'])
             ->assertSessionHas('success', fn ($m) => str_contains($m, 'Already in'));
         $this->assertSame(2, $playlist->tracks()->count());
 
@@ -241,7 +241,7 @@ class AlbumPageTest extends TestCase
         $this->post(route('playlists.tracks.add', $spotify), ['track_id' => $track->id])->assertSessionHas('error');
         $this->assertSame(0, $smart->tracks()->count() + $spotify->tracks()->count());
 
-        $this->post(route('playlists.store'), ['name' => 'Fresh', 'album_id' => $album->id, 'source' => 'dlna'])->assertSessionHas('success');
+        $this->post(route('playlists.store'), ['name' => 'Fresh', 'album_id' => $album->id, 'source' => 'files'])->assertSessionHas('success');
         $this->assertSame([$track->id], Playlist::where('name', 'Fresh')->first()->tracks()->pluck('tracks.id')->all());
 
         // The modal lists the editable playlists only.
@@ -274,7 +274,7 @@ class AlbumPageTest extends TestCase
 
         $this->connectSpotify(\Mockery::mock(\SpotifyWebAPI\SpotifyWebAPI::class));
         $this->get(route('albums.show', $album))->assertOk()
-            ->assertSee('data-test="source-spotify"', false)->assertSee('data-test="source-dlna"', false);
+            ->assertSee('data-test="source-spotify"', false)->assertSee('data-test="source-files"', false);
 
         // The Spotify side hosts the lazily loaded Spotify tracklist, not the library's rows.
         $this->get(route('albums.show', [$album, 'source' => 'spotify']))->assertOk()
@@ -292,7 +292,7 @@ class AlbumPageTest extends TestCase
 
         // A Spotify device only does Spotify: nothing to play on the Local side, and rows have no play button.
         $this->app->forgetScopedInstances();
-        $this->withCookie(SelectedDevice::COOKIE, (string) $spotifyDevice->id)->get(route('albums.show', [$album, 'source' => 'dlna']))->assertOk()
+        $this->withCookie(SelectedDevice::COOKIE, (string) $spotifyDevice->id)->get(route('albums.show', [$album, 'source' => 'files']))->assertOk()
             ->assertDontSee($play, false)->assertSee("Spotify Connect can't play Local", false)->assertDontSee('Play Local Song on', false);
 
         // On the Spotify side it plays the album from Spotify.

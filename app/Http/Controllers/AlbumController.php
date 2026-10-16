@@ -93,7 +93,7 @@ class AlbumController extends Controller
 
     public function play(Request $request, Album $album, Device $device, LibraryPlayback $library)
     {
-        $source = $request->validate(['source' => ['nullable', 'in:dlna,spotify']])['source'] ?? null;
+        $source = $request->validate(['source' => ['nullable', 'in:files,dlna,spotify']])['source'] ?? null;
 
         return $this->flashPlayback(fn () => $library->playAlbum($device, $album, shuffle: $request->boolean('shuffle'), source: $source), $device, $album->name);
     }

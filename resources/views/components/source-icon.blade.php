@@ -3,6 +3,7 @@
 @php
     [$iconClass, $colorClass] = match(strtolower($source ?? '')) {
         'spotify' => ['fa-brands fa-spotify', 'text-emerald-500'],
+        'files' => ['fa-solid fa-hard-drive', 'text-gray-400 dark:text-gray-500'],
         'dlna' => ['fa-solid fa-server', 'text-gray-400 dark:text-gray-500'],
         'local' => ['fa-solid fa-house', 'text-gray-400 dark:text-gray-500'],
         'smart' => ['fa-solid fa-wand-magic-sparkles', 'text-gray-400 dark:text-gray-500'],

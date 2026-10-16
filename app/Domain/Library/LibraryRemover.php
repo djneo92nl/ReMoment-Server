@@ -58,7 +58,7 @@ class LibraryRemover
     /** Removes every track of an album that has none on DLNA; returns how many, null when the album has DLNA tracks. */
     public static function album(Album $album): ?int
     {
-        if (LibrarySources::availableFrom($album->tracks(), 'dlna')->exists()) {
+        if (self::ownedElsewhere($album->tracks())) {
             return null;
         }
 
@@ -83,7 +83,7 @@ class LibraryRemover
      */
     public static function artist(Artist $artist): ?int
     {
-        if (LibrarySources::availableFrom($artist->tracks(), 'dlna')->exists()) {
+        if (self::ownedElsewhere($artist->tracks())) {
             return null;
         }
 
@@ -113,5 +113,12 @@ class LibraryRemover
         $model->metadata()->delete();
         $model->genreRelation()->detach();
         $model->delete();
+    }
+
+    /** Whether any of the tracks is in the Local files or on a DLNA server: those are removed at their source, not here. */
+    public static function ownedElsewhere($tracks): bool
+    {
+        return LibrarySources::availableFrom($tracks, 'dlna')->exists()
+            || LibrarySources::availableFrom($tracks, 'files')->exists();
     }
 }

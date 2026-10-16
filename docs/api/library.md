@@ -48,7 +48,7 @@ Duplicates from before that are merged by an admin running `php artisan library:
   "year": 2003,
   "artwork": { "hash": "…", "proxy_120": "…", "proxy_320": "…", "colors": ["#…"], "safe_colors": ["#…"] },
   "favorite": false,
-  "sources": ["dlna", "spotify"],
+  "sources": ["files", "dlna", "spotify"],
   "genres": ["Alternative Rock"],
   "details": {
     "label": "Mushroom", "catalog_number": "MUSH-1", "release_type": "album", "secondary_types": ["live"],
@@ -62,7 +62,7 @@ Duplicates from before that are merged by an admin running `php artisan library:
 }
 ```
 
-`sources` lists where the album's visible tracks come from: `spotify` and/or `dlna`, in that order (a track merged from both counts for both; `App\Domain\Library\LibrarySources::ofTracks`). Playlists (`GET /api/library/playlists/{id}`) have the same field.
+`sources` lists where the album's visible tracks come from: `files`, `dlna` and/or `spotify`, in that order (a track merged from both counts for both; `App\Domain\Library\LibrarySources::ofTracks`). Playlists (`GET /api/library/playlists/{id}`) have the same field.
 
 **TrackDetails** — `{ "genres": [], "quality": "FLAC · 16-bit / 44.1 kHz · 1411 kbps · stereo"|null, "credits": { "composer": ["…"], "instrument": ["Name (guitar)"] }, "isrc": null, "explicit": true|false|null, "popularity": 67|null, "listeners": null, "playcount": null, "analysis": TrackAnalysis|null }`. `quality` is what a DLNA server reported; `credits` are MusicBrainz credits grouped by role (an empty object when none); `popularity` is Spotify's 0–100; `listeners`/`playcount` are Last.fm's.
 
@@ -139,13 +139,13 @@ The mosaic is used **even when the playlist has its own image**, so all playlist
 
 ### `GET /api/library/libraries[?client={api_token}][&device_id={id}]`
 
-A **library** is a music collection: DLNA/local, Spotify, later Deezer and Tidal. (A *source*, in the device APIs, is an input of a device: never the same thing.) Libraries cannot be played combined, so there is no "all" entry. Registered in `App\Domain\Library\LibrarySources::LIBRARIES`: adding one there makes it appear here, accepted as a `scope` and hideable per client.
+A **library** is a music collection: Local (own files, id `files`), DLNA and Spotify, later Deezer and Tidal. (A *source*, in the device APIs, is an input of a device: never the same thing.) Libraries cannot be played combined, so there is no "all" entry. Registered in `App\Domain\Library\LibrarySources::LIBRARIES`: adding one there makes it appear here, accepted as a `scope` and hideable per client.
 
 ```
 { "data": [ Library, … ] }
 Library = { id, name, kind, album_count, artist_count, playlist_count, artwork, playable? }
-  id        "dlna" | "spotify" | … (also a valid `scope`)
-  name      "Local" | "Spotify" | …
+  id        "files" | "dlna" | "spotify" | … (also a valid `scope`)
+  name      "Local" | "DLNA" | "Spotify" | …
   kind      "local" | "streaming"
   *_count   what the library has for this client (a track merged from DLNA and Spotify counts in both)
   artwork   a representative cover (the library's most recently played album with a cover, else its newest), the small
@@ -182,13 +182,13 @@ Recently played albums, playlists and radio stations in one list, newest first. 
 
 ## Hiding sources per client
 
-An admin can hide sources from a client at `/settings/clients` (edit → *Hide from library*): `spotify`, `dlna` and `radio` (`App\Domain\Library\LibrarySources::ALL`; a future source is added there). The setting is `clients.hidden_sources` (JSON array).
+An admin can hide sources from a client at `/settings/clients` (edit → *Hide from library*): `files`, `dlna`, `spotify` and `radio` (`App\Domain\Library\LibrarySources::ALL`; a future source is added there). The setting is `clients.hidden_sources` (JSON array).
 
 A client applies it by adding its API token as `?client={api_token}` to the browse endpoints (`/api/library/libraries`, `recent-items`, `artists`, `artists/{id}`, `albums/{id}`, `genres`, `genres/{slug}`, `playlists`, `playlists/{id}`, `recent`, `favorites`) and to `GET /api/devices/{id}/radio`. Without the parameter no client preference applies; an unknown token is `404`.
 
-**Library scope.** The browse endpoints also take `?scope=` (`422` for anything else): a **library id** from `GET /api/library/libraries` (`dlna`, `spotify`, later `deezer`, `tidal`) to show only that library, or the older `local` (the libraries of kind `local`: DLNA), `streaming` (kind `streaming`: Spotify) and `all` (every library combined), which keep working unchanged. A track available from two libraries shows in either. The playlist list, favorites, recent, genres, albums, artists and search all take it; `playlists?scope=all` lists the playlists of every library, last-played first, smart playlists included. Without `scope` the default is the leading library: DLNA when it has imported tracks, otherwise Spotify (admin setting `/settings/library`: Automatic, DLNA, Spotify or Everything, which defaults to `all`). `GET /api/clients/{api_token}/artwork` always uses the default. Nothing is deleted, the scope only filters. `GET /api/clients/{api_token}/artwork` applies it from its path.
+**Library scope.** The browse endpoints also take `?scope=` (`422` for anything else): a **library id** from `GET /api/library/libraries` (`files`, `dlna`, `spotify`, later `deezer`, `tidal`) to show only that library, or the older `local` (the libraries of kind `local`: your own files), `streaming` (kind `streaming`: DLNA, Spotify, later Deezer/Tidal) and `all` (every library combined), which keep working unchanged. A track available from two libraries shows in either. The playlist list, favorites, recent, genres, albums, artists and search all take it; `playlists?scope=all` lists the playlists of every library, last-played first, smart playlists included. Without `scope` the default is the leading library: the own files when indexed, else DLNA when it has imported tracks, otherwise Spotify (admin setting `/settings/library`: Automatic, Local files, DLNA, Spotify or Everything, which defaults to `all`). `GET /api/clients/{api_token}/artwork` always uses the default. Nothing is deleted, the scope only filters. `GET /api/clients/{api_token}/artwork` applies it from its path.
 
-- A track is available from its own `source` and from the sources of its `dlna_url` (`dlna:{server}`) and `external_id` metadata, so a track merged from DLNA and Spotify. It is hidden only when **all** of those are hidden.
+- A track is available from its own `source` and from the sources of its `dlna_url` (`dlna:{server}`, own files: `files`) and `external_id` metadata, so a track merged from DLNA and Spotify. It is hidden only when **all** of those are hidden.
 - Albums, artists and playlists with no visible track are left out; counts (`album_count`, `track_count`, genre counts) and album/playlist `tracks` only count visible tracks.
 - `radio` empties the `/radio` station list (`{ "stations": [] }`).
 - Playing is not blocked: the filter is for browsing, so playing a hidden id still works.
@@ -221,7 +221,7 @@ Favorites are listed most recently favorited first; favoriting an item again kee
 ```
 POST /api/devices/{id}/library/play-album     body: { "album_id": 12, "start_track_id": 34, "shuffle": false }    → { "status": "ok", "album": "Absolution" }
 POST /api/devices/{id}/library/play-artist    body: { "artist_id": 5, "shuffle": true }                           → { "status": "ok", "artist": "Muse" }
-POST /api/devices/{id}/library/play-playlist  body: { "playlist_id": 3, "start_track_id": 12, "shuffle": false, "library": "dlna" } → { "status": "ok", "playlist": "Discover Weekly", "mode": "library" }   (local mode adds "queued", "skipped"; see below)
+POST /api/devices/{id}/library/play-playlist  body: { "playlist_id": 3, "start_track_id": 12, "shuffle": false, "library": "files" } → { "status": "ok", "playlist": "Discover Weekly", "mode": "library" }   (local mode adds "queued", "skipped"; see below)
 ```
 
 `library` (play-playlist only, optional) is the library the playlist was browsed in; it picks the playback mode (see [Playlists of another library, played locally](#playlists-of-another-library-played-locally)). `start_track_id` (optional) must be a track of that album (or playlist); playback starts there and continues to the end of the album (playlist, in playlist order). `shuffle` (optional, default `false`) shuffles the order (after the start track, if given). An artist plays all its library tracks, grouped by album.
@@ -256,18 +256,18 @@ A playlist belongs to a **library** (`spotify` for a synced Spotify playlist; lo
 | Mode | What plays | Needs a device that can play |
 |---|---|---|
 | `library` | The playlist's own library plays it: a Spotify playlist is loaded as a Spotify context and Spotify Connect handles playback. Local/smart playlists play their tracks as always (Local first, then Spotify URIs). | the playlist's library (`playable` in `GET /api/library/libraries?device_id=`) |
-| `local` | The server queues the playlist's tracks that have a playable copy in the **Local** library (`dlna`), in playlist order, and **skips** the rest. | Local |
+| `local` | The server queues the playlist's tracks that have a playable copy in the **Local** library (`files`), in playlist order, and **skips** the rest. | Local |
 
 **Which mode:** it follows from where the playlist was opened. The client passes the id of the library it was browsing as `library` (the same ids as `scope`: `dlna`, `spotify`, …), the server decides and validates:
 
-| Playlist | `library` absent | `library` = its own library | `library=dlna` | any other library |
+| Playlist | `library` absent | `library` = its own library | `library=files` | any other library |
 |---|---|---|---|---|
-| Spotify playlist | `library` mode, `mode_library` `spotify` | `library` mode, `spotify` | **`local` mode**, `dlna` | `422` |
-| Local or smart playlist | `library` mode, `mode_library` `null` | n/a | `library` mode, `dlna` | `422` |
+| Spotify playlist | `library` mode, `mode_library` `spotify` | `library` mode, `spotify` | **`local` mode**, `files` | `422` |
+| Local or smart playlist | `library` mode, `mode_library` `null` | n/a | `library` mode, `files` | `422` |
 
 So: a playlist opened from the Spotify library plays through Spotify; the same playlist opened from the Local library plays the local copies. A client does not decide anything: it shows the response's `mode`, and sends the same `library` to play. `422` here is a Laravel validation error on `library`.
 
-**Coverage.** For a playlist of another library the server counts how many of its tracks have a playable Local copy (a `dlna_url`; a track counts once per place in the playlist):
+**Coverage.** For a playlist of another library the server counts how many of its tracks have a playable Local copy (a `dlna_url` from the own files; a track counts once per place in the playlist):
 
 - `track_count`: all tracks of the playlist,
 - `local_track_count`: those with a local copy,
@@ -275,7 +275,7 @@ So: a playlist opened from the Spotify library plays through Spotify; the same p
 
 For local/smart playlists (and playlists of the Local library) the two local fields are `null`. Counted for a whole page with one aggregate query (`App\Domain\Library\PlaylistCoverage`).
 
-**List.** `GET /api/library/playlists?scope=dlna` (or `local`) lists the Local playlists and, additionally, the playlists of another library with `local_coverage >= 0.4` (`PlaylistCoverage::MIN_COVERAGE`, the one place the threshold lives; it is compared after rounding, so `0.40` is in, `0.39` is out). Ordering and paging are as ever (last played first, then name; one cursor over the combined list). `scope=all` and the other scopes list each playlist once, as itself, never external. Items:
+**List.** `GET /api/library/playlists?scope=files` (or `local`) lists the Local playlists and, additionally, the playlists of another library with `local_coverage >= 0.4` (`PlaylistCoverage::MIN_COVERAGE`, the one place the threshold lives; it is compared after rounding, so `0.40` is in, `0.39` is out). Ordering and paging are as ever (last played first, then name; one cursor over the combined list). `scope=all` and the other scopes list each playlist once, as itself, never external. Items:
 
 ```json
 { "id": 7, "name": "Mix", "track_count": 20, "owner": null, "last_played_at": null, "artwork": null,
@@ -284,14 +284,14 @@ For local/smart playlists (and playlists of the Local library) the two local fie
   "library": "spotify", "external": true, "local_track_count": 18, "local_coverage": 0.6 }
 ```
 
-`external` is `true` only in the Local scope, for a playlist that belongs to another library; open it with `library=dlna` (what the client is browsing) so it gets local mode. Show the coverage ("18 of 30 tracks in Local") and, for tracks that are missing, mark them. A client that hides the playlist's library (`?client=`) does not get it as external either.
+`external` is `true` only in the Local scope, for a playlist that belongs to another library; open it with `library=files` (what the client is browsing) so it gets local mode. Show the coverage ("18 of 30 tracks in Local") and, for tracks that are missing, mark them. A client that hides the playlist's library (`?client=`) does not get it as external either.
 
-**Detail.** `GET /api/library/playlists/{id}?device_id=&library=dlna` on a Spotify playlist:
+**Detail.** `GET /api/library/playlists/{id}?device_id=&library=files` on a Spotify playlist:
 
 ```json
 {
   "id": 9, "name": "Discover Weekly", "owner": "Spotify", "last_played_at": null, "artwork": { … },
-  "mode": "local", "mode_library": "dlna", "sources": ["dlna"],
+  "mode": "local", "mode_library": "files", "sources": ["files"],
   "track_count": 30, "local_track_count": 18, "local_coverage": 0.6,
   "smart": false, "rules": null, "rules_summary": null,
   "playable": true,
@@ -308,7 +308,7 @@ For local/smart playlists (and playlists of the Local library) the two local fie
 - `playable` of the playlist: in local mode the device can play Local and at least one track has a local copy.
 - Without `library` (or `library=spotify`) the same Spotify playlist answers `"mode": "library"`, `"mode_library": "spotify"`, `"sources": ["spotify"]` and the playability described under *Playlists of a library*, exactly as before.
 
-**Play.** `POST /api/devices/{id}/library/play-playlist` takes the same optional `library` in its body (`{ "playlist_id": 9, "library": "dlna", "start_track_id": 34, "shuffle": false }`); the mode is decided like for the detail.
+**Play.** `POST /api/devices/{id}/library/play-playlist` takes the same optional `library` in its body (`{ "playlist_id": 9, "library": "files", "start_track_id": 34, "shuffle": false }`); the mode is decided like for the detail.
 
 ```json
 { "status": "ok", "playlist": "Discover Weekly", "queued": 18, "skipped": 12, "mode": "local" }

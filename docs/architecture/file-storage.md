@@ -17,7 +17,7 @@ ReMoment can serve its own music files instead of relying on a DLNA server. File
 - `LibraryFiles` — management: `upload` (inbox → index → library layout), `importInbox`, `reorganize`, `deleteFile`, `deleteTrack`, `move` (rename), `retag` (writeTags + queue enrichment), `rematch` (re-read the tags and tie the file to its track again; the one place to change how songs are matched is `FileIndexer::attach`), `setHidden` / `setFolderHidden`, `enrich`, `writeTags` (getID3, mp3 pure PHP; flac needs `metaflac`, ogg `vorbiscomment`; re-reads the file and re-files the track), `verify` (re-hash, flag missing), `duplicates` (same hash).
 - `App\Services\Local\LocalLibraryScanner` — scans a location through the indexer and marks files that disappeared `missing`.
 
-A track made from a file gets source `dlna` and a `dlna_url` (metadata source `dlna:local`) of `{APP_URL}/stream/{track}`, so playback, library scopes and `library:merge-duplicates` work unchanged; a proper `local` library entry in `LibrarySources` is still to do. `APP_URL` must be an address the speakers can reach.
+A track made from a file gets source `files` and a `dlna_url` (metadata source `files`) of `{APP_URL}/stream/{track}`, so playback, library scopes and `library:merge-duplicates` work unchanged. The Local library is the `files` entry of `LibrarySources::LIBRARIES` (kind `local`); a real DLNA server is the separate `dlna` library (kind `streaming`). A track available from both counts for both, and plays from the file. `APP_URL` must be an address the speakers can reach.
 
 A track whose last file is deleted is removed, unless another source (a real DLNA server, Spotify) still plays it; then only the local stream is unlinked.
 

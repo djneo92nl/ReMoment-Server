@@ -102,8 +102,8 @@ final class AlbumPage
         }
 
         $preferred = match (true) {
-            $scope === 'local' => 'dlna',
-            $scope === 'streaming' => 'spotify',
+            $scope === 'local' => 'files',
+            $scope === 'streaming' => collect(LibrarySources::libraryIdsOfKind('streaming'))->first(fn ($id) => in_array($id, $sources, true)),
             in_array($scope, LibrarySources::libraryIds(), true) => $scope,
             default => null,
         };
@@ -142,7 +142,7 @@ final class AlbumPage
 
         // Only the selected source counts: a Spotify-only device gets no play buttons on the Local list, and the other way round.
         $dlna = $source !== 'spotify' && LibraryPlayback::canPlayDlna($device);
-        $spotify = $source !== 'dlna' && LibraryPlayback::canPlaySpotify($device);
+        $spotify = !in_array($source, ['files', 'dlna'], true) && LibraryPlayback::canPlaySpotify($device);
 
         return $tracks->mapWithKeys(fn (Track $t) => [
             $t->id => ($dlna && $t->getDlnaUrl()) || ($spotify && LibraryPlayback::spotifyUri($t) !== null),

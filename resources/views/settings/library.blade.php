@@ -13,10 +13,10 @@
             @csrf
             <p class="text-sm text-gray-500">
                 The leading source is what the library pages and the API show by default; the other source extends it.
-                Currently leading: <strong class="text-gray-800 dark:text-gray-200">{{ ['dlna' => 'DLNA', 'spotify' => 'Spotify', 'all' => 'everything'][$leading] }}</strong>.
+                Currently leading: <strong class="text-gray-800 dark:text-gray-200">{{ ['files' => 'Local files', 'dlna' => 'DLNA', 'spotify' => 'Spotify', 'all' => 'everything'][$leading] }}</strong>.
             </p>
 
-            @foreach(['auto' => ['Automatic', 'DLNA when it has imported tracks, otherwise Spotify.'], 'dlna' => ['DLNA', 'Always lead with the DLNA library.'], 'spotify' => ['Spotify', 'Always lead with Spotify.'], 'all' => ['Everything', 'No leading source: show every source together.']] as $value => [$label, $hint])
+            @foreach(['auto' => ['Automatic', 'Local files when indexed, else DLNA when it has imported tracks, otherwise Spotify.'], 'files' => ['Local files', 'Always lead with your own files.'], 'dlna' => ['DLNA', 'Always lead with the DLNA library.'], 'spotify' => ['Spotify', 'Always lead with Spotify.'], 'all' => ['Everything', 'No leading source: show every source together.']] as $value => [$label, $hint])
                 <label class="flex items-start gap-3 cursor-pointer">
                     <input type="radio" name="leading_source" value="{{ $value }}" @checked($mode === $value) class="mt-1 text-gray-900 dark:text-stone-500 focus:ring-gray-400">
                     <span>

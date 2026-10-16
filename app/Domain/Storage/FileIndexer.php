@@ -30,8 +30,8 @@ class FileIndexer
     /** Source of the track metadata written from the file's tags and properties. */
     public const TAG_SOURCE = 'local';
 
-    /** Metadata source of the stream URL: the library treats it as the local library (see LibrarySources). */
-    public const URL_SOURCE = 'dlna:local';
+    /** Metadata source of the stream URL: the Local library (see LibrarySources). */
+    public const URL_SOURCE = 'files';
 
     /** @return array{0: ?File, 1: string} the file row and what happened */
     public function index(StorageLocation $location, string $path, ?FileStore $store = null): array
@@ -87,16 +87,16 @@ class FileIndexer
         $artistName = $tags['artist'] ?? $tags['album_artist'] ?? 'Unknown Artist';
         $albumArtistName = $tags['album_artist'] ?? $artistName;
 
-        $artist = LibraryIdentity::artist($artistName, 'dlna');
-        $albumArtist = $albumArtistName === $artistName ? $artist : LibraryIdentity::artist($albumArtistName, 'dlna');
+        $artist = LibraryIdentity::artist($artistName, 'files');
+        $albumArtist = $albumArtistName === $artistName ? $artist : LibraryIdentity::artist($albumArtistName, 'files');
 
         $released = ReleaseDate::parse($tags['year']);
-        $album = LibraryIdentity::album($albumArtist, $tags['album'] ?? 'Unknown Album', 'dlna',
+        $album = LibraryIdentity::album($albumArtist, $tags['album'] ?? 'Unknown Album', 'files',
             $released ? ['released_at' => $released] : []);
 
         app(CoverExtractor::class)->apply($album, $tags['picture'] ?? null);
 
-        $track = LibraryIdentity::track($artist, $album, $tags['title'] ?? $fallbackTitle, 'local:file:'.$file->id, 'dlna', [
+        $track = LibraryIdentity::track($artist, $album, $tags['title'] ?? $fallbackTitle, 'local:file:'.$file->id, 'files', [
             'duration' => $tags['duration'],
         ]);
 

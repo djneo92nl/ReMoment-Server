@@ -139,7 +139,7 @@ class AseLibraryPlaybackTest extends TestCase
     private function ownTrack(string $name): Track
     {
         $track = $this->track($name, 'http://old-host.test/stream/1');
-        Metadata::where('metadatable_id', $track->id)->where('key', 'dlna_url')->update(['source' => 'dlna:local']);
+        Metadata::where('metadatable_id', $track->id)->where('key', 'dlna_url')->update(['source' => 'files']);
 
         return $track->refresh();
     }

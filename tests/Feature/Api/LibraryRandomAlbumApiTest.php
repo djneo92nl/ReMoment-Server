@@ -66,7 +66,7 @@ class LibraryRandomAlbumApiTest extends TestCase
         $this->album('Local', true);
         $this->album('Streamed', false, 'abc');
 
-        $this->assertSame(['Local'], $this->names('/api/library/random-album?scope=dlna'));
+        $this->assertSame(['Local'], $this->names('/api/library/random-album?scope=files'));
         $this->assertSame(['Streamed'], $this->names('/api/library/random-album?scope=spotify'));
         $this->assertSame(['Local'], $this->names('/api/library/random-album?scope=local'));
         $this->assertSame(['Streamed'], $this->names('/api/library/random-album?scope=streaming'));

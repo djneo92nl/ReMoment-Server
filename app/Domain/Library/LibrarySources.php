@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\Relation;
  * The sources a client can hide from what it browses: the key is what
  * `clients.hidden_sources` stores, and what `tracks.source` / the `source`
  * of a track's `dlna_url` and `external_id` metadata start with (a DLNA
- * stream's source is `dlna:{server_id}`). Add a future source here and it
+ * stream's source is `dlna:{server_id}`, an own file's `files`). Add a future source here and it
  * shows up in the client settings; the filters need no other change.
  *
  * A track is hidden only when every source it is available from is hidden,
@@ -32,8 +32,9 @@ class LibrarySources
      * can be hidden per client.
      */
     public const LIBRARIES = [
+        'files' => ['name' => 'Local', 'kind' => 'local', 'label' => 'Local files', 'device' => [LibraryPlayback::class, 'canPlayDlna']],
+        'dlna' => ['name' => 'DLNA', 'kind' => 'streaming', 'label' => 'DLNA library', 'device' => [LibraryPlayback::class, 'canPlayDlna']],
         'spotify' => ['name' => 'Spotify', 'kind' => 'streaming', 'label' => 'Spotify', 'device' => [LibraryPlayback::class, 'canPlaySpotify']],
-        'dlna' => ['name' => 'Local', 'kind' => 'local', 'label' => 'DLNA library', 'device' => [LibraryPlayback::class, 'canPlayDlna']],
     ];
 
     /** Whether $device can play the library $id; false for an unknown library. */

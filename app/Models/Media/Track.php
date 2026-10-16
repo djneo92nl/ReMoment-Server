@@ -95,7 +95,7 @@ class Track extends Model
      * id, and the station's logo as its image. Matching it to a real track replaces it.
      */
     /**
-     * The library sources this track is available from, `dlna` and/or `spotify`: its own source, or
+     * The library sources this track is available from, `files`, `dlna` and/or `spotify`: its own source, or
      * a DLNA url / Spotify id kept from a merge.
      *
      * @return list<string>
@@ -107,7 +107,7 @@ class Track extends Model
             : $this->metadata()->whereIn('key', ['dlna_url', 'external_id'])->get();
 
         $sources = [];
-        foreach (['dlna', 'spotify'] as $source) {
+        foreach (['files', 'dlna', 'spotify'] as $source) {
             if ($this->source === $source || $meta->contains(fn ($m) => $m->source === $source || str_starts_with((string) $m->source, $source.':'))) {
                 $sources[] = $source;
             }
@@ -116,10 +116,10 @@ class Track extends Model
         return $sources;
     }
 
-    /** Whether the track may be removed from the library: it isn't available from the DLNA library. */
+    /** Whether the track may be removed from the library: it isn't available from the Local or DLNA library. */
     public function isRemovable(): bool
     {
-        return !in_array('dlna', $this->sources(), true);
+        return array_intersect(['files', 'dlna'], $this->sources()) === [];
     }
 
     public function isRadioStub(): bool
@@ -137,9 +137,12 @@ class Track extends Model
 
     public function getDlnaUrl(): ?string
     {
-        $row = $this->relationLoaded('metadata')
-            ? $this->metadata->firstWhere('key', 'dlna_url')
-            : $this->metadata()->where('key', 'dlna_url')->first();
+        $rows = $this->relationLoaded('metadata')
+            ? $this->metadata->where('key', 'dlna_url')
+            : $this->metadata()->where('key', 'dlna_url')->get();
+
+        // A track in both the Local files and on a DLNA server plays from the file.
+        $row = $rows->firstWhere('source', FileIndexer::URL_SOURCE) ?? $rows->first();
 
         // Our own files are addressed at play time, so the setting applies to tracks scanned before it.
         if ($row?->source === FileIndexer::URL_SOURCE) {

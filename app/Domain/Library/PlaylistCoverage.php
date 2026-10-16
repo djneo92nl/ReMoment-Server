@@ -2,14 +2,15 @@
 
 namespace App\Domain\Library;
 
+use App\Domain\Storage\FileIndexer;
 use App\Models\Media\Playlist;
 use App\Models\Media\Track;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
- * How much of a playlist of another library (a Spotify playlist) exists in the Local (DLNA) library:
- * the share of its tracks with a playable local copy (a `dlna_url`). Playlists of the Local library
+ * How much of a playlist of another library (a Spotify playlist) exists in the Local (own files) library:
+ * the share of its tracks with a playable local copy (a `dlna_url` of source `files`). Playlists of the Local library
  * and local/smart playlists have no coverage. A playlist with at least MIN_COVERAGE is listed in the
  * Local scope as an "external" playlist and can be played in local mode (PlaylistMode).
  *
@@ -89,6 +90,7 @@ final class PlaylistCoverage
                 $join->on('m.metadatable_id', '=', 'pt.track_id')
                     ->where('m.metadatable_type', (new Track)->getMorphClass())
                     ->where('m.key', 'dlna_url')
+                    ->where('m.source', FileIndexer::URL_SOURCE)
                     ->where('m.value', '!=', '');
             })
             ->groupBy('pt.playlist_id')

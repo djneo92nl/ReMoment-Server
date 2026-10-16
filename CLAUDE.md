@@ -406,7 +406,7 @@ For Sonos, `joinable` is always empty (returns `[]`); the UI falls back to showi
 Browse, favorites and playback for clients; full shapes in `docs/api/library.md`. Artwork in these responses is the small object `{ hash, proxy_120, proxy_320, colors, safe_colors }` or `null` while unprocessed (queued at most once an hour per image). `colors`/`safe_colors` are the full artwork object's palette from the cover's cache entry (`null` when the entry expired or predates it); list endpoints read the entries of a page in one cache round trip (`LibraryItemArtwork::preload`).
 
 ```
-GET  /api/library/libraries[?device_id=]    → { data: [{ id, name, kind, album_count, artist_count, playlist_count, artwork, playable? }] }   music libraries (dlna, spotify, …; LibrarySources::LIBRARIES) with content, not hidden for ?client=; `playable` only with ?device_id= (can that device play it: LibrarySources::LIBRARIES `device` check, 422 unknown device); a library id is also a valid ?scope= on the browse endpoints (next to local|streaming|all)
+GET  /api/library/libraries[?device_id=]    → { data: [{ id, name, kind, album_count, artist_count, playlist_count, artwork, playable? }] }   music libraries (files = Local own files, dlna, spotify, …; LibrarySources::LIBRARIES) with content, not hidden for ?client=; `playable` only with ?device_id= (can that device play it: LibrarySources::LIBRARIES `device` check, 422 unknown device); a library id is also a valid ?scope= on the browse endpoints (next to local|streaming|all)
 GET  /api/library/recent-items?limit=30   → { data: [{ type: album|playlist|radio, library, played_at, album, playlist, station }] }   mixed recently played, newest first
 GET  /api/library/artists?cursor=&sort=&letter= → { data: [ArtistItem], next_cursor }   sort name (default, "The " ignored) | plays (most played first, plays of visible tracks in the scope, unplayed last, ties name then id), 50/page, only artists with albums; letter A-Z/# starts there (ignored for plays)
 GET  /api/library/albums?cursor=&sort=&letter= → { data: [AlbumItem], next_cursor }   sort name (default) | artist | year | added | plays, 60/page, only albums with tracks; letter A-Z/# starts at that letter of the name/artist sort (ignored for year/added/plays)
@@ -609,7 +609,7 @@ DLNA servers are discovered on the network and their tracks imported into the sh
 
 ### Leading source
 
-`App\Domain\Library\LeadingSource`: DLNA leads the library when it has imported tracks (else Spotify; setting at `/settings/library`). Web pages and `/api/library/*` default to that source's scope; `?scope=local|streaming|all` overrides it, nothing is deleted. See `docs/architecture/library-identity.md`.
+`App\Domain\Library\LeadingSource`: the own files (library `files`, kind `local`) lead when indexed, else DLNA when it has imported tracks, else Spotify (DLNA, Spotify and future Tidal/Deezer are kind `streaming`; scope `local` = own files, `streaming` = all of those; setting at `/settings/library`). Web pages and `/api/library/*` default to that source's scope; `?scope=local|streaming|all` overrides it, nothing is deleted. See `docs/architecture/library-identity.md`.
 
 ### Library Identity
 

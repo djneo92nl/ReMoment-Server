@@ -178,7 +178,7 @@ class LibraryApiTest extends TestCase
         $this->playsOf($this->track($albumB, 'dlna'), 2);
 
         $this->getJson('/api/library/artists?sort=plays&scope=all')->assertJsonPath('data.*.name', ['A', 'B']);
-        $this->getJson('/api/library/artists?sort=plays&scope=dlna')->assertJsonPath('data.*.name', ['B', 'A']);
+        $this->getJson('/api/library/artists?sort=plays&scope=files')->assertJsonPath('data.*.name', ['B', 'A']);
     }
 
     public function test_artist_items_are_identical_under_sort_plays_and_sort_name(): void
@@ -192,7 +192,7 @@ class LibraryApiTest extends TestCase
         $b = $this->artist('Beta');
         $this->playsOf($this->track($this->album($b, 'B1'), 'dlna'), 1);
 
-        foreach (['', '&scope=dlna', '&scope=all'] as $scope) {
+        foreach (['', '&scope=files', '&scope=all'] as $scope) {
             $byName = $this->getJson('/api/library/artists?sort=name'.$scope)->assertOk()->json('data');
             $byPlays = $this->getJson('/api/library/artists?sort=plays'.$scope)->assertOk()->json('data');
             $this->assertSame(
@@ -202,7 +202,7 @@ class LibraryApiTest extends TestCase
             );
         }
 
-        $dlna = collect($this->getJson('/api/library/artists?sort=plays&scope=dlna')->json('data'))->keyBy('name');
+        $dlna = collect($this->getJson('/api/library/artists?sort=plays&scope=files')->json('data'))->keyBy('name');
         $this->assertSame(2, $dlna['Alpha']['album_count']);
         $this->assertTrue($dlna['Alpha']['favorite']);
         $all = collect($this->getJson('/api/library/artists?sort=plays&scope=all')->json('data'))->keyBy('name');
@@ -315,9 +315,9 @@ class LibraryApiTest extends TestCase
         // Spotify-only albums are out of the DLNA scope, so they do not shift the jump
         $spotify = $this->artist('Sp');
         $this->track($this->album($spotify, 'A 000'), 'One', dlna: false, spotifyId: 'sp1');
-        $this->getJson('/api/library/albums?scope=dlna&letter=B')->assertJsonPath('data.0.name', 'B 01');
+        $this->getJson('/api/library/albums?scope=files&letter=B')->assertJsonPath('data.0.name', 'B 01');
         $this->getJson('/api/library/albums?scope=all&letter=B')->assertJsonPath('data.0.name', 'B 01');
-        $this->getJson('/api/library/albums?scope=dlna&letter=A')->assertJsonPath('data.0.name', 'A 01');
+        $this->getJson('/api/library/albums?scope=files&letter=A')->assertJsonPath('data.0.name', 'A 01');
     }
 
     public function test_albums_are_paged_by_an_opaque_cursor(): void
@@ -399,7 +399,7 @@ class LibraryApiTest extends TestCase
                 'year' => 2003,
                 'artwork' => null,
                 'favorite' => false,
-                'sources' => ['dlna'],
+                'sources' => ['files'],
                 'genres' => [],
                 'details' => [
                     'label' => null, 'catalog_number' => null, 'release_type' => null, 'secondary_types' => [],

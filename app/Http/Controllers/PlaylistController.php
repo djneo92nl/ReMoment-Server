@@ -64,7 +64,7 @@ class PlaylistController extends Controller
     }
 
     /**
-     * Track ids from `track_id`, or from `album_id` limited to `source` (dlna|spotify), in album order.
+     * Track ids from `track_id`, or from `album_id` limited to `source` (files|dlna|spotify), in album order.
      *
      * @return list<int>
      */
@@ -73,7 +73,7 @@ class PlaylistController extends Controller
         $data = $request->validate([
             'track_id' => ['nullable', 'integer', 'exists:tracks,id'],
             'album_id' => ['nullable', 'integer', 'exists:albums,id'],
-            'source' => ['nullable', 'in:dlna,spotify'],
+            'source' => ['nullable', 'in:files,dlna,spotify'],
         ]);
 
         if (!empty($data['track_id'])) {

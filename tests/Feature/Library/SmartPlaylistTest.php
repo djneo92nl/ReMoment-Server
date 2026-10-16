@@ -174,7 +174,7 @@ class SmartPlaylistTest extends TestCase
 
         $this->assertSame(['Kept', 'Streamed'], $this->names([]));
 
-        Setting::set(LeadingSource::SETTING, 'dlna');
+        Setting::set(LeadingSource::SETTING, 'files');
         $this->assertSame(['Kept'], $this->names([]));
     }
 

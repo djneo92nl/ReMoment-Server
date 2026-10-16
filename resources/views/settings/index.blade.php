@@ -55,7 +55,7 @@
             </x-settings-row>
             <x-settings-row href="{{ route('settings.library') }}" icon="fa-solid fa-compact-disc"
                              label="Library">
-                Leading source: {{ ['dlna' => 'DLNA', 'spotify' => 'Spotify', 'all' => 'everything'][\App\Domain\Library\LeadingSource::leading()] }}
+                Leading source: {{ ['files' => 'Local files', 'dlna' => 'DLNA', 'spotify' => 'Spotify', 'all' => 'everything'][\App\Domain\Library\LeadingSource::leading()] }}
             </x-settings-row>
             <x-settings-row href="{{ route('settings.mqtt') }}" icon="fa-solid fa-tower-broadcast"
                              label="MQTT">

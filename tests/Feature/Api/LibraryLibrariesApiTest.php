@@ -70,7 +70,7 @@ class LibraryLibrariesApiTest extends TestCase
         $this->release('Dlna Band', 'dlna');
         $this->getJson('/api/library/libraries')
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0', ['id' => 'dlna', 'name' => 'Local', 'kind' => 'local', 'album_count' => 1, 'artist_count' => 1, 'playlist_count' => 0, 'artwork' => null]);
+            ->assertJsonPath('data.0', ['id' => 'dlna', 'name' => 'DLNA', 'kind' => 'streaming', 'album_count' => 1, 'artist_count' => 1, 'playlist_count' => 0, 'artwork' => null]);
 
         $spot = $this->release('Spot Band', 'spotify');
         $playlist = Playlist::create(['name' => 'Mix', 'source' => 'spotify']);
@@ -118,16 +118,18 @@ class LibraryLibrariesApiTest extends TestCase
 
     public function test_scope_accepts_a_library_id_and_keeps_the_legacy_values(): void
     {
+        $this->release('Own Band', 'files');
         $this->release('Dlna Band', 'dlna');
         $this->release('Spot Band', 'spotify');
 
         $names = fn (string $scope) => collect($this->getJson("/api/library/artists?scope={$scope}")->assertOk()->json('data'))->pluck('name')->all();
 
+        $this->assertSame(['Own Band'], $names('files'));
         $this->assertSame(['Dlna Band'], $names('dlna'));
         $this->assertSame(['Spot Band'], $names('spotify'));
-        $this->assertSame(['Dlna Band'], $names('local'));
-        $this->assertSame(['Spot Band'], $names('streaming'));
-        $this->assertCount(2, $names('all'));
+        $this->assertSame(['Own Band'], $names('local'));
+        $this->assertEqualsCanonicalizing(['Dlna Band', 'Spot Band'], $names('streaming'));
+        $this->assertCount(3, $names('all'));
         $this->getJson('/api/library/artists?scope=deezer')->assertStatus(422);
         $this->getJson('/api/library/albums?scope=spotify')->assertJsonCount(1, 'data');
         $this->getJson('/api/library/recent?scope=spotify')->assertOk();
@@ -137,14 +139,15 @@ class LibraryLibrariesApiTest extends TestCase
 
     public function test_playlists_follow_the_scope_and_all_lists_every_library(): void
     {
-        $dlna = $this->release('Dlna Band', 'dlna');
+        Setting::set(LeadingSource::SETTING, 'files');
+        $dlna = $this->release('Own Band', 'files');
         $spot = $this->release('Spot Band', 'spotify');
         foreach ([['Local mix', $dlna], ['Spotify mix', $spot]] as [$name, $track]) {
             Playlist::create(['name' => $name, 'source' => 'local'])->tracks()->sync([$track->id => ['position' => 0]]);
         }
         Playlist::where('name', 'Spotify mix')->update(['last_played_at' => '2026-10-02 10:00:00']);
 
-        // Without scope: the leading library (dlna here).
+        // Without scope: the leading library (files here).
         $this->getJson('/api/library/playlists')->assertJsonCount(1, 'data')->assertJsonPath('data.0.name', 'Local mix');
         $this->getJson('/api/library/playlists?scope=spotify')->assertJsonCount(1, 'data')->assertJsonPath('data.0.name', 'Spotify mix')
             ->assertJsonPath('data.0.last_played_at', '2026-10-02T10:00:00+00:00');
@@ -227,9 +230,9 @@ class LibraryLibrariesApiTest extends TestCase
 
     public function test_a_new_library_is_one_registry_entry(): void
     {
-        $this->assertSame(['spotify', 'dlna'], LibrarySources::libraryIds());
-        $this->assertSame(['spotify', 'dlna', 'radio'], array_keys(LibrarySources::all()));
-        $this->assertSame(['spotify'], LeadingSource::hidden('dlna'));
+        $this->assertSame(['files', 'dlna', 'spotify'], LibrarySources::libraryIds());
+        $this->assertSame(['files', 'dlna', 'spotify', 'radio'], array_keys(LibrarySources::all()));
+        $this->assertSame(['files', 'spotify'], LeadingSource::hidden('dlna'));
     }
 
     /** @return array<string, bool> library id => playable */

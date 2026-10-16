@@ -7,11 +7,11 @@ use App\Models\Setting;
 use Illuminate\Http\Request;
 
 /**
- * Which source leads the library. With DLNA connected it is the main library
- * and streaming services extend it; without, Spotify leads.
+ * Which source leads the library. With own files indexed they are the main
+ * library and streaming libraries (DLNA, Spotify, ...) extend it; without, DLNA or Spotify leads.
  *
- * What a page or API call shows is a scope: `local` (DLNA), `streaming`
- * (Spotify) or `all`; the API also takes a library id (LibrarySources::LIBRARIES). It defaults to the leading source and is applied
+ * What a page or API call shows is a scope: `local` (own files), `streaming`
+ * (DLNA, Spotify, any future streaming service) or `all`; the API also takes a library id (LibrarySources::LIBRARIES). It defaults to the leading source and is applied
  * through LibrarySources' hidden-source filters, so nothing is deleted and
  * a track available from both sources shows in either scope.
  */
@@ -20,7 +20,7 @@ class LeadingSource
     public const SETTING = 'library_leading_source';
 
     /** Admin setting: pick automatically, force a source, or show everything (no leading source). */
-    public const MODES = ['auto', 'dlna', 'spotify', 'all'];
+    public const MODES = ['auto', 'files', 'dlna', 'spotify', 'all'];
 
     public const SCOPES = ['local', 'streaming', 'all'];
 
@@ -33,7 +33,7 @@ class LeadingSource
         return in_array($mode, self::MODES, true) ? $mode : 'auto';
     }
 
-    /** `dlna`, `spotify` or `all`: the forced choice, else DLNA when it has imported tracks, else Spotify. */
+    /** `files`, `dlna`, `spotify` or `all`: the forced choice, else the own files when indexed, else DLNA when it has imported tracks, else Spotify. */
     public static function leading(): string
     {
         $mode = self::mode();
@@ -41,14 +41,18 @@ class LeadingSource
             return $mode;
         }
 
-        return Track::where('source', 'dlna')->exists() ? 'dlna' : 'spotify';
+        return match (true) {
+            Track::where('source', 'files')->exists() => 'files',
+            Track::where('source', 'dlna')->exists() => 'dlna',
+            default => 'spotify',
+        };
     }
 
     public static function defaultScope(): string
     {
         return match (self::leading()) {
-            'dlna' => 'local',
-            'spotify' => 'streaming',
+            'files' => 'local',
+            'dlna', 'spotify' => 'streaming',
             default => 'all',
         };
     }
@@ -82,13 +86,21 @@ class LeadingSource
     public static function forRequest(Request $request): string
     {
         $requested = $request->query('scope');
-        if (is_string($requested) && in_array($requested, self::SCOPES, true)) {
+        if (is_string($requested) && in_array($requested, self::apiScopes(), true)) {
             $request->session()->put(self::SESSION_KEY, $requested);
 
             return $requested;
         }
 
         return self::scope($request->session()->get(self::SESSION_KEY));
+    }
+
+    /** The toggle group a scope belongs to: `local`, `streaming` or `all` (a library id belongs to its kind's group). */
+    public static function group(string $scope): string
+    {
+        $kind = LibrarySources::LIBRARIES[$scope]['kind'] ?? null;
+
+        return $kind ?? $scope;
     }
 
     /** Label for a scope, matching the leading source. */

@@ -14,7 +14,7 @@
                 </form>
             </x-slot>
             @auth
-                @if(! \App\Domain\Library\LibrarySources::availableFrom($artist->tracks(), 'dlna')->exists())
+                @if(! \App\Domain\Library\LibraryRemover::ownedElsewhere($artist->tracks()))
                     <form method="POST" action="{{ route('artists.destroy', $artist) }}" class="mt-2" onsubmit="return confirm('Remove this artist and all their albums and tracks from the library? Your play history is kept.')">
                         @csrf
                         @method('DELETE')

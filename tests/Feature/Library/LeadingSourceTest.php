@@ -22,27 +22,32 @@ class LeadingSourceTest extends TestCase
         $track = Track::create(['artist_id' => $artist->id, 'album_id' => $album->id, 'name' => "{$name} song", 'external_id' => "{$source}:{$name}", 'source' => $source, 'duration' => 100]);
         Metadata::create([
             'metadatable_type' => Track::class, 'metadatable_id' => $track->id,
-            'key' => $source === 'dlna' ? 'dlna_url' : 'external_id', 'value' => 'x', 'type' => 'url',
-            'source' => $source === 'dlna' ? 'dlna:1' : 'spotify',
+            'key' => $source === 'spotify' ? 'external_id' : 'dlna_url', 'value' => 'x', 'type' => 'url',
+            'source' => $source === 'dlna' ? 'dlna:1' : ($source === 'files' ? 'files' : 'spotify'),
         ]);
 
         return $album;
     }
 
-    public function test_dlna_leads_when_it_has_tracks_and_spotify_otherwise(): void
+    public function test_files_lead_then_dlna_then_spotify(): void
     {
         $this->assertSame('spotify', LeadingSource::leading());
         $this->assertSame('streaming', LeadingSource::defaultScope());
 
-        $this->album('Local', 'dlna');
+        $this->album('Streamed', 'dlna');
 
         $this->assertSame('dlna', LeadingSource::leading());
+        $this->assertSame('streaming', LeadingSource::defaultScope());
+
+        $this->album('Local', 'files');
+
+        $this->assertSame('files', LeadingSource::leading());
         $this->assertSame('local', LeadingSource::defaultScope());
     }
 
     public function test_the_setting_overrides_automatic_detection(): void
     {
-        $this->album('Local', 'dlna');
+        $this->album('Local', 'files');
         Setting::set(LeadingSource::SETTING, 'spotify');
 
         $this->assertSame('spotify', LeadingSource::leading());
@@ -50,7 +55,7 @@ class LeadingSourceTest extends TestCase
 
     public function test_api_defaults_to_the_leading_source_and_accepts_a_scope(): void
     {
-        $this->album('Local', 'dlna');
+        $this->album('Local', 'files');
         $this->album('Zephyr', 'spotify');
 
         $names = fn ($r) => collect($r->json('data'))->pluck('name')->sort()->values()->all();
@@ -63,7 +68,7 @@ class LeadingSourceTest extends TestCase
 
     public function test_web_pages_follow_the_scope_and_remember_it(): void
     {
-        $this->album('Local', 'dlna');
+        $this->album('Local', 'files');
         $this->album('Zephyr', 'spotify');
 
         $this->get('/albums')->assertSee('Local')->assertDontSee('Zephyr');

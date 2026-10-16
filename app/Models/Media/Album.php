@@ -50,10 +50,11 @@ class Album extends Model
         });
     }
 
-    /** Adds `on_dlna` / `on_spotify`: whether any of the album's tracks is available from that source. */
+    /** Adds `on_files` / `on_dlna` / `on_spotify`: whether any of the album's tracks is available from that source. */
     public function scopeWithSourceFlags($query)
     {
         return $query->withExists([
+            'tracks as on_files' => fn ($q) => LibrarySources::availableFrom($q, 'files'),
             'tracks as on_dlna' => fn ($q) => LibrarySources::availableFrom($q, 'dlna'),
             'tracks as on_spotify' => fn ($q) => LibrarySources::availableFrom($q, 'spotify'),
         ]);
