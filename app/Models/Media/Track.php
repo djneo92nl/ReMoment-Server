@@ -2,6 +2,7 @@
 
 namespace App\Models\Media;
 
+use App\Domain\Analysis\Camelot;
 use App\Domain\Library\Normalizer;
 use App\Domain\Storage\FileIndexer;
 use App\Domain\Storage\StreamUrl;
@@ -262,9 +263,11 @@ class Track extends Model
             'bpm' => $a->bpm !== null ? round($a->bpm, 1) : null,
             'key' => $a->key,
             'mode' => $a->mode,
+            'camelot' => Camelot::code($a->key, $a->mode),
             'loudness' => $a->loudness_lufs,
             'loudness_range' => $a->loudness_range,
             'true_peak' => $a->true_peak,
+            'plr' => $a->true_peak !== null && $a->loudness_lufs !== null ? round($a->true_peak - $a->loudness_lufs, 1) : null,
             'replaygain_track_gain' => $a->replaygain_track_gain,
             'replaygain_album_gain' => $a->replaygain_album_gain,
             'danceability' => $a->danceability,

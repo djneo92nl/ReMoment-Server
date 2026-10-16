@@ -91,6 +91,7 @@ final class LibraryHome
                 'radio' => RadioStation::query()->count(),
                 'favorites' => self::favoriteCount($hidden),
             ],
+            'listeningModes' => ListeningModes::available(),
             'recentPlayed' => $recentPlayed,
             'playedArtwork' => $playedArtwork,
             'recentAdded' => $recentAdded,

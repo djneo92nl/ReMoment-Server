@@ -11,6 +11,7 @@ use App\Domain\Device\SourceSync;
 use App\Domain\Device\SpotifyRouting;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\LibrarySources;
+use App\Domain\Library\ListeningModes;
 use App\Domain\Library\NotPlayableException;
 use App\Domain\Library\PlaybackFailedException;
 use App\Domain\Library\PlaybackResult;
@@ -383,6 +384,30 @@ class DeviceController extends Controller
             withResult: fn (PlaybackResult $result) => $result->mode === PlaylistMode::LOCAL
                 ? ['queued' => $result->playable, 'skipped' => $result->skipped, 'mode' => $result->mode]
                 : ['mode' => $result->mode],
+        );
+    }
+
+    /** Plays a listening mode (a random selection of analysed tracks that fit it); see docs/architecture/listening-modes.md. */
+    public function libraryPlayListeningMode(Request $request, Device $device, LibraryPlayback $library): JsonResponse
+    {
+        $data = $request->validate(['mode' => ['required', 'string', Rule::in(ListeningModes::keys())]]);
+
+        if ($error = $this->assertReachable($device)) {
+            return $error;
+        }
+
+        if (!LibraryPlayback::availableFor($device)) {
+            return $this->unsupported('library_playback');
+        }
+
+        $tracks = ListeningModes::tracks($data['mode'], $device)->with(['metadata', 'artist'])->get();
+        if ($tracks->count() < ListeningModes::MIN_TRACKS) {
+            return response()->json(['error' => 'not_playable', 'message' => 'Not enough analysed tracks fit this mode on this device.'], 422);
+        }
+
+        return $this->playFromLibrary(
+            fn () => $library->playTracks($device, $tracks),
+            ['mode' => $data['mode'], 'queued' => $tracks->count()],
         );
     }
 

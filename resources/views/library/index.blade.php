@@ -23,6 +23,24 @@
             @endforeach
         </nav>
 
+        {{-- Listening modes: a random selection of analysed tracks that fit, on the player pinned in this browser --}}
+        @if($listeningModes)
+            <section>
+                <h2 class="mb-3 text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">Listening modes</h2>
+                <div class="flex flex-wrap gap-2.5">
+                    @foreach($listeningModes as $mode)
+                        <form method="POST" action="{{ route('library.listening-modes.play', $mode['key']) }}">
+                            @csrf
+                            <button type="submit" title="{{ $mode['description'] }}"
+                                    class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white dark:bg-stone-900 border border-gray-200/70 dark:border-stone-800 text-sm text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-stone-600 transition-colors">
+                                <i class="fa-solid fa-{{ $mode['icon'] }} text-xs text-gray-400 dark:text-gray-500"></i>{{ $mode['name'] }}
+                            </button>
+                        </form>
+                    @endforeach
+                </div>
+            </section>
+        @endif
+
         {{-- What was played last: albums, playlists and radio stations together --}}
         @if($recentPlayed->isNotEmpty())
             <x-shelf title="Recently played" :href="route('history.index')">

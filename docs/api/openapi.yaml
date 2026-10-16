@@ -747,6 +747,30 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/FavoriteBody" }
+  /library/listening-modes:
+    get:
+      tags: [Library]
+      summary: Listening modes (focus, party, sleep, workout) the library has enough analysed tracks for
+      operationId: listListeningModes
+      description: A mode is a selection of the server's own analysed files by tempo, energy, danceability, mood and loudness. A mode with too few matching tracks is left out, so the list is empty until audio analysis has run.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        key: { type: string, example: party }
+                        name: { type: string, example: Party }
+                        description: { type: string }
+                        icon: { type: string, description: Font Awesome solid icon name, example: champagne-glasses }
+                        track_count: { type: integer, description: Tracks the mode would play (at most 100) }
   /library/genres:
     get:
       tags: [Library]
@@ -991,6 +1015,33 @@ paths:
                 shuffle: { type: boolean, default: false }
       responses:
         "200": { $ref: "#/components/responses/PlayedOk" }
+        "422": { $ref: "#/components/responses/DeviceError" }
+  /devices/{device}/library/play-listening-mode:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    post:
+      tags: [Library playback]
+      operationId: playListeningMode
+      description: Plays a random selection of up to 100 tracks that fit the mode and that the device can play. 422 `not_playable` when fewer than 5 qualify on this device, 422 `unsupported` when the device has no library playback.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mode]
+              properties:
+                mode: { type: string, description: A `key` from `GET /library/listening-modes`, example: sleep }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  mode: { type: string }
+                  queued: { type: integer }
         "422": { $ref: "#/components/responses/DeviceError" }
   /devices/{device}/library/play-playlist:
     parameters: [{ $ref: "#/components/parameters/device" }]

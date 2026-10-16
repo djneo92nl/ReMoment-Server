@@ -53,6 +53,9 @@ Computed from the own audio files (`file_analyses` of the track's primary file, 
 | `bpm` | tempo, at least / at most |
 | `danceability`, `energy`, `positivity` | 0–100 %, at least / at most (`danceability`, `arousal`, `valence`; energy and positivity need the ML tier of the Essentia sidecar) |
 | `loudness` | integrated loudness in LUFS (negative numbers, e.g. -14) |
+| `loudness_range` | EBU R128 loudness range in LU, at least / at most |
+| `plr` | dynamics: true peak minus integrated loudness in dB (about 6–10 heavily compressed, 14+ dynamic), at least / at most; tracks without a true peak never match |
+| `camelot` | the key on the Camelot wheel (`8A` = A minor, `8B` = C major); is / is not |
 | `musical_key`, `mode` | key (C…B) and major / minor |
 | `mood` | one of the classifier moods (happy, sad, aggressive, relaxed, party, acoustic, electronic) |
 | `instrumental` | the classifier says instrumental |

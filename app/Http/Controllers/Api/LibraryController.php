@@ -9,6 +9,7 @@ use App\Domain\Library\GenreColors;
 use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\LibrarySources;
+use App\Domain\Library\ListeningModes;
 use App\Domain\Library\PlaylistCoverage;
 use App\Domain\Library\PlaylistMode;
 use App\Domain\Library\RandomAlbum;
@@ -237,6 +238,12 @@ class LibraryController extends Controller
 
         return response()->json(['points' => $points, 'duration' => $track->duration])
             ->header('Cache-Control', 'public, max-age=3600');
+    }
+
+    /** The listening modes (focus, party, …) the library has enough analysed tracks for; see docs/architecture/listening-modes.md. */
+    public function listeningModes(): JsonResponse
+    {
+        return response()->json(['data' => array_values(ListeningModes::available())]);
     }
 
     /** Genres with artists or albums, most artists first. */

@@ -7,6 +7,7 @@ use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibraryHome;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\LibrarySources;
+use App\Domain\Library\ListeningModes;
 use App\Domain\Library\RandomAlbum;
 use App\Http\Controllers\Concerns\FlashesLibraryPlayback;
 use App\Models\Media\Album;
@@ -40,6 +41,25 @@ class LibraryController extends Controller
         }
 
         return $this->flashPlayback(fn () => $library->playAlbum($device, $album, shuffle: true), $device, $album->name);
+    }
+
+    /** A listening mode on the player pinned in this browser. */
+    public function playListeningMode(string $mode, LibraryPlayback $library)
+    {
+        $found = ListeningModes::find($mode);
+        abort_if($found === null, 404);
+
+        $device = app(SelectedDevice::class)->device();
+        if ($device === null) {
+            return back()->with('error', 'Pick a player in the bar below first.');
+        }
+
+        $tracks = ListeningModes::tracks($mode, $device)->with(['metadata', 'artist'])->get();
+        if ($tracks->count() < ListeningModes::MIN_TRACKS) {
+            return back()->with('error', "{$device->device_name} can't play enough tracks for {$found['name']}.");
+        }
+
+        return $this->flashPlayback(fn () => $library->playTracks($device, $tracks), $device, $found['name'].' mode');
     }
 
     /** Favourite albums and artists of the scope, most recently favourited first. */

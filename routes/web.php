@@ -60,6 +60,7 @@ Route::get('/genres', [GenreController::class, 'index'])->name('genres.index');
 Route::get('/genres/{slug}', [GenreController::class, 'show'])->name('genres.show');
 Route::get('/library', [LibraryController::class, 'index'])->name('library.index');
 Route::post('/library/shuffle', [LibraryController::class, 'shuffle'])->name('library.shuffle');
+Route::post('/library/listening-modes/{mode}', [LibraryController::class, 'playListeningMode'])->name('library.listening-modes.play');
 Route::get('/library/favorites', [LibraryController::class, 'favorites'])->name('library.favorites');
 Route::get('/playlists', [PlaylistController::class, 'index'])->name('playlists.index');
 Route::post('/playlists', [PlaylistController::class, 'store'])->name('playlists.store');

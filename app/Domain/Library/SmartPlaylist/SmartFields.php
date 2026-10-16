@@ -2,6 +2,7 @@
 
 namespace App\Domain\Library\SmartPlaylist;
 
+use App\Domain\Analysis\Camelot;
 use App\Domain\Library\LibrarySources;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
@@ -158,6 +159,21 @@ final class SmartFields
 
             new SmartField('loudness', 'Loudness', SmartField::NUMBER, self::ATLEAST_ATMOST,
                 fn (Builder $q, string $op, $v) => $q->whereExists(fn ($s) => self::analysis($s)->where('file_analyses.loudness_lufs', self::COMPARE[$op], $v)), unit: 'LUFS (e.g. -14)', signed: true),
+
+            new SmartField('loudness_range', 'Loudness range', SmartField::NUMBER, self::ATLEAST_ATMOST,
+                fn (Builder $q, string $op, $v) => $q->whereExists(fn ($s) => self::analysis($s)->where('file_analyses.loudness_range', self::COMPARE[$op], $v)), unit: 'LU'),
+
+            // Peak-to-loudness ratio: true peak minus integrated loudness. Low means heavily compressed, high means dynamic.
+            new SmartField('plr', 'Dynamics (peak to loudness)', SmartField::NUMBER, self::ATLEAST_ATMOST,
+                fn (Builder $q, string $op, $v) => $q->whereExists(fn ($s) => self::analysis($s)->whereNotNull('file_analyses.true_peak')
+                    ->whereRaw('(file_analyses.true_peak - file_analyses.loudness_lufs) '.self::COMPARE[$op].' ?', [$v])), unit: 'dB'),
+
+            new SmartField('camelot', 'Camelot key', SmartField::SELECT, self::IS,
+                fn (Builder $q, string $op, $v) => self::negatable($q, $op === 'is_not', fn ($w) => $w->whereExists(function ($s) use ($v) {
+                    $key = Camelot::parse((string) $v);
+                    self::analysis($s)->where('file_analyses.key', $key['key'] ?? '')->where('file_analyses.mode', $key['mode'] ?? '');
+                })),
+                fn () => Camelot::options()),
 
             new SmartField('musical_key', 'Key', SmartField::SELECT, self::IS,
                 fn (Builder $q, string $op, $v) => self::negatable($q, $op === 'is_not', fn ($w) => $w->whereExists(fn ($s) => self::analysis($s)->where('file_analyses.key', $v))),
