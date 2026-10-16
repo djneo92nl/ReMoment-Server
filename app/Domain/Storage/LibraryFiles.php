@@ -248,6 +248,65 @@ class LibraryFiles
         return $file;
     }
 
+    /**
+     * Writes tags (see writeTags) and queues enrichment for the track the file now matches, so a
+     * corrected tag is also looked up again.
+     *
+     * @param  array<string, string|int>  $tags
+     */
+    public function retag(File $file, array $tags): File
+    {
+        $file = $this->writeTags($file, $tags);
+        $this->enrich($file);
+
+        return $file;
+    }
+
+    /**
+     * Matches the file to its track again from the tags it holds now. The one place where a file is tied
+     * to a track after the fact, so a change in how songs are matched is made in FileIndexer::attach.
+     */
+    public function rematch(File $file): File
+    {
+        $oldTrackIds = $file->trackFiles()->pluck('track_id')->all();
+
+        $file->update(['size' => -1]); // get past the indexer's size/mtime shortcut
+        [$indexed] = $this->indexer->index($file->location, $file->path);
+        $file = $indexed ?? $file->refresh();
+
+        $this->releaseTracks(array_diff($oldTrackIds, $file->trackFiles()->pluck('track_id')->all()));
+        $this->enrich($file);
+
+        return $file;
+    }
+
+    /** Queues the enrichment jobs the file's track still misses; returns how many. */
+    public function enrich(File $file): int
+    {
+        $track = $file->tracks()->with(['artist', 'album'])->first();
+
+        return $track ? Enrichment::queue($track) : 0;
+    }
+
+    /** Hides the file (or shows it again) in the library; the bytes and the row stay. */
+    public function setHidden(File $file, bool $hidden): File
+    {
+        $file->update(['hidden_at' => $hidden ? ($file->hidden_at ?? now()) : null]);
+
+        return $file;
+    }
+
+    /** Hides or shows every file under a folder of a location; returns how many changed. */
+    public function setFolderHidden(StorageLocation $location, string $dir, bool $hidden): int
+    {
+        $prefix = $dir === '' ? '' : rtrim($dir, '/').'/';
+
+        return File::where('storage_location_id', $location->id)
+            ->when($prefix !== '', fn ($q) => $q->where('path', 'like', str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $prefix).'%'))
+            ->when($hidden, fn ($q) => $q->whereNull('hidden_at'), fn ($q) => $q->whereNotNull('hidden_at'))
+            ->update(['hidden_at' => $hidden ? now() : null]);
+    }
+
     /** @return 'ok'|'missing'|'changed' — `changed` means the content no longer matches the stored hash (re-indexed). */
     public function verify(File $file): string
     {

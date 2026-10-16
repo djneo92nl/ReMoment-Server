@@ -2,8 +2,10 @@
 
 namespace App\Domain\Library;
 
+use App\Domain\Storage\FileIndexer;
 use App\Models\Client;
 use App\Models\Device;
+use App\Models\File;
 use App\Models\Media\Track;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -139,7 +141,7 @@ class LibrarySources
     /** Whether nothing but radio is hidden, i.e. no library filtering is needed. */
     private static function onlyRadioHidden(array $hidden): bool
     {
-        return array_diff($hidden, [self::RADIO]) === [];
+        return array_diff($hidden, [self::RADIO]) === [] && !File::whereNotNull('hidden_at')->exists();
     }
 
     /**
@@ -175,6 +177,7 @@ class LibrarySources
     public static function tracks(Builder|Relation $query, array $hidden): Builder|Relation
     {
         $hidden = array_values(array_diff($hidden, [self::RADIO]));
+        $query = self::withoutHiddenFiles($query);
         if ($hidden === []) {
             return $query;
         }
@@ -194,6 +197,29 @@ class LibrarySources
                             }
                         });
                 });
+        });
+    }
+
+    /**
+     * Leaves out tracks whose own files are all hidden (`files.hidden_at`, set in the storage browser).
+     * A track that another source (a DLNA server, Spotify) also plays stays, through that source.
+     */
+    private static function withoutHiddenFiles(Builder|Relation $query): Builder|Relation
+    {
+        if (!File::whereNotNull('hidden_at')->exists()) {
+            return $query;
+        }
+
+        return $query->whereNot(function (Builder $q) {
+            $q->whereExists(fn ($f) => $f->selectRaw('1')->from('track_files')->join('files', 'files.id', '=', 'track_files.file_id')
+                ->whereColumn('track_files.track_id', 'tracks.id'))
+                ->whereNotExists(fn ($f) => $f->selectRaw('1')->from('track_files')->join('files', 'files.id', '=', 'track_files.file_id')
+                    ->whereColumn('track_files.track_id', 'tracks.id')->whereNull('files.hidden_at'))
+                ->whereNotExists(fn ($m) => $m->selectRaw('1')->from('metadata')
+                    ->whereColumn('metadata.metadatable_id', 'tracks.id')
+                    ->where('metadata.metadatable_type', (new Track)->getMorphClass())
+                    ->whereIn('metadata.key', self::SOURCE_METADATA)
+                    ->where('metadata.source', '!=', FileIndexer::URL_SOURCE));
         });
     }
 

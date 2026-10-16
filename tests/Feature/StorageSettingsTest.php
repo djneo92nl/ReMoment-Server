@@ -184,7 +184,63 @@ class StorageSettingsTest extends TestCase
         $this->assertSame(1, StorageLocation::count());
     }
 
-    public function test_the_file_browser_filters_renames_and_deletes(): void
+    private function mp3(): string
+    {
+        return str_repeat("\xFF\xFB\x90\x00".str_repeat("\0", 413), 40);
+    }
+
+    public function test_the_file_browser_lists_folders_and_navigates_into_them(): void
+    {
+        $this->actingAs($this->admin());
+        $location = $this->library();
+        Fs::makeDirectory($this->base.'/library/Artist/Album', 0777, true);
+        file_put_contents($this->base.'/library/Artist/Album/one.wav', $this->wav(0));
+        file_put_contents($this->base.'/library/Artist/two.wav', $this->wav(1));
+        file_put_contents($this->base.'/library/root.wav', $this->wav(2));
+        StorageTasks::queue('scan', $location->id);
+
+        Livewire::test(StorageFiles::class)
+            ->assertSee('data-test="folder-Artist"', false)->assertSee('root.wav')->assertDontSee('two.wav')
+            ->call('open', 'Artist')
+            ->assertSee('data-test="folder-Album"', false)->assertSee('two.wav')->assertDontSee('root.wav')
+            ->assertSee('data-test="breadcrumbs"', false)
+            ->call('open', 'Artist/Album')->assertSee('one.wav')->assertDontSee('two.wav');
+    }
+
+    public function test_search_and_state_filters_list_files_flat(): void
+    {
+        $this->actingAs($this->admin());
+        $location = $this->library();
+        Fs::makeDirectory($this->base.'/library/Artist', 0777, true);
+        file_put_contents($this->base.'/library/Artist/alpha.wav', $this->wav(0));
+        file_put_contents($this->base.'/library/beta.wav', $this->wav(1));
+        StorageTasks::queue('scan', $location->id);
+        File::where('path', 'beta.wav')->update(['status' => File::MISSING]);
+
+        Livewire::test(StorageFiles::class)
+            ->set('search', 'alp')->assertSee('alpha.wav')->assertDontSee('beta.wav')
+            ->set('search', '')->set('statusFilter', 'missing')->assertSee('beta.wav')->assertDontSee('alpha.wav')
+            ->set('statusFilter', 'not_parsed')->assertDontSee('alpha.wav');
+    }
+
+    public function test_a_file_shows_its_parsed_and_enriched_state(): void
+    {
+        $this->actingAs($this->admin());
+        $location = $this->library();
+        file_put_contents($this->base.'/library/alpha.wav', $this->wav(0));
+        StorageTasks::queue('scan', $location->id);
+        $track = Track::firstOrFail();
+
+        Livewire::test(StorageFiles::class)
+            ->assertSee('data-test="chip-parsed"', false)->assertSee('data-test="chip-enriched"', false);
+
+        $this->assertSame([], \App\Domain\Library\Enrichment::pendingByTrack([$track->load('artist')])[$track->id] ?? []);
+
+        \App\Models\TrackFile::query()->delete();
+        Livewire::test(StorageFiles::class)->assertSee('not parsed');
+    }
+
+    public function test_hiding_a_file_removes_its_track_from_the_library_but_keeps_it_in_the_browser(): void
     {
         $this->actingAs($this->admin());
         $location = $this->library();
@@ -192,18 +248,67 @@ class StorageSettingsTest extends TestCase
         file_put_contents($this->base.'/library/beta.wav', $this->wav(1));
         StorageTasks::queue('scan', $location->id);
         $alpha = File::where('path', 'alpha.wav')->firstOrFail();
+        $visible = fn () => \App\Domain\Library\LibrarySources::tracks(Track::query(), [])->count();
+        $this->assertSame(2, $visible());
+
+        Livewire::test(StorageFiles::class)->call('toggleHidden', $alpha->id)->assertSee('data-test="chip-hidden"', false)->assertSee('alpha.wav');
+
+        $this->assertSame(1, $visible());
+        $this->assertNotNull($alpha->fresh()->hidden_at);
+
+        Livewire::test(StorageFiles::class)->call('toggleHidden', $alpha->id);
+        $this->assertSame(2, $visible());
+    }
+
+    public function test_hiding_a_folder_hides_every_file_under_it(): void
+    {
+        $this->actingAs($this->admin());
+        $location = $this->library();
+        Fs::makeDirectory($this->base.'/library/Artist', 0777, true);
+        file_put_contents($this->base.'/library/Artist/a.wav', $this->wav(0));
+        file_put_contents($this->base.'/library/b.wav', $this->wav(1));
+        StorageTasks::queue('scan', $location->id);
+
+        Livewire::test(StorageFiles::class)->call('setFolderHidden', 'Artist', true);
+
+        $this->assertSame(['Artist/a.wav'], File::whereNotNull('hidden_at')->pluck('path')->all());
+
+        Livewire::test(StorageFiles::class)->call('setFolderHidden', 'Artist', false);
+        $this->assertSame(0, File::whereNotNull('hidden_at')->count());
+    }
+
+    public function test_editing_tags_writes_them_and_matches_the_file_again(): void
+    {
+        $this->actingAs($this->admin());
+        $location = $this->library();
+        file_put_contents($this->base.'/library/a.mp3', $this->mp3());
+        StorageTasks::queue('scan', $location->id);
+        $file = File::firstOrFail();
 
         Livewire::test(StorageFiles::class)
-            ->assertSee('alpha.wav')->assertSee('beta.wav')
-            ->set('search', 'alp')->assertSee('alpha.wav')->assertDontSee('beta.wav')
-            ->call('startRename', $alpha->id)->set('renamePath', 'renamed/alpha.wav')->call('saveRename')
-            ->assertSee('renamed/alpha.wav');
+            ->call('startEdit', $file->id)->assertSet('editing', $file->id)
+            ->set('tags.title', 'Real Title')->set('tags.artist', 'Real Artist')->set('tags.album', 'Real Album')
+            ->call('saveTags')->assertSet('editing', null);
 
-        $this->assertFileExists($this->base.'/library/renamed/alpha.wav');
+        $track = Track::with('artist')->firstOrFail();
+        $this->assertSame(1, Track::count());
+        $this->assertSame('Real Title', $track->name);
+        $this->assertSame('Real Artist', $track->artist->name);
+    }
 
+    public function test_the_file_browser_verifies_and_deletes(): void
+    {
+        $this->actingAs($this->admin());
+        $location = $this->library();
+        file_put_contents($this->base.'/library/alpha.wav', $this->wav(0));
+        StorageTasks::queue('scan', $location->id);
+        $alpha = File::firstOrFail();
+
+        Livewire::test(StorageFiles::class)->call('verify', $alpha->id)->assertSee('matches its stored hash');
         Livewire::test(StorageFiles::class)->call('delete', $alpha->id);
-        $this->assertFileDoesNotExist($this->base.'/library/renamed/alpha.wav');
-        $this->assertSame(1, File::count());
+
+        $this->assertFileDoesNotExist($this->base.'/library/alpha.wav');
+        $this->assertSame(0, File::count());
     }
 
     public function test_the_api_can_queue_a_scan(): void

@@ -18,8 +18,10 @@ class File extends Model
 
     protected $fillable = [
         'storage_location_id', 'path', 'hash', 'size', 'mtime', 'mime_type', 'extension', 'codec',
-        'bitrate', 'sample_rate', 'bit_depth', 'channels', 'duration', 'status',
+        'bitrate', 'sample_rate', 'bit_depth', 'channels', 'duration', 'status', 'hidden_at',
     ];
+
+    protected $casts = ['hidden_at' => 'datetime'];
 
     protected static function booted(): void
     {
@@ -28,6 +30,11 @@ class File extends Model
                 $file->path_hash = hash('sha256', $file->path);
             }
         });
+    }
+
+    public function isHidden(): bool
+    {
+        return $this->hidden_at !== null;
     }
 
     public function location(): BelongsTo

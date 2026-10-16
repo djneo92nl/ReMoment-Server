@@ -205,6 +205,40 @@ class Enrichment
         return array_values(array_filter(array_keys(self::trackJobs($track)), fn (string $source) => !self::isDone($track, $source)));
     }
 
+    /**
+     * pendingSources() for many tracks in one query, by track id (the tracks of one page of a list).
+     *
+     * @param  iterable<Track>  $tracks
+     * @return array<int, list<string>>
+     */
+    public static function pendingByTrack(iterable $tracks): array
+    {
+        $tracks = collect($tracks)->keyBy('id');
+        if ($tracks->isEmpty()) {
+            return [];
+        }
+
+        $done = Metadata::query()
+            ->where('metadatable_type', (new Track)->getMorphClass())
+            ->whereIn('metadatable_id', $tracks->keys())
+            ->where('key', 'enriched_at')
+            ->get(['metadatable_id', 'source'])
+            ->groupBy('metadatable_id')
+            ->map(fn ($rows) => $rows->pluck('source')->all());
+
+        return $tracks->map(function (Track $track) use ($done) {
+            if (!self::eligible($track)) {
+                return [];
+            }
+            $marked = $done[$track->id] ?? [];
+            if (in_array(self::LEGACY_SOURCE, $marked, true)) {
+                return [];
+            }
+
+            return array_values(array_diff(array_keys(self::trackJobs($track)), $marked));
+        })->all();
+    }
+
     /** Queues the artist-level jobs whose data is available and not yet fetched; returns how many. */
     public static function queueArtist(Artist $artist): int
     {

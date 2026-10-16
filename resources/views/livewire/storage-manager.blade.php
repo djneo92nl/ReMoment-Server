@@ -26,7 +26,9 @@
         </div>
 
         @if($editing !== null)
-            <div class="px-8 py-6 border-b border-gray-100 dark:border-stone-800 bg-gray-50/60 dark:bg-stone-800/20 space-y-4" data-test="location-form">
+            <div style="position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 1rem; background: rgba(0,0,0,.5);" wire:keydown.escape="cancel">
+            <div class="w-full max-w-2xl max-h-full overflow-y-auto bg-white dark:bg-stone-900 rounded-3xl shadow-2xl border border-gray-200 dark:border-stone-700 px-8 py-6 space-y-4" data-test="location-form">
+                <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">{{ is_int($editing) ? 'Edit location' : 'Add location' }}</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                         <label class="block text-xs font-medium text-gray-500 mb-1.5">Name</label>
@@ -94,6 +96,7 @@
                     <button wire:click="save" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-xl transition-colors">Save</button>
                     <button wire:click="cancel" class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">Cancel</button>
                 </div>
+            </div>
             </div>
         @endif
 
