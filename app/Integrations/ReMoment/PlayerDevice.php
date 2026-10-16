@@ -2,6 +2,7 @@
 
 namespace App\Integrations\ReMoment;
 
+use App\Domain\Artwork\LibraryArtwork;
 use App\Models\Device;
 use App\Models\DeviceMeta;
 use Illuminate\Support\Str;
@@ -15,6 +16,12 @@ class PlayerDevice
 
     /** Browser-decodable by default; a player reports its own list. */
     public const DEFAULT_FORMATS = ['audio/mpeg', 'audio/mp4', 'audio/aac', 'audio/flac', 'audio/ogg', 'audio/wav', 'audio/x-wav'];
+
+    /** The cover URL of a track: its album's first image (a string or {url}), else the track's own. */
+    public static function cover(\App\Models\Media\Track $track): ?string
+    {
+        return LibraryArtwork::coverUrl($track->album?->images ?? []) ?? LibraryArtwork::coverUrl($track->images ?? []);
+    }
 
     public static function hash(string $token): string
     {

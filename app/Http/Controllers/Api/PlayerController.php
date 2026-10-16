@@ -136,7 +136,7 @@ class PlayerController extends Controller
     private function nowPlaying(Track $track, int $position, string $state): NowPlaying
     {
         $artist = $track->artist ? new ArtistData(name: $track->artist->name) : null;
-        $images = array_values(array_filter([($track->album?->images ?? [])[0] ?? ($track->images ?? [])[0] ?? null]));
+        $images = array_values(array_filter([PlayerDevice::cover($track)]));
         $album = $track->album ? new AlbumData(name: $track->album->name, images: $images, artist: $artist) : null;
 
         return new NowPlaying(

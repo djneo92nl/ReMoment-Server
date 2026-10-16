@@ -76,7 +76,7 @@ class PlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, 
                 name: $track->name,
                 artist: $track->artist?->name,
                 album: $track->album?->name,
-                image: ($track->album?->images ?? [])[0] ?? ($track->images ?? [])[0] ?? null,
+                image: PlayerDevice::cover($track),
                 duration: $track->duration,
                 uri: StreamUrl::for($track->id),
             );
@@ -236,7 +236,7 @@ class PlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, 
             'artist' => $track->artist?->name,
             'album' => $track->album?->name,
             'duration' => $track->duration,
-            'images' => array_values(array_filter([($track->album?->images ?? [])[0] ?? ($track->images ?? [])[0] ?? null])),
+            'images' => array_values(array_filter([PlayerDevice::cover($track)])),
         ]]);
     }
 
