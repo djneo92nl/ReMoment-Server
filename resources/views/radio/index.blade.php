@@ -1,26 +1,21 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center justify-between">
-            <div>
-                <h1 class="text-3xl md:text-4xl font-medium tracking-tight dark:text-gray-100 text-gray-900">Radio</h1>
-                <p class="mt-1.5 text-gray-500 dark:text-gray-500">{{ $stations->count() }} {{ Str::plural('station', $stations->count()) }} in your library</p>
-            </div>
-            <x-primary-button href="{{ route('radio.create') }}">
-                <i class="fa-solid fa-plus"></i>
-                Add station
-            </x-primary-button>
-        </div>
+        <x-page-header title="Radio" :subtitle="$stations->count().' '.Str::plural('station', $stations->count()).' in your library'">
+            <x-slot name="actions">
+                <x-primary-button href="{{ route('radio.create') }}">
+                    <i class="fa-solid fa-plus"></i>
+                    Add station
+                </x-primary-button>
+            </x-slot>
+        </x-page-header>
     </x-slot>
 
     @if($stations->isEmpty())
-        <div class="bg-white dark:bg-stone-900 rounded-3xl border border-gray-200/70 dark:border-stone-800/80 shadow-sm p-16 text-center">
-            <i class="fa-solid fa-radio text-4xl text-gray-200 dark:text-stone-700 mb-4"></i>
-            <p class="text-gray-500 dark:text-gray-500 font-medium mb-1">No radio stations yet</p>
-            <p class="text-gray-400 dark:text-gray-600 text-sm mb-6">Add a station and set platform identifiers to play it on any supported device</p>
+        <x-empty-state icon="radio" title="No radio stations yet" text="Add a station and set platform identifiers to play it on any supported device">
             <x-primary-button href="{{ route('radio.create') }}">
                 <i class="fa-solid fa-plus"></i>Add station
             </x-primary-button>
-        </div>
+        </x-empty-state>
     @else
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             @foreach($stations as $station)
@@ -35,7 +30,7 @@
                     });
                 @endphp
 
-                <div class="bg-white dark:bg-stone-900 rounded-2xl border border-gray-200/70 dark:border-stone-800/80 shadow-sm p-5 flex flex-col gap-4">
+                <x-card compact class="p-5 flex flex-col gap-4">
                     <div class="flex items-center gap-4">
                         <div class="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-gray-100 dark:bg-stone-800 flex items-center justify-center">
                             @if($cover = $artwork[$station->id] ?? null)
@@ -48,9 +43,7 @@
                             <p class="font-medium text-gray-900 dark:text-gray-100 truncate">{{ $station->name }}</p>
                             <div class="flex flex-wrap gap-1 mt-1">
                                 @forelse($station->meta as $id)
-                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-stone-800 text-xs text-gray-500 dark:text-gray-400 font-mono">
-                                        {{ $id->key }}
-                                    </span>
+                                    <x-badge class="font-mono">{{ $id->key }}</x-badge>
                                 @empty
                                     <span class="text-xs text-amber-500 dark:text-amber-400">
                                         <i class="fa-solid fa-triangle-exclamation mr-1"></i>No identifiers
@@ -66,19 +59,19 @@
                                 @csrf
                                 <button type="submit"
                                         title="{{ $station->favorited_at ? 'Remove from favorites' : 'Add to favorites' }}"
-                                        class="flex items-center justify-center w-8 h-8 rounded-lg transition-colors {{ $station->favorited_at ? 'text-rose-500 hover:text-rose-600' : 'text-gray-300 hover:text-rose-400 dark:text-stone-600' }}">
+                                        class="flex items-center justify-center w-8 h-8 rounded-xl transition-colors {{ $station->favorited_at ? 'text-rose-500 hover:text-rose-600' : 'text-gray-300 hover:text-rose-400 dark:text-stone-600' }}">
                                     <i class="{{ $station->favorited_at ? 'fa-solid' : 'fa-regular' }} fa-heart text-sm"></i>
                                 </button>
                             </form>
                             <a href="{{ route('radio.edit', $station) }}"
-                               class="flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-stone-800 hover:text-gray-600 dark:hover:text-gray-400 transition-colors">
+                               class="flex items-center justify-center w-8 h-8 rounded-xl text-gray-400 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-stone-800 hover:text-gray-600 dark:hover:text-gray-400 transition-colors">
                                 <i class="fa-solid fa-pen text-xs"></i>
                             </a>
                             <form method="POST" action="{{ route('radio.destroy', $station) }}"
                                   onsubmit="return confirm('Remove {{ addslashes($station->name) }}?')">
                                 @csrf @method('DELETE')
                                 <button type="submit"
-                                        class="flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 dark:text-gray-600 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-colors">
+                                        class="flex items-center justify-center w-8 h-8 rounded-xl text-gray-400 dark:text-gray-600 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-colors">
                                     <i class="fa-solid fa-trash text-xs"></i>
                                 </button>
                             </form>
@@ -103,7 +96,7 @@
                             No compatible devices — add a platform identifier to enable playback
                         </p>
                     @endif
-                </div>
+                </x-card>
             @endforeach
         </div>
     @endif

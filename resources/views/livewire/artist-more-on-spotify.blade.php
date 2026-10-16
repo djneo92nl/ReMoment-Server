@@ -1,6 +1,6 @@
 <div wire:init="load">
     @if($available)
-        <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8">
+        <x-card class="p-6 md:p-8">
             <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
                 <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600">
                     <i class="fa-brands fa-spotify text-emerald-500 mr-1.5"></i>More on Spotify
@@ -22,8 +22,8 @@
             @else
                 <x-album-grid>
                     @foreach($shown as $album)
-                        <div class="min-w-0 rounded-xl bg-white dark:bg-stone-900 border border-gray-200/70 dark:border-stone-800/80 overflow-hidden">
-                            <div style="aspect-ratio:1/1">
+                        <x-card compact flush class="min-w-0">
+                            <div class="aspect-square">
                                 <x-artwork-thumb :src="$album['image']" :seed="$album['name']" icon="fa-solid fa-compact-disc"
                                                  size="w-full h-full" rounded="rounded-none" class="text-3xl" />
                             </div>
@@ -34,12 +34,12 @@
                                     <p class="mt-1.5 text-[11px] text-emerald-600 dark:text-emerald-400"><i class="fa-solid fa-check mr-1"></i>Adding…</p>
                                 @else
                                     <button wire:click="add('{{ $album['id'] }}')" type="button"
-                                            class="mt-1.5 text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
+                                            class="mt-1.5 text-[11px] font-medium text-gray-900 dark:text-gray-100 underline">
                                         <i class="fa-solid fa-plus mr-1"></i>Add to library
                                     </button>
                                 @endif
                             </div>
-                        </div>
+                        </x-card>
                     @endforeach
                 </x-album-grid>
                 @if(count($albums) > count($shown))
@@ -48,6 +48,6 @@
                     </button>
                 @endif
             @endif
-        </div>
+        </x-card>
     @endif
 </div>

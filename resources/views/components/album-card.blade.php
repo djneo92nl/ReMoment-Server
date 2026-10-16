@@ -19,8 +19,8 @@
     ])->filter()->implode(' · ');
 @endphp
 
-<div class="group block min-w-0 rounded-xl bg-white dark:bg-stone-900 border border-gray-200/70 dark:border-stone-800/80 hover:border-gray-300 dark:hover:border-stone-600 overflow-hidden transition-colors">
-    <a href="{{ route('albums.show', $album) }}" class="block relative" style="aspect-ratio:1/1">
+<x-card compact flush class="group min-w-0 transition-colors hover:border-gray-300 dark:hover:border-stone-600">
+    <a href="{{ route('albums.show', $album) }}" class="block relative aspect-square">
         <x-artwork-thumb
             :src="$cover"
             :colors="$album->colors"
@@ -30,13 +30,11 @@
             rounded="rounded-none"
             class="text-3xl"
         />
-        <div style="position:absolute;left:6px;bottom:6px">
+        <div class="absolute left-1.5 bottom-1.5">
             <x-source-badges :dlna="(bool) ($album->on_dlna ?? false)" :spotify="(bool) ($album->on_spotify ?? false)" />
         </div>
         @if($album->favorited_at)
-            <span class="flex items-center justify-center text-[10px]" style="position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:6px;background:rgba(0,0,0,.6);color:#fcd34d">
-                <i class="fa-solid fa-star"></i>
-            </span>
+            <x-fav-badge />
         @endif
     </a>
     <div class="px-2.5 py-2">
@@ -48,9 +46,9 @@
             <p class="text-[11px] leading-tight text-gray-400 dark:text-gray-600 truncate mt-0.5" title="{{ $meta }}">{{ $meta }}</p>
         @endif
         @if($genres)
-            <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">
+            <div class="flex flex-wrap gap-1 mt-1.5">
                 @foreach($genres as $genre)
-                    <span class="text-[10px] bg-gray-100 dark:bg-stone-800 text-gray-500 dark:text-gray-400 truncate" style="max-width:100%;padding:1px 8px;border-radius:9999px">{{ $genre }}</span>
+                    <x-badge class="!text-[10px] !py-px max-w-full truncate">{{ $genre }}</x-badge>
                 @endforeach
             </div>
         @endif
@@ -62,4 +60,4 @@
             </p>
         @endif
     </div>
-</div>
+</x-card>

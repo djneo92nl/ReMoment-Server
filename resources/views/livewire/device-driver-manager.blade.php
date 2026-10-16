@@ -121,7 +121,7 @@
                     <a href="{{ route('settings.spotify-connect') }}" class="text-gray-900 dark:text-gray-100 underline">Spotify Connect</a>.
                 </div>
             @endif
-        </div>
+        </x-card>
     @endforeach
 
 </div>

@@ -1,6 +1,6 @@
 <div wire:init="load">
     @if($available && $loaded && !$failed && ($rows === null || $missing > 0 || $message))
-        <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8">
+        <x-card class="p-6 md:p-8">
             <div class="flex flex-wrap items-center justify-between gap-3 {{ $missing > 0 ? 'mb-4' : '' }}">
                 <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600">
                     <i class="fa-brands fa-spotify text-emerald-500 mr-1.5"></i>More on Spotify
@@ -15,7 +15,7 @@
             </div>
 
             @if($message)
-                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ $message }}</p>
+                <p class="mt-2 text-sm text-gray-500">{{ $message }}</p>
             @elseif($rows === null)
                 <p class="mt-2 text-sm text-gray-400 dark:text-gray-600">This album isn't on Spotify.</p>
             @else
@@ -55,6 +55,6 @@
                     @endforeach
                 </div>
             @endif
-        </div>
+        </x-card>
     @endif
 </div>

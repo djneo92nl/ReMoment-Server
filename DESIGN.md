@@ -69,7 +69,7 @@ Flat first. `shadow-sm` on cards, `shadow-xl` only on drawers/popovers/modals, `
 
 ## 7. Do's and don'ts
 
-Do: reuse components; keep light and dark in the same edit; use `text-sm` by default; give every interactive element a hover, focus-visible and disabled state; keep lazy-loaded Livewire geometry in inline `style` (Tailwind classes first seen after a lazy load are not generated).
+Do: reuse components; keep light and dark in the same edit; use `text-sm` by default; give every interactive element a hover, focus-visible and disabled state; build class names whole (no `bg-{{ $color }}-50`), because Tailwind is compiled from the views and only sees complete strings.
 Don't: add a hex colour to a view; use `gray-*` inside `dark:`; invent a radius, shadow or heading size; use `fixed` bottom elements besides modals; add decorative gradients, glow or emoji; ship a page half-migrated; add accounts, profiles or roles UI.
 
 ## 8. Responsive behaviour

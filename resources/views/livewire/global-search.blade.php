@@ -1,10 +1,10 @@
 <div class="relative max-w-xl" x-data="{ open: false }" @click.outside="open = false">
     <div class="relative">
         <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-xs text-gray-300 dark:text-stone-600"></i>
-        <input type="text" wire:model.live.debounce.300ms="query"
+        <x-text-input type="text" wire:model.live.debounce.300ms="query"
                @focus="open = true" @input="open = true"
                placeholder="Search artists, albums, tracks, playlists&hellip;"
-               class="w-full pl-10 pr-9 py-2.5 text-sm rounded-2xl border-gray-200 dark:border-stone-700 dark:bg-stone-900 dark:text-gray-100 focus:border-indigo-500 focus:ring-indigo-500">
+               class="w-full pl-10 pr-9" />
         @if($query !== '')
             <button wire:click="clear" @click="open = false"
                     class="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-300 dark:text-stone-600 hover:text-gray-500 dark:hover:text-gray-400">
@@ -68,32 +68,32 @@
                     </p>
                     @foreach($spotify['artists'] as $sArtist)
                         <div class="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 dark:hover:bg-stone-800 transition-colors">
-                            <div style="width:28px;height:28px;flex:none"><x-artwork-thumb :src="$sArtist['image']" :seed="$sArtist['name']" icon="fa-solid fa-microphone-lines" size="w-full h-full" rounded="rounded-md" class="text-[10px]" /></div>
+                            <div style="width:28px;height:28px;flex:none"><x-artwork-thumb :src="$sArtist['image']" :seed="$sArtist['name']" icon="fa-solid fa-microphone-lines" size="w-full h-full" rounded="rounded-xl" class="text-[10px]" /></div>
                             <span class="text-sm text-gray-800 dark:text-gray-200 truncate flex-1 min-w-0">{{ $sArtist['name'] }}</span>
                             @if($sArtist['local'])
-                                <a href="{{ route('artists.show', $sArtist['local']) }}" class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex-shrink-0">In library</a>
+                                <a href="{{ route('artists.show', $sArtist['local']) }}" class="text-xs text-gray-900 dark:text-gray-100 underline flex-shrink-0">In library</a>
                             @elseif(in_array($sArtist['id'], $queued, true))
                                 <span class="text-xs text-emerald-600 dark:text-emerald-400 flex-shrink-0">Adding…</span>
                             @else
                                 <button type="button" wire:click="addArtist('{{ $sArtist['id'] }}')" @click.stop
-                                        class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex-shrink-0">Add albums</button>
+                                        class="text-xs text-gray-900 dark:text-gray-100 underline flex-shrink-0">Add albums</button>
                             @endif
                         </div>
                     @endforeach
                     @foreach($spotify['albums'] as $sAlbum)
                         <div class="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 dark:hover:bg-stone-800 transition-colors">
-                            <div style="width:28px;height:28px;flex:none"><x-artwork-thumb :src="$sAlbum['image']" :seed="$sAlbum['name']" icon="fa-solid fa-compact-disc" size="w-full h-full" rounded="rounded-md" class="text-[10px]" /></div>
+                            <div style="width:28px;height:28px;flex:none"><x-artwork-thumb :src="$sAlbum['image']" :seed="$sAlbum['name']" icon="fa-solid fa-compact-disc" size="w-full h-full" rounded="rounded-xl" class="text-[10px]" /></div>
                             <div class="min-w-0 flex-1">
                                 <p class="text-sm text-gray-800 dark:text-gray-200 truncate">{{ $sAlbum['name'] }}</p>
                                 <p class="text-xs text-gray-400 dark:text-gray-600 truncate">{{ $sAlbum['artist'] }}{{ $sAlbum['year'] ? ' · '.$sAlbum['year'] : '' }}</p>
                             </div>
                             @if($sAlbum['local'])
-                                <a href="{{ route('albums.show', $sAlbum['local']) }}" class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex-shrink-0">In library</a>
+                                <a href="{{ route('albums.show', $sAlbum['local']) }}" class="text-xs text-gray-900 dark:text-gray-100 underline flex-shrink-0">In library</a>
                             @elseif(in_array($sAlbum['id'], $queued, true))
                                 <span class="text-xs text-emerald-600 dark:text-emerald-400 flex-shrink-0">Adding…</span>
                             @else
                                 <button type="button" wire:click="addAlbum('{{ $sAlbum['id'] }}')" @click.stop
-                                        class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex-shrink-0">Add</button>
+                                        class="text-xs text-gray-900 dark:text-gray-100 underline flex-shrink-0">Add</button>
                             @endif
                         </div>
                     @endforeach

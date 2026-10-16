@@ -1,11 +1,10 @@
-<div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 overflow-hidden">
+<x-card flush>
 
     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-stone-800">
         @if($renaming)
             <form wire:submit.prevent="rename" class="flex items-center gap-2 flex-1">
-                <input type="text" wire:model="editName" autofocus
-                       class="flex-1 text-sm rounded-lg border-gray-300 dark:border-stone-700 dark:bg-stone-800 dark:text-gray-100 focus:border-indigo-500 focus:ring-indigo-500">
-                <button type="submit" class="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">Save</button>
+                <x-text-input size="sm" type="text" wire:model="editName" autofocus class="flex-1" />
+                <button type="submit" class="text-xs font-medium text-gray-900 dark:text-gray-100 underline">Save</button>
                 <button type="button" wire:click="$set('renaming', false)" class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">Cancel</button>
             </form>
         @else
@@ -17,10 +16,7 @@
     </div>
 
     @if($tracks->isEmpty())
-        <div class="flex flex-col items-center justify-center py-16 text-center px-8">
-            <i class="fa-solid fa-music text-4xl text-gray-200 dark:text-stone-700 mb-4"></i>
-            <p class="text-gray-500 dark:text-gray-500">No tracks in this playlist yet — search below to add some.</p>
-        </div>
+        <x-empty-state bare icon="music" text="No tracks in this playlist yet — search below to add some." />
     @else
         <div class="divide-y divide-gray-50 dark:divide-stone-800/50">
             @foreach($tracks as $i => $track)
@@ -58,8 +54,7 @@
     <div class="px-6 py-4 border-t border-gray-100 dark:border-stone-800">
         <div class="relative">
             <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-gray-300 dark:text-stone-600"></i>
-            <input type="text" wire:model.live.debounce.300ms="trackSearch" placeholder="Search tracks to add&hellip;"
-                   class="w-full pl-9 pr-3 py-2 text-sm rounded-xl border-gray-200 dark:border-stone-700 dark:bg-stone-800 dark:text-gray-100 focus:border-indigo-500 focus:ring-indigo-500">
+            <x-text-input type="text" wire:model.live.debounce.300ms="trackSearch" placeholder="Search tracks to add&hellip;" class="w-full pl-9" />
         </div>
 
         @if($searchResults->isNotEmpty())
@@ -80,4 +75,4 @@
             <p class="mt-2 text-xs text-gray-400 dark:text-gray-600 px-3">No matching tracks found.</p>
         @endif
     </div>
-</div>
+</x-card>

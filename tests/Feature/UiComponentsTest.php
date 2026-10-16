@@ -7,6 +7,7 @@ use App\Livewire\DeviceQueue;
 use App\Models\Device;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\File;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -91,5 +92,43 @@ class UiComponentsTest extends TestCase
 
             $this->assertMatchesRegularExpression('/<div [^>]*wire:id="[^"]+"[^>]*rounded-3xl/', $html, $component);
         }
+    }
+
+    /** A shared component opened but never closed (or closed with </div>) renders as broken nesting that no page test notices. */
+    public function test_every_view_closes_the_components_it_opens(): void
+    {
+        $tags = ['x-card', 'x-table', 'x-empty-state', 'x-alert', 'x-page-header', 'x-badge', 'x-chip', 'x-primary-button', 'x-secondary-button', 'x-danger-button', 'x-select'];
+        $problems = [];
+
+        foreach (File::allFiles(resource_path('views')) as $file) {
+            $source = $file->getContents();
+
+            foreach ($tags as $tag) {
+                $opens = 0;
+                preg_match_all('/<'.preg_quote($tag, '/').'(?=[\s>\/])/', $source, $matches, PREG_OFFSET_CAPTURE);
+
+                foreach ($matches[0] as [$text, $offset]) {
+                    $quote = null;
+                    for ($i = $offset, $n = strlen($source); $i < $n; $i++) {
+                        $c = $source[$i];
+                        if ($quote !== null) {
+                            $quote = $c === $quote ? null : $quote;
+                        } elseif ($c === '"' || $c === "'") {
+                            $quote = $c;
+                        } elseif ($c === '>') {
+                            break;
+                        }
+                    }
+                    $opens += $source[$i - 1] === '/' ? 0 : 1;
+                }
+
+                $closes = substr_count($source, '</'.$tag.'>');
+                if ($opens !== $closes) {
+                    $problems[] = "{$file->getRelativePathname()}: <{$tag}> opened {$opens}x, closed {$closes}x";
+                }
+            }
+        }
+
+        $this->assertSame([], $problems);
     }
 }

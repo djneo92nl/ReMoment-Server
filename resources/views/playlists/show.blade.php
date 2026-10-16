@@ -1,32 +1,21 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-start justify-between gap-4">
-            <div class="flex items-start gap-4">
-                <x-back-button href="{{ route('playlists.index') }}" class="mt-1" />
-                <div>
-                    <div class="flex items-center gap-2">
-                        <h1 class="text-3xl md:text-4xl font-medium tracking-tight dark:text-gray-100 text-gray-900">{{ $playlist->name }}</h1>
-                        <x-source-icon :source="$playlist->source" size="text-lg" />
-                    </div>
-                    <p class="mt-1.5 text-gray-500 dark:text-gray-500">
-                        {{ number_format($playlist->tracks->count()) }} {{ Str::plural('track', $playlist->tracks->count()) }}
-                        @if($playlist->source === 'spotify' && $playlist->spotifyOwner())
-                            &middot; by {{ $playlist->spotifyOwner() }}
+        <x-page-header :title="$playlist->name"
+                       :subtitle="number_format($playlist->tracks->count()).' '.Str::plural('track', $playlist->tracks->count()).($playlist->source === 'spotify' && $playlist->spotifyOwner() ? ' · by '.$playlist->spotifyOwner() : '')"
+                       :back="route('playlists.index')">
+            <x-slot name="badge"><x-source-icon :source="$playlist->source" size="text-lg" /></x-slot>
+            @if($playlist->isSmart() || ! $playlist->isEditable())
+                <x-slot name="actions">
+                    <p class="text-xs text-gray-400 dark:text-gray-600">
+                        @if($playlist->isSmart())
+                            <i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Smart playlist
+                        @else
+                            <i class="fa-solid fa-lock mr-1"></i>Synced from Spotify
                         @endif
                     </p>
-                </div>
-            </div>
-
-            @if($playlist->isSmart())
-                <p class="text-xs text-gray-400 dark:text-gray-600 mt-2 flex-shrink-0">
-                    <i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Smart playlist
-                </p>
-            @elseif(!$playlist->isEditable())
-                <p class="text-xs text-gray-400 dark:text-gray-600 mt-2 flex-shrink-0">
-                    <i class="fa-solid fa-lock mr-1"></i>Synced from Spotify
-                </p>
+                </x-slot>
             @endif
-        </div>
+        </x-page-header>
     </x-slot>
 
     <div class="grid gap-6 lg:grid-cols-3">
@@ -37,12 +26,9 @@
                 @if($playlist->isSmart())
                     <livewire:smart-playlist-editor :playlist="$playlist" />
                 @endif
-                <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 overflow-hidden">
+                <x-card flush>
                     @if($playlist->tracks->isEmpty())
-                        <div class="flex flex-col items-center justify-center py-20 text-center px-8">
-                            <i class="fa-solid fa-music text-4xl text-gray-200 dark:text-stone-700 mb-4"></i>
-                            <p class="text-gray-500 dark:text-gray-500">No tracks in this playlist yet.</p>
-                        </div>
+                        <x-empty-state bare icon="music" text="No tracks in this playlist yet." />
                     @else
                         <div class="divide-y divide-gray-50 dark:divide-stone-800/50">
                             @foreach($playlist->tracks as $i => $track)
@@ -62,14 +48,14 @@
                             @endforeach
                         </div>
                     @endif
-                </div>
+                </x-card>
             @endif
         </div>
 
         <div class="space-y-6">
             @php($devices = $playlist->source === 'spotify' ? $spotifyDevices : $playableDevices)
 
-            <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8">
+            <x-card class="p-6 md:p-8">
                 <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">Playback</h2>
 
                 @if($playlist->tracks->isEmpty())
@@ -80,7 +66,7 @@
                     <p class="text-xs text-gray-400 dark:text-gray-600">
                         @if($playlist->source === 'spotify')
                             No devices are mapped to a Spotify Connect speaker yet. Configure this in
-                            <a href="{{ route('settings.spotify-connect') }}" class="text-indigo-600 dark:text-indigo-400 hover:underline">Settings &rarr; Spotify Connect</a>.
+                            <a href="{{ route('settings.spotify-connect') }}" class="text-gray-900 dark:text-gray-100 underline">Settings &rarr; Spotify Connect</a>.
                         @else
                             No compatible devices available.
                         @endif
@@ -93,22 +79,18 @@
                         :devices="$devices"
                         :action-template="\App\Support\DeviceAction::template('playlists.play', ['playlist' => $playlist])"
                         wrapper-class="w-full"
-                        class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors">
+                        class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gray-900 dark:bg-stone-700 hover:bg-gray-700 dark:hover:bg-stone-600 text-white text-sm font-medium transition-colors">
                         <i class="fa-solid fa-play text-xs"></i>
                         Play
                     </x-play-button>
                 @endif
-            </div>
+            </x-card>
 
             @if($playlist->isDeletable())
                 <form method="POST" action="{{ route('playlists.destroy', $playlist) }}"
                       onsubmit="return confirm('Delete this playlist? This cannot be undone.')">
                     @csrf @method('DELETE')
-                    <button type="submit"
-                            class="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm font-medium hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">
-                        <i class="fa-solid fa-trash text-xs"></i>
-                        Delete playlist
-                    </button>
+                    <x-danger-button class="w-full justify-center"><i class="fa-solid fa-trash text-xs"></i>Delete playlist</x-danger-button>
                 </form>
             @endif
         </div>

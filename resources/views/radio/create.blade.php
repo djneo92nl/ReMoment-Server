@@ -1,16 +1,10 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center gap-4">
-            <x-back-button href="{{ route('radio.index') }}" />
-            <div>
-                <h1 class="text-3xl md:text-4xl font-medium tracking-tight dark:text-gray-100 text-gray-900">Add Radio Station</h1>
-                <p class="mt-1.5 text-gray-500 dark:text-gray-500">Register a known station for cross-device playback</p>
-            </div>
-        </div>
+        <x-page-header title="Add Radio Station" subtitle="Register a known station for cross-device playback" :back="route('radio.index')" />
     </x-slot>
 
     <div class="max-w-2xl">
-        <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-8 md:p-10">
+        <x-card class="p-8 md:p-10">
             <form method="POST" action="{{ route('radio.store') }}">
                 @csrf
 
@@ -26,6 +20,6 @@
                     </x-primary-button>
                 </div>
             </form>
-        </div>
+        </x-card>
     </div>
 </x-app-layout>

@@ -1,38 +1,25 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center justify-between">
-            <div>
-                <h1 class="text-3xl md:text-4xl font-medium tracking-tight dark:text-gray-100 text-gray-900">Playlists</h1>
-                <p class="mt-1.5 text-gray-500 dark:text-gray-500">{{ number_format($playlists->count()) }} playlists</p>
-            </div>
-
-            <div class="flex items-center gap-2">
-                <button type="button"
-                        @click="$dispatch('open-modal', 'create-smart-playlist')"
-                        class="flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-stone-900 border border-gray-200 dark:border-stone-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-stone-800 rounded-2xl text-sm font-medium transition-colors">
+        <x-page-header title="Playlists" :subtitle="number_format($playlists->count()).' playlists'">
+            <x-slot name="actions">
+                <x-secondary-button type="button" @click="$dispatch('open-modal', 'create-smart-playlist')">
                     <i class="fa-solid fa-wand-magic-sparkles"></i>
                     <span class="hidden sm:inline">New smart playlist</span>
-                </button>
-                <button type="button"
-                        @click="$dispatch('open-modal', 'create-playlist')"
-                        class="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-sm font-medium transition-colors">
+                </x-secondary-button>
+                <x-primary-button type="button" @click="$dispatch('open-modal', 'create-playlist')">
                     <i class="fa-solid fa-plus"></i>
                     <span class="hidden sm:inline">New playlist</span>
-                </button>
-            </div>
-        </div>
+                </x-primary-button>
+            </x-slot>
+        </x-page-header>
     </x-slot>
 
     @if($playlists->isEmpty())
-        <div class="bg-white dark:bg-stone-900 rounded-3xl border border-gray-200/70 dark:border-stone-800/80 shadow-sm p-16 text-center">
-            <i class="fa-solid fa-list-ul text-4xl text-gray-200 dark:text-stone-700 mb-4"></i>
-            <p class="text-gray-400 dark:text-gray-600 text-sm">No playlists yet — create one or sync from Spotify</p>
-        </div>
+        <x-empty-state icon="list-ul" text="No playlists yet — create one or sync from Spotify" />
     @else
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             @foreach($playlists as $playlist)
-                <a href="{{ route('playlists.show', $playlist) }}"
-                   class="bg-white dark:bg-stone-900 rounded-2xl border border-gray-200/70 dark:border-stone-800/80 shadow-sm p-5 hover:border-gray-300 dark:hover:border-stone-700 hover:shadow-md transition-all group">
+                <x-card compact :href="route('playlists.show', $playlist)" class="p-5 group">
                     <div class="flex items-center gap-4">
                         <div class="w-12 h-12 rounded-xl bg-gray-100 dark:bg-stone-800 flex items-center justify-center flex-shrink-0 overflow-hidden group-hover:bg-gray-200 dark:group-hover:bg-stone-700 transition-colors">
                             @if($cover = \App\Domain\Artwork\LibraryItemArtwork::proxy(\App\Domain\Artwork\LibraryArtwork::coverUrl($playlist->images)))
@@ -52,17 +39,17 @@
                         </div>
                         <i class="fa-solid fa-chevron-right text-gray-200 dark:text-stone-700 text-xs group-hover:text-gray-400 dark:group-hover:text-stone-500 transition-colors"></i>
                     </div>
-                </a>
+                </x-card>
             @endforeach
         </div>
     @endif
 
     <x-modal name="create-playlist" maxWidth="sm">
-        <div class="bg-white dark:bg-stone-900 rounded-lg overflow-hidden">
+        <div class="bg-white dark:bg-stone-900 rounded-2xl overflow-hidden">
             <div class="flex items-start justify-between px-6 pt-6 pb-4 border-b border-gray-100 dark:border-stone-800">
                 <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">New playlist</h3>
                 <button type="button" @click="$dispatch('close-modal', 'create-playlist')"
-                        class="ml-4 flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-stone-800 hover:text-gray-600 dark:hover:text-gray-300 transition-colors flex-shrink-0">
+                        class="ml-4 flex items-center justify-center w-7 h-7 rounded-xl text-gray-400 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-stone-800 hover:text-gray-600 dark:hover:text-gray-300 transition-colors flex-shrink-0">
                     <i class="fa-solid fa-xmark text-xs"></i>
                 </button>
             </div>
@@ -72,20 +59,17 @@
                     <x-input-label for="name" value="Name" />
                     <x-text-input id="name" name="name" type="text" class="mt-1 block w-full" required autofocus />
                 </div>
-                <button type="submit"
-                        class="w-full px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium transition-colors">
-                    Create
-                </button>
+                <x-primary-button size="md" class="w-full justify-center">Create</x-primary-button>
             </form>
         </div>
     </x-modal>
 
     <x-modal name="create-smart-playlist" maxWidth="sm">
-        <div class="bg-white dark:bg-stone-900 rounded-lg overflow-hidden">
+        <div class="bg-white dark:bg-stone-900 rounded-2xl overflow-hidden">
             <div class="flex items-start justify-between px-6 pt-6 pb-4 border-b border-gray-100 dark:border-stone-800">
                 <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">New smart playlist</h3>
                 <button type="button" @click="$dispatch('close-modal', 'create-smart-playlist')"
-                        class="ml-4 flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-stone-800 hover:text-gray-600 dark:hover:text-gray-300 transition-colors flex-shrink-0">
+                        class="ml-4 flex items-center justify-center w-7 h-7 rounded-xl text-gray-400 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-stone-800 hover:text-gray-600 dark:hover:text-gray-300 transition-colors flex-shrink-0">
                     <i class="fa-solid fa-xmark text-xs"></i>
                 </button>
             </div>
@@ -96,10 +80,7 @@
                     <x-input-label for="smart-name" value="Name" />
                     <x-text-input id="smart-name" name="name" type="text" class="mt-1 block w-full" required autofocus />
                 </div>
-                <button type="submit"
-                        class="w-full px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium transition-colors">
-                    Create
-                </button>
+                <x-primary-button size="md" class="w-full justify-center">Create</x-primary-button>
             </form>
         </div>
     </x-modal>

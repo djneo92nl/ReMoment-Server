@@ -1,48 +1,44 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-start gap-4">
-            <x-back-button href="{{ route('artists.show', $album->artist) }}" class="mt-1" />
-            <div>
-                <div class="flex items-center gap-3">
-                    <h1 class="text-3xl md:text-4xl font-medium tracking-tight dark:text-gray-100 text-gray-900">{{ $album->name }}</h1>
-                    <form method="POST" action="{{ route('albums.favorite', $album) }}">
-                        @csrf
-                        <button type="submit"
-                                title="{{ $album->favorited_at ? 'Remove from favorites' : 'Add to favorites' }}"
-                                class="text-xl transition-colors {{ $album->favorited_at ? 'text-rose-500 hover:text-rose-600' : 'text-gray-300 hover:text-rose-400 dark:text-stone-600' }}">
-                            <i class="{{ $album->favorited_at ? 'fa-solid' : 'fa-regular' }} fa-heart"></i>
-                        </button>
-                    </form>
-                </div>
-                @php
-                    $albumSources = $album->tracks->flatMap(fn ($t) => $t->sources())->unique();
-                    $albumRemovable = $album->tracks->isEmpty() || $album->tracks->every(fn ($t) => $t->isRemovable());
-                @endphp
-                <div class="mt-2 flex flex-wrap items-center gap-2">
-                    <x-source-badges :dlna="$albumSources->contains('dlna')" :spotify="$albumSources->contains('spotify')" :labels="true" :light="true" />
-                    @auth
-                        @if($albumRemovable)
-                            <form method="POST" action="{{ route('albums.destroy', $album) }}" onsubmit="return confirm('Remove this album and its tracks from the library? Your play history is kept.')">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="text-xs text-gray-400 hover:text-red-500 transition-colors">
-                                    <i class="fa-solid fa-trash-can mr-1"></i>Remove from library
-                                </button>
-                            </form>
-                        @endif
-                    @endauth
-                </div>
-                <p class="mt-1.5 text-gray-500 dark:text-gray-500">
-                    <a href="{{ route('artists.show', $album->artist) }}" class="hover:underline">{{ $album->artist->name }}</a>
-                    @if($album->released_at)
-                        &middot; {{ $album->released_at->format('Y') }}
+        @php
+            $albumSources = $album->tracks->flatMap(fn ($t) => $t->sources())->unique();
+            $albumRemovable = $album->tracks->isEmpty() || $album->tracks->every(fn ($t) => $t->isRemovable());
+        @endphp
+        <x-page-header :title="$album->name" :back="route('artists.show', $album->artist)">
+            <x-slot name="badge">
+                <form method="POST" action="{{ route('albums.favorite', $album) }}">
+                    @csrf
+                    <button type="submit"
+                            title="{{ $album->favorited_at ? 'Remove from favorites' : 'Add to favorites' }}"
+                            class="text-xl transition-colors {{ $album->favorited_at ? 'text-rose-500 hover:text-rose-600' : 'text-gray-300 hover:text-rose-400 dark:text-stone-600' }}">
+                        <i class="{{ $album->favorited_at ? 'fa-solid' : 'fa-regular' }} fa-heart"></i>
+                    </button>
+                </form>
+            </x-slot>
+            <x-slot name="meta">
+                <a href="{{ route('artists.show', $album->artist) }}" class="hover:underline">{{ $album->artist->name }}</a>
+                @if($album->released_at)
+                    &middot; {{ $album->released_at->format('Y') }}
+                @endif
+                @if($totalPlays > 0)
+                    &middot; {{ number_format($totalPlays) }} {{ Str::plural('play', $totalPlays) }}
+                @endif
+            </x-slot>
+            <div class="flex flex-wrap items-center gap-2">
+                <x-source-badges :dlna="$albumSources->contains('dlna')" :spotify="$albumSources->contains('spotify')" :labels="true" :light="true" />
+                @auth
+                    @if($albumRemovable)
+                        <form method="POST" action="{{ route('albums.destroy', $album) }}" onsubmit="return confirm('Remove this album and its tracks from the library? Your play history is kept.')">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="text-xs text-gray-400 hover:text-red-500 transition-colors">
+                                <i class="fa-solid fa-trash-can mr-1"></i>Remove from library
+                            </button>
+                        </form>
                     @endif
-                    @if($totalPlays > 0)
-                        &middot; {{ number_format($totalPlays) }} {{ Str::plural('play', $totalPlays) }}
-                    @endif
-                </p>
+                @endauth
             </div>
-        </div>
+        </x-page-header>
     </x-slot>
 
     <div class="grid gap-6 lg:grid-cols-3">
@@ -50,7 +46,7 @@
         <!-- Left: Album art + tracklist -->
         <div class="lg:col-span-2 space-y-6">
 
-            <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 overflow-hidden">
+            <x-card class="overflow-hidden">
 
                 @php
                     $artUrl = $album->images[0]['url'] ?? null;
@@ -72,7 +68,7 @@
                     <div class="flex-1 min-w-0 pt-2">
                         <p class="text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-1">Album</p>
                         <h2 class="text-xl font-medium text-gray-900 dark:text-gray-100 leading-snug">{{ $album->name }}</h2>
-                        <p class="text-sm text-gray-500 dark:text-gray-500 mt-1">{{ $album->artist->name }}</p>
+                        <p class="text-sm text-gray-500 mt-1">{{ $album->artist->name }}</p>
                         @php
                             $details = $album->details();
                             $subline = collect([
@@ -91,7 +87,7 @@
                         @if(count($genres))
                             <div class="flex flex-wrap gap-1.5 mt-2">
                                 @foreach(array_slice($genres, 0, 5) as $genre)
-                                    <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 dark:bg-stone-800 text-gray-500 dark:text-gray-500">{{ $genre }}</span>
+                                    <x-badge>{{ $genre }}</x-badge>
                                 @endforeach
                             </div>
                         @endif
@@ -102,7 +98,7 @@
                         @if($albumTags->isNotEmpty())
                             <div class="flex flex-wrap gap-1.5 mt-1.5">
                                 @foreach($albumTags as $tag)
-                                    <span class="px-2 py-0.5 rounded-full text-[11px] font-medium border border-gray-200 dark:border-stone-700 text-gray-500 dark:text-gray-500">{{ $tag }}</span>
+                                    <x-badge variant="outline">{{ $tag }}</x-badge>
                                 @endforeach
                             </div>
                         @endif
@@ -117,7 +113,7 @@
                         @if($details['summary'])
                             <p class="mt-3 text-sm text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-4">{{ $details['summary'] }}
                                 @if($details['wikipedia_url'])
-                                    <a href="{{ $details['wikipedia_url'] }}" target="_blank" rel="noopener" class="text-indigo-600 dark:text-indigo-400 hover:underline">Wikipedia</a>
+                                    <a href="{{ $details['wikipedia_url'] }}" target="_blank" rel="noopener" class="text-gray-900 dark:text-gray-100 underline">Wikipedia</a>
                                 @endif
                             </p>
                         @endif
@@ -146,7 +142,7 @@
                                     :description="$album->name"
                                     :devices="$playableDevices"
                                     :action-template="\App\Support\DeviceAction::template('albums.play', ['album' => $album])"
-                                    class="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors">
+                                    class="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gray-900 dark:bg-stone-700 hover:bg-gray-700 dark:hover:bg-stone-600 text-white text-sm font-medium transition-colors">
                                     <i class="fa-solid fa-play text-xs"></i>
                                     Play all
                                 </x-play-button>
@@ -174,7 +170,7 @@
                     @endphp
                     <div x-data="{ localOnly: false }">
                     @if($localCount > 0 && $addedCount > 0)
-                        <div class="flex items-center justify-between gap-3 px-6 py-2.5 border-t border-gray-100 dark:border-stone-800 text-xs text-gray-500 dark:text-gray-500">
+                        <div class="flex items-center justify-between gap-3 px-6 py-2.5 border-t border-gray-100 dark:border-stone-800 text-xs text-gray-500">
                             <span>{{ $addedCount }} {{ Str::plural('track', $addedCount) }} added from Spotify</span>
                             <button type="button" @click="localOnly = !localOnly"
                                     class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-100 dark:bg-stone-800 hover:bg-gray-200 dark:hover:bg-stone-700 text-gray-600 dark:text-gray-400 transition-colors">
@@ -345,7 +341,7 @@
                                             @endif
                                             @if($recordingMbid)
                                                 <dt class="text-gray-400 dark:text-gray-600">MusicBrainz</dt>
-                                                <dd><a href="https://musicbrainz.org/recording/{{ $recordingMbid }}" target="_blank" rel="noopener" class="text-indigo-600 dark:text-indigo-400 hover:underline">Recording page</a></dd>
+                                                <dd><a href="https://musicbrainz.org/recording/{{ $recordingMbid }}" target="_blank" rel="noopener" class="text-gray-900 dark:text-gray-100 underline">Recording page</a></dd>
                                             @endif
                                         </dl>
                                     </div>
@@ -360,7 +356,7 @@
                     </div>
                     </div>
                 @endif
-            </div>
+            </x-card>
 
             @if($spotifyConnected)
                 <livewire:album-more-on-spotify :album="$album" :key="'spotify-more-'.$album->id" />
@@ -371,30 +367,30 @@
         <div class="space-y-6">
 
             @if($albumSound)
-                <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8">
+                <x-card class="p-6 md:p-8">
                     <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">Sound</h2>
                     <dl class="space-y-4 text-sm">
                         @if($albumSound['bpm'])
                             <div class="flex justify-between gap-4">
-                                <dt class="text-gray-500 dark:text-gray-500">Average tempo</dt>
+                                <dt class="text-gray-500">Average tempo</dt>
                                 <dd class="font-medium text-gray-800 dark:text-gray-200">{{ $albumSound['bpm'] }} BPM</dd>
                             </div>
                         @endif
                         @if($albumSound['loudness'] !== null)
                             <div class="flex justify-between gap-4">
-                                <dt class="text-gray-500 dark:text-gray-500">Average loudness</dt>
+                                <dt class="text-gray-500">Average loudness</dt>
                                 <dd class="font-medium text-gray-800 dark:text-gray-200">{{ number_format($albumSound['loudness'], 1) }} LUFS</dd>
                             </div>
                         @endif
                         @if($albumSound['danceability'] !== null)
                             <div class="flex justify-between gap-4">
-                                <dt class="text-gray-500 dark:text-gray-500">Danceability</dt>
+                                <dt class="text-gray-500">Danceability</dt>
                                 <dd class="font-medium text-gray-800 dark:text-gray-200">{{ round($albumSound['danceability'] * 100) }}%</dd>
                             </div>
                         @endif
                         @if($albumSound['keys'])
                             <div class="flex justify-between gap-4">
-                                <dt class="text-gray-500 dark:text-gray-500">Common keys</dt>
+                                <dt class="text-gray-500">Common keys</dt>
                                 <dd class="font-medium text-gray-800 dark:text-gray-200 text-right">{{ implode(', ', $albumSound['keys']) }}</dd>
                             </div>
                         @endif
@@ -407,12 +403,12 @@
                         @endif
                         <p class="text-xs text-gray-400 dark:text-gray-600">From {{ $albumSound['tracks'] }} of {{ $album->tracks->count() }} {{ Str::plural('track', $album->tracks->count()) }} analysed on the server.</p>
                     </dl>
-                </div>
+                </x-card>
             @endif
 
             @php $albumCredits = (array) $details['credits']; @endphp
             @if($albumCredits)
-                <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8">
+                <x-card class="p-6 md:p-8">
                     <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">Credits</h2>
                     <dl class="space-y-3 text-sm">
                         @foreach($albumCredits as $role => $names)
@@ -423,35 +419,35 @@
                         @endforeach
                     </dl>
                     @if($details['discogs_url'])
-                        <a href="{{ $details['discogs_url'] }}" target="_blank" rel="noopener" class="inline-block mt-4 text-xs text-indigo-600 dark:text-indigo-400 hover:underline">Discogs release</a>
+                        <a href="{{ $details['discogs_url'] }}" target="_blank" rel="noopener" class="inline-block mt-4 text-xs text-gray-900 dark:text-gray-100 underline">Discogs release</a>
                     @endif
-                </div>
+                </x-card>
             @endif
 
             @if($totalPlays > 0)
-                <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8">
+                <x-card class="p-6 md:p-8">
                     <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">Stats</h2>
                     <dl class="space-y-4 text-sm">
                         <div class="flex justify-between gap-4">
-                            <dt class="text-gray-500 dark:text-gray-500">Total plays</dt>
+                            <dt class="text-gray-500">Total plays</dt>
                             <dd class="font-medium text-gray-800 dark:text-gray-200">{{ number_format($totalPlays) }}</dd>
                         </div>
                         @if($totalSeconds > 0)
                             <div class="flex justify-between gap-4">
-                                <dt class="text-gray-500 dark:text-gray-500">Listening time</dt>
+                                <dt class="text-gray-500">Listening time</dt>
                                 <dd class="font-medium text-gray-800 dark:text-gray-200">{{ \App\Domain\Helpers\TimeHelper::humanDuration((int) $totalSeconds) }}</dd>
                             </div>
                         @endif
                         <div class="flex justify-between gap-4">
-                            <dt class="text-gray-500 dark:text-gray-500">Tracks played</dt>
+                            <dt class="text-gray-500">Tracks played</dt>
                             <dd class="font-medium text-gray-800 dark:text-gray-200">{{ $album->tracks->filter(fn ($t) => $t->plays_count > 0)->count() }} / {{ $album->tracks->count() }}</dd>
                         </div>
                     </dl>
-                </div>
+                </x-card>
             @endif
 
             @if($recentPlays->isNotEmpty())
-                <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8">
+                <x-card class="p-6 md:p-8">
                     <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">Recent Plays</h2>
                     <div class="space-y-3">
                         @foreach($recentPlays as $play)
@@ -486,7 +482,7 @@
                             </div>
                         @endforeach
                     </div>
-                </div>
+                </x-card>
             @endif
         </div>
     </div>

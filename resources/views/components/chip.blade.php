@@ -1,0 +1,2 @@
+{{-- Pill link for browsing (genre, mood, tempo). The default slot is the label; add a count in a muted <span class="text-xs text-gray-400 dark:text-gray-600">. --}}
+<a {{ $attributes->merge(['class' => 'inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white dark:bg-stone-900 border border-gray-200/70 dark:border-stone-800 text-sm text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-stone-600 transition-colors']) }}>{{ $slot }}</a>

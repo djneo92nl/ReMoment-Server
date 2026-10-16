@@ -1,12 +1,8 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-end justify-between gap-4 flex-wrap">
-            <div>
-                <h1 class="text-3xl md:text-4xl font-medium tracking-tight dark:text-gray-100 text-gray-900">Library</h1>
-                <p class="mt-1.5 text-gray-500 dark:text-gray-500">What's new and what's playing</p>
-            </div>
-            <x-library-scope :scope="$scope" />
-        </div>
+        <x-page-header title="Library" subtitle="What's new and what's playing">
+            <x-slot name="actions"><x-library-scope :scope="$scope" /></x-slot>
+        </x-page-header>
     </x-slot>
 
     <div class="space-y-8">
@@ -14,19 +10,14 @@
         {{-- Genres of the library (canonical genres of the artists, tinted by the covers' colours) --}}
         @if($genres->isNotEmpty())
             <div>
-                <div class="flex items-center justify-between mb-3">
-                    <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600">Browse by Genre</h2>
-                    <a href="{{ route('genres.index') }}" class="text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors">All genres &rarr;</a>
-                </div>
-                <div style="display:flex;flex-wrap:wrap;gap:10px">
+                <x-section-heading title="Browse by Genre" :href="route('genres.index')" link="All genres →" class="mb-3" />
+                <div class="flex flex-wrap gap-2.5">
                     @foreach($genres as $genre)
-                        <a href="{{ route('genres.show', $genre->slug) }}"
-                           class="bg-white dark:bg-stone-900 border border-gray-200/70 dark:border-stone-800/80 text-sm text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-stone-600 transition-colors"
-                           style="display:inline-flex;align-items:center;gap:8px;padding:7px 16px;border-radius:9999px">
-                            <span style="width:9px;height:9px;border-radius:9999px;flex:none;background:{{ $genre->colors[0] ?? '#9ca3af' }}"></span>
+                        <x-chip :href="route('genres.show', $genre->slug)">
+                            <span class="w-2 h-2 rounded-full flex-none" style="background:{{ $genre->colors[0] ?? 'var(--genre-fallback)' }}"></span>
                             {{ $genre->name }}
-                            <span class="text-xs text-gray-400 dark:text-gray-600" style="margin-left:2px">{{ number_format($genre->artists) }}</span>
-                        </a>
+                            <span class="text-xs text-gray-400 dark:text-gray-600">{{ number_format($genre->artists) }}</span>
+                        </x-chip>
                     @endforeach
                 </div>
             </div>
@@ -34,17 +25,10 @@
 
         {{-- Recently added albums --}}
         <div>
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600">Recently Added</h2>
-                <a href="{{ route('albums.index', ['sort' => 'recent']) }}" class="text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors">
-                    All albums &rarr;
-                </a>
-            </div>
+            <x-section-heading title="Recently Added" :href="route('albums.index', ['sort' => 'recent'])" link="All albums →" />
 
             @if($recentAlbums->isEmpty())
-                <div class="bg-white dark:bg-stone-900 rounded-3xl border border-gray-200/70 dark:border-stone-800/80 shadow-sm p-10 text-center">
-                    <p class="text-gray-400 dark:text-gray-600 text-sm">No albums yet — start listening to build your library</p>
-                </div>
+                <x-empty-state icon="compact-disc" text="No albums yet — start listening to build your library" />
             @else
                 <x-album-grid>
                     @foreach($recentAlbums as $album)
@@ -57,7 +41,7 @@
         {{-- Discover: what the enrichment says about what you could play next --}}
         @if($similarArtists->isNotEmpty() || $sound['moods'] || $sound['tempos'] || $topRated->isNotEmpty())
             <div class="space-y-6">
-                <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600">Discover</h2>
+                <x-section-heading title="Discover" class="mb-0" />
 
                 @if($similarArtists->isNotEmpty())
                     <div>
@@ -75,11 +59,9 @@
                         @if($sound['moods'])
                             <div>
                                 <p class="text-xs text-gray-400 dark:text-gray-600 mb-3">By mood <span class="opacity-70">(analysed own files)</span></p>
-                                <div style="display:flex;flex-wrap:wrap;gap:10px">
+                                <div class="flex flex-wrap gap-2.5">
                                     @foreach($sound['moods'] as $mood => $count)
-                                        <a href="{{ route('albums.index', ['mood' => $mood]) }}" class="bg-white dark:bg-stone-900 border border-gray-200/70 dark:border-stone-800/80 text-sm text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-stone-600 transition-colors" style="display:inline-block;padding:7px 16px;border-radius:9999px">
-                                            {{ ucfirst($mood) }} <span class="text-xs text-gray-400 dark:text-gray-600" style="margin-left:4px">{{ $count }}</span>
-                                        </a>
+                                        <x-chip :href="route('albums.index', ['mood' => $mood])">{{ ucfirst($mood) }} <span class="text-xs text-gray-400 dark:text-gray-600">{{ $count }}</span></x-chip>
                                     @endforeach
                                 </div>
                             </div>
@@ -87,12 +69,10 @@
                         @if($sound['tempos'])
                             <div>
                                 <p class="text-xs text-gray-400 dark:text-gray-600 mb-3">By tempo <span class="opacity-70">(analysed own files)</span></p>
-                                <div style="display:flex;flex-wrap:wrap;gap:10px">
+                                <div class="flex flex-wrap gap-2.5">
                                     @foreach(['slow' => 'Slow · under 90 BPM', 'steady' => 'Steady · 90–125', 'fast' => 'Fast · over 125'] as $key => $label)
                                         @if(isset($sound['tempos'][$key]))
-                                            <a href="{{ route('albums.index', ['tempo' => $key]) }}" class="bg-white dark:bg-stone-900 border border-gray-200/70 dark:border-stone-800/80 text-sm text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-stone-600 transition-colors" style="display:inline-block;padding:7px 16px;border-radius:9999px">
-                                                {{ $label }} <span class="text-xs text-gray-400 dark:text-gray-600" style="margin-left:4px">{{ $sound['tempos'][$key] }}</span>
-                                            </a>
+                                            <x-chip :href="route('albums.index', ['tempo' => $key])">{{ $label }} <span class="text-xs text-gray-400 dark:text-gray-600">{{ $sound['tempos'][$key] }}</span></x-chip>
                                         @endif
                                     @endforeach
                                 </div>
@@ -118,7 +98,7 @@
         @endif
 
         {{-- Library at a glance: totals, decades and how complete the enrichment is --}}
-        <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8">
+        <x-card class="p-6 md:p-8">
             <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">Library at a Glance</h2>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:1rem" class="mb-6">
                 @foreach(['artists' => 'Artists', 'albums' => 'Albums', 'tracks' => 'Tracks'] as $key => $label)
@@ -141,9 +121,9 @@
                         <div class="space-y-1.5">
                             @foreach($glance['decades'] as $decade => $count)
                                 <div class="flex items-center gap-3 text-xs">
-                                    <span class="w-10 text-gray-500 dark:text-gray-500">{{ $decade }}</span>
+                                    <span class="w-10 text-gray-500">{{ $decade }}</span>
                                     <div class="flex-1 rounded-full bg-gray-100 dark:bg-stone-800" style="height:6px">
-                                        <div class="rounded-full bg-indigo-500" style="height:6px;width:{{ max(2, round($count / $maxDecade * 100)) }}%"></div>
+                                        <div class="rounded-full bg-gray-500 dark:bg-stone-400" style="height:6px;width:{{ max(2, round($count / $maxDecade * 100)) }}%"></div>
                                     </div>
                                     <span class="w-10 text-right text-gray-400 dark:text-gray-600">{{ number_format($count) }}</span>
                                 </div>
@@ -159,7 +139,7 @@
                             @php $percent = $row['of'] > 0 ? round($row['have'] / $row['of'] * 100) : 0; @endphp
                             <div>
                                 <div class="flex justify-between text-xs mb-1">
-                                    <span class="text-gray-500 dark:text-gray-500">{{ $row['label'] }}</span>
+                                    <span class="text-gray-500">{{ $row['label'] }}</span>
                                     <span class="text-gray-400 dark:text-gray-600">{{ number_format($row['have']) }} / {{ number_format($row['of']) }} · {{ $percent }}%</span>
                                 </div>
                                 <div class="rounded-full bg-gray-100 dark:bg-stone-800" style="height:6px">
@@ -170,11 +150,11 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </x-card>
 
         <div class="grid gap-6 lg:grid-cols-2">
             {{-- Recently played --}}
-            <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8">
+            <x-card class="p-6 md:p-8">
                 <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">Recently Played</h2>
                 @if($recentPlays->isEmpty())
                     <p class="text-sm text-gray-400 dark:text-gray-600">Nothing played yet.</p>
@@ -189,7 +169,7 @@
                                     :seed="$play->trackTitle().$play->id"
                                     icon="fa-solid fa-music"
                                     size="w-10 h-10"
-                                    rounded="rounded-lg"
+                                    rounded="rounded-xl"
                                 />
                                 <div class="flex-1 min-w-0">
                                     @if($track?->album)
@@ -213,10 +193,10 @@
                         @endforeach
                     </div>
                 @endif
-            </div>
+            </x-card>
 
             {{-- Top artists --}}
-            <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8">
+            <x-card class="p-6 md:p-8">
                 <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">Top Artists</h2>
                 @if($topArtists->isEmpty())
                     <p class="text-sm text-gray-400 dark:text-gray-600">No plays yet.</p>
@@ -231,7 +211,7 @@
                                     :seed="$artist->name"
                                     icon="fa-solid fa-microphone-lines"
                                     size="w-10 h-10"
-                                    rounded="rounded-lg"
+                                    rounded="rounded-xl"
                                 />
                                 <div class="flex-1 min-w-0">
                                     <p class="text-sm text-gray-800 dark:text-gray-200 truncate group-hover:underline">{{ $artist->name }}</p>
@@ -243,7 +223,7 @@
                         @endforeach
                     </div>
                 @endif
-            </div>
+            </x-card>
         </div>
     </div>
 </x-app-layout>

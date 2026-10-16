@@ -3,6 +3,7 @@
 @tailwind utilities;
 
 @layer base {
+    :root { --genre-fallback: #9ca3af; } /* dot of a genre with no cover colours */
     [x-cloak] { display: none !important; }
 
     input[type=range]::-webkit-slider-thumb {

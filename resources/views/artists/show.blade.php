@@ -1,39 +1,30 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-start gap-4">
-            <x-back-button href="{{ route('artists.index') }}" class="mt-1" />
-            <div>
-                <div class="flex items-center gap-3">
-                    <h1 class="text-3xl md:text-4xl font-medium tracking-tight dark:text-gray-100 text-gray-900">{{ $artist->name }}</h1>
-                    <form method="POST" action="{{ route('artists.favorite', $artist) }}">
+        <x-page-header :title="$artist->name"
+                       :subtitle="number_format($totalPlays).' '.Str::plural('play', $totalPlays).($totalSeconds > 0 ? ' · '.\App\Domain\Helpers\TimeHelper::humanDuration((int) $totalSeconds).' listened' : '')"
+                       :back="route('artists.index')">
+            <x-slot name="badge">
+                <form method="POST" action="{{ route('artists.favorite', $artist) }}">
+                    @csrf
+                    <button type="submit"
+                            title="{{ $artist->favorited_at ? 'Remove from favorites' : 'Add to favorites' }}"
+                            class="text-xl transition-colors {{ $artist->favorited_at ? 'text-rose-500 hover:text-rose-600' : 'text-gray-300 hover:text-rose-400 dark:text-stone-600' }}">
+                        <i class="{{ $artist->favorited_at ? 'fa-solid' : 'fa-regular' }} fa-heart"></i>
+                    </button>
+                </form>
+            </x-slot>
+            @auth
+                @if(! \App\Domain\Library\LibrarySources::availableFrom($artist->tracks(), 'dlna')->exists())
+                    <form method="POST" action="{{ route('artists.destroy', $artist) }}" class="mt-2" onsubmit="return confirm('Remove this artist and all their albums and tracks from the library? Your play history is kept.')">
                         @csrf
-                        <button type="submit"
-                                title="{{ $artist->favorited_at ? 'Remove from favorites' : 'Add to favorites' }}"
-                                class="text-xl transition-colors {{ $artist->favorited_at ? 'text-rose-500 hover:text-rose-600' : 'text-gray-300 hover:text-rose-400 dark:text-stone-600' }}">
-                            <i class="{{ $artist->favorited_at ? 'fa-solid' : 'fa-regular' }} fa-heart"></i>
+                        @method('DELETE')
+                        <button type="submit" class="text-xs text-gray-400 hover:text-red-500 transition-colors">
+                            <i class="fa-solid fa-trash-can mr-1"></i>Remove from library
                         </button>
                     </form>
-                </div>
-                @auth
-                    @if(! \App\Domain\Library\LibrarySources::availableFrom($artist->tracks(), 'dlna')->exists())
-                        <form method="POST" action="{{ route('artists.destroy', $artist) }}" class="mt-2" onsubmit="return confirm('Remove this artist and all their albums and tracks from the library? Your play history is kept.')">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" class="text-xs text-gray-400 hover:text-red-500 transition-colors">
-                                <i class="fa-solid fa-trash-can mr-1"></i>Remove from library
-                            </button>
-                        </form>
-                    @endif
-                @endauth
-                <p class="mt-1.5 text-gray-500 dark:text-gray-500">
-                    {{ number_format($totalPlays) }} {{ Str::plural('play', $totalPlays) }}
-                    @if($totalSeconds > 0)
-                        &middot;
-                        {{ \App\Domain\Helpers\TimeHelper::humanDuration((int) $totalSeconds) }} listened
-                    @endif
-                </p>
-            </div>
-        </div>
+                @endif
+            @endauth
+        </x-page-header>
     </x-slot>
 
     @php
@@ -53,7 +44,7 @@
         $similarArtists = $artist->similarArtistModels();
     @endphp
 
-    <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8 mb-6"
+    <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-sm border border-gray-200/70 dark:border-stone-800 p-6 md:p-8 mb-6"
          @if($fanart) style="background: linear-gradient(rgba(0,0,0,.35), rgba(0,0,0,.35)), url('{{ $fanart }}') center/cover" @elseif(count($heroColors) >= 2) style="background: linear-gradient(135deg, {{ $heroColors[0] }}22, {{ $heroColors[1] }}11)" @endif>
         <div class="flex flex-col md:flex-row items-center md:items-start gap-6 text-center md:text-left">
             <x-artwork-thumb
@@ -68,24 +59,24 @@
             <div class="flex-1 min-w-0">
                 <div class="flex flex-wrap items-center justify-center md:justify-start gap-1.5">
                     @foreach(array_slice($genres, 0, 8) as $genre)
-                        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-stone-800 text-gray-600 dark:text-gray-400">{{ $genre }}</span>
+                        <x-badge>{{ $genre }}</x-badge>
                     @endforeach
                     @if($country)
-                        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-stone-800 text-gray-600 dark:text-gray-400">
+                        <x-badge>
                             <i class="fa-solid fa-earth-americas mr-1"></i>{{ $details['area'] ? $details['area'].', ' : '' }}{{ $country }}
-                        </span>
+                        </x-badge>
                     @endif
                     @if($details['type'] || $lifeSpan)
-                        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-stone-800 text-gray-600 dark:text-gray-400">
+                        <x-badge>
                             {{ collect([ucfirst((string) $details['type']), $lifeSpan])->filter()->implode(' · ') }}
-                        </span>
+                        </x-badge>
                     @endif
                 </div>
 
                 @if($extraTags->isNotEmpty())
                     <div class="flex flex-wrap items-center justify-center md:justify-start gap-1.5 mt-2">
                         @foreach($extraTags as $tag)
-                            <span class="px-2 py-0.5 rounded-full text-[11px] font-medium border border-gray-200 dark:border-stone-700 text-gray-500 dark:text-gray-500">{{ $tag }}</span>
+                            <x-badge variant="outline">{{ $tag }}</x-badge>
                         @endforeach
                     </div>
                 @endif
@@ -103,11 +94,11 @@
                 @if($details['wikipedia_url'] || $links)
                     <div class="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-1 mt-3 text-xs">
                         @if($details['wikipedia_url'])
-                            <a href="{{ $details['wikipedia_url'] }}" target="_blank" rel="noopener" class="text-indigo-600 dark:text-indigo-400 hover:underline">Wikipedia</a>
+                            <a href="{{ $details['wikipedia_url'] }}" target="_blank" rel="noopener" class="text-gray-900 dark:text-gray-100 underline">Wikipedia</a>
                         @endif
                         @foreach(['official' => 'Website', 'discogs' => 'Discogs', 'bandcamp' => 'Bandcamp', 'allmusic' => 'AllMusic', 'lastfm' => 'Last.fm', 'instagram' => 'Instagram'] as $linkKey => $linkLabel)
                             @isset($links[$linkKey])
-                                <a href="{{ $links[$linkKey] }}" target="_blank" rel="noopener" class="text-indigo-600 dark:text-indigo-400 hover:underline">{{ $linkLabel }}</a>
+                                <a href="{{ $links[$linkKey] }}" target="_blank" rel="noopener" class="text-gray-900 dark:text-gray-100 underline">{{ $linkLabel }}</a>
                             @endisset
                         @endforeach
                     </div>
@@ -121,7 +112,7 @@
                             :description="$artist->name"
                             :devices="$playableDevices"
                             :action-template="\App\Support\DeviceAction::template('artists.play', ['artist' => $artist])"
-                            class="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors">
+                            class="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gray-900 dark:bg-stone-700 hover:bg-gray-700 dark:hover:bg-stone-600 text-white text-sm font-medium transition-colors">
                             <i class="fa-solid fa-play text-xs"></i>
                             Play all
                         </x-play-button>
@@ -158,7 +149,7 @@
         <div class="lg:col-span-2 space-y-6">
 
             @if($topTracks->isNotEmpty())
-                <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8">
+                <x-card class="p-6 md:p-8">
                     <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">Top Tracks</h2>
                     <div class="space-y-1">
                         @foreach($topTracks as $i => $track)
@@ -167,7 +158,7 @@
                             @endphp
                             <div class="flex items-center gap-4 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-stone-800/50 transition-colors group">
                                 <span class="w-5 text-center text-xs text-gray-300 dark:text-stone-600 flex-shrink-0">{{ $i + 1 }}</span>
-                                <div class="w-9 h-9 rounded-lg overflow-hidden bg-gray-100 dark:bg-stone-800 flex-shrink-0">
+                                <div class="w-9 h-9 rounded-xl overflow-hidden bg-gray-100 dark:bg-stone-800 flex-shrink-0">
                                     @if($artUrl)
                                         <img src="{{ $artUrl }}" alt="" class="w-full h-full object-cover">
                                     @else
@@ -193,7 +184,7 @@
                             </div>
                         @endforeach
                     </div>
-                </div>
+                </x-card>
             @endif
 
             @php
@@ -203,7 +194,7 @@
                 $addedAlbums = $artist->albums->count() - $localAlbums;
             @endphp
             @if($artist->albums->isNotEmpty())
-                <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8" x-data="{ localOnly: false }">
+                <x-card class="p-6 md:p-8" x-data="{ localOnly: false }">
                     <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
                         <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600">Albums</h2>
                         <div class="flex items-center gap-2">
@@ -237,7 +228,7 @@
                             </a>
                         @endforeach
                     </div>
-                </div>
+                </x-card>
             @endif
 
             @if($spotifyConnected)
@@ -248,7 +239,7 @@
         <!-- Right: Recent plays -->
         <div>
             @if($recentPlays->isNotEmpty())
-                <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8">
+                <x-card class="p-6 md:p-8">
                     <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">Recent Plays</h2>
                     <div class="space-y-3">
                         @foreach($recentPlays as $play)
@@ -289,21 +280,18 @@
                             Full history &rarr;
                         </a>
                     </div>
-                </div>
+                </x-card>
             @endif
 
             @if($similarArtists->isNotEmpty())
-                <div class="bg-white dark:bg-stone-900 rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 p-6 md:p-8 mt-6">
+                <x-card class="p-6 md:p-8 mt-6">
                     <h2 class="text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-5">Similar Artists</h2>
                     <div class="flex flex-wrap gap-2">
                         @foreach($similarArtists as $similarArtist)
-                            <a href="{{ route('artists.show', $similarArtist) }}"
-                               class="px-3 py-1.5 rounded-full text-sm font-medium bg-gray-100 dark:bg-stone-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-stone-700 transition-colors">
-                                {{ $similarArtist->name }}
-                            </a>
+                            <x-chip :href="route('artists.show', $similarArtist)">{{ $similarArtist->name }}</x-chip>
                         @endforeach
                     </div>
-                </div>
+                </x-card>
             @endif
         </div>
     </div>
