@@ -16,6 +16,10 @@ Only tracks with a file of the server's own (`GET /stream/{track}`) and a MIME t
 
 Response `201`: `{ player_token, device_id, command_topic, last_command_id, mqtt: { host, port, ws_port } }`. Start polling commands after `last_command_id`, so a reloaded player does not replay old ones. `player_token` is secret: it is the only credential of the player endpoints.
 
+## Taking over an existing player
+
+`GET /api/players` lists the players (`{ data: [{ id, name, kind, state }] }`). A client that has no token yet can send `adopt_device_id` with the register call: it gets a token of its own for that device and the device keeps its name, kind and formats (the other fields are ignored). Every token of a device works, so the browsers share it; nothing stops two of them playing at once. An id that is no player registers a new one. The `/player` page asks this once, when the browser has no token.
+
 ## Commands (server → player)
 
 MQTT topic `remoment/playercmd/{device_id}` (QoS 1, not retained), or poll `GET /api/players/{token}/commands?since={last id}` (`wait` up to 25 s long-polls). Both deliver `{ "id": 12, "op": …}`; ids rise per player, the last 50 are kept for 5 minutes. Ignore ids you have seen.

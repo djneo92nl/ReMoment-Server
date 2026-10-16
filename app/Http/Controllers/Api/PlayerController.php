@@ -16,6 +16,7 @@ use App\Events\Device\VolumeUpdated;
 use App\Http\Controllers\Controller;
 use App\Integrations\ReMoment\PlayerCommands;
 use App\Integrations\ReMoment\PlayerDevice;
+use App\Integrations\ReMoment\PlayerDriver;
 use App\Models\Device;
 use App\Models\Media\Track;
 use Illuminate\Http\JsonResponse;
@@ -28,6 +29,7 @@ class PlayerController extends Controller
     {
         $data = $request->validate([
             'token' => ['nullable', 'string', 'max:100'],
+            'adopt_device_id' => ['nullable', 'integer'],
             'name' => ['required', 'string', 'max:255'],
             'kind' => ['required', 'in:'.implode(',', PlayerDevice::KINDS)],
             'capabilities' => ['nullable', 'array'],
@@ -36,7 +38,7 @@ class PlayerController extends Controller
             'formats.*' => ['string', 'max:100'],
         ]);
 
-        [$device, $token] = PlayerDevice::register($data['token'] ?? null, $data['name'], $data['kind'], $data['capabilities'] ?? null, $data['formats'] ?? null);
+        [$device, $token] = PlayerDevice::register($data['token'] ?? null, $data['name'], $data['kind'], $data['capabilities'] ?? null, $data['formats'] ?? null, $data['adopt_device_id'] ?? null);
 
         // A player that registers is online until it misses its heartbeats.
         DeviceCache::markListenerAlive($device->id);
@@ -45,6 +47,7 @@ class PlayerController extends Controller
         return response()->json([
             'player_token' => $token,
             'device_id' => $device->id,
+            'name' => $device->device_name,
             'command_topic' => PlayerCommands::topic($device->id),
             'last_command_id' => PlayerCommands::lastId($device->id),
             'mqtt' => [
@@ -53,6 +56,19 @@ class PlayerController extends Controller
                 'ws_port' => (int) config('mqtt.public_ws_port'),
             ],
         ], 201);
+    }
+
+    /** The existing players, so a new browser can take one over instead of adding another. */
+    public function index(): JsonResponse
+    {
+        $players = Device::where('device_driver', PlayerDriver::class)->orderBy('device_name')->get();
+
+        return response()->json(['data' => $players->map(fn (Device $device) => [
+            'id' => $device->id,
+            'name' => $device->device_name,
+            'kind' => PlayerDevice::kind($device),
+            'state' => $device->liveState()->value,
+        ])->values()]);
     }
 
     public function state(Request $request, string $token): JsonResponse

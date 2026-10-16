@@ -18,6 +18,7 @@
   #status { color: #777; font-size: 13px; margin-top: 16px; }
   button { background: #fff; color: #000; border: 0; border-radius: 999px; padding: 12px 28px; font-size: 16px; cursor: pointer; }
   input { background: #1a1a1a; color: #fff; border: 1px solid #333; border-radius: 8px; padding: 8px 12px; font-size: 14px; text-align: center; }
+  select { background: #1a1a1a; color: #fff; border: 1px solid #333; border-radius: 8px; padding: 8px 12px; font-size: 14px; }
   #start { display: none; margin: 16px 0; }
 </style>
 </head>
@@ -28,6 +29,7 @@
   <div id="artist"></div>
   <div id="bar"><i></i></div>
   <button id="start" type="button">Start player</button>
+  <div id="choose" style="display:none;margin-bottom:16px"><p style="color:#aaa;font-size:14px;margin-bottom:8px">Use an existing player or add this browser as a new one:</p><select id="existing"></select> <button id="use" type="button" style="padding:8px 18px;font-size:14px">Use</button></div>
   <div><input id="name" aria-label="Player name" maxlength="60"></div>
   <div id="status">Connecting…</div>
 </main>

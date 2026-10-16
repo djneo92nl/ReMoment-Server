@@ -143,4 +143,32 @@ class PlayerApiTest extends TestCase
             ->test(\App\Livewire\PlayerBar::class)
             ->assertSee('open the player');
     }
+
+    public function test_another_browser_can_adopt_an_existing_player_with_its_own_token(): void
+    {
+        $first = $this->register();
+
+        $list = $this->getJson('/api/players')->assertOk()->json('data');
+        $this->assertSame([$first['device_id']], array_column($list, 'id'));
+
+        $second = $this->register(['adopt_device_id' => $first['device_id'], 'name' => 'ignored']);
+
+        $this->assertSame($first['device_id'], $second['device_id']);
+        $this->assertNotSame($first['player_token'], $second['player_token']);
+        $this->assertSame('Kitchen browser', $second['name']);
+        $this->assertSame(1, Device::count());
+
+        // Both tokens work.
+        $this->putJson("/api/players/{$second['player_token']}/state", ['state' => 'paused'])->assertOk();
+        $this->putJson("/api/players/{$first['player_token']}/state", ['state' => 'paused'])->assertOk();
+    }
+
+    public function test_adopting_a_device_that_is_no_player_makes_a_new_player(): void
+    {
+        $speaker = Device::factory()->create();
+
+        $registered = $this->register(['adopt_device_id' => $speaker->id]);
+
+        $this->assertNotSame($speaker->id, $registered['device_id']);
+    }
 }

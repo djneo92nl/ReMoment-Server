@@ -40,9 +40,21 @@ class PlayerDevice
      * @param  string[]|null  $formats  MIME types the player decodes (null: the defaults)
      * @return array{0: Device, 1: string} the device and the player token (new when none was given or it was unknown)
      */
-    public static function register(?string $token, string $name, string $kind, ?array $capabilities = null, ?array $formats = null): array
+    public static function register(?string $token, string $name, string $kind, ?array $capabilities = null, ?array $formats = null, ?int $adopt = null): array
     {
         $device = $token ? self::findByToken($token) : null;
+        $adopted = false;
+
+        // Another browser takes over an existing player instead of making a new one: it gets a token of its own.
+        if (!$device && $adopt) {
+            $device = Device::where('device_driver', PlayerDriver::class)->find($adopt);
+            $adopted = $device !== null;
+
+            if ($adopted) {
+                $token = Str::random(48);
+                DeviceMeta::create(['device_id' => $device->id, 'key' => 'player_token', 'value' => self::hash($token)]);
+            }
+        }
 
         if (!$device) {
             $token = Str::random(48);
@@ -55,13 +67,15 @@ class PlayerDevice
                 'ip_address' => null,
             ]);
             self::setMeta($device, 'player_token', self::hash($token));
-        } else {
+        } elseif (!$adopted) {
             $device->update(['device_name' => $name]);
         }
 
-        self::setMeta($device, 'player_kind', $kind);
-        self::setMeta($device, 'player_capabilities', json_encode(array_values(array_intersect($capabilities ?? self::OPTIONAL, self::OPTIONAL))));
-        self::setMeta($device, 'player_formats', json_encode($formats ?: self::DEFAULT_FORMATS));
+        if (!$adopted) {
+            self::setMeta($device, 'player_kind', $kind);
+            self::setMeta($device, 'player_capabilities', json_encode(array_values(array_intersect($capabilities ?? self::OPTIONAL, self::OPTIONAL))));
+            self::setMeta($device, 'player_formats', json_encode($formats ?: self::DEFAULT_FORMATS));
+        }
 
         return [$device, $token];
     }
@@ -76,6 +90,11 @@ class PlayerDevice
     public static function formats(Device $device): array
     {
         return self::jsonMeta($device, 'player_formats', self::DEFAULT_FORMATS);
+    }
+
+    public static function kind(Device $device): string
+    {
+        return DeviceMeta::where('device_id', $device->id)->where('key', 'player_kind')->value('value') ?? 'web';
     }
 
     public static function setMeta(Device $device, string $key, string $value): void

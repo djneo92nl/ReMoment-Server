@@ -40,13 +40,15 @@
         return response.json();
     }
 
-    async function register() {
+    async function register(adopt) {
         const name = $('name').value.trim() || 'Browser';
         store.set(NAME_KEY, name);
         const result = await api('/players/register', {
             method: 'POST',
-            body: JSON.stringify({ token: store.get(TOKEN_KEY), name, kind: 'web' }),
+            body: JSON.stringify({ token: store.get(TOKEN_KEY), name, kind: 'web', adopt_device_id: adopt || null }),
         });
+        if (adopt) $('name').value = result.name;
+        store.set(NAME_KEY, $('name').value);
         token = result.player_token;
         deviceId = result.device_id;
         store.set(TOKEN_KEY, token);
@@ -151,9 +153,37 @@
         } catch (e) { /* the state report shows the problem */ }
     }
 
+    /** A browser without a token of its own may take over an existing player instead of adding one. */
+    function chooseExisting() {
+        if (store.get(TOKEN_KEY)) return Promise.resolve(null);
+
+        return api('/players').then(list => {
+            const players = list.data.filter(p => p.kind === 'web');
+            if (!players.length) return null;
+
+            const select = $('existing');
+            select.innerHTML = '<option value="">Add as a new player</option>';
+            players.forEach(p => {
+                const option = document.createElement('option');
+                option.value = p.id;
+                option.textContent = p.name + (p.state === 'unreachable' ? ' (offline)' : '');
+                select.appendChild(option);
+            });
+            // Offline players first in line: they are the ones this browser most likely replaces.
+            const offline = players.find(p => p.state === 'unreachable');
+            if (offline) select.value = offline.id;
+
+            $('choose').style.display = 'block';
+            return new Promise(resolve => $('use').addEventListener('click', () => {
+                $('choose').style.display = 'none';
+                resolve(select.value ? parseInt(select.value, 10) : null);
+            }, { once: true }));
+        }).catch(() => null);
+    }
+
     async function init() {
         $('name').value = store.get(NAME_KEY) || defaultName();
-        const info = await register();
+        const info = await register(await chooseExisting());
         lastCommand = info.last_command_id || 0;
         setupMediaSession();
         connectMqtt(info);

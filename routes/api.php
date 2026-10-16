@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/info', InfoController::class);
 
+Route::get('/players', [PlayerController::class, 'index']);
 Route::post('/players/register', [PlayerController::class, 'register']);
 Route::put('/players/{token}/state', [PlayerController::class, 'state']);
 Route::get('/players/{token}/commands', [PlayerController::class, 'commands']);
