@@ -92,6 +92,11 @@
                                 @endif
                             </p>
 
+                            {{-- The track's own waveform, a quiet hint of its shape --}}
+                            @if($waveform)
+                                <div class="hidden w-28 flex-none text-gray-500 sm:block dark:text-gray-400"><x-waveform :points="$waveform" :height="24" :opacity="0.5" /></div>
+                            @endif
+
                             @if($badge = $track->qualityBadge())
                                 <span class="hidden flex-none rounded-md border border-gray-300 px-1.5 py-0.5 text-[10px] font-medium leading-none text-gray-500 sm:inline dark:border-stone-600 dark:text-gray-400" title="{{ $quality }}">{{ $badge }}</span>
                             @endif
