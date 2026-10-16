@@ -13,7 +13,7 @@
 @view-transition { navigation: auto; }
 /* only the named parts (cover, bar) morph between pages; the rest of a page switches as before */
 ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
-::view-transition-group(np-cover), ::view-transition-group(np-bar) { animation-duration: 0.5s; animation-timing-function: cubic-bezier(0.3, 0.7, 0.2, 1); }
+::view-transition-group(np-cover), ::view-transition-group(np-bar) { animation-duration: 0.8s; animation-timing-function: cubic-bezier(0.3, 0.7, 0.2, 1); }
     </style>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 text-gray-900 dark:text-gray-300 dark:bg-stone-950 dark:from-stone-950 dark:to-stone-900 antialiased"

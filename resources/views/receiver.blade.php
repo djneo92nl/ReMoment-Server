@@ -9,7 +9,7 @@
   @view-transition { navigation: auto; }
   /* only the named parts (cover, bar) morph between pages; the rest of a page switches as before */
   ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
-  ::view-transition-group(np-cover), ::view-transition-group(np-bar) { animation-duration: 0.5s; animation-timing-function: cubic-bezier(0.3, 0.7, 0.2, 1); }
+  ::view-transition-group(np-cover), ::view-transition-group(np-bar) { animation-duration: 0.8s; animation-timing-function: cubic-bezier(0.3, 0.7, 0.2, 1); }
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
