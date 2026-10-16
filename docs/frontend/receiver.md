@@ -31,7 +31,7 @@ A standalone Blade template with no Livewire dependency — plain JS fetching `G
 
 ## Ambient Mode
 
-After 30 seconds without mouse/touch/keyboard input while a device is playing, the page adds `body.ambient`. The bar stays: play/pause and progress as they are, the other buttons (volume, previous/next/shuffle/repeat, queue, lyrics) (including like, multiroom and the switcher) darkened to 25% over 2.5s and not clickable. With lyrics the meta panel fades and the lyrics view takes over; without lyrics the page also adds `body.ambient-plain`, which keeps track name and artist and fades album, device and state badge. The corner button and the panels fade out. With the bar idle (`body.ambient`) it turns into blurred glass and the cover drifts slowly larger.
+After 30 seconds without mouse/touch/keyboard input while a device is playing, the page adds `body.ambient`. The bar stays: play/pause and progress as they are, the other buttons (volume, previous/next/shuffle/repeat, queue, lyrics) (including like, multiroom and the switcher) darkened to 25% over 2.5s and not clickable. With lyrics the meta panel fades and the lyrics view takes over (with a small "track · artist" line above the lyrics); without lyrics the page also adds `body.ambient-plain`, which keeps track name and artist and fades album, device and state badge. The corner button and the panels fade out. With the bar idle (`body.ambient`) it turns into blurred glass and the cover drifts slowly larger.
 
 **Auto-switch behaviour:**
 - When ambient activates: if lyrics are loaded and the meta view is active, the page automatically switches to lyrics view.

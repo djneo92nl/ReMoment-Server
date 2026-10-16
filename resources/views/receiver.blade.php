@@ -458,6 +458,17 @@
     gap: 18px;
     transition: opacity 0.2s ease;
   }
+  #lyrics-title {
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: var(--title, rgba(255,255,255,0.7));
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0.85;
+    margin-bottom: 14px;
+  }
   #lyric-prev, #lyric-next {
     font-size: 20px;
     font-weight: 300;
@@ -657,6 +668,7 @@
   </div>
 
   <div id="lyrics-view">
+    <p id="lyrics-title"></p>
     <p id="lyric-prev"></p>
     <p id="lyric-curr"><span id="lyric-curr-inner"></span></p>
     <p id="lyric-next"></p>
@@ -1038,6 +1050,7 @@ function updateUI(d) {
       setMarquee(trackName);
       document.getElementById('artist-name').textContent = artistName;
       document.getElementById('album-name').textContent = albumName;
+      document.getElementById('lyrics-title').textContent = artistName ? trackName + ' · ' + artistName : trackName;
       meta.style.opacity = '1';
     }, 250);
     setArtwork(artUrl, np.artwork || null);
