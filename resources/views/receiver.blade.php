@@ -1147,7 +1147,7 @@ function setArtwork(url, artwork) {
     const src    = (artwork && artwork.safe_colors) || null;
     const accent = src ? src[1]            : ensureL(colors[1], 0.58);
     const muted  = src ? (src[2] || src[1]): ensureL(colors[2] || colors[1], 0.68);
-    setAccent(accent, colors);
+    setAccent(accentFor(colors, src || []), colors);
     document.getElementById('artwork-wrap').style.setProperty('--vinyl-label', accent);
     document.getElementById('state-dot').style.background = accent;
     document.getElementById('artist-name').style.color = hexToRgba(muted, 0.9);
@@ -1190,6 +1190,41 @@ function updateProgress() {
 }
 
 // ── Bar: accent, waveform, shuffle/repeat (same look as the sticky player bar) ──
+// Port of App\Domain\Artwork\AccentColor (the sticky bar's accent): the most vivid light safe colour whose hue
+// is not the background's own, else the background's complementary hue.
+function hexToHsl(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec((hex || '').trim());
+  if (!m) return null;
+  const r = parseInt(m[1].slice(0,2),16)/255, g = parseInt(m[1].slice(2,4),16)/255, b = parseInt(m[1].slice(4,6),16)/255;
+  const max = Math.max(r,g,b), min = Math.min(r,g,b), l = (max + min) / 2;
+  if (max === min) return [0, 0, l];
+  const d = max - min, s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  const h = max === r ? (g - b) / d + (g < b ? 6 : 0) : (max === g ? (b - r) / d + 2 : (r - g) / d + 4);
+  return [h * 60, s, l];
+}
+
+function hslToHex(h, s, l) {
+  const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2;
+  const rgb = h < 60 ? [c,x,0] : h < 120 ? [x,c,0] : h < 180 ? [0,c,x] : h < 240 ? [0,x,c] : h < 300 ? [x,0,c] : [c,0,x];
+  return '#' + rgb.map(v => Math.round((v + m) * 255).toString(16).padStart(2, '0')).join('');
+}
+
+function hueDistance(a, b) { const d = Math.abs(a - b); return d > 180 ? 360 - d : d; }
+
+function accentFor(colors, safeColors) {
+  const base = colors && colors[0] ? hexToHsl(colors[0]) : null;
+  if (!base) return '#ffffff';
+  let best = null;
+  (safeColors || []).forEach(hex => {
+    const hsl = hexToHsl(hex);
+    if (!hsl || hsl[1] < 0.35 || hueDistance(hsl[0], base[0]) < 40) return;
+    if (!best || hsl[1] > best[1]) best = hsl;
+  });
+  if (best) return hslToHex(best[0], best[1], Math.max(best[2], 0.6));
+  if (base[1] < 0.15) return '#ffffff';
+  return hslToHex((base[0] + 180) % 360, Math.max(base[1], 0.6), 0.62);
+}
+
 function setAccent(accent, colors) {
   const root = document.documentElement.style;
   root.setProperty('--accent', accent || '#e8a46b');
