@@ -5,14 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ReMoment Receiver</title>
 <x-live-scripts />
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
     background: #0a0a0a;
     color: #fff;
-    font-family: 'DM Sans', sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     height: 100vh;
     width: 100vw;
     overflow: hidden;
@@ -51,11 +50,16 @@
     flex-shrink: 0;
     width: 425px;
     height: 425px;
-    border-radius: 10px;
+    width: min(50vh, 480px);
+    height: min(50vh, 480px);
+    border-radius: 16px;
     overflow: hidden;
     background: #1a1a1a;
     position: relative;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.55), 0 6px 20px rgba(0,0,0,0.35);
+    transition: transform 10s ease;
   }
+  body.ambient #artwork-wrap { transform: scale(1.04); }
 
   .art-img {
     position: absolute;
@@ -88,7 +92,7 @@
   }
 
   #platform {
-    font-family: 'DM Mono', monospace;
+    font-variant-numeric: tabular-nums;
     font-size: 14px;
     font-weight: 300;
     letter-spacing: 0.15em;
@@ -97,11 +101,13 @@
   }
 
   #track-name {
-    font-size: 45px;
+    font-size: 56px;
     font-weight: 500;
+    letter-spacing: -0.02em;
     line-height: 1.15;
     overflow: hidden;
-    color: #fff;
+    color: var(--title, #fff);
+    transition: color 0.6s;
     position: relative;
   }
   #track-name-inner {
@@ -119,7 +125,7 @@
   }
 
   #artist-name {
-    font-size: 25px;
+    font-size: 28px;
     font-weight: 300;
     color: rgba(255,255,255,0.6);
     white-space: nowrap;
@@ -138,7 +144,7 @@
   }
 
   #device-name {
-    font-family: 'DM Mono', monospace;
+    font-variant-numeric: tabular-nums;
     font-size: 14px;
     color: rgba(255,255,255,0.2);
     letter-spacing: 0.08em;
@@ -149,7 +155,7 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-family: 'DM Mono', monospace;
+    font-variant-numeric: tabular-nums;
     font-size: 12px;
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -175,49 +181,155 @@
     50% { opacity: 0.5; }
   }
 
-  #progress-wrap {
+  /* ── Bar: the sticky player bar's look (artwork-coloured glass, accent play button, waveform progress) ── */
+  #bar {
     position: relative;
     z-index: 1;
-    padding: 0 80px 50px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-sizing: border-box;
+    flex-wrap: wrap;
+    width: calc(100% - 160px);
     max-width: 1200px;
-    margin: 0 auto;
-    width: 100%;
-  }
-
-  #progress-bar-bg {
-    height: 4px;
-    background: rgba(255,255,255,0.08);
-    border-radius: 2px;
+    margin: 0 auto 36px;
+    padding: 12px 20px 10px;
+    border-radius: 16px;
     overflow: hidden;
+    color: #fff;
+    background: var(--bar-bg, linear-gradient(100deg, #2a2e36 0%, #1c1f25 100%));
+    border: 1px solid transparent;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.35);
+    transition: border-color 0.8s, box-shadow 0.8s;
   }
+  /* idle: the bar turns into frosted glass over the blurred cover */
+  body.ambient #bar {
+    background: rgba(255,255,255,0.07) !important;
+    -webkit-backdrop-filter: blur(28px) saturate(1.3);
+    backdrop-filter: blur(28px) saturate(1.3);
+    border-color: rgba(255,255,255,0.12);
+  }
+  body.ambient #bar::before { background: transparent; }
+  #bar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    pointer-events: none;
+  }
+  #bar > * { position: relative; }
 
-  #progress-bar-fill {
-    height: 100%;
-    background: rgba(255,255,255,0.5);
-    border-radius: 2px;
-    width: 0%;
-    transition: width 1s linear;
+  #controls { display: none; align-items: center; gap: 4px; flex: none; }
+  #vol-row { display: none; }
+  #bar.has-controls #controls, #bar.has-controls #vol-row { display: flex; }
+
+  .ctrl-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #fff;
+    width: 38px; height: 38px;
+    padding: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    transition: background 0.15s, transform 0.1s, opacity 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .ctrl-btn:hover { background: rgba(255,255,255,0.12); }
+  .ctrl-btn:active { transform: scale(0.92); }
+  .ctrl-btn svg { display: block; }
+  .ctrl-btn.primary { width: 48px; height: 48px; margin-right: 6px; background: var(--accent, #e8a46b); color: #111; }
+  .ctrl-btn.primary:hover { background: var(--accent, #e8a46b); filter: brightness(1.1); }
+  .ctrl-btn.mode { opacity: 0.6; }
+  .ctrl-btn.mode.on { opacity: 1; color: var(--accent, #e8a46b); }
+
+  #progress-wrap {
+    order: -1;
+    flex: 1 1 100%;
+    margin: 0 0 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: rgba(255,255,255,0.75);
+  }
+  #time-pos { min-width: 36px; text-align: right; }
+  #progress-bar-bg {
+    position: relative;
+    flex: 1;
+    height: 44px;
   }
   #progress-wrap.seekable #progress-bar-bg { cursor: pointer; }
-  #progress-wrap.seekable #progress-bar-bg:hover { height: 6px; margin-top: -1px; }
-
-  #vol-mute {
-    background: none; border: none; padding: 0; cursor: pointer;
-    display: flex; align-items: center;
+  #progress-line {
+    position: absolute;
+    left: 0; right: 0; top: 50%;
+    height: 4px; margin-top: -2px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.28);
+    overflow: hidden;
   }
+  #progress-bar-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 2px;
+    background: var(--accent, #e8a46b);
+    transition: width 1s linear;
+  }
+  #wf-base, #wf-played { position: absolute; inset: 0; display: none; }
+  #wf-played {
+    color: var(--accent, #e8a46b);
+    -webkit-clip-path: inset(0 100% 0 0);
+    clip-path: inset(0 100% 0 0);
+    transition: clip-path 1s linear, -webkit-clip-path 1s linear;
+  }
+  #wf-base { color: rgba(255,255,255,0.35); }
+  #wf-base svg, #wf-played svg { width: 100%; height: 100%; display: block; }
+  #progress-bar-bg.has-wave #wf-base, #progress-bar-bg.has-wave #wf-played { display: block; }
+  #progress-bar-bg.has-wave #progress-line { display: none; }
+
+  #bar-right { display: flex; align-items: center; gap: 2px; margin-left: auto; flex: none; }
+  #bar-right > .ctrl-btn { display: none; }
+  #vol-row {
+    align-items: center;
+    gap: 4px;
+    width: 130px;
+    flex: none;
+    margin-right: 8px;
+  }
+  #vol-mute { color: #fff; }
   #vol-row.muted #vol-slider, #vol-row.muted #vol-val { opacity: 0.35; }
-  #vol-row.muted #vol-mute svg { stroke: #f87171; }
-
-  #time-row {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 12px;
-    font-family: 'DM Mono', monospace;
-    font-size: 14px;
-    font-weight: 300;
-    color: rgba(255,255,255,0.25);
-    letter-spacing: 0.05em;
+  #vol-row.muted #vol-mute { color: #f87171; }
+  #vol-slider {
+    flex: 1;
+    min-width: 0;
+    -webkit-appearance: none;
+    height: 4px;
+    background: rgba(255,255,255,0.3);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
   }
+  #vol-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+    cursor: pointer;
+  }
+  #vol-slider::-moz-range-thumb {
+    width: 12px; height: 12px;
+    border: none;
+    border-radius: 50%;
+    background: #fff;
+    cursor: pointer;
+  }
+  #vol-val { display: none; }
 
   #picker-panel {
     position: fixed;
@@ -233,7 +345,7 @@
   }
 
   #picker-panel h1 {
-    font-family: 'DM Mono', monospace;
+    font-variant-numeric: tabular-nums;
     font-size: 16px;
     letter-spacing: 0.2em;
     text-transform: uppercase;
@@ -247,7 +359,7 @@
     border: 1px solid rgba(255,255,255,0.1);
     border-radius: 4px;
     color: #fff;
-    font-family: 'DM Mono', monospace;
+    font-variant-numeric: tabular-nums;
     font-size: 14px;
     padding: 14px 16px;
     cursor: pointer;
@@ -267,71 +379,11 @@
   .picker-device .device-sub { font-size: 11px; color: rgba(255,255,255,0.3); letter-spacing: 0.05em; }
 
   #picker-status {
-    font-family: 'DM Mono', monospace;
+    font-variant-numeric: tabular-nums;
     font-size: 13px;
     color: rgba(255,255,255,0.3);
     min-height: 16px;
     text-align: center;
-  }
-
-  #controls {
-    display: none;
-    flex-direction: column;
-    position: relative;
-    z-index: 1;
-    align-items: center;
-    gap: 18px;
-    padding: 0 80px 40px;
-  }
-
-  #controls.visible { display: flex; }
-
-  .ctrl-playback {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 32px;
-  }
-
-  #vol-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    width: 280px;
-    opacity: 0.6;
-    transition: opacity 0.2s;
-  }
-  #vol-row:hover { opacity: 1; }
-
-  #vol-slider {
-    flex: 1;
-    -webkit-appearance: none;
-    height: 3px;
-    background: rgba(255,255,255,0.2);
-    border-radius: 2px;
-    outline: none;
-    cursor: pointer;
-  }
-  #vol-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 13px; height: 13px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.85);
-    cursor: pointer;
-  }
-  #vol-slider::-moz-range-thumb {
-    width: 13px; height: 13px;
-    border: none;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.85);
-    cursor: pointer;
-  }
-  #vol-val {
-    font-family: 'DM Mono', monospace;
-    font-size: 12px;
-    color: rgba(255,255,255,0.4);
-    width: 26px;
-    text-align: right;
   }
 
   #btn-fullscreen {
@@ -350,43 +402,47 @@
   }
   #btn-fullscreen:hover { color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.08); }
 
-  .ctrl-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 12px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.15s, transform 0.1s;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .ctrl-btn:hover { background: rgba(255,255,255,0.08); }
-  .ctrl-btn:active { transform: scale(0.92); background: rgba(255,255,255,0.12); }
-  .ctrl-btn svg { display: block; }
-  .ctrl-btn.primary { padding: 18px; background: rgba(255,255,255,0.1); }
-  .ctrl-btn.primary:hover { background: rgba(255,255,255,0.18); }
-
-  /* ── Lyrics toggle button ── */
-  #btn-lyrics {
+  /* ── Up next: a panel floating above the bar, like the sticky bar's ── */
+  #bar-right > .ctrl-btn.active { color: var(--accent, #e8a46b); }
+  #queue-panel.open, #multi-panel.open, #switch-panel.open { display: flex; }
+  #queue-panel, #multi-panel, #switch-panel {
     display: none;
     position: fixed;
-    top: 20px;
-    right: 64px;
-    z-index: 10;
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 10px;
-    border-radius: 8px;
-    color: rgba(255,255,255,0.25);
-    transition: color 0.15s, background 0.15s;
-    line-height: 0;
+    z-index: 5;
+    right: 0; bottom: 0;
+    width: 26rem; max-width: calc(100vw - 24px);
+    max-height: 60vh;
+    flex-direction: column;
+    box-sizing: border-box;
+    padding: 16px 8px 12px 16px;
+    border-radius: 16px 16px 0 0;
+    overflow: hidden;
+    color: #fff;
+    background: #1c1f25;
+    box-shadow: 0 -8px 30px rgba(0,0,0,0.35);
   }
-  #btn-lyrics:hover { color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.08); }
-  #btn-lyrics.active { color: rgba(255,255,255,0.6); }
+  .fpanel h3 { font-size: 17px; font-weight: 700; margin: 0 0 10px; flex: none; }
+  .fpanel .q-row {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    padding: 6px 8px; border: 0; border-radius: 10px;
+    background: none; color: inherit; text-align: left; font: inherit; flex: none;
+  }
+  .fpanel button.q-row { cursor: pointer; }
+  .fpanel button.q-row:hover { background: rgba(255,255,255,0.12); }
+  .fpanel .q-row.now { background: rgba(255,255,255,0.12); margin-bottom: 6px; }
+  .fpanel .q-n { width: 20px; text-align: right; font-size: 12px; opacity: 0.5; flex: none; }
+  .fpanel .q-art { width: 40px; height: 40px; border-radius: 6px; overflow: hidden; flex: none; background: rgba(255,255,255,0.12); }
+  .fpanel .q-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .fpanel .q-txt { min-width: 0; flex: 1; }
+  .fpanel .q-name, #queue-panel .q-sub { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fpanel .q-name { font-size: 14px; font-weight: 600; }
+  .fpanel .q-sub { font-size: 12px; opacity: 0.6; }
+  .fpanel .q-dur { font-size: 12px; opacity: 0.55; flex: none; font-variant-numeric: tabular-nums; }
+  .fpanel .q-msg { font-size: 14px; opacity: 0.7; margin: 0; }
+  #queue-list { list-style: none; margin: 0; padding: 0 8px 0 0; overflow-y: auto; min-height: 0; flex: 1 1 auto; }
+  .fpanel .q-row.now .q-name { color: var(--accent, #e8a46b); }
+
+  /* ── Lyrics toggle: a bar button, shown only when the track has lyrics ── */
 
   /* ── Lyrics 3-line view ── */
   #lyrics-view {
@@ -447,7 +503,7 @@
     line-height: 1;
   }
   #idle-date {
-    font-family: 'DM Mono', monospace;
+    font-variant-numeric: tabular-nums;
     font-size: 15px;
     color: rgba(255,255,255,0.28);
     letter-spacing: 0.18em;
@@ -456,69 +512,30 @@
   }
 
   /* ── Ambient mode ── */
-  body.ambient #meta,
-  body.ambient #progress-wrap,
-  body.ambient #controls,
+  body.ambient:not(.ambient-plain) #meta,
   body.ambient #btn-fullscreen,
-  body.ambient #btn-lyrics,
-  body.ambient #switch-btn { opacity: 0 !important; pointer-events: none; transition: opacity 2.5s ease !important; }
+  body.ambient .fpanel,
+  /* no lyrics to show: keep play/pause, progress, track and artist, fade the rest */
+  body.ambient-plain #album-name,
+  body.ambient-plain #device-name,
+  body.ambient-plain #state-badge,
+  body.ambient-plain #platform { opacity: 0 !important; pointer-events: none; transition: opacity 2.5s ease !important; }
+  /* the bar stays (with or without lyrics): play/pause and progress as they are, the other buttons darkened so the bar doesn't look empty */
+  body.ambient #vol-row,
+  body.ambient #controls .ctrl-btn:not(.primary),
+  body.ambient #bar-right > .ctrl-btn { opacity: 0.25 !important; pointer-events: none; transition: opacity 2.5s ease !important; }
 
-  /* ── Device switcher ── */
-  #switch-btn {
-    display: none;
-    position: fixed;
-    top: 20px;
-    left: 20px;
-    z-index: 10;
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 10px;
-    border-radius: 8px;
-    color: rgba(255,255,255,0.25);
-    transition: color 0.15s, background 0.15s;
-    line-height: 0;
-  }
-  #switch-btn:hover { color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.08); }
-
-  #switch-panel {
-    display: none;
-    position: fixed;
-    top: 52px;
-    left: 12px;
-    z-index: 20;
-    background: rgba(12,12,12,0.96);
-    border: 1px solid rgba(255,255,255,0.09);
-    border-radius: 12px;
-    padding: 6px;
-    min-width: 200px;
-    backdrop-filter: blur(20px);
-  }
-  #switch-panel.open { display: block; }
-
-  .switch-item {
-    width: 100%;
-    text-align: left;
-    background: none;
-    border: none;
-    color: #fff;
-    font-family: 'DM Mono', monospace;
-    font-size: 13px;
-    padding: 9px 12px;
-    border-radius: 7px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    transition: background 0.12s;
-  }
-  .switch-item:hover { background: rgba(255,255,255,0.08); }
-  .switch-item.active { opacity: 0.4; cursor: default; }
-  .switch-dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
+  /* ── Device switcher / multiroom panels share the queue panel's look ── */
+  .switch-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin: 0 6px; }
+  .fpanel .q-section { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.5; margin: 8px 0 4px; flex: none; }
+  .fpanel .q-scroll { overflow-y: auto; min-height: 0; flex: 1 1 auto; padding-right: 8px; }
+  .fpanel .q-row.active { opacity: 0.45; cursor: default; }
+  .eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; width: 20px; justify-content: center; flex: none; }
+  .eq i { width: 3px; height: 100%; background: var(--accent, #e8a46b); border-radius: 1px; transform-origin: bottom; transform: scaleY(0.5); }
+  body.is-playing .eq i { animation: eq-bar 0.9s ease-in-out infinite alternate; }
+  .eq i:nth-child(2) { animation-delay: 0.2s; }
+  .eq i:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes eq-bar { from { transform: scaleY(0.3); } to { transform: scaleY(1); } }
 
   /* ── Responsive: portrait tablet (≤ 900px) ── */
   @media (max-width: 900px) {
@@ -529,18 +546,17 @@
       padding: 20px 24px 0;
     }
     #artwork-wrap { width: 260px; height: 260px; }
+    #track-name { font-size: 34px; }
     #meta, #lyrics-view { width: 100%; }
-    #track-name { font-size: 30px; }
-    #artist-name { font-size: 17px; }
+    #artist-name { font-size: 18px; }
     #album-name { font-size: 13px; }
-    #progress-wrap { padding: 0 24px 16px; }
-    #controls { padding: 0 24px 16px; }
+    #bar { width: calc(100% - 48px); margin-bottom: 20px; }
+    .ctrl-btn { width: 44px; height: 44px; }
+    .ctrl-btn.primary { width: 52px; height: 52px; }
     #lyric-curr { font-size: 24px; }
     #lyric-prev, #lyric-next { font-size: 15px; }
     .picker-device { width: 100%; max-width: 360px; }
-    .ctrl-btn { padding: 16px; touch-action: manipulation; }
-    .ctrl-btn.primary { padding: 22px; }
-    #btn-fullscreen, #btn-lyrics, #switch-btn { touch-action: manipulation; }
+    .ctrl-btn, #btn-fullscreen { touch-action: manipulation; }
   }
 
   /* ── Responsive: phone (≤ 480px) ── */
@@ -550,12 +566,13 @@
     #track-name { font-size: 22px; }
     #artist-name { font-size: 14px; }
     #album-name { font-size: 11px; }
-    #progress-wrap { padding: 0 16px 12px; }
-    #controls { padding: 0 16px 12px; }
+    #bar { width: calc(100% - 24px); padding: 10px 12px; margin-bottom: 12px; }
     #lyric-curr { font-size: 19px; }
     #lyric-prev, #lyric-next { font-size: 12px; }
     #lyrics-view { gap: 14px; }
-    #vol-row { width: 100%; }
+    #vol-slider, #vol-val { display: none; }
+    #vol-row { width: auto; margin-right: 0; }
+    #progress-bar-bg { height: 36px; }
   }
   /* ── Easter egg: vinyl mode (↑↑↓↓←→←→BA) ── */
   body.vinyl #artwork-wrap {
@@ -594,19 +611,6 @@
   <div id="picker-devices"></div>
   <div id="picker-status">Loading…</div>
 </div>
-
-<button id="switch-btn" title="Switch device">
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
-  </svg>
-</button>
-<div id="switch-panel"></div>
-
-<button id="btn-lyrics" onclick="toggleLyricsView()" title="Toggle lyrics">
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
-    <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="17" y2="12"/><line x1="3" y1="18" x2="19" y2="18"/>
-  </svg>
-</button>
 
 <button id="btn-fullscreen" onclick="toggleFullscreen()" title="Toggle fullscreen">
   <svg id="icon-expand" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -655,45 +659,91 @@
   </div>
 </div>
 
-<div id="progress-wrap">
-  <div id="progress-bar-bg">
-    <div id="progress-bar-fill"></div>
-  </div>
-  <div id="time-row">
-    <span id="time-pos">0:00</span>
-    <span id="time-dur">—</span>
-  </div>
+<div id="queue-panel" class="fpanel" onclick="event.stopPropagation()">
+  <h3>Up next</h3>
+  <div id="queue-now"></div>
+  <p class="q-msg" id="queue-msg"></p>
+  <ol id="queue-list"></ol>
+</div>
+<div id="multi-panel" class="fpanel" onclick="event.stopPropagation()">
+  <h3>Multiroom</h3>
+  <p class="q-msg" id="multi-msg"></p>
+  <div class="q-scroll" id="multi-body"></div>
+</div>
+<div id="switch-panel" class="fpanel" onclick="event.stopPropagation()">
+  <h3>Player</h3>
+  <div class="q-scroll" id="switch-body"></div>
 </div>
 
-<div id="controls">
-  <div class="ctrl-playback">
-    <button class="ctrl-btn" onclick="sendAction('previous')" title="Previous">
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-        <polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="4" x2="5" y2="20"/>
-      </svg>
-    </button>
+<div id="bar">
+  <div id="controls">
     <button class="ctrl-btn primary" id="btn-playpause" onclick="togglePlayPause()" title="Play/Pause">
-      <svg id="icon-play" width="32" height="32" viewBox="0 0 24 24" fill="white" stroke="none">
+      <svg id="icon-play" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="margin-left:2px">
         <polygon points="5 3 19 12 5 21 5 3"/>
       </svg>
-      <svg id="icon-pause" width="32" height="32" viewBox="0 0 24 24" fill="white" stroke="none" style="display:none">
+      <svg id="icon-pause" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display:none">
         <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
       </svg>
     </button>
+    <button class="ctrl-btn" onclick="sendAction('previous')" title="Previous">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+        <polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="4" x2="5" y2="20"/>
+      </svg>
+    </button>
     <button class="ctrl-btn" onclick="sendAction('next')" title="Next">
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
         <polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="4" x2="19" y2="20"/>
       </svg>
     </button>
+    <button class="ctrl-btn mode" id="btn-shuffle" onclick="toggleShuffle()" title="Shuffle" style="display:none">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/>
+      </svg>
+    </button>
+    <button class="ctrl-btn mode" id="btn-repeat" onclick="cycleRepeat()" title="Repeat" style="display:none">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+        <text id="repeat-one" x="12" y="15" text-anchor="middle" font-size="8" font-weight="700" fill="currentColor" stroke="none" style="display:none">1</text>
+      </svg>
+    </button>
   </div>
+
+  <div id="progress-wrap">
+    <span id="time-pos">0:00</span>
+    <div id="progress-bar-bg">
+      <div id="progress-line"><div id="progress-bar-fill"></div></div>
+      <div id="wf-base"></div>
+      <div id="wf-played"></div>
+    </div>
+    <span id="time-dur">—</span>
+  </div>
+
+  <div id="bar-right">
+    <button class="ctrl-btn" id="btn-like" onclick="toggleLike()" title="Like">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path id="heart-path" d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/></svg>
+    </button>
   <div id="vol-row">
-    <button id="vol-mute" onclick="toggleMute()" title="Mute">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <button class="ctrl-btn" id="vol-mute" onclick="toggleMute()" title="Mute">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
       </svg>
     </button>
     <input type="range" id="vol-slider" min="0" max="100" value="50">
     <span id="vol-val">—</span>
+  </div>
+
+    <button class="ctrl-btn" id="btn-multi" onclick="togglePanel('multi', event)" title="Multiroom">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+    </button>
+    <button class="ctrl-btn" id="btn-queue" onclick="togglePanel('queue', event)" title="Up next">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1" fill="currentColor"/><circle cx="3.5" cy="12" r="1" fill="currentColor"/><circle cx="3.5" cy="18" r="1" fill="currentColor"/></svg>
+    </button>
+    <button class="ctrl-btn" id="btn-lyrics" onclick="toggleLyricsView()" title="Lyrics">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="17" y2="12"/><line x1="3" y1="18" x2="19" y2="18"/></svg>
+    </button>
+    <button class="ctrl-btn" id="btn-devices" onclick="togglePanel('devices', event)" title="Change player">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+    </button>
   </div>
 </div>
 
@@ -770,11 +820,18 @@ function startReceiver(device) {
   const label = [device.device_name, device.device_product_type].filter(Boolean).join(' · ');
   document.getElementById('device-name').textContent = label;
   if (showControls) {
-    document.getElementById('controls').classList.add('visible');
+    document.getElementById('bar').classList.add('has-controls');
     fetchVolume();
   }
-  document.getElementById('switch-btn').style.display = 'block';
-  deviceCaps = device.capabilities || [];
+    deviceCaps = device.capabilities || [];
+  document.getElementById('btn-shuffle').style.display = deviceCaps.includes('shuffle') ? 'flex' : 'none';
+  document.getElementById('btn-repeat').style.display = deviceCaps.includes('repeat') ? 'flex' : 'none';
+  const showBtn = (id, on) => { document.getElementById(id).style.display = on ? 'flex' : 'none'; };
+  showBtn('btn-queue', deviceCaps.includes('queue'));
+  showBtn('btn-like', deviceCaps.includes('like'));
+  showBtn('btn-multi', deviceCaps.includes('multi_room'));
+  showBtn('btn-devices', allDevices.length > 1);
+  togglePanel(null, null, false);
   document.getElementById('progress-wrap').classList.toggle('seekable', deviceCaps.includes('seek'));
   if (showControls && deviceCaps.includes('volume_control')) fetchMute();
   resetAmbient();
@@ -835,7 +892,7 @@ function setLyrics(lyrics) {
     const lines = parseLrc(lyrics.synced);
     if (lines.length) {
       currentLyricsData = { type: 'synced', lines };
-      btn.style.display = 'block';
+      btn.style.display = 'flex';
       syncLyricsLine();
       return;
     }
@@ -844,7 +901,7 @@ function setLyrics(lyrics) {
     const lines = lyrics.plain.split('\n').filter(t => t.trim()).map(t => ({ time: null, text: t }));
     if (lines.length) {
       currentLyricsData = { type: 'plain', lines };
-      btn.style.display = 'block';
+      btn.style.display = 'flex';
       syncLyricsLine();
       return;
     }
@@ -970,6 +1027,7 @@ function updateUI(d) {
   if (trackId !== lastTrackId) {
     lastTrackId = trackId;
     lastLyricsKey = null;
+    if (openPanel === 'queue') setTimeout(loadQueue, 600);
     const meta = document.getElementById('meta');
     meta.style.opacity = '0';
     setTimeout(() => {
@@ -978,9 +1036,9 @@ function updateUI(d) {
       document.getElementById('album-name').textContent = albumName;
       meta.style.opacity = '1';
     }, 250);
-    setArtwork(artUrl, np.artwork && np.artwork.colors);
+    setArtwork(artUrl, np.artwork || null);
   } else if (artUrl && artUrl !== currentArtUrl) {
-    setArtwork(artUrl, np.artwork && np.artwork.colors);
+    setArtwork(artUrl, np.artwork || null);
   }
 
   const newLyricsKey = trackId + ':' + ((np.lyrics && np.lyrics.synced) ? 'synced' : (np.lyrics && np.lyrics.plain) ? 'plain' : 'none');
@@ -988,6 +1046,9 @@ function updateUI(d) {
     lastLyricsKey = newLyricsKey;
     setLyrics(np.lyrics || null);
   }
+
+  setWaveform(np.waveform || null);
+  setModes(np.modes || null);
 
   currentDuration = (np.track && np.track.duration) || 0;
   if (np.position !== undefined) currentProgress = np.position;
@@ -1052,7 +1113,8 @@ function setMarquee(text) {
   }));
 }
 
-function setArtwork(url, colors) {
+function setArtwork(url, artwork) {
+  const colors = artwork && artwork.colors;
   if (url && url !== currentArtUrl) {
     const next = activeArt === 'a' ? 'b' : 'a';
     const awNext = document.getElementById('aw-' + next);
@@ -1078,26 +1140,22 @@ function setArtwork(url, colors) {
     currentArtUrl = '';
   }
   if (colors && colors.length >= 2) {
-    const src    = (np.artwork && np.artwork.safe_colors) || null;
+    const src    = (artwork && artwork.safe_colors) || null;
     const accent = src ? src[1]            : ensureL(colors[1], 0.58);
     const muted  = src ? (src[2] || src[1]): ensureL(colors[2] || colors[1], 0.68);
-    document.getElementById('progress-bar-fill').style.background = accent;
+    setAccent(accent, colors);
     document.getElementById('artwork-wrap').style.setProperty('--vinyl-label', accent);
     document.getElementById('state-dot').style.background = accent;
     document.getElementById('artist-name').style.color = hexToRgba(muted, 0.9);
     document.getElementById('album-name').style.color  = hexToRgba(muted, 0.55);
-    document.getElementById('time-pos').style.color    = hexToRgba(accent, 0.5);
-    document.getElementById('time-dur').style.color    = hexToRgba(accent, 0.3);
     document.getElementById('lyric-curr').style.color  = hexToRgba(accent, 0.92);
     document.getElementById('lyric-prev').style.color  = hexToRgba(muted, 0.28);
     document.getElementById('lyric-next').style.color  = hexToRgba(muted, 0.28);
   } else {
-    document.getElementById('progress-bar-fill').style.background = 'rgba(255,255,255,0.5)';
+    setAccent(null, null);
     document.getElementById('state-dot').style.background = 'rgba(255,255,255,0.2)';
     document.getElementById('artist-name').style.color = 'rgba(255,255,255,0.6)';
     document.getElementById('album-name').style.color  = 'rgba(255,255,255,0.35)';
-    document.getElementById('time-pos').style.color    = 'rgba(255,255,255,0.25)';
-    document.getElementById('time-dur').style.color    = 'rgba(255,255,255,0.25)';
     document.getElementById('lyric-curr').style.color  = 'rgba(255,255,255,0.92)';
     document.getElementById('lyric-prev').style.color  = 'rgba(255,255,255,0.22)';
     document.getElementById('lyric-next').style.color  = 'rgba(255,255,255,0.22)';
@@ -1116,13 +1174,104 @@ function updateProgress() {
     const pos = currentPosition();
     const pct = Math.min(100, (pos / currentDuration) * 100);
     document.getElementById('progress-bar-fill').style.width = pct + '%';
+    setPlayed(pct);
     document.getElementById('time-pos').textContent = fmtTime(pos);
     document.getElementById('time-dur').textContent = fmtTime(currentDuration);
   } else {
     document.getElementById('progress-bar-fill').style.width = '0%';
+    setPlayed(0);
     document.getElementById('time-pos').textContent = '—';
     document.getElementById('time-dur').textContent = '—';
   }
+}
+
+// ── Bar: accent, waveform, shuffle/repeat (same look as the sticky player bar) ──
+function setAccent(accent, colors) {
+  const root = document.documentElement.style;
+  root.setProperty('--accent', accent || '#e8a46b');
+  if (accent) root.setProperty('--title', accent); else root.removeProperty('--title');
+  const bar = document.getElementById('bar');
+  if (colors && colors.length >= 2) bar.style.setProperty('--bar-bg', `linear-gradient(100deg, ${colors[0]} 0%, ${colors[1]} 100%)`);
+  else bar.style.removeProperty('--bar-bg');
+}
+
+let currentWaveKey = null;
+function waveSvg(points) {
+  const h = 32, mid = h / 2;
+  let d = '';
+  points.forEach((peak, i) => {
+    const half = Math.max(0.5, peak / 100 * mid);
+    d += `M${i + 0.5} ${(mid - half).toFixed(1)}V${(mid + half).toFixed(1)}`;
+  });
+  return `<svg viewBox="0 0 ${points.length} ${h}" preserveAspectRatio="none"><path d="${d}" stroke="currentColor" stroke-width="0.7" stroke-linecap="round" fill="none"/></svg>`;
+}
+
+function setWaveform(points) {
+  const key = points ? points.length + ':' + points[0] + ':' + points[points.length >> 1] : null;
+  if (key === currentWaveKey) return;
+  currentWaveKey = key;
+  const bg = document.getElementById('progress-bar-bg');
+  bg.classList.toggle('has-wave', !!points);
+  const svg = points ? waveSvg(points) : '';
+  document.getElementById('wf-base').innerHTML = svg;
+  document.getElementById('wf-played').innerHTML = svg;
+}
+
+function setPlayed(pct) {
+  const clip = 'inset(0 ' + (100 - pct) + '% 0 0)';
+  const el = document.getElementById('wf-played');
+  el.style.webkitClipPath = clip;
+  el.style.clipPath = clip;
+}
+
+let currentShuffle = false, currentRepeat = 'off', currentLiked = false;
+function setModes(modes) {
+  currentShuffle = !!(modes && modes.shuffle);
+  currentRepeat = (modes && modes.repeat) || 'off';
+  currentLiked = !!(modes && modes.liked);
+  updateModesUI();
+}
+
+function updateModesUI() {
+  document.getElementById('btn-like').classList.toggle('active', currentLiked);
+  document.getElementById('btn-like').title = currentLiked ? 'Remove from liked' : 'Like';
+  document.getElementById('heart-path').setAttribute('fill', currentLiked ? 'currentColor' : 'none');
+  document.getElementById('btn-shuffle').classList.toggle('on', currentShuffle);
+  document.getElementById('btn-repeat').classList.toggle('on', currentRepeat !== 'off');
+  document.getElementById('repeat-one').style.display = currentRepeat === 'one' ? 'block' : 'none';
+  document.getElementById('btn-repeat').title = 'Repeat: ' + currentRepeat;
+}
+
+async function putMode(path, body) {
+  try {
+    await fetch(`/api/devices/${deviceId}/${path}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch(e) {}
+  setTimeout(pollNow, 400);
+}
+
+function toggleShuffle() {
+  resetAmbient();
+  currentShuffle = !currentShuffle;
+  updateModesUI();
+  putMode('shuffle', { shuffle: currentShuffle });
+}
+
+function toggleLike() {
+  resetAmbient();
+  currentLiked = !currentLiked;
+  updateModesUI();
+  putMode('like', { liked: currentLiked });
+}
+
+function cycleRepeat() {
+  resetAmbient();
+  currentRepeat = currentRepeat === 'off' ? 'all' : (currentRepeat === 'all' ? 'one' : 'off');
+  updateModesUI();
+  putMode('repeat', { repeat: currentRepeat });
 }
 
 function fmtTime(s) {
@@ -1185,7 +1334,7 @@ updateClock();
 // ── Ambient mode ─────────────────────────────────────────────
 function resetAmbient() {
   const wasAmbient = document.body.classList.contains('ambient');
-  document.body.classList.remove('ambient');
+  document.body.classList.remove('ambient', 'ambient-plain');
   clearTimeout(ambientTimer);
   if (wasAmbient && ambientSwitchedToLyrics && lyricsViewActive) {
     ambientSwitchedToLyrics = false;
@@ -1194,6 +1343,7 @@ function resetAmbient() {
   if (isCurrentlyPlaying) {
     ambientTimer = setTimeout(() => {
       document.body.classList.add('ambient');
+      if (!currentLyricsData) document.body.classList.add('ambient-plain');
       if (currentLyricsData && !lyricsViewActive) {
         ambientSwitchedToLyrics = true;
         toggleLyricsView();
@@ -1296,38 +1446,137 @@ async function toggleMute() {
   } catch(e) {}
 }
 
+// ── Up next (queue, queue_jump) ──────────────────────────────
+let openPanel = null;
+const PANELS = {
+  queue:   { el: 'queue-panel',  btn: 'btn-queue',   load: () => loadQueue() },
+  multi:   { el: 'multi-panel',  btn: 'btn-multi',   load: () => loadMulti() },
+  devices: { el: 'switch-panel', btn: 'btn-devices', load: () => buildSwitcher() },
+};
+
+// One panel at a time floats above the bar; `togglePanel(null, null, false)` closes them all.
+function togglePanel(name, e, force) {
+  if (e) { e.stopPropagation(); resetAmbient(); }
+  const open = force === false ? null : (force === true || openPanel !== name ? name : null);
+  openPanel = open;
+  Object.keys(PANELS).forEach(k => {
+    const on = k === open;
+    document.getElementById(PANELS[k].el).classList.toggle('open', on);
+    document.getElementById(PANELS[k].btn).classList.toggle('active', on);
+  });
+  if (open) {
+    const panel = document.getElementById(PANELS[open].el);
+    const bar = document.getElementById('bar').getBoundingClientRect();
+    panel.style.right = Math.max(0, window.innerWidth - bar.right) + 'px';
+    panel.style.bottom = (window.innerHeight - bar.top - 16) + 'px';
+    PANELS[open].load();
+  }
+}
+
+const NOTE_ICON = '<svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg>';
+
+function qEsc(t) {
+  return String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+function qArt(a) {
+  const u = a && (a.proxy_120 || a.proxy_320);
+  return '<span class="q-art">' + (u ? '<img src="' + qEsc(fixHost(u)) + '" alt="" loading="lazy">' : NOTE_ICON) + '</span>';
+}
+
+async function loadQueue() {
+  if (!deviceId || openPanel !== 'queue') return;
+  const canJump = deviceCaps.includes('queue_jump');
+  const now = document.getElementById('track-name-inner').textContent;
+  document.getElementById('queue-now').innerHTML = (currentArtUrl || now !== '—')
+    ? '<div class="q-row now"><span class="eq"><i></i><i></i><i></i></span><span class="q-art">' + (currentArtUrl ? '<img src="' + qEsc(currentArtUrl) + '" alt="">' : '') + '</span><span class="q-txt"><span class="q-name">' + qEsc(now) + '</span><span class="q-sub">' + qEsc(document.getElementById('artist-name').textContent) + '</span></span></div>'
+    : '';
+  const msg = document.getElementById('queue-msg'), list = document.getElementById('queue-list');
+  try {
+    const r = await fetch(`/api/devices/${deviceId}/queue?limit=50`);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const items = (await r.json()).up_next || [];
+    msg.textContent = items.length ? '' : 'Nothing queued after the current track.';
+    list.innerHTML = items.map((it, i) => {
+      const sub = [it.artist, it.album].filter(Boolean).join(' · ');
+      return '<li><' + (canJump ? 'button type="button" data-pos="' + (i + 1) + '" title="Play from here"' : 'div') + ' class="q-row">'
+        + '<span class="q-n">' + (i + 1) + '</span>' + qArt(it.artwork)
+        + '<span class="q-txt"><span class="q-name">' + qEsc(it.name) + '</span>' + (sub ? '<span class="q-sub">' + qEsc(sub) + '</span>' : '') + '</span>'
+        + (it.duration ? '<span class="q-dur">' + fmtTime(it.duration) + '</span>' : '')
+        + '</' + (canJump ? 'button' : 'div') + '></li>';
+    }).join('');
+  } catch(e) {
+    list.innerHTML = '';
+    msg.textContent = 'Could not read the queue from the device.';
+  }
+}
+
+document.getElementById('queue-list').addEventListener('click', async e => {
+  const row = e.target.closest('[data-pos]');
+  if (!row) return;
+  try {
+    await fetch(`/api/devices/${deviceId}/queue/jump`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ position: parseInt(row.getAttribute('data-pos')) }),
+    });
+  } catch(err) {}
+  setTimeout(pollNow, 400);
+});
+
 // ── Device switcher ──────────────────────────────────────────
 const STATE_COLORS = { playing: '#4ade80', paused: '#fbbf24', standby: '#ef4444', unreachable: '#6b7280' };
 
 function buildSwitcher() {
-  const panel = document.getElementById('switch-panel');
-  panel.innerHTML = '';
+  const body = document.getElementById('switch-body');
+  body.innerHTML = '';
   allDevices.forEach(d => {
     const btn = document.createElement('button');
-    btn.className = 'switch-item' + (d.id === deviceId ? ' active' : '');
+    btn.className = 'q-row' + (d.id === deviceId ? ' active' : '');
     const color = STATE_COLORS[d.state] || STATE_COLORS.unreachable;
-    btn.innerHTML = `<span class="switch-dot" style="background:${color}"></span><span>${d.device_name}</span>`;
+    btn.innerHTML = '<span class="switch-dot" style="background:' + color + '"></span><span class="q-txt"><span class="q-name">' + qEsc(d.device_name) + '</span><span class="q-sub">' + qEsc(d.device_product_type || '') + '</span></span>';
     if (d.id !== deviceId) {
-      btn.onclick = () => { toggleSwitcher(false); startReceiver(d); };
+      btn.onclick = () => { togglePanel(null, null, false); startReceiver(d); };
     }
-    panel.appendChild(btn);
+    body.appendChild(btn);
   });
 }
 
-function toggleSwitcher(force) {
-  const panel = document.getElementById('switch-panel');
-  const open = force !== undefined ? force : !panel.classList.contains('open');
-  if (open) buildSwitcher();
-  panel.classList.toggle('open', open);
+// ── Multiroom ────────────────────────────────────────────────
+function multiRow(d, action) {
+  const color = STATE_COLORS[d.state] || STATE_COLORS.unreachable;
+  return '<' + (action ? 'button type="button" data-host="' + d.id + '"' : 'div') + ' class="q-row"><span class="switch-dot" style="background:' + color + '"></span><span class="q-txt"><span class="q-name">' + qEsc(d.device_name) + '</span><span class="q-sub">' + (action ? 'Join' : 'Listening here') + '</span></span></' + (action ? 'button' : 'div') + '>';
 }
 
-document.getElementById('switch-btn').addEventListener('click', e => {
-  e.stopPropagation();
-  resetAmbient();
-  toggleSwitcher();
-});
+async function loadMulti() {
+  if (!deviceId || openPanel !== 'multi') return;
+  const msg = document.getElementById('multi-msg'), body = document.getElementById('multi-body');
+  try {
+    const r = await fetch(`/api/devices/${deviceId}/multiroom`);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    const joinable = (j.joinable || []).filter(d => d.id !== deviceId);
+    const listeners = j.listeners || [];
+    msg.textContent = (joinable.length || listeners.length) ? '' : 'No other player is playing to join.';
+    body.innerHTML = (joinable.length ? '<div class="q-section">Join a player</div>' + joinable.map(d => multiRow(d, true)).join('') : '')
+      + (listeners.length ? '<div class="q-section">In this group</div>' + listeners.map(d => multiRow(d, false)).join('') : '')
+      + '<button type="button" class="q-row" data-leave="1"><span class="q-txt"><span class="q-name">Leave group</span></span></button>';
+  } catch(e) {
+    body.innerHTML = '';
+    msg.textContent = 'Could not read multiroom from the device.';
+  }
+}
 
-document.addEventListener('click', () => toggleSwitcher(false));
+document.getElementById('multi-body').addEventListener('click', async e => {
+  const host = e.target.closest('[data-host]'), leave = e.target.closest('[data-leave]');
+  if (!host && !leave) return;
+  try {
+    await fetch(`/api/devices/${deviceId}/multiroom/` + (host ? 'join' : 'leave'), host
+      ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ host_device_id: parseInt(host.getAttribute('data-host')) }) }
+      : { method: 'DELETE' });
+  } catch(err) {}
+  setTimeout(() => { loadMulti(); pollNow(); }, 500);
+});
 
 // Easter egg: ↑↑↓↓←→←→BA toggles vinyl mode.
 const KONAMI = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];

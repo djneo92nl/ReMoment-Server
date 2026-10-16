@@ -13,12 +13,15 @@ A standalone Blade template with no Livewire dependency — plain JS fetching `G
 | Device picker | Shown on first load if `?device=` is absent |
 | Album art crossfade | Two `<img>` layers (a/b) swap with opacity transition |
 | Color theming | 5 dominant colors from `ArtworkCache`; accent on track name, muted on artist/album |
-| Progress bar | Position from the API, interpolated locally each second; re-fetches when the pushed `progress` percentage drifts >3% |
+| Bar | Frosted-glass-when-idle bar at the bottom in the look of the [sticky player bar](player-bar.md): row 1 the waveform/progress strip with elapsed and total, row 2 accent play/pause, previous/next, shuffle, repeat on the left and like (`like`), volume, multiroom (`multi_room`), queue, lyrics and the player switcher (more than one device) on the right. Colours come from the artwork (`--accent`, `--title`, `--bar-bg` set by `setAccent`); title is set in the accent. Fonts are the app's system stack (no webfonts). Wraps on narrow screens |
+| Progress | Position from the API, interpolated locally each second; re-fetches when the pushed `progress` percentage drifts >3%. When `now_playing.waveform` is present (own analysed file) it is drawn as the waveform with the played part in the accent, else a plain bar |
 | Seek | Click the progress bar → `PUT /api/devices/{id}/seek`; only when the device has the `seek` capability (`#progress-wrap.seekable`) |
 | Playback controls | Play/pause/next/previous via REST API; hidden on Chromecast UA |
 | Volume control | Slider, debounced 200ms, hidden on TV UA and Chromecast; updates live from the `volume` MQTT topic |
 | Mute | Speaker icon (`#vol-mute`) toggles `PUT /api/devices/{id}/mute`; `#vol-row.muted` dims the slider |
-| Lyrics view | Toggle button swaps meta panel ↔ 3-line teleprompter (previous / current / next) |
+| Panels | One floating panel at a time above the bar (`togglePanel`): Up next, Multiroom (`GET …/multiroom`, join a playing player, leave group) and the player switcher; closes on outside click or Escape |
+| Up next | Queue button in the bar (`queue` capability) opens a panel above it, like the sticky bar's: the playing track, then `GET /api/devices/{id}/queue?limit=50`; with `queue_jump` a click plays from there (`POST …/queue/jump`). Reloads on track change while open; closes on outside click or Escape |
+| Lyrics view | Toggle button (`#btn-lyrics`, last button in the bar, accent while active, only shown when the track has lyrics) swaps meta panel ↔ 3-line teleprompter (previous / current / next) |
 | Synced lyrics | LRC timestamps → binary search per second for current line |
 | Plain lyrics | Proportional estimate when no timestamps available |
 | Marquee | Long track names and long current lyric lines scroll via CSS animation |
@@ -28,7 +31,7 @@ A standalone Blade template with no Livewire dependency — plain JS fetching `G
 
 ## Ambient Mode
 
-After 30 seconds without mouse/touch/keyboard input while a device is playing, the page adds `body.ambient`. This fades out all UI chrome (controls, progress, buttons) with a 2.5s transition. Album art and — if lyrics are present — the lyrics view remain visible.
+After 30 seconds without mouse/touch/keyboard input while a device is playing, the page adds `body.ambient`. The bar stays: play/pause and progress as they are, the other buttons (volume, previous/next/shuffle/repeat, queue, lyrics) (including like, multiroom and the switcher) darkened to 25% over 2.5s and not clickable. With lyrics the meta panel fades and the lyrics view takes over; without lyrics the page also adds `body.ambient-plain`, which keeps track name and artist and fades album, device and state badge. The corner button and the panels fade out. With the bar idle (`body.ambient`) it turns into blurred glass and the cover drifts slowly larger.
 
 **Auto-switch behaviour:**
 - When ambient activates: if lyrics are loaded and the meta view is active, the page automatically switches to lyrics view.

@@ -12,8 +12,7 @@ use App\Domain\Device\DeviceCapabilities;
 use App\Domain\Device\RepeatMode;
 use App\Domain\Device\SpotifyRouting;
 use App\Domain\Device\State;
-use App\Domain\Library\LibraryIdentity;
-use App\Domain\Media\NowPlaying;
+use App\Domain\Library\NowPlayingWaveform;
 use App\Events\Device\PlaybackModesUpdated;
 use App\Integrations\Contracts\LikeInterface;
 use App\Integrations\Contracts\QueueInterface;
@@ -174,7 +173,7 @@ class PlayerBar extends Component
             'state' => $state,
             'nowPlaying' => $nowPlaying,
             'artwork' => $nowPlaying ? NowPlayingArtwork::resolve($nowPlaying) : null,
-            'waveform' => $nowPlaying ? $this->waveform($nowPlaying) : null,
+            'waveform' => $nowPlaying ? NowPlayingWaveform::for($nowPlaying) : null,
             'capabilities' => $capabilities,
             'modes' => $modes,
             'volume' => $this->volume($device, $capabilities, $state),
@@ -195,36 +194,6 @@ class PlayerBar extends Component
             ->reject(fn (Device $d) => $d->id !== $pinned && $d->liveState() === State::Unreachable)
             ->sortBy(fn (Device $d) => $d->id === $pinned ? 0 : ($d->liveState() === State::Playing ? 1 : 2))
             ->values();
-    }
-
-    /**
-     * The waveform (peaks 0-100) of the playing track when the library has its own audio file analysed, else null.
-     * Looked up through the library like play history does; remembered briefly so a refresh costs no queries.
-     *
-     * @return list<int>|null
-     */
-    private function waveform(?NowPlaying $nowPlaying): ?array
-    {
-        $track = $nowPlaying?->track;
-        $name = is_string($track?->name) ? trim($track->name) : '';
-        $artist = $track?->artist?->name;
-        if ($name === '' || !is_string($artist) || $artist === '') {
-            return null;
-        }
-
-        $key = 'player_bar_waveform_'.md5(implode('|', [$artist, $nowPlaying->album?->name, $name, (int) $track->duration]));
-        $points = Cache::get($key);
-        if ($points === null) {
-            try {
-                $points = LibraryIdentity::lookupTrack($artist, $nowPlaying->album?->name, $name, $track->id, $track->source, $track->duration)?->waveform();
-            } catch (\Throwable) {
-                $points = null;
-            }
-            // An analysis can arrive later: a miss is remembered only briefly
-            Cache::put($key, $points ?? false, $points ? 3600 : 120);
-        }
-
-        return $points ?: null;
     }
 
     /**

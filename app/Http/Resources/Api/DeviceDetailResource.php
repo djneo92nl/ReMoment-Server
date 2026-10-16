@@ -6,6 +6,7 @@ use App\Domain\Artwork\NowPlayingArtwork;
 use App\Domain\Device\Cache\Modes;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
+use App\Domain\Library\NowPlayingWaveform;
 use App\Models\Media\Track;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -28,6 +29,11 @@ class DeviceDetailResource extends JsonResource
                 }
 
                 $nowPlaying['modes'] = Modes::get($this->id)->toArray();
+
+                $waveform = NowPlayingWaveform::for($cachedNowPlaying);
+                if ($waveform !== null) {
+                    $nowPlaying['waveform'] = $waveform;
+                }
 
                 $track = $this->resolveTrack($cachedNowPlaying);
                 if ($track) {
