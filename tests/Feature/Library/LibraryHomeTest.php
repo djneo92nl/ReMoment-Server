@@ -58,7 +58,7 @@ class LibraryHomeTest extends TestCase
 
         $hero = LibraryHome::build('all', [])['hero'];
 
-        $this->assertSame('All', $hero['name']);
+        $this->assertSame('Everything', $hero['name']);
         $this->assertSame(3, $hero['albums']);
         $this->assertSame(2, $hero['artists']);
 

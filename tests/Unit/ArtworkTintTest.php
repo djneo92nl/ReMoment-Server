@@ -50,6 +50,8 @@ class ArtworkTintTest extends TestCase
 
         $this->assertGreaterThanOrEqual(4.5, $this->contrast($tint['dark'], $tint['ink_dark']), "dark tint of $cover");
         $this->assertGreaterThanOrEqual(4.5, $this->contrast($tint['light'], $tint['ink_light']), "light tint of $cover");
+        $this->assertGreaterThanOrEqual(4.5, $this->contrast($tint['dark'], $tint['muted_dark']), "muted text on the dark tint of $cover");
+        $this->assertGreaterThanOrEqual(4.5, $this->contrast($tint['light'], $tint['muted_light']), "muted text on the light tint of $cover");
         // deep stays deep and pastel stays pastel: fitting only moves away from the ink
         $this->assertLessThanOrEqual(0.31, Hsl::fromHex($tint['dark'])[2]);
         $this->assertGreaterThanOrEqual(0.89, Hsl::fromHex($tint['light'])[2]);
@@ -57,14 +59,14 @@ class ArtworkTintTest extends TestCase
 
     public static function covers(): array
     {
-        return array_map(fn ($c) => [$c], ['#000000', '#ffffff', '#ffff00', '#00ffff', '#ff0000', '#0000ff', '#808080', '#f5deb3', '#1a2b3c', '#ff00ff']);
+        return array_map(fn ($c) => [$c], ['#000000', '#ffffff', '#ffff00', '#00ffff', '#ff0000', '#0000ff', '#808080', '#f5deb3', '#1a2b3c', '#ff00ff', '#c0c040', '#c0c0ff', '#40c040', '#80c0ff']);
     }
 
     public function test_style_carries_both_variants_for_the_tint_class(): void
     {
         $style = ArtworkTint::style(['#336699']);
 
-        foreach (['--tint-dark:#', '--tint-light:#', '--ink-dark:#', '--ink-light:#'] as $part) {
+        foreach (['--tint-dark:#', '--tint-light:#', '--ink-dark:#', '--ink-light:#', '--muted-dark:#', '--muted-light:#'] as $part) {
             $this->assertStringContainsString($part, $style);
         }
     }

@@ -6,7 +6,7 @@
         <div class="hero-collage pointer-events-none absolute inset-y-0 right-0 w-3/5" aria-hidden="true">
             <div class="grid -translate-y-8 translate-x-10 rotate-[8deg] scale-110 grid-cols-3 gap-3 opacity-90 sm:grid-cols-4">
                 @foreach($hero['covers'] as $cover)
-                    <img src="{{ $cover }}" alt="" loading="lazy" class="aspect-square w-full rounded-xl object-cover shadow-lg {{ $loop->odd ? 'translate-y-6' : '' }}">
+                    <img src="{{ $cover }}" alt="" decoding="async" class="aspect-square w-full rounded-xl object-cover shadow-lg {{ $loop->odd ? 'translate-y-6' : '' }}">
                 @endforeach
             </div>
         </div>

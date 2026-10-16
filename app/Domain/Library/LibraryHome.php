@@ -25,6 +25,9 @@ final class LibraryHome
     /** Covers in the hero collage. */
     public const COLLAGE = 8;
 
+    /** The hero's title: the scope toggle says "All", a page title reads better as "Everything". */
+    private const NAMES = ['local' => 'Local', 'streaming' => 'Streaming', 'all' => 'Everything'];
+
     /** Icon (Font Awesome solid) of each scope's hero tile. */
     private const ICONS = ['local' => 'hard-drive', 'streaming' => 'cloud', 'all' => 'layer-group'];
 
@@ -127,7 +130,7 @@ final class LibraryHome
     private static function hero(string $scope, array $glance, Collection $recentAdded, array $hidden): array
     {
         return [
-            'name' => LeadingSource::labels()[$scope] ?? ucfirst($scope),
+            'name' => self::NAMES[$scope] ?? ucfirst($scope),
             'icon' => self::ICONS[$scope] ?? 'layer-group',
             'albums' => $glance['albums'],
             'artists' => $glance['artists'],

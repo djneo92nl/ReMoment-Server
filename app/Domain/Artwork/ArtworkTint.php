@@ -23,7 +23,7 @@ final class ArtworkTint
 
     /**
      * @param  string[]|null  $colors  the artwork's dominant colours (the first leads); null/empty/invalid → no tint
-     * @return array{dark: string, light: string, ink_dark: string, ink_light: string}|null
+     * @return array{dark: string, light: string, ink_dark: string, ink_light: string, muted_dark: string, muted_light: string}|null
      */
     public static function for(?array $colors): ?array
     {
@@ -34,11 +34,16 @@ final class ArtworkTint
             }
             [$h, $s] = $hsl;
 
+            $dark = self::fit($h, min($s, 0.55), min($hsl[2], 0.30), self::INK_DARK, -0.02);
+            $light = self::fit($h, min($s, 0.60), max($hsl[2], 0.90), self::INK_LIGHT, 0.01);
+
             return [
-                'dark' => self::fit($h, min($s, 0.55), min($hsl[2], 0.30), self::INK_DARK, -0.02),
-                'light' => self::fit($h, min($s, 0.60), max($hsl[2], 0.90), self::INK_LIGHT, 0.01),
+                'dark' => $dark,
+                'light' => $light,
                 'ink_dark' => self::INK_DARK,
                 'ink_light' => self::INK_LIGHT,
+                'muted_dark' => self::muted(self::INK_DARK, $dark),
+                'muted_light' => self::muted(self::INK_LIGHT, $light),
             ];
         }
 
@@ -50,7 +55,23 @@ final class ArtworkTint
     {
         $tint = self::for($colors);
 
-        return $tint === null ? '' : "--tint-dark:{$tint['dark']};--tint-light:{$tint['light']};--ink-dark:{$tint['ink_dark']};--ink-light:{$tint['ink_light']}";
+        return $tint === null ? '' : "--tint-dark:{$tint['dark']};--tint-light:{$tint['light']};--ink-dark:{$tint['ink_dark']};--ink-light:{$tint['ink_light']};--muted-dark:{$tint['muted_dark']};--muted-light:{$tint['muted_light']}";
+    }
+
+    /** The secondary text colour: the ink blended into the surface (from 70%) as far as needed to keep MIN_CONTRAST. */
+    private static function muted(string $ink, string $surface): string
+    {
+        for ($alpha = 0.7; $alpha < 1.0; $alpha += 0.05) {
+            $hex = '#';
+            for ($i = 1; $i < 7; $i += 2) {
+                $hex .= sprintf('%02x', round(hexdec(substr($ink, $i, 2)) * $alpha + hexdec(substr($surface, $i, 2)) * (1 - $alpha)));
+            }
+            if (self::contrast($hex, $surface) >= self::MIN_CONTRAST) {
+                return $hex;
+            }
+        }
+
+        return $ink;
     }
 
     /** Moves the lightness by `$step` until `$ink` reaches MIN_CONTRAST on the colour (or the range ends). */

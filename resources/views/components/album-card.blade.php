@@ -21,7 +21,7 @@
     ])->filter()->implode(' · ');
 @endphp
 
-<x-card compact flush class="group {{ $tinted ? 'tint w-40 shrink-0 snap-start' : 'min-w-0 transition-colors hover:border-gray-300 dark:hover:border-stone-600' }}"
+<x-card compact flush class="group {{ $tinted ? 'tint w-36 shrink-0 snap-start sm:w-40 lg:w-44' : 'min-w-0 transition-colors hover:border-gray-300 dark:hover:border-stone-600' }}"
         style="{{ $tinted ? \App\Domain\Artwork\ArtworkTint::style($album->colors) : '' }}">
     <div class="relative aspect-square">
     <a href="{{ route('albums.show', $album) }}" class="block h-full">
@@ -56,7 +56,7 @@
         @if($genres)
             <div class="flex flex-wrap gap-1 mt-1.5">
                 @foreach($genres as $genre)
-                    <x-badge class="!text-[10px] !py-px max-w-full truncate">{{ $genre }}</x-badge>
+                    <x-badge class="!text-[10px] !py-px max-w-full truncate {{ $tinted ? '!bg-black/10 dark:!bg-white/10 !text-inherit' : '' }}">{{ $genre }}</x-badge>
                 @endforeach
             </div>
         @endif

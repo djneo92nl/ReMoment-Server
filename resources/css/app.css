@@ -63,7 +63,10 @@
         color: var(--ink-dark, #f5f5f4);
     }
 }
-.tint .tint-muted { opacity: .7; }
+.tint .tint-muted { color: var(--muted-light, #6b7280); }
+@media (prefers-color-scheme: dark) {
+    .tint .tint-muted { color: var(--muted-dark, #a8a29e); }
+}
 
 /* Library hub (DESIGN.md §10): shelves scroll sideways without a scrollbar; the hero fades from the cover tint. */
 .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }

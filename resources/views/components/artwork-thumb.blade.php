@@ -23,7 +23,7 @@
 <div {{ $attributes->merge(['class' => "{$size} {$rounded} overflow-hidden flex-shrink-0"]) }}
      style="background: linear-gradient(135deg, {{ $colors[0] }}, {{ $colors[1] }})">
     @if($src)
-        <img src="{{ $src }}" alt="" class="w-full h-full object-cover">
+        <img src="{{ $src }}" alt="" loading="lazy" decoding="async" class="w-full h-full object-cover">
     @else
         <div class="w-full h-full flex items-center justify-center">
             <i class="{{ $icon }} text-white/60"></i>

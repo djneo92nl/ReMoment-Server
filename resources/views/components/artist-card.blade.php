@@ -11,7 +11,7 @@
 
 @if($round)
     {{-- Shelf style: a round photo and two lines, no card. --}}
-    <a href="{{ route('artists.show', $artist) }}" class="group block w-36 shrink-0 snap-start text-center">
+    <a href="{{ route('artists.show', $artist) }}" class="group block w-32 shrink-0 snap-start text-center sm:w-36 lg:w-40">
         <div class="relative aspect-square">
             <x-artwork-thumb :src="$src" :colors="$cover?->colors" :seed="$artist->name"
                              icon="fa-solid fa-microphone-lines" size="w-full h-full" rounded="rounded-full" class="text-3xl ring-1 ring-black/5 transition group-hover:brightness-110 dark:ring-white/10" />
