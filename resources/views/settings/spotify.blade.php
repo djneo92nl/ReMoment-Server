@@ -5,7 +5,9 @@
 
     <div class="max-w-2xl space-y-6">
 
-        <x-alert type="success">{{ session('success') }}</x-alert>
+        @if(session('success'))
+            <x-alert type="success">{{ session('success') }}</x-alert>
+        @endif
 
         <x-card class="p-8">
             <div class="flex items-center gap-4 mb-6">

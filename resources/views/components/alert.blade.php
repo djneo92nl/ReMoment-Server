@@ -1,5 +1,5 @@
 @props(['type' => 'info', 'icon' => null])
-{{-- Flash and inline messages: success | error | warning | info. Put an action (button/link) in the `action` slot. --}}
+{{-- Renders nothing without a message. Flash and inline messages: success | error | warning | info. Put an action (button/link) in the `action` slot. --}}
 @php
     $styles = [
         'success' => ['bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300', 'circle-check'],
@@ -9,6 +9,7 @@
     ];
     [$cls, $defaultIcon] = $styles[$type] ?? $styles['info'];
 @endphp
+@if(! $slot->isEmpty())
 <div role="{{ $type === 'error' ? 'alert' : 'status' }}"
      {{ $attributes->merge(['class' => "flex items-center gap-3 rounded-2xl border px-6 py-4 text-sm $cls"]) }}>
     <i class="fa-solid fa-{{ $icon ?? $defaultIcon }} flex-shrink-0"></i>
@@ -17,3 +18,4 @@
         <div class="flex-shrink-0">{{ $action }}</div>
     @endisset
 </div>
+@endif

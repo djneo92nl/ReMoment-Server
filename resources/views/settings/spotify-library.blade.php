@@ -5,7 +5,9 @@
 
     <div class="max-w-4xl space-y-6">
 
-        <x-alert type="success">{{ session('success') }}</x-alert>
+        @if(session('success'))
+            <x-alert type="success">{{ session('success') }}</x-alert>
+        @endif
 
         <x-alert type="info">
             Sync your saved tracks and playlists into the shared library. This also runs automatically once a day. You can

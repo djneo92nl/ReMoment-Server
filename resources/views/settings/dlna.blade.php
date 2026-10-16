@@ -15,7 +15,9 @@
 
     <div class="max-w-4xl space-y-6">
 
-        <x-alert type="success">{{ session('success') }}</x-alert>
+        @if(session('success'))
+            <x-alert type="success">{{ session('success') }}</x-alert>
+        @endif
 
         <x-alert type="info">
             Click <strong>Discover servers</strong> to find DLNA/UPnP media servers on your network, then
