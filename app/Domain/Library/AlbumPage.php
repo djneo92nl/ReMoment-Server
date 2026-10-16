@@ -18,7 +18,8 @@ use Illuminate\Support\Str;
 final class AlbumPage
 {
     /**
-     * @param  list<string>  $sources  library ids the album has tracks in (`dlna`, `spotify`)
+     * @param  list<string>  $sources  library ids to switch between: where the album has tracks, plus Spotify while connected
+     * @param  bool  $spotifyAlbum  the Spotify side is selected: the page shows the album as Spotify has it (AlbumMoreOnSpotify)
      * @param  Collection<int, Track>  $tracks  of the selected source, in album order
      * @param  Collection<int, Track>  $allTracks  of every source, in album order
      * @param  array<int, bool>  $playable  track id => whether the pinned player can play it (empty without a pinned player)
@@ -43,6 +44,7 @@ final class AlbumPage
         public readonly int $totalPlays,
         public readonly int $listenedSeconds,
         public readonly Collection $recentPlays,
+        public readonly bool $spotifyAlbum,
         public readonly bool $removable,
     ) {}
 
@@ -51,15 +53,20 @@ final class AlbumPage
      * @param  string|null  $requested  the `?source=` of the request, used when the album has it
      * @param  string  $scope  the scope browsed in (LeadingSource), picks the default source
      */
-    public static function build(Album $album, ?string $requested, string $scope, ?Device $pinned = null): self
+    public static function build(Album $album, ?string $requested, string $scope, ?Device $pinned = null, bool $spotifyAvailable = false): self
     {
         $all = self::inAlbumOrder($album->tracks);
         $album->setRelation('tracks', $all);
 
         $sources = array_values(array_intersect(LibrarySources::libraryIds(), LibrarySources::ofTracks($all)));
+        // With Spotify connected its side of the album is always one click away, whatever the library holds of it.
+        if ($spotifyAvailable && !in_array('spotify', $sources, true)) {
+            $sources[] = 'spotify';
+        }
         $source = self::selectSource($sources, $requested, $scope);
 
         $tracks = $source === null ? $all : $all->filter(fn (Track $t) => in_array($source, $t->sources(), true))->values();
+        $spotifyAlbum = $source === 'spotify' && $spotifyAvailable;
         $seconds = (int) $tracks->sum('duration');
         $details = $album->details();
         $genres = $album->genres() ?: $album->artist->genres();
@@ -82,6 +89,7 @@ final class AlbumPage
             listenedSeconds: (int) Play::secondsListened(Play::whereHas('track', fn ($q) => $q->where('album_id', $album->id))),
             recentPlays: Play::whereHas('track', fn ($q) => $q->where('album_id', $album->id))
                 ->with(['track', 'device', 'radioStation'])->orderByDesc('played_at')->limit(20)->get(),
+            spotifyAlbum: $spotifyAlbum,
             removable: $all->isEmpty() || $all->every(fn (Track $t) => $t->isRemovable()),
         );
     }

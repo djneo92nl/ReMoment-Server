@@ -26,7 +26,7 @@
         <x-tabs.panel name="tracks" class="space-y-6">
 
         {{-- Tracklist --}}
-        @if($page->tracks->isNotEmpty())
+        @if($page->tracks->isNotEmpty() || $page->spotifyAlbum)
             <x-card flush>
                 {{-- Source: tracks are never merged across sources; with several, the switch in the table header picks the list (and what Play plays) --}}
                 @if(count($page->sources) > 1)
@@ -42,6 +42,10 @@
                 @elseif($page->source)
                     <p class="flex items-center gap-2 border-b border-gray-100 px-5 py-3 text-sm text-gray-500 dark:border-stone-800/70"><x-source-icon :source="$page->source" />In {{ $sourceNames[$page->source] }}</p>
                 @endif
+                @if($page->spotifyAlbum)
+                    {{-- The album as Spotify has it (what the library holds of it is marked); lazily loaded --}}
+                    <livewire:album-more-on-spotify :album="$album" :key="'spotify-album-'.$album->id" />
+                @else
                 <div class="divide-y divide-gray-100 dark:divide-stone-800/70">
                 @foreach($page->tracks as $i => $track)
                     @php
@@ -196,6 +200,7 @@
                     </div>
                 @endforeach
                 </div>
+                @endif
             </x-card>
         @else
             <x-empty-state icon="music" title="No tracks here" text="This album has no tracks from {{ $page->source ? $sourceNames[$page->source] : 'any source' }} yet." />

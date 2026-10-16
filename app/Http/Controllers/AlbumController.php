@@ -79,14 +79,15 @@ class AlbumController extends Controller
         $album->load(['artist', 'tracks' => fn ($q) => $q->withCount('plays')->with(['genreRelation', 'analysis', 'metadata' => fn ($q) => $q->whereIn('key', [...Track::DISPLAY_METADATA, 'external_id'])])]);
 
         $source = $request->query('source');
-        $page = AlbumPage::build($album, is_string($source) ? $source : null, LeadingSource::forRequest($request), app(SelectedDevice::class)->device());
+        $spotifyConnected = app(SpotifyTokenService::class)->isConnected();
+        $page = AlbumPage::build($album, is_string($source) ? $source : null, LeadingSource::forRequest($request), app(SelectedDevice::class)->device(), $spotifyConnected);
 
         return view('albums.show', [
             'page' => $page,
             'album' => $album,
             'playableDevices' => Device::libraryCapable(),
             'editablePlaylists' => Playlist::where('source', 'local')->orderBy('name')->get(['id', 'name']),
-            'spotifyConnected' => app(SpotifyTokenService::class)->isConnected(),
+            'spotifyConnected' => $spotifyConnected,
         ]);
     }
 

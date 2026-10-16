@@ -17,12 +17,14 @@ use App\Support\SelectedDevice;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\FakeLibraryPlaybackDriver;
+use Tests\Support\FakesSpotify;
 use Tests\Support\MakesLibraryTracks;
 use Tests\TestCase;
 
 /** The redesigned /albums/{id}: hero, waveform strip, source switch, tracklist, about tabs (docs/frontend/library.md). */
 class AlbumPageTest extends TestCase
 {
+    use FakesSpotify;
     use MakesLibraryTracks;
     use RefreshDatabase;
 
@@ -260,5 +262,22 @@ class AlbumPageTest extends TestCase
 
         $this->post(route('tracks.favorite', $track));
         $this->assertNull($track->fresh()->favorited_at);
+    }
+
+    public function test_the_spotify_side_is_the_album_as_spotify_has_it_while_connected(): void
+    {
+        $album = $this->album();
+        $this->track($album, 'Local Song');
+
+        // Not connected: a local-only album has no switch.
+        $this->get(route('albums.show', $album))->assertOk()->assertDontSee('data-test="source-spotify"', false);
+
+        $this->connectSpotify(\Mockery::mock(\SpotifyWebAPI\SpotifyWebAPI::class));
+        $this->get(route('albums.show', $album))->assertOk()
+            ->assertSee('data-test="source-spotify"', false)->assertSee('data-test="source-dlna"', false);
+
+        // The Spotify side hosts the lazily loaded Spotify tracklist, not the library's rows.
+        $this->get(route('albums.show', [$album, 'source' => 'spotify']))->assertOk()
+            ->assertSee('album-more-on-spotify', false)->assertDontSee('Local Song');
     }
 }

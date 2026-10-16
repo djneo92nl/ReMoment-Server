@@ -14,8 +14,8 @@ use App\Models\Media\Album;
 use Livewire\Component;
 
 /**
- * The album's Spotify tracklist in album order: the tracks the library has are greyed out in
- * their place, the others can be added in one go. Loaded lazily. Loading also records the
+ * The album as Spotify has it (the Spotify side of the album page's source switch), in album order:
+ * the tracks the library has are marked, the others can be added in one go. Loaded lazily. Loading also records the
  * position of the tracks we have (`track_number`), so the album page orders and numbers them.
  */
 class AlbumMoreOnSpotify extends Component
@@ -36,7 +36,7 @@ class AlbumMoreOnSpotify extends Component
 
         if (is_array($rows) && $this->recordPositions($rows) > 0) {
             // The album page above was rendered without the numbers.
-            $this->redirect(route('albums.show', $this->album));
+            $this->redirect(route('albums.show', [$this->album, 'source' => 'spotify']));
         }
     }
 

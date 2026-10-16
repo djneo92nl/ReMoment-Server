@@ -79,10 +79,9 @@ class MoreOnSpotifyTest extends TestCase
         Livewire::test(AlbumMoreOnSpotify::class, ['album' => $album])
             ->call('load') // records the Spotify id of the track we have and reloads the page once
             ->call('load')
-            ->assertSee('More on Spotify')
             ->assertSee('Bonus Demo')
-            ->assertSee('Add 1 track to album')
-            ->assertSee('In album');
+            ->assertSee('Add 1 to album')
+            ->assertSee('In your library');
     }
 
     public function test_global_search_shows_spotify_results_marking_what_is_in_the_library(): void
@@ -135,12 +134,12 @@ class MoreOnSpotifyTest extends TestCase
 
         $component = Livewire::test(AlbumMoreOnSpotify::class, ['album' => $album])
             ->call('load')
-            ->assertRedirect(route('albums.show', $album)); // positions were recorded: the page reloads once
+            ->assertRedirect(route('albums.show', [$album, 'source' => 'spotify'])); // positions were recorded: the page reloads once
 
         $this->assertSame('3', $mine->fresh()->metaValue('track_number'));
 
         $component->call('load')->assertNoRedirect()
-            ->assertSeeInOrder(['Mexican Wine', 'Bright Future In Sales', "Stacy's Mom", 'In album']);
+            ->assertSeeInOrder(['Mexican Wine', 'Bright Future In Sales', "Stacy's Mom", 'In your library']);
     }
 
     public function test_playing_a_spotify_row_on_a_device_that_cannot_play_spotify_reports_it(): void
