@@ -201,9 +201,6 @@
             <x-empty-state icon="music" title="No tracks here" text="This album has no tracks from {{ $page->source ? $sourceNames[$page->source] : 'any source' }} yet." />
         @endif
 
-        @if($spotifyConnected)
-            <livewire:album-more-on-spotify :album="$album" :key="'spotify-more-'.$album->id" />
-        @endif
         </x-tabs.panel>
 
         {{-- The other tabs: only those that have something to show --}}
