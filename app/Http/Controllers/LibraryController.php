@@ -11,6 +11,7 @@ use App\Domain\Library\RandomAlbum;
 use App\Http\Controllers\Concerns\FlashesLibraryPlayback;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
+use App\Models\Media\Track;
 use App\Support\SelectedDevice;
 use Illuminate\Http\Request;
 
@@ -54,11 +55,14 @@ class LibraryController extends Controller
             ->with(['metadata' => fn ($q) => $q->whereIn('key', Artist::PHOTO_METADATA), 'albums' => fn ($q) => LibrarySources::albums($q, $hidden)->withCount('plays')->orderByDesc('plays_count')->orderByDesc('created_at')])
             ->orderByDesc('favorited_at')->get();
 
+        $tracks = LibrarySources::tracks(Track::query()->whereNotNull('favorited_at'), $hidden)
+            ->with(['artist', 'album'])->orderByDesc('favorited_at')->orderByDesc('id')->limit(100)->get();
+
         LibraryItemArtwork::preload([
             ...LibraryItemArtwork::urlsOfAlbums($albums),
             ...LibraryItemArtwork::urlsOfAlbums($artists->map->coverAlbum()),
         ]);
 
-        return view('library.favorites', compact('albums', 'artists', 'scope'));
+        return view('library.favorites', compact('albums', 'artists', 'tracks', 'scope'));
     }
 }

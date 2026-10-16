@@ -186,9 +186,10 @@ class LibraryPlayback
         ])->values();
     }
 
-    public function playAlbum(Device $device, Album $album, ?Track $start = null, bool $shuffle = false): PlaybackResult
+    /** @param  string|null  $source  `dlna` | `spotify`: play from that path only (see playTracks) */
+    public function playAlbum(Device $device, Album $album, ?Track $start = null, bool $shuffle = false, ?string $source = null): PlaybackResult
     {
-        return $this->playTracks($device, self::albumTracks($album), $start, $shuffle, $album);
+        return $this->playTracks($device, self::albumTracks($album), $start, $shuffle, $album, $source);
     }
 
     public function playArtist(Device $device, Artist $artist, bool $shuffle = false): PlaybackResult
@@ -315,10 +316,18 @@ class LibraryPlayback
 
     /**
      * @param  Collection<int, Track>  $tracks  in play order
+     * @param  string|null  $source  `dlna` | `spotify` limits playback to that path and to the tracks it has
+     *                               (a device that can't play it: NotPlayableException); null tries DLNA, then Spotify
      */
-    public function playTracks(Device $device, Collection $tracks, ?Track $start = null, bool $shuffle = false, ?Album $album = null): PlaybackResult
+    public function playTracks(Device $device, Collection $tracks, ?Track $start = null, bool $shuffle = false, ?Album $album = null, ?string $source = null): PlaybackResult
     {
-        if (self::canPlayDlna($device)) {
+        if ($source === 'dlna') {
+            $tracks = $tracks->filter(fn (Track $t) => (bool) $t->getDlnaUrl())->values();
+        } elseif ($source === 'spotify') {
+            $tracks = $tracks->filter(fn (Track $t) => self::spotifyUri($t) !== null)->values();
+        }
+
+        if ($source !== 'spotify' && self::canPlayDlna($device)) {
             $ordered = self::order($tracks, $start, $shuffle);
             $playable = $ordered->filter(fn (Track $t) => (bool) $t->getDlnaUrl())->count();
 
@@ -329,7 +338,7 @@ class LibraryPlayback
             }
         }
 
-        $spotifyTracks = $tracks->filter(fn (Track $t) => self::spotifyUri($t) !== null)->values();
+        $spotifyTracks = $source === 'dlna' ? collect() : $tracks->filter(fn (Track $t) => self::spotifyUri($t) !== null)->values();
 
         if ($spotifyTracks->isNotEmpty() && self::canPlaySpotify($device)) {
             $startUri = $start ? self::spotifyUri($start) : null;

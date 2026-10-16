@@ -186,6 +186,7 @@ final class LibraryMerger
 
             $survivor->album_id ??= $loser->album_id;
             $survivor->duration = $survivor->duration ?: $loser->duration;
+            $survivor->favorited_at = $this->earliest($survivor->favorited_at, $loser->favorited_at);
             $survivor->images = $survivor->images ?: $loser->images;
 
             if ($loser->external_id !== null && $loser->external_id !== '') {

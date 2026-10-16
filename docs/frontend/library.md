@@ -24,3 +24,12 @@ One call returns everything the view needs; every artwork cover is read from the
 
 ## Not on the page any more
 The old "Recently played" track list (it listed plays of tracks that are not in the library too) is replaced by the shelf of albums/playlists/stations. Text-only plays are in `/history`.
+
+## Album page: `App\Domain\Library\AlbumPage::build($album, $source, $scope, $pinned)`
+`AlbumController@show` loads the tracks (metadata, analysis, plays count) and `AlbumPage` assembles the rest: tracks in album order for the **selected source**, the album's sources, meta line, genres/tags, sound, credits, play stats, and `playable` (track id => can the pinned player play it, the two library paths checked once per album, never per track). The page's query count does not depend on the number of tracks (`AlbumPageTest`).
+
+- **Source**: `?source=dlna|spotify` when the album has it, else the scope's (`local` → dlna, `streaming` → spotify), else the leading source, else local before streaming. The tracklist, strip, meta line, Play/Shuffle (`albums.play?source=`, `LibraryPlayback::playAlbum(source:)` limits playback to that path and its tracks; a device that can't play it gets `NotPlayableException`) and add-to-playlist all follow it.
+- **Track favourites**: `tracks.favorited_at`, `POST /tracks/{track}/favorite` (`tracks.favorite`), a Tracks section on `/library/favorites`. One record per song across sources, so a favourite shows in every source view. Web only for now: REST/MCP parity (`PUT /api/library/tracks/{id}/favorite`, tracks in `GET /api/library/favorites`) is a follow-up so API clients are not changed silently.
+- **Add to playlist**: `POST /playlists/{playlist}/tracks` with `track_id`, or `album_id` + `source` (the album's tracks of that source, in album order); only playlists made here (`Playlist::isEditable()`), duplicates ignored (`PlaylistEditor::addTracks`). `POST /playlists` accepts the same fields to create a playlist that starts with them.
+- **Queue** (play next / add to queue) has a reserved place next to Add to playlist; it renders once a driver reports a `queue_add` capability, which none does yet.
+

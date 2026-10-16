@@ -215,7 +215,7 @@ class MusicBrainzDetailsTest extends TestCase
         $this->get("/artists/{$artist->id}")->assertOk()
             ->assertSee('The Band is a band.')->assertSee('Since 1999')->assertSee('https://band.example', false)->assertSee('Wikipedia');
         $this->get("/albums/{$album->id}")->assertOk()
-            ->assertSee('Album · 2011 · Fancy Label · 12 tracks')->assertSee('An album about things.');
+            ->assertSee('2011')->assertSee('Album · Fancy Label')->assertSee('An album about things.');
     }
 
     public function test_album_page_lists_track_credits_quality_and_genres(): void

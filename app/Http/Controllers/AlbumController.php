@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Library\AlbumPage;
 use App\Domain\Library\AlbumSound;
 use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibraryOverview;
@@ -12,9 +13,10 @@ use App\Http\Controllers\Concerns\FlashesLibraryPlayback;
 use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
 use App\Models\Device;
 use App\Models\Media\Album;
+use App\Models\Media\Playlist;
 use App\Models\Media\Track;
-use App\Models\Play;
 use App\Services\SpotifyTokenService;
+use App\Support\SelectedDevice;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -72,46 +74,27 @@ class AlbumController extends Controller
         return view('albums.index', compact('albums', 'sort', 'scope', 'search', 'favorites', 'filters'));
     }
 
-    public function show(Album $album)
+    public function show(Request $request, Album $album)
     {
-        $album->load(['artist', 'tracks' => fn ($q) => $q->withCount('plays')->with(['genreRelation', 'analysis', 'metadata' => fn ($q) => $q->whereIn('key', [...Track::DISPLAY_METADATA, 'external_id'])])->orderByDesc('plays_count')]);
+        $album->load(['artist', 'tracks' => fn ($q) => $q->withCount('plays')->with(['genreRelation', 'analysis', 'metadata' => fn ($q) => $q->whereIn('key', [...Track::DISPLAY_METADATA, 'external_id'])])]);
 
-        // Album order (disc, then track number), tracks without a position last by plays.
-        $album->setRelation('tracks', $album->tracks->sortBy(fn ($t) => [
-            (int) ($t->metaValue('disc_number') ?: 1),
-            (int) ($t->metaValue('track_number') ?: 9999),
-            -$t->plays_count,
-        ])->values());
+        $source = $request->query('source');
+        $page = AlbumPage::build($album, is_string($source) ? $source : null, LeadingSource::forRequest($request), app(SelectedDevice::class)->device());
 
-        $totalPlays = $album->plays()->count();
-
-        $totalSeconds = Play::secondsListened(Play::whereHas('track', fn ($q) => $q->where('album_id', $album->id)));
-
-        $recentPlays = Play::whereHas('track', fn ($q) => $q->where('album_id', $album->id))
-            ->with(['track', 'device', 'radioStation'])
-            ->orderByDesc('played_at')
-            ->limit(20)
-            ->get();
-
-        $playableDevices = Device::libraryCapable();
-        $spotifyConnected = app(SpotifyTokenService::class)->isConnected();
-
-        $albumSound = AlbumSound::forAlbums([$album->id])[$album->id] ?? null;
-
-        return view('albums.show', compact(
-            'album',
-            'albumSound',
-            'totalPlays',
-            'totalSeconds',
-            'recentPlays',
-            'playableDevices',
-            'spotifyConnected',
-        ));
+        return view('albums.show', [
+            'page' => $page,
+            'album' => $album,
+            'playableDevices' => Device::libraryCapable(),
+            'editablePlaylists' => Playlist::where('source', 'local')->orderBy('name')->get(['id', 'name']),
+            'spotifyConnected' => app(SpotifyTokenService::class)->isConnected(),
+        ]);
     }
 
     public function play(Request $request, Album $album, Device $device, LibraryPlayback $library)
     {
-        return $this->flashPlayback(fn () => $library->playAlbum($device, $album, shuffle: $request->boolean('shuffle')), $device, $album->name);
+        $source = $request->validate(['source' => ['nullable', 'in:dlna,spotify']])['source'] ?? null;
+
+        return $this->flashPlayback(fn () => $library->playAlbum($device, $album, shuffle: $request->boolean('shuffle'), source: $source), $device, $album->name);
     }
 
     /** Adds the album's missing tracks from Spotify, whatever source the album came from. */
@@ -176,5 +159,13 @@ class AlbumController extends Controller
         $album->toggleFavorite();
 
         return back();
+    }
+
+    /** Toggles a track's household-wide favourite; back to its row on the album page. */
+    public function favoriteTrack(Track $track)
+    {
+        $track->toggleFavorite();
+
+        return back()->withFragment('track-'.$track->id);
     }
 }

@@ -213,4 +213,23 @@ class LibraryPlaybackTest extends TestCase
 
         $this->assertSame(['one', 'three', 'five', 'unnumbered', 'disc2-one'], $names);
     }
+
+    public function test_album_play_can_be_limited_to_one_source(): void
+    {
+        $device = $this->makeDevice();
+        $artist = Artist::create(['name' => 'Test Artist', 'source' => 'dlna']);
+        $album = Album::create(['artist_id' => $artist->id, 'name' => 'Test Album', 'source' => 'dlna']);
+        $this->makeTrackWithDlnaUrl($album);
+        $this->makeTrackWithoutDlnaUrl($album);
+
+        $this->post(route('albums.play', [$album, $device, 'source' => 'dlna']))->assertSessionHas('success', fn ($m) => !str_contains($m, ' of '));
+        $this->assertCount(1, FakeLibraryPlaybackDriver::$calls[0]['tracks']);
+
+        // The device cannot play Spotify: limited to it, nothing plays and the flash says so.
+        FakeLibraryPlaybackDriver::reset();
+        $this->post(route('albums.play', [$album, $device, 'source' => 'spotify']))->assertSessionHas('error');
+        $this->assertCount(0, FakeLibraryPlaybackDriver::$calls);
+
+        $this->post(route('albums.play', [$album, $device, 'source' => 'tidal']))->assertSessionHasErrors('source');
+    }
 }

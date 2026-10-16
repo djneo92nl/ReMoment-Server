@@ -95,3 +95,14 @@ Dark is the reference (the app is dark); light must hold the same hierarchy.
 - **Quick play** (`<x-quick-play>`): a white round button on a cover. Pinned player: it posts to the item's play route; none pinned: it opens the player picker. Shown on hover/focus, always on touch screens.
 - Artists are round photos with two lines of text, no card. Favourites and "Highest rated" keep the fav star and the enrichment details respectively.
 - Heading sizes here are the one place `text-xl` section headings replace the small uppercase label (§3); the Library at a Glance block keeps the label style.
+
+### Album page (`/albums/{id}`)
+
+Same language as the hub, dark first. No page header: the hero carries the title (once).
+
+- **Hero** (`<x-album-hero>`): the cover (about 290 px on desktop, 230 on phones, `rounded-2xl`, shadow) left of the text on `md+`, centred above it on phones; back button and heart in the corners; title, artist as a link with `›`, one meta line (`2024 · Nu Metal · 11 tracks · 32 min`, then release type, format, label, rating when known); Play (filled) and Shuffle (outlined) pills, round icon buttons (Add to playlist, `…` for "Fill out from Spotify" and the admin "Remove from library"), and the caption "Plays on {pinned player}" or a "Choose a player" link. Background: the cover's tint fading into the page (`.tint-hero`); the colour dots are gone, the tint carries the colour.
+- **Waveform strip** (`<x-album-waveform>`), inside the hero: one silhouette of the whole album, every track as wide as it is long, a gap between tracks, a dotted line for a track without a waveform; hidden when no track has one. Segments link to `#track-ID`.
+- **Source** (decided with the user: streaming is never merged with local in one list): an album in several sources gets a segmented control `Spotify | Local` (links with `?source=`), one source gets the plain label "In Local". The list, the strip, the meta line and Play/Shuffle all follow the selected source.
+- **Tracklist**: number (a play button on hover/focus, always on touch), title (+ explicit mark), a small waveform on `sm+`, heart, length, `…` menu (play on device, add to playlist, details, lyrics, remove). One shared picker and one shared playlist modal per page, never one per row.
+- **About this album** (`<x-tabs>`): About, Sound, Credits, Stats, Recent plays; a tab exists only with content, the card only when one does. The tab bar scrolls sideways on phones.
+

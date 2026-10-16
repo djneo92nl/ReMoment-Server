@@ -5,6 +5,7 @@ namespace App\Models\Media;
 use App\Domain\Library\Normalizer;
 use App\Domain\Storage\FileIndexer;
 use App\Domain\Storage\StreamUrl;
+use App\Models\Concerns\Favoritable;
 use App\Models\FileAnalysis;
 use App\Models\Media\Concerns\HasGenres;
 use App\Models\Media\Concerns\ReadsMetadata;
@@ -18,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Track extends Model
 {
-    use HasGenres, ReadsMetadata;
+    use Favoritable, HasGenres, ReadsMetadata;
 
     /** Metadata keys the album page reads for each track. */
     public const DISPLAY_METADATA = [
@@ -37,10 +38,12 @@ class Track extends Model
         'duration',
         'source',
         'images',
+        'favorited_at',
     ];
 
     protected $casts = [
         'images' => 'array',
+        'favorited_at' => 'datetime',
         'duration' => 'integer',
     ];
 

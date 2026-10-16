@@ -51,7 +51,7 @@ class FillFromSpotifyTest extends TestCase
         $this->assertSame('spotify:album:alb1', $album->metadata()->where('key', 'spotify_album_uri')->value('value'));
     }
 
-    public function test_album_page_offers_the_filter_once_spotify_tracks_were_added(): void
+    public function test_album_page_offers_the_source_switch_once_spotify_tracks_were_added(): void
     {
         $album = $this->dlnaAlbum();
         Track::create(['artist_id' => $album->artist_id, 'album_id' => $album->id, 'name' => 'Added', 'external_id' => 'spotify:track:x', 'source' => 'spotify']);
@@ -60,6 +60,7 @@ class FillFromSpotifyTest extends TestCase
         $this->get(route('albums.show', $album))
             ->assertOk()
             ->assertSee('Fill out album from Spotify')
-            ->assertSee('Only my library');
+            ->assertSee('source=spotify', false)
+            ->assertSee('source=dlna', false);
     }
 }

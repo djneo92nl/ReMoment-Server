@@ -1,0 +1,95 @@
+@props(['page', 'devices', 'spotifyConnected' => false])
+{{-- The top of /albums/{id} (DESIGN.md §10): the cover on the left (centred above the text on phones), the title once, the artist, one meta line, Play and Shuffle
+     for the selected source, round buttons (add to playlist, "…"), all on the cover's tint fading into the page. The slot (the album waveform strip) sits at the bottom, in the hero's ink.
+     Queue ("play next / add to queue") belongs next to Add to playlist and renders once the pinned player reports a `queue_add` capability, which no driver has yet. --}}
+@php
+    $album = $page->album;
+    $pinned = app(\App\Support\SelectedDevice::class)->device();
+    $direct = $pinned !== null && $devices->contains('id', $pinned->id);
+    $playable = $page->tracks->isNotEmpty() && $devices->isNotEmpty();
+    $action = fn (bool $shuffle) => \App\Support\DeviceAction::template('albums.play', ['album' => $album, 'source' => $page->source, 'shuffle' => $shuffle ? 1 : null]);
+    $primary = 'inline-flex items-center justify-center gap-2 rounded-full bg-gray-900 px-6 py-3 text-base font-medium text-white shadow-sm transition hover:bg-gray-700 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200';
+    $secondary = 'inline-flex items-center justify-center gap-2 rounded-full border border-black/20 bg-black/5 dark:border-white/25 px-6 py-3 text-base font-medium transition hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10';
+    $round = 'flex h-11 w-11 items-center justify-center rounded-full bg-black/10 transition hover:bg-black/20 dark:bg-white/10 dark:hover:bg-white/20';
+    $label = $page->source ? \App\Domain\Library\LibrarySources::LIBRARIES[$page->source]['name'] : null;
+@endphp
+<div class="tint-hero relative overflow-hidden rounded-3xl" style="{{ \App\Domain\Artwork\ArtworkTint::style($album->colors) }}">
+    <div class="flex items-center justify-between px-5 pt-5 sm:px-8 sm:pt-6">
+        <x-back-button :href="route('artists.show', $album->artist)" title="{{ $album->artist->name }}" aria-label="Back to {{ $album->artist->name }}" />
+        <form method="POST" action="{{ route('albums.favorite', $album) }}">
+            @csrf
+            <button type="submit" title="{{ $album->favorited_at ? 'Remove from favorites' : 'Add to favorites' }}" aria-label="{{ $album->favorited_at ? 'Remove from favorites' : 'Add to favorites' }}"
+                    class="flex h-9 w-9 items-center justify-center rounded-xl text-xl transition-colors {{ $album->favorited_at ? 'text-rose-500 hover:text-rose-600' : 'opacity-60 hover:text-rose-400 hover:opacity-100' }}">
+                <i class="{{ $album->favorited_at ? 'fa-solid' : 'fa-regular' }} fa-heart"></i>
+            </button>
+        </form>
+    </div>
+
+    <div class="flex flex-col items-center gap-6 px-5 pb-6 pt-3 text-center sm:px-8 md:flex-row md:items-end md:gap-8 md:text-left">
+        <x-artwork-thumb :src="$album->images[0]['url'] ?? null" :colors="$album->colors" :seed="$album->name.$album->id" icon="fa-solid fa-compact-disc" :proxy="320"
+                         size="h-56 w-56 sm:h-64 sm:w-64 md:h-72 md:w-72" rounded="rounded-2xl" class="text-5xl shadow-2xl ring-1 ring-black/10" />
+
+        <div class="min-w-0 flex-1">
+            <h1 class="text-3xl font-semibold leading-tight tracking-tight sm:text-4xl lg:text-5xl">{{ $album->name }}</h1>
+            <a href="{{ route('artists.show', $album->artist) }}" class="mt-2 inline-flex items-center gap-1.5 text-lg opacity-80 hover:underline hover:opacity-100">{{ $album->artist->name }}<i class="fa-solid fa-chevron-right text-xs"></i></a>
+            @if($page->metaLine !== '')
+                <p class="mt-1 text-sm opacity-70">{{ $page->metaLine }}</p>
+            @endif
+
+            <div class="mt-5 flex flex-wrap items-center justify-center gap-3 md:justify-start">
+                @if($playable)
+                    @foreach([['Play', 'play', false, $primary], ['Shuffle', 'shuffle', true, $secondary]] as [$text, $icon, $shuffle, $class])
+                        @if($direct)
+                            <form method="POST" action="{{ str_replace('{id}', $pinned->id, $action($shuffle)) }}">
+                                @csrf
+                                <button type="submit" class="{{ $class }}" title="{{ $text }} on {{ $pinned->device_name }}"><i class="fa-solid fa-{{ $icon }} text-sm"></i>{{ $text }}</button>
+                            </form>
+                        @elseif($pinned)
+                            <button type="button" class="{{ $class }}" title="{{ $text }} on a device that can play it"
+                                    @click="$dispatch('play-on-device', {{ \Illuminate\Support\Js::from(['action' => $action($shuffle), 'label' => $album->name]) }})"><i class="fa-solid fa-{{ $icon }} text-sm"></i>{{ $text }}</button>
+                        @else
+                            <button type="button" class="{{ $class }}" title="Choose a player to {{ strtolower($text) }} on" @click="$dispatch('open-player-panel')"><i class="fa-solid fa-{{ $icon }} text-sm"></i>{{ $text }}</button>
+                        @endif
+                    @endforeach
+                @endif
+
+                <button type="button" class="{{ $round }}" title="Add to playlist" aria-label="Add to playlist" data-test="album-add-to-playlist"
+                        @click="$dispatch('add-to-playlist', {{ \Illuminate\Support\Js::from(['album_id' => $album->id, 'source' => $page->source, 'label' => $album->name]) }})"><i class="fa-solid fa-list-ul text-sm"></i></button>
+
+                @php $canFill = $spotifyConnected; $canRemove = auth()->check() && $page->removable; @endphp
+                @if($canFill || $canRemove)
+                    <x-menu label="More" :button="$round">
+                        @if($canFill)
+                            <form method="POST" action="{{ route('albums.fill', $album) }}" x-data="{ busy: false }" @submit="busy = true">
+                                @csrf
+                                <x-menu.item type="submit" icon="plus" ::disabled="busy"><span x-text="busy ? 'Adding tracks…' : 'Fill out album from Spotify'"></span></x-menu.item>
+                            </form>
+                        @endif
+                        @if($canRemove)
+                            <form method="POST" action="{{ route('albums.destroy', $album) }}" onsubmit="return confirm('Remove this album and its tracks from the library? Your play history is kept.')">
+                                @csrf
+                                @method('DELETE')
+                                <x-menu.item type="submit" icon="trash-can" danger>Remove from library</x-menu.item>
+                            </form>
+                        @endif
+                    </x-menu>
+                @endif
+            </div>
+
+            @if($playable)
+                <p class="mt-3 text-sm opacity-70">
+                    @if($direct)
+                        Plays on {{ $pinned->device_name }}
+                    @else
+                        <button type="button" class="underline hover:opacity-100" @click="$dispatch('open-player-panel')">Choose a player</button>
+                    @endif
+                    @if($label && count($page->sources) > 1) · from {{ $label }} @endif
+                </p>
+            @endif
+        </div>
+    </div>
+
+    @if(!$slot->isEmpty())
+        <div class="px-5 pb-6 sm:px-8">{{ $slot }}</div>
+    @endif
+</div>

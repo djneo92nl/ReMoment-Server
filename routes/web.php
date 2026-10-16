@@ -53,6 +53,7 @@ Route::get('/albums/{album}', [AlbumController::class, 'show'])->name('albums.sh
 Route::post('/albums/{album}/play/{device}', [AlbumController::class, 'play'])->name('albums.play');
 Route::post('/albums/{album}/fill', [AlbumController::class, 'fill'])->name('albums.fill');
 Route::post('/albums/{album}/favorite', [AlbumController::class, 'favorite'])->name('albums.favorite');
+Route::post('/tracks/{track}/favorite', [AlbumController::class, 'favoriteTrack'])->name('tracks.favorite');
 Route::post('/tracks/{track}/play/{device}', [DeviceController::class, 'playTrack'])->name('tracks.play');
 Route::post('/spotify/tracks/{spotifyTrackId}/play/{device}', [DeviceController::class, 'playSpotifyTrack'])->where('spotifyTrackId', '[A-Za-z0-9]+')->name('spotify.tracks.play');
 Route::get('/genres', [GenreController::class, 'index'])->name('genres.index');
@@ -64,6 +65,7 @@ Route::get('/playlists', [PlaylistController::class, 'index'])->name('playlists.
 Route::post('/playlists', [PlaylistController::class, 'store'])->name('playlists.store');
 Route::get('/playlists/{playlist}', [PlaylistController::class, 'show'])->name('playlists.show');
 Route::delete('/playlists/{playlist}', [PlaylistController::class, 'destroy'])->name('playlists.destroy');
+Route::post('/playlists/{playlist}/tracks', [PlaylistController::class, 'addTracks'])->name('playlists.tracks.add');
 Route::post('/playlists/{playlist}/play/{device}', [PlaylistController::class, 'play'])->name('playlists.play');
 
 Route::post('/player/select/{device}', [PlayerController::class, 'select'])->name('player.select');

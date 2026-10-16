@@ -63,6 +63,22 @@ class PlaylistEditor
         $playlist->tracks()->syncWithoutDetaching([$trackId => ['position' => $this->nextPosition($playlist)]]);
     }
 
+    /**
+     * Adds tracks in the given order; ones already in the playlist are ignored.
+     *
+     * @param  iterable<int>  $trackIds
+     * @return int how many were new
+     */
+    public function addTracks(Playlist $playlist, iterable $trackIds): int
+    {
+        $before = $playlist->tracks()->count();
+        foreach ($trackIds as $id) {
+            $this->addTrack($playlist, (int) $id);
+        }
+
+        return $playlist->tracks()->count() - $before;
+    }
+
     public function removeTrack(Playlist $playlist, int $trackId): void
     {
         $playlist->tracks()->detach($trackId);
