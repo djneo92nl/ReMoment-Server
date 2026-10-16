@@ -40,6 +40,7 @@ Route::get('/history', [HistoryController::class, 'index'])->name('history.index
 Route::get('/stats', [StatsController::class, 'index'])->name('stats.index');
 Route::get('/multiroom', fn () => view('multiroom.index'))->name('multiroom.index');
 Route::get('/receiver', fn () => view('receiver'))->name('receiver');
+Route::get('/player', fn () => view('player'))->name('player');
 Route::get('/artists', [ArtistController::class, 'index'])->name('artists.index');
 Route::resource('radio', RadioStationController::class);
 Route::post('/radio/{radio}/favorite', [RadioStationController::class, 'favorite'])->name('radio.favorite');

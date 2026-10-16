@@ -104,6 +104,13 @@ return [
             'virtual' => true,
         ],
     ],
+    'ReMoment' => [
+        'Player' => [
+            'driver_name' => 'ReMoment Player',
+            'driver' => \App\Integrations\ReMoment\PlayerDriver::class,
+            'virtual' => true,
+        ],
+    ],
     'Sonos' => [
         'Sonos Speaker' => [
             'driver_name' => 'Sonos',

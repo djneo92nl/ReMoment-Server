@@ -33,6 +33,7 @@
         }
         if (!$isActive) {
             $line3 = ucfirst($state->value);
+            $isOfflinePlayer = $state === \App\Domain\Device\State::Unreachable && is_a($device->device_driver, \App\Integrations\ReMoment\PlayerDriver::class, true);
         } elseif ($isPaused) {
             $line3 = trim(($line3 ? $line3.' · ' : '').'Paused');
         }
@@ -198,7 +199,8 @@
                 <div style="min-width:0">
                     <p class="truncate" style="font-size:.9rem;font-weight:600;line-height:1.3">{{ $title }}</p>
                     @if($line2)<p class="truncate" style="font-size:.78rem;line-height:1.3;{{ $dim }}">{{ $line2 }}</p>@endif
-                    @if($line3)<p class="truncate" style="font-size:.78rem;line-height:1.3;opacity:.5">{{ $line3 }}</p>@endif
+                    @if(!empty($isOfflinePlayer))<p class="truncate" style="font-size:.78rem;line-height:1.3;opacity:.7">Offline · <a href="{{ route('player') }}" target="_blank" rel="noopener" style="text-decoration:underline">open the player</a></p>
+                    @elseif($line3)<p class="truncate" style="font-size:.78rem;line-height:1.3;opacity:.5">{{ $line3 }}</p>@endif
                 </div>
             </a>
 

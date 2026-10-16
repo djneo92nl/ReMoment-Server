@@ -5,6 +5,8 @@ namespace App\Domain\Device;
 use App\Domain\Control\SourceControls;
 use App\Domain\Device\Cache\Battery;
 use App\Domain\Library\LibraryPlayback;
+use App\Integrations\ReMoment\PlayerDevice;
+use App\Integrations\ReMoment\PlayerDriver;
 use App\Models\Device;
 
 /**
@@ -31,6 +33,11 @@ final class DeviceCapabilities
 
         // A driver covers a whole platform; some features need hardware only some models have.
         $capabilities = array_filter($capabilities, fn (string $capability) => HardwareFeatures::allows($device, $capability));
+
+        // A player says at registration which optional controls it has (an ESP32 may lack seek).
+        if (is_a($device->device_driver, PlayerDriver::class, true)) {
+            $capabilities = array_diff($capabilities, array_diff(PlayerDevice::OPTIONAL, PlayerDevice::capabilities($device)));
+        }
 
         if (SourceControls::available($device) !== null) {
             $capabilities[] = 'source_controls';

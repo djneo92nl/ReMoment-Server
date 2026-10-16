@@ -6,11 +6,16 @@ use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\DeviceSettingsController;
 use App\Http\Controllers\Api\InfoController;
 use App\Http\Controllers\Api\LibraryController;
+use App\Http\Controllers\Api\PlayerController;
 use App\Http\Controllers\Api\SourceControlsController;
 use App\Http\Controllers\Api\StorageController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/info', InfoController::class);
+
+Route::post('/players/register', [PlayerController::class, 'register']);
+Route::put('/players/{token}/state', [PlayerController::class, 'state']);
+Route::get('/players/{token}/commands', [PlayerController::class, 'commands']);
 
 Route::get('/devices', [DeviceController::class, 'index']);
 Route::get('/devices/{device}', [DeviceController::class, 'show']);
