@@ -71,7 +71,7 @@ class AlbumPageTest extends TestCase
         return Device::factory()->create(['device_name' => 'Kitchen Speaker', 'device_driver' => FakeLibraryPlaybackDriver::class]);
     }
 
-    public function test_the_title_is_shown_once_and_the_tabs_are_left_out_without_content(): void
+    public function test_the_title_is_shown_once_and_only_the_tracks_tab_exists_without_content(): void
     {
         $album = $this->album();
         $this->track($album, 'Mysterons');
@@ -80,7 +80,8 @@ class AlbumPageTest extends TestCase
 
         $this->assertSame(1, substr_count($html, '<h1'));
         $this->assertStringContainsString('Dummy Record</h1>', $html);
-        $this->assertStringNotContainsString('About this album', $html);
+        $this->assertStringContainsString('data-test="tab-tracks"', $html);
+        $this->assertStringNotContainsString('data-test="tab-sound"', $html);
         $this->assertStringContainsString('tint-hero', $html);
     }
 
@@ -91,7 +92,7 @@ class AlbumPageTest extends TestCase
         $album->metadata()->create(['key' => 'wikipedia_extract', 'value' => 'A trip-hop record.', 'type' => 'string', 'source' => 'wikipedia']);
 
         $this->get(route('albums.show', $album))->assertOk()
-            ->assertSee('About this album')->assertSee('data-test="tab-about"', false)->assertSee('A trip-hop record.')
+            ->assertSee('data-test="tab-about"', false)->assertSee('A trip-hop record.')
             ->assertDontSee('data-test="tab-credits"', false)->assertDontSee('data-test="tab-stats"', false);
     }
 
@@ -111,28 +112,28 @@ class AlbumPageTest extends TestCase
             ->assertSee("/albums/{$album->id}/play/{$speaker->id}?source=dlna&amp;shuffle=1", false);
     }
 
-    public function test_the_waveform_strip_has_one_segment_per_track_as_wide_as_it_is_long(): void
+    public function test_the_hero_carries_the_metadata_and_flags_high_quality_tracks(): void
     {
         $album = $this->album();
-        $short = $this->track($album, 'Short', 100, [10, 80, 40], 1);
-        $long = $this->track($album, 'Long', 300, null, 2);
+        $flac = $this->track($album, 'Lossless');
+        $mp3 = $this->track($album, 'Lossy', 200, null, 2);
+        $flac->metadata()->createMany([
+            ['key' => 'mime_type', 'value' => 'audio/flac', 'type' => 'string', 'source' => 'dlna:1'],
+            ['key' => 'bit_depth', 'value' => '24', 'type' => 'int', 'source' => 'dlna:1'],
+            ['key' => 'sample_rate', 'value' => '96000', 'type' => 'int', 'source' => 'dlna:1'],
+        ]);
+        $mp3->metadata()->createMany([
+            ['key' => 'mime_type', 'value' => 'audio/mpeg', 'type' => 'string', 'source' => 'dlna:1'],
+            ['key' => 'bitrate', 'value' => '128', 'type' => 'int', 'source' => 'dlna:1'],
+        ]);
+        $album->metadata()->create(['key' => 'lastfm_listeners', 'value' => '1234', 'type' => 'int', 'source' => 'lastfm']);
 
-        $html = $this->get(route('albums.show', $album))->assertOk()->getContent();
+        $this->assertSame('FLAC 24/96', Track::find($flac->id)->qualityBadge());
+        $this->assertNull(Track::find($mp3->id)->qualityBadge());
 
-        $this->assertStringContainsString('data-strip-links', $html);
-        $this->assertStringContainsString('flex:100 1 0', $html);
-        $this->assertStringContainsString('flex:300 1 0', $html);
-        $this->assertStringContainsString('href="#track-'.$short->id.'"', $html);
-        $this->assertStringContainsString('id="track-'.$long->id.'"', $html);
-        $this->assertStringContainsString('stroke-dasharray', $html, 'a track without a waveform is a dotted line');
-    }
-
-    public function test_the_strip_is_left_out_when_no_track_has_a_waveform(): void
-    {
-        $album = $this->album();
-        $this->track($album, 'Mysterons');
-
-        $this->get(route('albums.show', $album))->assertOk()->assertDontSee('data-strip-links', false);
+        $this->get(route('albums.show', $album))->assertOk()
+            ->assertSee('FLAC 24/96')->assertSee('1,234 listeners on Last.fm')->assertSee('Add to playlist')
+            ->assertDontSee('data-strip-links', false);
     }
 
     public function test_rows_have_no_device_picker_of_their_own(): void

@@ -44,7 +44,6 @@ final class AlbumPage
         public readonly int $listenedSeconds,
         public readonly Collection $recentPlays,
         public readonly bool $removable,
-        public readonly bool $hasWaveforms,
     ) {}
 
     /**
@@ -84,7 +83,6 @@ final class AlbumPage
             recentPlays: Play::whereHas('track', fn ($q) => $q->where('album_id', $album->id))
                 ->with(['track', 'device', 'radioStation'])->orderByDesc('played_at')->limit(20)->get(),
             removable: $all->isEmpty() || $all->every(fn (Track $t) => $t->isRemovable()),
-            hasWaveforms: $tracks->contains(fn (Track $t) => $t->waveform() !== null),
         );
     }
 

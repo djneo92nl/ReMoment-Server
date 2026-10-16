@@ -1,6 +1,6 @@
 @props(['page', 'devices', 'spotifyConnected' => false])
 {{-- The top of /albums/{id} (DESIGN.md §10): the cover on the left (centred above the text on phones), the title once, the artist, one meta line, Play and Shuffle
-     for the selected source, round buttons (add to playlist, "…"), all on the cover's tint fading into the page. The slot (the album waveform strip) sits at the bottom, in the hero's ink.
+     for the selected source, round buttons (add to playlist, "…"), all on the cover's tint fading into the page. All the album's metadata (genres, tags, release facts, listeners, a summary) sits in the hero.
      Queue ("play next / add to queue") belongs next to Add to playlist and renders once the pinned player reports a `queue_add` capability, which no driver has yet. --}}
 @php
     $album = $page->album;
@@ -35,6 +35,30 @@
             @if($page->metaLine !== '')
                 <p class="mt-1 text-sm opacity-70">{{ $page->metaLine }}</p>
             @endif
+            @php
+                $facts = collect([
+                    $page->details['release_date'] ? 'Released '.$page->details['release_date'] : null,
+                    $page->details['catalog_number'] ? 'Cat. '.$page->details['catalog_number'] : null,
+                    $page->details['country'],
+                    $page->details['disc_count'] > 1 ? $page->details['disc_count'].' discs' : null,
+                    $page->details['listeners'] ? number_format($page->details['listeners']).' listeners on Last.fm' : null,
+                    $page->totalPlays > 0 ? number_format($page->totalPlays).' '.Str::plural('play', $page->totalPlays) : null,
+                ])->filter()->implode(' · ');
+            @endphp
+            @if($facts !== '')
+                <p class="mt-0.5 text-xs opacity-60">{{ $facts }}</p>
+            @endif
+            @if($page->genres || $page->tags)
+                <div class="mt-3 flex flex-wrap justify-center gap-1.5 md:justify-start">
+                    @foreach(array_slice($page->genres, 0, 5) as $genre)<x-badge class="!bg-black/10 dark:!bg-white/10 !text-inherit">{{ $genre }}</x-badge>@endforeach
+                    @foreach($page->tags as $tag)<x-badge variant="outline" class="!text-inherit">{{ $tag }}</x-badge>@endforeach
+                </div>
+            @endif
+            @if($page->details['summary'])
+                <p class="mt-3 line-clamp-3 max-w-2xl text-sm leading-relaxed opacity-75">{{ $page->details['summary'] }}
+                    @if($page->details['wikipedia_url'])<a href="{{ $page->details['wikipedia_url'] }}" target="_blank" rel="noopener" class="underline">Wikipedia</a>@endif
+                </p>
+            @endif
 
             <div class="mt-5 flex flex-wrap items-center justify-center gap-3 md:justify-start">
                 @if($playable)
@@ -53,8 +77,8 @@
                     @endforeach
                 @endif
 
-                <button type="button" class="{{ $round }}" title="Add to playlist" aria-label="Add to playlist" data-test="album-add-to-playlist"
-                        @click="$dispatch('add-to-playlist', {{ \Illuminate\Support\Js::from(['album_id' => $album->id, 'source' => $page->source, 'label' => $album->name]) }})"><i class="fa-solid fa-list-ul text-sm"></i></button>
+                <button type="button" class="{{ $secondary }}" title="Add to playlist" data-test="album-add-to-playlist"
+                        @click="$dispatch('add-to-playlist', {{ \Illuminate\Support\Js::from(['album_id' => $album->id, 'source' => $page->source, 'label' => $album->name]) }})"><i class="fa-solid fa-list-ul text-sm"></i>Add to playlist</button>
 
                 @php $canFill = $spotifyConnected; $canRemove = auth()->check() && $page->removable; @endphp
                 @if($canFill || $canRemove)
@@ -88,8 +112,4 @@
             @endif
         </div>
     </div>
-
-    @if(!$slot->isEmpty())
-        <div class="px-5 pb-6 sm:px-8">{{ $slot }}</div>
-    @endif
 </div>

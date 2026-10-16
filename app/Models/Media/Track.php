@@ -198,6 +198,27 @@ class Track extends Model
         return $parts ? implode(' · ', $parts) : null;
     }
 
+    /**
+     * A short badge for tracks worth flagging: lossless files ("FLAC 24/96", "FLAC") and high-bitrate lossy ones
+     * ("320 kbps", from 256); null for everything else.
+     */
+    public function qualityBadge(): ?string
+    {
+        $mime = $this->metaValue('mime_type');
+        $format = $mime ? (self::FORMATS[$mime] ?? null) : null;
+        $depth = (int) $this->metaValue('bit_depth');
+        $rate = (int) $this->metaValue('sample_rate');
+        $bitrate = (int) $this->metaValue('bitrate');
+
+        if (in_array($format, ['FLAC', 'WAV', 'AIFF'], true)) {
+            $hiRes = $depth > 16 || $rate > 48000;
+
+            return $format.($hiRes && $depth && $rate ? ' '.$depth.'/'.rtrim(rtrim(number_format($rate / 1000, 1), '0'), '.') : '');
+        }
+
+        return $bitrate >= 256 ? $bitrate.' kbps' : null;
+    }
+
     /** What the album page and the library API show about a track beyond its name and duration. */
     public function details(): array
     {

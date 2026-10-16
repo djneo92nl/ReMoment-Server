@@ -6,11 +6,24 @@
     @endphp
 
     <div class="space-y-8">
-        <x-album-hero :page="$page" :devices="$playableDevices" :spotify-connected="$spotifyConnected">
-            @if($page->hasWaveforms)
-                <x-album-waveform :tracks="$page->tracks" :height="72" />
-            @endif
-        </x-album-hero>
+        <x-album-hero :page="$page" :devices="$playableDevices" :spotify-connected="$spotifyConnected" />
+
+        @php
+            $details = $page->details;
+            $tabs = array_filter([
+                'tracks' => ['Tracks', 'music'],
+                'about' => $details['summary'] ? ['About', 'circle-info'] : null,
+                'sound' => $page->sound ? ['Sound', 'sliders'] : null,
+                'credits' => $page->credits ? ['Credits', 'users'] : null,
+                'stats' => $page->totalPlays > 0 ? ['Stats', 'chart-simple'] : null,
+                'plays' => $page->recentPlays->isNotEmpty() ? ['Recent plays', 'clock-rotate-left'] : null,
+            ]);
+            $albumSound = $page->sound;
+            $dd = 'text-sm font-medium text-gray-800 dark:text-gray-200';
+        @endphp
+
+        <x-tabs :tabs="$tabs">
+        <x-tabs.panel name="tracks" class="space-y-6">
 
         {{-- Source: the album's tracks are never merged across sources; with several, a switch picks the list (and what Play plays) --}}
         @if(count($page->sources) > 1)
@@ -55,7 +68,7 @@
                         $playAction = \App\Support\DeviceAction::template('tracks.play', ['track' => $track]);
                         $rowBtn = 'flex h-8 w-8 items-center justify-center rounded-full';
                     @endphp
-                    <div id="track-{{ $track->id }}" class="scroll-mt-24 target:bg-gray-50 dark:target:bg-stone-800/40" x-data="{ panel: null }">
+                    <div id="track-{{ $track->id }}" class="scroll-mt-24" x-data="{ panel: null }">
                         <div class="group flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-gray-50 sm:px-5 dark:hover:bg-stone-800/30">
                             {{-- The number; the play button takes its place on hover or focus, and on touch screens --}}
                             <div class="relative h-8 w-8 flex-none">
@@ -79,10 +92,10 @@
                                 @endif
                             </p>
 
-                            {{-- The track's own waveform, a quiet hint of its shape --}}
-                            @if($waveform)
-                                <div class="hidden w-28 flex-none text-gray-500 sm:block dark:text-gray-400"><x-waveform :points="$waveform" :height="24" :opacity="0.5" /></div>
+                            @if($badge = $track->qualityBadge())
+                                <span class="hidden flex-none rounded-md border border-gray-300 px-1.5 py-0.5 text-[10px] font-medium leading-none text-gray-500 sm:inline dark:border-stone-600 dark:text-gray-400" title="{{ $quality }}">{{ $badge }}</span>
                             @endif
+
 
                             <form method="POST" action="{{ route('tracks.favorite', $track) }}" class="flex-none">
                                 @csrf
@@ -181,25 +194,15 @@
             <x-empty-state icon="music" title="No tracks here" text="This album has no tracks from {{ $page->source ? $sourceNames[$page->source] : 'any source' }} yet." />
         @endif
 
-        {{-- About this album: only the tabs that have something to show --}}
-        @php
-            $details = $page->details;
-            $aboutText = $details['summary'] || $page->genres || $page->tags || $details['listeners'];
-            $tabs = array_filter([
-                'about' => $aboutText ? ['About', 'circle-info'] : null,
-                'sound' => $page->sound ? ['Sound', 'sliders'] : null,
-                'credits' => $page->credits ? ['Credits', 'users'] : null,
-                'stats' => $page->totalPlays > 0 ? ['Stats', 'chart-simple'] : null,
-                'plays' => $page->recentPlays->isNotEmpty() ? ['Recent plays', 'clock-rotate-left'] : null,
-            ]);
-            $albumSound = $page->sound;
-            $dd = 'text-sm font-medium text-gray-800 dark:text-gray-200';
-        @endphp
-        @if($tabs)
-            <x-card class="p-5 sm:p-6" title="About this album">
-                <x-tabs :tabs="$tabs">
+        @if($spotifyConnected)
+            <livewire:album-more-on-spotify :album="$album" :key="'spotify-more-'.$album->id" />
+        @endif
+        </x-tabs.panel>
+
+        {{-- The other tabs: only those that have something to show --}}
+
                     @isset($tabs['about'])
-                        <x-tabs.panel name="about" class="space-y-4">
+                        <x-tabs.panel name="about" class="rounded-3xl border border-gray-200/70 bg-white p-5 shadow-sm sm:p-6 dark:border-stone-800 dark:bg-stone-900">
                             @if($details['summary'])
                                 <p class="max-w-3xl text-sm leading-relaxed text-gray-600 dark:text-gray-400">{{ $details['summary'] }}
                                     @if($details['wikipedia_url'])
@@ -207,20 +210,11 @@
                                     @endif
                                 </p>
                             @endif
-                            @if($page->genres || $page->tags)
-                                <div class="flex flex-wrap gap-1.5">
-                                    @foreach(array_slice($page->genres, 0, 5) as $genre)<x-badge>{{ $genre }}</x-badge>@endforeach
-                                    @foreach($page->tags as $tag)<x-badge variant="outline">{{ $tag }}</x-badge>@endforeach
-                                </div>
-                            @endif
-                            @if($details['listeners'])
-                                <p class="text-xs text-gray-400 dark:text-gray-600">{{ number_format($details['listeners']) }} listeners on Last.fm</p>
-                            @endif
                         </x-tabs.panel>
                     @endisset
 
                     @isset($tabs['sound'])
-                        <x-tabs.panel name="sound">
+                        <x-tabs.panel name="sound" class="rounded-3xl border border-gray-200/70 bg-white p-5 shadow-sm sm:p-6 dark:border-stone-800 dark:bg-stone-900">
                             <dl class="max-w-md space-y-4 text-sm">
                                 @if($albumSound['bpm'])
                                     <div class="flex justify-between gap-4"><dt class="text-gray-500">Average tempo</dt><dd class="{{ $dd }}">{{ $albumSound['bpm'] }} BPM</dd></div>
@@ -247,7 +241,7 @@
                     @endisset
 
                     @isset($tabs['credits'])
-                        <x-tabs.panel name="credits">
+                        <x-tabs.panel name="credits" class="rounded-3xl border border-gray-200/70 bg-white p-5 shadow-sm sm:p-6 dark:border-stone-800 dark:bg-stone-900">
                             <dl class="grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
                                 @foreach($page->credits as $role => $names)
                                     <div>
@@ -263,7 +257,7 @@
                     @endisset
 
                     @isset($tabs['stats'])
-                        <x-tabs.panel name="stats">
+                        <x-tabs.panel name="stats" class="rounded-3xl border border-gray-200/70 bg-white p-5 shadow-sm sm:p-6 dark:border-stone-800 dark:bg-stone-900">
                             <dl class="max-w-md space-y-4 text-sm">
                                 <div class="flex justify-between gap-4"><dt class="text-gray-500">Total plays</dt><dd class="{{ $dd }}">{{ number_format($page->totalPlays) }}</dd></div>
                                 @if($page->listenedSeconds > 0)
@@ -275,7 +269,7 @@
                     @endisset
 
                     @isset($tabs['plays'])
-                        <x-tabs.panel name="plays">
+                        <x-tabs.panel name="plays" class="rounded-3xl border border-gray-200/70 bg-white p-5 shadow-sm sm:p-6 dark:border-stone-800 dark:bg-stone-900">
                             <div class="grid gap-x-8 gap-y-3 md:grid-cols-2">
                                 @foreach($page->recentPlays as $play)
                                     @php
@@ -305,13 +299,7 @@
                             </div>
                         </x-tabs.panel>
                     @endisset
-                </x-tabs>
-            </x-card>
-        @endif
-
-        @if($spotifyConnected)
-            <livewire:album-more-on-spotify :album="$album" :key="'spotify-more-'.$album->id" />
-        @endif
+        </x-tabs>
     </div>
 
     <x-play-on-modal :devices="$playableDevices" />

@@ -20,8 +20,7 @@ The building blocks of `DESIGN.md` (`resources/views/components/`). Use them ins
 | `<x-genre-tile>` | `genre`, `albums` | A genre tinted by the colours its covers share |
 | `<x-quick-play>` | `action` (DeviceAction template) | Round play button on a cover: pinned player plays, else opens the picker |
 | `<x-library-hero>` | `hero`, `scope` | Top of `/library`: name, counts, Shuffle, cover collage |
-| `<x-album-hero>` | `page` (`AlbumPage`), `devices`, `spotify-connected`; slot = waveform strip | Top of `/albums/{id}`: cover, title, meta line, Play/Shuffle, add to playlist, `…` menu |
-| `<x-album-waveform>` | `tracks`, `height` | One silhouette for the album, a segment per track as wide as it is long, linking to its row |
+| `<x-album-hero>` | `page` (`AlbumPage`), `devices`, `spotify-connected` | Top of `/albums/{id}`: cover, title, meta line, facts, genres/tags, summary, Play/Shuffle/Add to playlist, `…` menu |
 | `<x-tabs>` / `<x-tabs.panel>` | `tabs` (key => label or [label, icon]), `active`; panel `name` | Alpine tabs, scrolling bar on phones; leave out tabs without content |
 | `<x-menu>` / `<x-menu.item>` | `label`, `icon`, `button`, `active`; item `icon`, `type`, `danger` | A "…" dropdown whose panel is `position: fixed` so clipping parents can't cut it |
 | `<x-play-on-modal>` | `devices` | One "Play on device" picker per page; open with the `play-on-device` event `{action, label}` |
