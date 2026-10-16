@@ -9,6 +9,6 @@
     $iconCls = ($sub ? 'w-4 text-xs ' : 'w-5 ')
         . ($active ? 'text-gray-700 dark:text-gray-300' : ($sub ? 'text-gray-300 dark:text-stone-700' : ''));
 @endphp
-<a href="{{ $href }}" @click="mobileMenuOpen = false" @if($active) aria-current="page" @endif class="{{ $cls }}">
+<a href="{{ $href }}" @click="mobileMenuOpen = false" @if($active) aria-current="page" @endif {{ $attributes->merge(['class' => $cls]) }}>
     <i class="fa-solid fa-{{ $icon }} {{ $iconCls }}"></i>{{ $slot }}
 </a>
