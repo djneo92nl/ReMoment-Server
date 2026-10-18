@@ -25,6 +25,9 @@ final class ListeningModes
     /** Tracks a mode plays. */
     public const LIMIT = 100;
 
+    /** Modes read the audio analysis, which only the own files have: always the Local scope, whatever leads the library. */
+    private const SCOPE = 'local';
+
     private const TTL = 600;
 
     /**
@@ -101,8 +104,8 @@ final class ListeningModes
      */
     public static function available(): array
     {
-        $counts = Cache::remember('listening-modes:counts:'.LeadingSource::defaultScope(), self::TTL, fn () => array_map(
-            fn (array $mode) => SmartPlaylistBuilder::count($mode['definition']),
+        $counts = Cache::remember('listening-modes:counts', self::TTL, fn () => array_map(
+            fn (array $mode) => SmartPlaylistBuilder::count($mode['definition'], self::SCOPE),
             self::all(),
         ));
 
@@ -125,7 +128,7 @@ final class ListeningModes
     {
         $definition = self::find($key)['definition'] ?? throw new \InvalidArgumentException("Unknown listening mode {$key}");
 
-        $query = SmartPlaylistBuilder::query($definition);
+        $query = SmartPlaylistBuilder::query($definition, self::SCOPE);
         if ($device !== null) {
             LibraryPlayback::playableTracks($query, $device);
         }

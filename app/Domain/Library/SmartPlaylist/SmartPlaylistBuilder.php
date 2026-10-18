@@ -75,13 +75,13 @@ final class SmartPlaylistBuilder
         ];
     }
 
-    /** Every track the rules match, unsorted and unlimited. */
-    public static function query(array $definition): Builder
+    /** Every track the rules match, unsorted and unlimited; for what $scope shows (default: the leading source's). */
+    public static function query(array $definition, ?string $scope = null): Builder
     {
         $definition = self::normalize($definition);
 
         $query = Track::query()->where(fn (Builder $q) => $q->whereNull('tracks.source')->orWhere('tracks.source', '!=', 'radio'));
-        LibrarySources::tracks($query, LeadingSource::hidden(LeadingSource::defaultScope()));
+        LibrarySources::tracks($query, LeadingSource::hidden($scope ?? LeadingSource::defaultScope()));
 
         if ($definition['rules'] !== []) {
             $any = $definition['match'] === 'any';
@@ -96,9 +96,9 @@ final class SmartPlaylistBuilder
     }
 
     /** How many tracks the rules match, before the limit. */
-    public static function count(array $definition): int
+    public static function count(array $definition, ?string $scope = null): int
     {
-        return self::query($definition)->count();
+        return self::query($definition, $scope)->count();
     }
 
     /** The tracks the playlist gets: sorted, limited. */

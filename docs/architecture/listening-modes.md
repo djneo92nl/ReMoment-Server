@@ -4,7 +4,7 @@ Ready-made selections of the own, analysed files for a situation: **Focus**, **P
 
 ## Code
 
-- `App\Domain\Library\ListeningModes`: `all()` (key, name, description, icon, definition), `find()`, `keys()`, `available()` (the modes with at least `MIN_TRACKS` = 5 matching tracks and their counts, cached 10 minutes per leading-source scope) and `tracks($key, $device?)` (a query: random order, at most `LIMIT` = 100, narrowed to what the device can play with `LibraryPlayback::playableTracks`). **To add a mode** add one entry to `all()`.
+- `App\Domain\Library\ListeningModes`: `all()` (key, name, description, icon, definition), `find()`, `keys()`, `available()` (the modes with at least `MIN_TRACKS` = 5 matching tracks and their counts, cached 10 minutes) and `tracks($key, $device?)` (a query: random order, at most `LIMIT` = 100, narrowed to what the device can play with `LibraryPlayback::playableTracks`). **To add a mode** add one entry to `all()`.
 - Thresholds (energy, danceability and positivity are 0–100 %, loudness in LUFS):
 
 | Mode | Rules |
@@ -18,7 +18,7 @@ They are starting points, checked against 50 analysed tracks of one library (Par
 
 ## Where it shows
 
-- Library page (`/library`): a *Listening modes* row of buttons that play on the player pinned in this browser (`POST /library/listening-modes/{mode}`). Left out while no mode has enough tracks.
+- Library page (`/library`): a *Listening modes* row of buttons that play on the player pinned in this browser (`POST /library/listening-modes/{mode}`). Only in the Local scope, because only own files are analysed, and left out while no mode has enough tracks. Modes always read the Local scope, whatever leads the library.
 - API: `GET /api/library/listening-modes` and `POST /api/devices/{id}/library/play-listening-mode` (`docs/api/library.md`).
 
 A mode picks a fresh random selection every time it is played; it is not stored as a playlist. A selection is queued once: there is no endless refill yet.

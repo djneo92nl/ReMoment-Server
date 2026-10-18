@@ -217,14 +217,25 @@ class ListeningModesTest extends TestCase
 
     // --- Web ---
 
-    public function test_library_page_shows_the_modes_it_can_serve(): void
+    public function test_library_page_shows_the_modes_in_the_local_scope_only(): void
     {
-        $this->get('/library')->assertOk()->assertDontSee('Listening modes');
+        $this->get('/library?scope=local')->assertOk()->assertDontSee('Listening modes');
 
         Cache::flush();
         $this->party(ListeningModes::MIN_TRACKS);
 
-        $this->get('/library')->assertOk()->assertSee('Listening modes')->assertSee('Party');
+        $this->get('/library?scope=local')->assertOk()->assertSee('Listening modes')->assertSee('Party');
+        $this->get('/library?scope=streaming')->assertOk()->assertDontSee('Listening modes');
+        $this->get('/library?scope=all')->assertOk()->assertDontSee('Listening modes');
+    }
+
+    public function test_modes_ignore_the_leading_source(): void
+    {
+        $this->party(ListeningModes::MIN_TRACKS);
+        Setting::set(LeadingSource::SETTING, 'spotify');
+        Cache::flush();
+
+        $this->assertArrayHasKey('party', ListeningModes::available());
     }
 
     public function test_web_play_needs_a_pinned_player_and_a_known_mode(): void
