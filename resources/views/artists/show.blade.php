@@ -68,10 +68,7 @@
                                             @endif
                                         </div>
                                         <div class="min-w-0 flex-1">
-                                            <p class="flex items-center gap-1.5 truncate text-sm text-gray-900 dark:text-gray-100">
-                                                <span class="truncate">{{ $track->name }}</span>
-                                                <x-source-icon :source="$track->source" />
-                                            </p>
+                                            <p class="truncate text-sm text-gray-900 dark:text-gray-100">{{ $track->name }}</p>
                                             @if($track->album)
                                                 <p class="mt-0.5 truncate text-xs text-gray-400 dark:text-gray-600">
                                                     <a href="{{ route('albums.show', $track->album) }}" class="hover:underline">{{ $track->album->name }}</a>
@@ -86,7 +83,9 @@
                     </section>
                 @endif
 
-                @if($albums->isNotEmpty())
+                @if($albums->count() > 12)
+                    <x-discography :albums="$albums" :source="$source" />
+                @elseif($albums->isNotEmpty())
                     <x-shelf title="Albums">
                         @foreach($albums as $album)
                             <x-album-card :album="$album" :source="$source" tinted />

@@ -9,6 +9,7 @@ use App\Domain\Library\LibraryRemover;
 use App\Domain\Library\LibrarySources;
 use App\Http\Controllers\Concerns\FlashesLibraryPlayback;
 use App\Models\Device;
+use App\Models\Media\Album;
 use App\Models\Media\Artist;
 use App\Models\Media\Genre;
 use App\Models\Play;
@@ -74,7 +75,7 @@ class ArtistController extends Controller
     public function show(Request $request, Artist $artist)
     {
         $sourceMeta = fn ($q) => $q->whereIn('key', ['dlna_url', 'external_id']);
-        $artist->load(['albums.tracks.metadata' => $sourceMeta, 'tracks.metadata' => $sourceMeta, 'tracks.album']);
+        $artist->load(['albums.metadata' => fn ($q) => $q->whereIn('key', Album::CARD_METADATA), 'albums.tracks.metadata' => $sourceMeta, 'tracks.metadata' => $sourceMeta, 'tracks.album']);
 
         $playableDevices = Device::libraryCapable();
         $spotifyConnected = app(SpotifyTokenService::class)->isConnected();

@@ -25,3 +25,7 @@ An admin's choice is a `metadata` row with source `manual` (`Metadata::MANUAL`).
 - **Name and duplicates** — rename (the comparison key follows), merge another library artist into this one (`LibraryMerger::mergeArtists`).
 - **Details** — bio, genres, tags, country and type as manual rows (`ArtistOverrides::setDetails`); an empty field removes the row, so the sources' value shows again (as the placeholder). Manual genres replace the artist's `genreables`; clearing them re-syncs from the stored `genres` rows of every source. A later enrichment run may add its genres on top again (GenreSync is additive).
 - **Library and files** — per library counts, a "open this artist's pages on" default (`default_source`: used by the artist and album pages when the URL names no `?source=`), the artist's own files (hide/show one or all, match again, verify, delete; ids are checked against the artist's files) and "Remove from library" (only when no Local/DLNA tracks, as before; moved here from the hero menu).
+
+## Discography on the artist page
+
+An artist with more than 12 albums gets `<x-discography>` instead of the shelf: kind chips with counts, a search box and a sort, one grid per kind (first 12, "Show all"). `App\Domain\Library\AlbumKind::of()` decides the kind from the album name first (pressings of a release are separate albums: "(Japan, …)", "EU CD1", catalogue numbers), then the stored release type and the track count. Filtering and sorting run in the browser.

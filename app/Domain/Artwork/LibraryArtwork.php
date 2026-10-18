@@ -74,7 +74,8 @@ final class LibraryArtwork
     /** Path of one processed file on the public disk. */
     public static function path(string $url, string $key): string
     {
-        return 'artwork/'.md5($url).'/'.self::CLIENT_FILES[$key];
+        // The 512 cover isn't a client file (clients cache 320 and 120) but the web fanart and the API use it.
+        return 'artwork/'.md5($url).'/'.(self::CLIENT_FILES[$key] ?? ($key === 'proxy_512' ? '512.jpg' : throw new \InvalidArgumentException("Unknown artwork file {$key}")));
     }
 
     /**
