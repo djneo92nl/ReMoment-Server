@@ -63,13 +63,13 @@ class Artist extends Model
 
     public function country(): ?string
     {
-        return $this->metadata()->where('key', 'country')->value('value');
+        return $this->metaValue('country');
     }
 
     /** The Wikipedia summary when there is one, else the Last.fm bio, else TheAudioDB's. */
     public function bio(): ?string
     {
-        return $this->metaValue('wikipedia_extract') ?? $this->metaValue('bio') ?? $this->metaValue('audiodb_bio');
+        return $this->manualValue('bio') ?? $this->metaValue('wikipedia_extract') ?? $this->metaValue('bio') ?? $this->metaValue('audiodb_bio');
     }
 
     /** What the web page and the library API show besides name and genres. */
@@ -118,10 +118,10 @@ class Artist extends Model
     /** Metadata keys photoUrl() reads: eager load just these for a list of artist cards (ReadsMetadata uses the loaded relation). */
     public const PHOTO_METADATA = ['images', 'spotify_image'];
 
-    /** The artist's own photo: TheAudioDB's, else Spotify's; null when neither is known. */
+    /** The artist's own photo: the one picked in the settings, else TheAudioDB's, else Spotify's; null when none is known. */
     public function photoUrl(): ?string
     {
-        return ((array) $this->metaJson('images'))['thumb'] ?? $this->metaValue('spotify_image');
+        return $this->metaValue('photo') ?? ((array) $this->metaJson('images'))['thumb'] ?? $this->metaValue('spotify_image');
     }
 
     /** TheAudioDB's fanart (a wide backdrop photo, remote URL); null when unknown. */
@@ -130,15 +130,33 @@ class Artist extends Model
         return ((array) $this->metaJson('images'))['fanart'] ?? null;
     }
 
-    /** Every wide photo TheAudioDB has: fanart 1–4 then the wide thumb (remote URLs, distinct). @return list<string> */
+    /** Wide photos that may be shown as backdrop and collage: TheAudioDB's fanart 1–4 and wide thumb plus added ones, minus hidden ones. @return list<string> */
     public function galleryUrls(): array
+    {
+        return array_values(array_diff($this->wideImageUrls(), $this->hiddenImages()));
+    }
+
+    /** Every wide photo known, hidden or not (remote URLs, distinct). @return list<string> */
+    public function wideImageUrls(): array
     {
         $images = (array) $this->metaJson('images');
 
-        return array_values(array_unique(array_filter(array_map(
-            fn (string $key) => $images[$key] ?? null,
-            ['fanart', 'fanart2', 'fanart3', 'fanart4', 'wide_thumb'],
-        ))));
+        return array_values(array_unique(array_filter([
+            ...array_map(fn (string $key) => $images[$key] ?? null, ['fanart', 'fanart2', 'fanart3', 'fanart4', 'wide_thumb']),
+            ...$this->extraImages(),
+        ])));
+    }
+
+    /** Pictures an admin added by URL or upload (pseudo URLs for uploads). @return list<string> */
+    public function extraImages(): array
+    {
+        return array_values(array_filter((array) $this->metaJson('extra_images'), 'is_string'));
+    }
+
+    /** Pictures an admin switched off for the hero. @return list<string> */
+    public function hiddenImages(): array
+    {
+        return array_values(array_filter((array) $this->metaJson('hidden_images'), 'is_string'));
     }
 
     public function coverAlbum(): ?Album

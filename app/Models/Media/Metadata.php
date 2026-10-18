@@ -9,6 +9,9 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class Metadata extends Model
 {
+    /** Source of values an admin set by hand (artist settings): they outrank every automatic source. */
+    public const MANUAL = 'manual';
+
     protected $table = 'metadata';
 
     protected $fillable = [

@@ -222,9 +222,10 @@ class LibraryPlayback
         return new PlaybackResult(PlaybackResult::VIA_SPOTIFY, 1, 1);
     }
 
-    public function playArtist(Device $device, Artist $artist, bool $shuffle = false): PlaybackResult
+    /** @param  string|null  $source  `files` | `dlna` | `spotify`: play from that path only (see playTracks) */
+    public function playArtist(Device $device, Artist $artist, bool $shuffle = false, ?string $source = null): PlaybackResult
     {
-        return $this->playTracks($device, self::artistTracks($artist), null, $shuffle);
+        return $this->playTracks($device, self::artistTracks($artist), null, $shuffle, null, $source);
     }
 
     public function playTrack(Device $device, Track $track): PlaybackResult

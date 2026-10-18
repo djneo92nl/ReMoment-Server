@@ -117,7 +117,7 @@ class RemoveExternalTest extends TestCase
         $artist = Artist::create(['name' => 'Nothing', 'source' => 'spotify']);
         $this->actingAs(User::factory()->create());
 
-        $this->get(route('artists.show', $artist))->assertSee('Remove from library');
+        $this->get(route('artists.settings', $artist))->assertSee('Remove from library');
         $this->delete(route('artists.destroy', $artist))->assertRedirect(route('artists.index'))->assertSessionHas('success');
 
         $this->assertNull(Artist::find($artist->id));

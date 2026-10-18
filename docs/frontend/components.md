@@ -20,6 +20,7 @@ The building blocks of `DESIGN.md` (`resources/views/components/`). Use them ins
 | `<x-genre-tile>` | `genre`, `albums` | A genre tinted by the colours its covers share |
 | `<x-quick-play>` | `action` (DeviceAction template) | Round play button on a cover: pinned player plays, else opens the picker |
 | `<x-library-hero>` | `hero`, `scope` | Top of `/library`: name, counts, Shuffle, cover collage |
+| `<x-artist-hero>` | `artist`, `devices`, `total-plays`, `total-seconds` | Top of `/artists/{id}`: round photo, name, meta/facts lines, genres/tags, clamped bio and links, Play/Shuffle on the pinned player, `…` menu (admin remove); tinted by the most played cover, fanart dimmed behind |
 | `<x-album-hero>` | `page` (`AlbumPage`), `devices`, `spotify-connected` | Top of `/albums/{id}`: cover, title, meta line, facts, genres/tags, summary, Play/Shuffle/Add to playlist, `…` menu |
 | `<x-tabs>` / `<x-tabs.panel>` | `tabs` (key => label or [label, icon]), `active`; panel `name` | Alpine tabs, scrolling bar on phones; leave out tabs without content |
 | `<x-menu>` / `<x-menu.item>` | `label`, `icon`, `button`, `active`; item `icon`, `type`, `danger` | A "…" dropdown whose panel is `position: fixed` so clipping parents can't cut it |

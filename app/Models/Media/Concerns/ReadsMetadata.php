@@ -4,14 +4,27 @@ namespace App\Models\Media\Concerns;
 
 trait ReadsMetadata
 {
-    /** The first stored metadata value for a key, whatever its source. */
+    /** The stored metadata value for a key: the manual one when there is one, else the first, whatever its source. */
     public function metaValue(string $key): ?string
     {
-        $value = $this->relationLoaded('metadata')
-            ? $this->metadata->firstWhere('key', $key)?->value
-            : $this->metadata()->where('key', $key)->value('value');
+        if ($this->relationLoaded('metadata')) {
+            $rows = $this->metadata->where('key', $key);
+            $value = ($rows->firstWhere('source', \App\Models\Media\Metadata::MANUAL) ?? $rows->first())?->value;
+        } else {
+            $value = $this->metadata()->where('key', $key)->orderByRaw('source = ? desc', [\App\Models\Media\Metadata::MANUAL])->value('value');
+        }
 
         return ($value !== null && $value !== '') ? $value : null;
+    }
+
+    /** The value an admin set by hand for a key, null when there is none. */
+    public function manualValue(string $key): ?string
+    {
+        $row = $this->relationLoaded('metadata')
+            ? $this->metadata->where('key', $key)->firstWhere('source', \App\Models\Media\Metadata::MANUAL)
+            : $this->metadata()->where('key', $key)->where('source', \App\Models\Media\Metadata::MANUAL)->first();
+
+        return ($row?->value !== null && $row->value !== '') ? $row->value : null;
     }
 
     /** @return array<mixed> a JSON metadata value, decoded; empty when absent */

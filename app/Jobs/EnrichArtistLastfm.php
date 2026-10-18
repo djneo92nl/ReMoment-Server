@@ -29,7 +29,7 @@ class EnrichArtistLastfm implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $info = $lastfm->get('artist.getinfo', ['artist' => $name])['artist'] ?? null;
+        $info = $lastfm->get('artist.getinfo', ['artist' => $artist->metaValue('lastfm_name') ?? $name])['artist'] ?? null;
 
         if ($info !== null) {
             if ($bio = LastfmInfoClient::cleanSummary($info['bio']['summary'] ?? null)) {

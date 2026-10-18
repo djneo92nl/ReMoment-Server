@@ -49,7 +49,7 @@ class FetchSpotifyArtistImages implements ShouldQueue
 
         $bySpotifyId = [];
         foreach ($artists as $artist) {
-            $spotifyId = $artist->metadata()->where('key', 'spotify_id')->value('value') ?: $this->search($api, $artist);
+            $spotifyId = $artist->metaValue('spotify_id') ?: $this->search($api, $artist);
 
             if ($spotifyId === null) {
                 $this->save($artist, null);

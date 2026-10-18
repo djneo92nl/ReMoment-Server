@@ -105,3 +105,11 @@ Same language as the hub, dark first. No page header: the hero carries the title
 - **Tracklist**: number (a play button on hover/focus, always on touch), title (+ explicit mark), a small waveform and a quality badge on `sm+` for lossless files (`FLAC`, `FLAC 24/96`) and bitrates from 256 kbps, heart, length, `…` menu (play on device, add to playlist, details, lyrics, remove). One shared picker and one shared playlist modal per page, never one per row.
 - **Tabs** (`<x-tabs>`) under the hero: Tracks (always; the table header switches Local | Spotify: Local lists the library rows, Spotify shows the album as Spotify has it, with what the library holds marked and an "Add N to album" button), then About (full summary), Sound, Credits, Stats, Recent plays; a tab exists only with content. The tab bar scrolls sideways on phones.
 
+
+### Artist page (`/artists/{id}`)
+
+The album page's sibling. No page header: the hero carries the name (once).
+
+- **Hero** (`<x-artist-hero>`): round photo (the artist's own, else their most played cover) left of the text on `md+`, centred above it on phones; back button and heart in the corners; name, one meta line (`N albums · N tracks · N plays · time listened`), facts (type, life span, area, Last.fm listeners and scrobbles), genre and tag chips, a clamped bio with Wikipedia and link row; Play (filled) and Shuffle (outlined) on the pinned player (or the player panel while none is pinned), a `…` for the admin "Remove from library". Background: the tint of the most played cover fading into the page; fanart, when known, sits dimmed behind.
+- **Source** (as on the album page, streaming is never merged with local): an artist with tracks in several libraries gets a segmented control `Spotify | Local` (links with `?source=`), one source the plain label "In Local". Albums, Popular, the track count and Play/Shuffle follow the selected source; "More on Spotify" shows on the Spotify side only. The hero's fanart fades in only on the right so the text stays readable.
+- **Tabs** (`<x-tabs>`): Overview (always: *Popular* tracks with a play button in place of the rank on hover, *Albums* shelf of tinted cards, *Similar artists* shelf of round cards, "More on Spotify"), About (full bio, only with one), Recent plays (only with plays).

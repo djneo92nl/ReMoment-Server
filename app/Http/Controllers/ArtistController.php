@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Library\AlbumPage;
 use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\LibraryRemover;
@@ -12,6 +13,7 @@ use App\Models\Media\Artist;
 use App\Models\Media\Genre;
 use App\Models\Play;
 use App\Services\SpotifyTokenService;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\Request;
 
 class ArtistController extends Controller
@@ -69,12 +71,26 @@ class ArtistController extends Controller
         return view('artists.index', compact('artists', 'scope', 'sort', 'search', 'favorites', 'genre', 'genres', 'letter', 'letters'));
     }
 
-    public function show(Artist $artist)
+    public function show(Request $request, Artist $artist)
     {
-        $artist->load(['albums.tracks.metadata' => fn ($q) => $q->where('key', 'dlna_url'), 'tracks.album']);
+        $sourceMeta = fn ($q) => $q->whereIn('key', ['dlna_url', 'external_id']);
+        $artist->load(['albums.tracks.metadata' => $sourceMeta, 'tracks.metadata' => $sourceMeta, 'tracks.album']);
 
         $playableDevices = Device::libraryCapable();
         $spotifyConnected = app(SpotifyTokenService::class)->isConnected();
+
+        // Like the album page: one source at a time, streaming is never merged with local. Spotify's side is always
+        // one click away while it is connected.
+        $sources = array_values(array_intersect(LibrarySources::libraryIds(), LibrarySources::ofTracks($artist->tracks)));
+        if ($spotifyConnected && !in_array('spotify', $sources, true)) {
+            $sources[] = 'spotify';
+        }
+        $requested = $request->query('source');
+        $source = AlbumPage::selectSource($sources, is_string($requested) ? $requested : $artist->metaValue('default_source'), LeadingSource::forRequest($request));
+        $inSource = fn ($track) => $source === null || in_array($source, $track->sources(), true);
+
+        $albums = $artist->albums->filter(fn ($album) => $album->tracks->contains($inSource))->values();
+        $trackCount = $artist->tracks->filter($inSource)->count();
 
         $totalPlays = $artist->plays()->count();
 
@@ -82,6 +98,7 @@ class ArtistController extends Controller
 
         $topTracks = $artist->tracks()
             ->whereHas('plays')
+            ->when($source !== null, fn ($q) => LibrarySources::availableFrom($q, $source))
             ->withCount('plays')
             ->orderByDesc('plays_count')
             ->limit(10)
@@ -93,8 +110,16 @@ class ArtistController extends Controller
             ->limit(20)
             ->get();
 
+        // The shelf cards show album and play counts.
+        $similarArtists = (new EloquentCollection($artist->similarArtistModels()->values()->all()))->loadCount(['albums', 'plays']);
+
         return view('artists.show', compact(
             'artist',
+            'similarArtists',
+            'sources',
+            'source',
+            'albums',
+            'trackCount',
             'totalPlays',
             'totalSeconds',
             'topTracks',
@@ -106,7 +131,9 @@ class ArtistController extends Controller
 
     public function play(Request $request, Artist $artist, Device $device, LibraryPlayback $library)
     {
-        return $this->flashPlayback(fn () => $library->playArtist($device, $artist, $request->boolean('shuffle')), $device, $artist->name);
+        $source = $request->validate(['source' => ['nullable', 'in:files,dlna,spotify']])['source'] ?? null;
+
+        return $this->flashPlayback(fn () => $library->playArtist($device, $artist, $request->boolean('shuffle'), $source), $device, $artist->name);
     }
 
     /** Removes an artist and everything of theirs that isn't on DLNA (admin); an empty artist just goes. */

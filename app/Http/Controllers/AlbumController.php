@@ -80,7 +80,7 @@ class AlbumController extends Controller
 
         $source = $request->query('source');
         $spotifyConnected = app(SpotifyTokenService::class)->isConnected();
-        $page = AlbumPage::build($album, is_string($source) ? $source : null, LeadingSource::forRequest($request), app(SelectedDevice::class)->device(), $spotifyConnected);
+        $page = AlbumPage::build($album, is_string($source) ? $source : $album->artist->metaValue('default_source'), LeadingSource::forRequest($request), app(SelectedDevice::class)->device(), $spotifyConnected);
 
         return view('albums.show', [
             'page' => $page,

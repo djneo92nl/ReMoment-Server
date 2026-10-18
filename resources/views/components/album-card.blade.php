@@ -1,4 +1,4 @@
-@props(['album', 'showPlays' => false, 'detail' => false, 'tinted' => false, 'quick' => null])
+@props(['album', 'showPlays' => false, 'detail' => false, 'tinted' => false, 'quick' => null, 'source' => null])
 
 @php
     // `tinted`: a shelf card (fixed width, footer tinted by the cover, quick-play); otherwise a grid cell.
@@ -42,7 +42,7 @@
         @endif
     </a>
     @if($quick)
-        <x-quick-play :action="\App\Support\DeviceAction::template('albums.play', ['album' => $album])" />
+        <x-quick-play :action="\App\Support\DeviceAction::template('albums.play', ['album' => $album, 'source' => $source])" />
     @endif
     </div>
     <div class="px-2.5 py-2">

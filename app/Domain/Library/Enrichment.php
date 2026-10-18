@@ -92,7 +92,8 @@ class Enrichment
     /** The MusicBrainz id stored for an artist or album, if it has been matched. */
     public static function mbid(Model $model): ?string
     {
-        return $model->metadata()->where('key', 'mbid')->where('source', self::MUSICBRAINZ)->value('value');
+        return $model->metadata()->where('key', 'mbid')->whereIn('source', [self::MUSICBRAINZ, Metadata::MANUAL])
+            ->orderByRaw('source = ? desc', [Metadata::MANUAL])->value('value');
     }
 
     /** A Wikipedia summary (`extract`, `url`) as the record's `wikipedia_*` metadata. */
@@ -242,7 +243,7 @@ class Enrichment
     /** Queues the artist-level jobs whose data is available and not yet fetched; returns how many. */
     public static function queueArtist(Artist $artist): int
     {
-        $hasMbid = self::hasMeta($artist, 'mbid', self::MUSICBRAINZ);
+        $hasMbid = self::mbid($artist) !== null;
 
         return self::dispatchUndone($artist, array_filter([
             self::MUSICBRAINZ => $hasMbid ? new EnrichArtistMusicBrainz($artist) : null,
@@ -321,7 +322,7 @@ class Enrichment
     public static function artistBacklog(): Builder
     {
         $notDone = fn (string $source) => fn (Builder $q) => $q->whereDoesntHave('metadata', fn ($m) => $m->where('key', 'enriched_at')->where('source', $source));
-        $hasMbid = fn (Builder $q) => $q->whereHas('metadata', fn ($m) => $m->where('key', 'mbid')->where('source', self::MUSICBRAINZ));
+        $hasMbid = fn (Builder $q) => $q->whereHas('metadata', fn ($m) => $m->where('key', 'mbid')->whereIn('source', [self::MUSICBRAINZ, Metadata::MANUAL]));
 
         return Artist::query()
             ->whereRaw('lower(name) != ?', [strtolower(self::UNKNOWN_ARTIST)])

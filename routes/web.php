@@ -79,6 +79,7 @@ Route::get('/dashboard', function () {
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
 
+    Route::get('/artists/{artist}/settings', fn (\App\Models\Media\Artist $artist) => view('artists.settings', ['artist' => $artist]))->name('artists.settings');
     Route::delete('/artists/{artist}', [ArtistController::class, 'destroy'])->name('artists.destroy');
     Route::delete('/albums/{album}', [AlbumController::class, 'destroy'])->name('albums.destroy');
     Route::delete('/tracks/{track}', [AlbumController::class, 'destroyTrack'])->name('tracks.destroy');

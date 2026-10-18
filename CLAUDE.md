@@ -34,6 +34,7 @@ docs/
     discovery-for-clients.md mDNS advertisement (_remoment._tcp via host Avahi) so clients find the server
     audio-analysis.md       Analysis of the own audio files: loudness, ReplayGain, Chromaprint/AcoustID, Essentia sidecar (BPM, key, mood), `analysis` queue, library:analyze, smart fields
     metadata-enrichment.md  Per-source enrichment jobs (MusicBrainz track/artist/album, Wikipedia, Cover Art Archive, lyrics, Spotify, Last.fm, TheAudioDB, Discogs), DLNA tags, canonical genres: markers, retries, rate limits, library:enrich
+    artist-settings.md      Admin page per artist: photo/backdrop choice, MusicBrainz/Spotify/Last.fm mappings, details overrides, files, default source; the `manual` metadata source
     file-storage.md          Own music files: storage locations (local/S3), files + track_files tables, indexer, organizer, management, /stream, admin API
     lastfm.md                Scrobbling, now-playing, auth flow, artist enrichment, backfill
     library-identity.md      One record per artist/album/track across sources: name keys, find-or-create, library:merge-duplicates
@@ -739,6 +740,7 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 - `/receiver` — full-screen now-playing display; fetches `GET /api/devices`, lets user pick device (or auto-selects if only one); re-fetches `GET /api/devices/{id}` on MQTT push (polling every 3s without a broker) and supports play/pause/next/previous, seek and mute via the REST API. Accepts `?device={id}` query parameter to skip the picker.
 - `/library` — listening hub: hero + Shuffle, section chips, shelves (recently played/added, most played artists, playlists, genres, favourites, discover), library at a glance (see `docs/frontend/library.md`); `/library/favorites`
 - `/artists` — artist library browser
+- `/artists/{id}` — artist page (hero, source switch, popular, albums, similar); `/artists/{id}/settings` (admin) — see `docs/architecture/artist-settings.md`
 - `/albums/{id}` — album detail with track listing
 - `/settings` — overview of listeners, MQTT config
 - `/settings/users` — user management table

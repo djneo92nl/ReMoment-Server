@@ -53,7 +53,7 @@ class SpotifyCatalog
      */
     public function artistAlbums(Artist $artist): array
     {
-        $spotifyId = $artist->metadata()->where('key', 'spotify_id')->value('value') ?: $this->findArtistId($artist);
+        $spotifyId = $artist->metaValue('spotify_id') ?: $this->findArtistId($artist);
 
         return $spotifyId ? $this->albumsOfSpotifyArtist($spotifyId) : [];
     }
