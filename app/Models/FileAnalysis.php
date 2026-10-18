@@ -14,6 +14,8 @@ class FileAnalysis extends Model
         'fingerprint', 'fingerprint_duration', 'acoustid_id', 'acoustid_recording_mbid', 'acoustid_score',
         'bpm', 'key', 'mode', 'key_strength', 'danceability', 'arousal', 'valence', 'instrumental',
         'mood_tags', 'genre_tags', 'waveform',
+        'spectral_cutoff_hz', 'lossless_suspect', 'measured_bit_depth', 'clipped_samples', 'clipping_suspect', 'is_mono',
+        'phase_issue', 'lead_silence_ms', 'trail_silence_ms', 'decode_warnings',
     ];
 
     protected $guarded = ['id'];
@@ -24,6 +26,8 @@ class FileAnalysis extends Model
         'acoustid_score' => 'float', 'bpm' => 'float', 'key_strength' => 'float', 'danceability' => 'float',
         'arousal' => 'float', 'valence' => 'float', 'instrumental' => 'float',
         'mood_tags' => 'array', 'genre_tags' => 'array', 'waveform' => 'array', 'stages' => 'array', 'errors' => 'array',
+        'lossless_suspect' => 'float', 'clipping_suspect' => 'boolean', 'is_mono' => 'boolean', 'phase_issue' => 'boolean',
+        'decode_warnings' => 'array',
     ];
 
     public function file(): BelongsTo

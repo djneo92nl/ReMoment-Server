@@ -51,10 +51,42 @@ class AudioAnalysisTest extends TestCase
             Peak:        -0.5 dBFS
         TXT;
 
+    /** What the whole-file pass of the quality stage prints (stereo, 24 s, lossless, a little clipping, silent start). */
+    private const QUALITY = <<<'TXT'
+        [silencedetect @ 0x1] silence_start: 0
+        [silencedetect @ 0x1] silence_end: 1.5 | silence_duration: 1.5
+        [astats@side @ 0x2] Overall
+        [astats@side @ 0x2] RMS level dB: -24.0
+        [astats@mid @ 0x3] Overall
+        [astats@mid @ 0x3] RMS level dB: -20.5
+        [astats@all @ 0x4] Overall
+        [astats@all @ 0x4] Flat factor: 3.5
+        [astats@all @ 0x4] Peak count: 120.000000
+        [astats@all @ 0x4] Bit depth: 22/24/24/24
+        [astats@all @ 0x4] Number of samples: 1058400
+        [out#0/null @ 0x5] video:0KiB audio:8269KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: unknown
+        TXT;
+
     /** 8 samples of mono PCM: a quiet half and a loud half. */
     private static function pcm(): string
     {
         return pack('s*', 100, -200, 300, -400, 5000, -10000, 20000, -20000);
+    }
+
+    /** Mono float PCM at 44.1 kHz whose spectrum stops at $cutoff Hz: equal sines every 150 Hz up to it. */
+    public static function floats(int $cutoff, int $samples = 24000): string
+    {
+        $freqs = range(150, $cutoff, 150);
+        $pcm = '';
+        for ($i = 0; $i < $samples; $i++) {
+            $sum = 0.0;
+            foreach ($freqs as $k => $f) {
+                $sum += sin(2 * M_PI * $f * $i / 44100 + $k);
+            }
+            $pcm .= pack('g', $sum / count($freqs) * 0.5);
+        }
+
+        return $pcm;
     }
 
     private string $dir;
@@ -82,6 +114,8 @@ class AudioAnalysisTest extends TestCase
                     : Process::result('', self::EBUR128),
                 str_contains($command, 'fpcalc') => Process::result(json_encode(['duration' => 241.3, 'fingerprint' => 'AQADtEmS'])),
                 str_contains($command, 's16le') => Process::result(self::pcm()),
+                str_contains($command, 'filter_complex') => Process::result('', self::QUALITY),
+                str_contains($command, 'f32le') => Process::result(self::floats(16000)),
                 str_contains($command, '-f wav') => Process::result(''),
                 default => Process::result('', "unexpected: {$command}", 1),
             };
@@ -148,8 +182,18 @@ class AudioAnalysisTest extends TestCase
         $this->assertSame('AQADtEmS', $analysis->fingerprint);
         $this->assertSame(241, $analysis->fingerprint_duration);
         $this->assertSame('rec-1', $analysis->acoustid_recording_mbid);
-        $this->assertEqualsCanonicalizing(['loudness', 'waveform', 'fingerprint', 'acoustid'], array_keys($analysis->stages), 'no Essentia sidecar configured');
+        $this->assertEqualsCanonicalizing(['loudness', 'waveform', 'quality', 'fingerprint', 'acoustid'], array_keys($analysis->stages), 'no Essentia sidecar configured');
         $this->assertSame([], $analysis->errors);
+
+        // The quality stage: the whole-file pass and the spectrum of the excerpt (a 16 kHz low-pass in a lossless file).
+        $this->assertSame(120, $analysis->clipped_samples);
+        $this->assertTrue($analysis->clipping_suspect);
+        $this->assertFalse($analysis->is_mono);
+        $this->assertSame(1500, $analysis->lead_silence_ms);
+        $this->assertSame(24, $analysis->measured_bit_depth);
+        $this->assertGreaterThanOrEqual(0.9, $analysis->lossless_suspect);
+        $this->assertGreaterThan(15000, $analysis->spectral_cutoff_hz);
+        $this->assertLessThan(18000, $analysis->spectral_cutoff_hz);
 
         // The recording id becomes the track's mbid, from the source "acoustid".
         $this->assertSame('rec-1', $track->metadata()->where('key', 'mbid')->where('source', 'acoustid')->value('value'));
@@ -168,7 +212,7 @@ class AudioAnalysisTest extends TestCase
 
         $analysis = $file->analysis()->first();
         $this->assertSame([], $analysis->errors, 'no "no fingerprint" error');
-        $this->assertSame(['loudness', 'waveform'], array_keys($analysis->stages));
+        $this->assertSame(['loudness', 'waveform', 'quality'], array_keys($analysis->stages));
     }
 
     public function test_a_weak_acoustid_match_is_no_match(): void
@@ -339,7 +383,7 @@ class AudioAnalysisTest extends TestCase
             ->assertJsonPath('tracks.0.details.analysis.loudness', -9.2);
 
         $this->get("/albums/{$track->album_id}")->assertOk()
-            ->assertSee('124 BPM · A minor · -9.2 LUFS')->assertSee('relaxed')->assertSee('80%')->assertSee('instrumental');
+            ->assertSee('124 BPM · A minor (8A) · -9.2 LUFS')->assertSee('relaxed')->assertSee('80%')->assertSee('instrumental');
 
         $other = Track::create(['artist_id' => $track->artist_id, 'album_id' => $track->album_id, 'name' => 'Unanalysed', 'source' => 'dlna']);
         $this->assertNull($other->sound());

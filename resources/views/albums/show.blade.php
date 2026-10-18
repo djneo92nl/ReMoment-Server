@@ -60,12 +60,19 @@
                         $sound = $track->sound();
                         $soundLine = $sound ? collect([
                             $sound['bpm'] ? round($sound['bpm']).' BPM' : null,
-                            $sound['key'] ? $sound['key'].' '.$sound['mode'] : null,
+                            $sound['key'] ? $sound['key'].' '.$sound['mode'].($sound['camelot'] ? ' ('.$sound['camelot'].')' : '') : null,
                             $sound['loudness'] !== null ? number_format($sound['loudness'], 1).' LUFS' : null,
+                        ])->filter()->implode(' · ') : '';
+                        $signalLine = $sound ? collect([
+                            ($sound['lossless_suspect'] ?? 0) >= 0.5 ? 'Suspected transcode, spectrum ends at '.number_format($sound['spectral_cutoff_hz'] / 1000, 1).' kHz' : null,
+                            ($sound['clipping'] ?? false) ? 'Clipping' : null,
+                            ($sound['mono'] ?? false) ? 'Mono in stereo' : null,
+                            ($sound['phase_issue'] ?? false) ? 'Channels out of phase' : null,
+                            ! empty($sound['decode_warnings']) ? 'Decoder warnings: '.implode('; ', $sound['decode_warnings']) : null,
                         ])->filter()->implode(' · ') : '';
                         $waveform = $track->waveform();
                         $plays = (int) ($track->plays_count ?? 0);
-                        $hasInfo = $waveform || $quality || $credits || $trackGenres || $isrc || $popularity !== null || $listeners || $soundLine !== '' || ($sound && $sound['mood']) || $plays > 0;
+                        $hasInfo = $waveform || $quality || $credits || $trackGenres || $isrc || $popularity !== null || $listeners || $soundLine !== '' || $signalLine !== '' || ($sound && $sound['mood']) || $plays > 0;
                         $removable = auth()->check() && $track->isRemovable();
                         // With a player pinned, a play button only where it can play the track; without one the button opens the player panel.
                         $canPlayHere = $pinned ? ($page->playable[$track->id] ?? false) : \App\Domain\Library\LibraryPlayback::trackPlayable($track);
@@ -160,6 +167,10 @@
                                     @if($soundLine !== '')
                                         <dt class="text-gray-400 dark:text-gray-600">Sound</dt>
                                         <dd class="text-gray-700 dark:text-gray-300">{{ $soundLine }}</dd>
+                                    @endif
+                                    @if($signalLine !== '')
+                                        <dt class="text-gray-400 dark:text-gray-600">Signal</dt>
+                                        <dd class="text-gray-700 dark:text-gray-300">{{ $signalLine }}</dd>
                                     @endif
                                     @if($sound && $sound['danceability'] !== null)
                                         <dt class="text-gray-400 dark:text-gray-600">Danceability</dt>

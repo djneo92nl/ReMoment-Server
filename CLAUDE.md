@@ -93,7 +93,7 @@ php artisan library:scan [--server=192.168.1.20] [--root=Muziek]   # --root: sta
 php artisan library:enrich [--only=metadata --only=artist-images] [--limit=200] [--dry-run]
 
 # Audio analysis of the own files (loudness, fingerprint + AcoustID, BPM/key/mood via the optional Essentia sidecar); needs ANALYSIS_ENABLED=true, runs on the `analysis` queue (scheduled nightly). --now with --file runs inline
-php artisan library:analyze [--limit=100] [--stage=loudness|fingerprint|acoustid|essentia] [--file=ID --now] [--dry-run]
+php artisan library:analyze [--limit=100] [--stage=loudness|waveform|quality|fingerprint|acoustid|essentia] [--file=ID --now] [--dry-run]
 
 # Re-select the tracks of smart (rule-based) playlists (scheduled daily)
 php artisan playlists:refresh-smart [--playlist=ID]

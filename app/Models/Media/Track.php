@@ -276,6 +276,15 @@ class Track extends Model
             'instrumental' => $a->instrumental,
             'mood' => array_column($a->mood_tags ?? [], 'name'),
             'recording_mbid' => $a->acoustid_recording_mbid,
+            'spectral_cutoff_hz' => $a->spectral_cutoff_hz,
+            'lossless_suspect' => $a->lossless_suspect !== null ? round($a->lossless_suspect, 2) : null,
+            'measured_bit_depth' => $a->measured_bit_depth,
+            'clipping' => $a->clipping_suspect,
+            'mono' => $a->is_mono,
+            'phase_issue' => $a->phase_issue,
+            'lead_silence_ms' => $a->lead_silence_ms,
+            'trail_silence_ms' => $a->trail_silence_ms,
+            'decode_warnings' => $a->decode_warnings ?: [],
         ];
     }
 

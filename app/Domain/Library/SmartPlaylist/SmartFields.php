@@ -175,6 +175,21 @@ final class SmartFields
                 })),
                 fn () => Camelot::options()),
 
+            // Quality of the file itself (QualityStage): a hint from the spectrum, so "suspected", never "fake".
+            new SmartField('transcode', 'Suspected transcode', SmartField::BOOL, self::YES_NO,
+                fn (Builder $q, string $op) => self::negatable($q, $op === 'no', fn ($w) => $w->whereExists(
+                    fn ($s) => self::analysis($s)->where('file_analyses.lossless_suspect', '>=', 0.5)
+                ))),
+
+            new SmartField('clipping', 'Clipping', SmartField::BOOL, self::YES_NO,
+                fn (Builder $q, string $op) => self::negatable($q, $op === 'no', fn ($w) => $w->whereExists(
+                    fn ($s) => self::analysis($s)->where('file_analyses.clipping_suspect', true)
+                ))),
+
+            new SmartField('cutoff', 'Spectral cutoff', SmartField::NUMBER, self::ATLEAST_ATMOST,
+                fn (Builder $q, string $op, $v) => $q->whereExists(fn ($s) => self::analysis($s)->whereNotNull('file_analyses.spectral_cutoff_hz')
+                    ->where('file_analyses.spectral_cutoff_hz', self::COMPARE[$op], $v * 1000)), unit: 'kHz'),
+
             new SmartField('musical_key', 'Key', SmartField::SELECT, self::IS,
                 fn (Builder $q, string $op, $v) => self::negatable($q, $op === 'is_not', fn ($w) => $w->whereExists(fn ($s) => self::analysis($s)->where('file_analyses.key', $v))),
                 fn () => array_combine(self::KEYS, self::KEYS)),

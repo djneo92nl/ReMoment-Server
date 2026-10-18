@@ -59,6 +59,9 @@ Computed from the own audio files (`file_analyses` of the track's primary file, 
 | `musical_key`, `mode` | key (C…B) and major / minor |
 | `mood` | one of the classifier moods (happy, sad, aggressive, relaxed, party, acoustic, electronic) |
 | `instrumental` | the classifier says instrumental |
+| `transcode` | a lossless file whose spectrum suggests a lossy source (`lossless_suspect` at least 0.5) |
+| `clipping` | the quality stage found flat, repeated peaks |
+| `cutoff` | where the spectrum ends, in kHz, at least / at most (files with a cliff only) |
 
 ## Scope
 
