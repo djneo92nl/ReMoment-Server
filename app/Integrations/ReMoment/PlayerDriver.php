@@ -8,6 +8,7 @@ use App\Domain\Device\QueueItem;
 use App\Domain\Device\RepeatMode;
 use App\Domain\Storage\StreamUrl;
 use App\Events\Device\PlaybackModesUpdated;
+use App\Integrations\Common\DeviceQueue;
 use App\Integrations\Contracts\LibraryPlaybackInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
@@ -47,12 +48,12 @@ class PlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, 
 
     public function next(): void
     {
-        $this->startTrack(fn (PlayerQueue $queue) => $queue->advance(manual: true));
+        $this->startTrack(fn (DeviceQueue $queue) => $queue->advance(manual: true));
     }
 
     public function previous(): void
     {
-        $this->startTrack(fn (PlayerQueue $queue) => $queue->back());
+        $this->startTrack(fn (DeviceQueue $queue) => $queue->back());
     }
 
     public function seek(int $seconds): void
@@ -62,12 +63,12 @@ class PlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, 
 
     public function skipToQueuePosition(int $position): void
     {
-        $this->startTrack(fn (PlayerQueue $queue) => $queue->jump(max(1, $position)));
+        $this->startTrack(fn (DeviceQueue $queue) => $queue->jump(max(1, $position)));
     }
 
     public function getUpNext(int $limit = 20): array
     {
-        $ids = PlayerQueue::for($this->device->id)->upNext($limit);
+        $ids = DeviceQueue::for($this->device->id)->upNext($limit);
         $tracks = Track::with(['artist', 'album'])->whereIn('id', $ids)->get()->keyBy('id');
 
         return collect($ids)->filter(fn ($id) => $tracks->has($id))->map(function ($id) use ($tracks) {
@@ -86,22 +87,15 @@ class PlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, 
 
     public function setShuffle(bool $shuffle): void
     {
-        $queue = PlayerQueue::for($this->device->id);
-        $queue->shuffle = $shuffle;
-
-        if ($shuffle) {
-            $rest = array_slice($queue->trackIds, $queue->index + 1);
-            shuffle($rest);
-            $queue->trackIds = array_merge(array_slice($queue->trackIds, 0, $queue->index + 1), $rest);
-        }
-
+        $queue = DeviceQueue::for($this->device->id);
+        $queue->setShuffle($shuffle);
         $queue->save($this->device->id);
         $this->reportModes($queue);
     }
 
     public function setRepeat(RepeatMode $mode): void
     {
-        $queue = PlayerQueue::for($this->device->id);
+        $queue = DeviceQueue::for($this->device->id);
         $queue->repeat = $mode->value;
         $queue->save($this->device->id);
         $this->reportModes($queue);
@@ -161,9 +155,8 @@ class PlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, 
             throw new \RuntimeException('No tracks this player can play.');
         }
 
-        $queue = PlayerQueue::for($this->device->id);
-        $queue->trackIds = $playable->pluck('id')->all();
-        $queue->index = 0;
+        $queue = DeviceQueue::for($this->device->id);
+        $queue->replace($playable->pluck('id')->all());
         $queue->save($this->device->id);
 
         $this->playCurrent($queue);
@@ -195,7 +188,7 @@ class PlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, 
     /** Called when the player reports that a track ended: plays the next one, or stops at the end. */
     public function trackEnded(): void
     {
-        $queue = PlayerQueue::for($this->device->id);
+        $queue = DeviceQueue::for($this->device->id);
 
         if ($queue->advance() === null) {
             $queue->save($this->device->id);
@@ -210,7 +203,7 @@ class PlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, 
 
     private function startTrack(\Closure $move): void
     {
-        $queue = PlayerQueue::for($this->device->id);
+        $queue = DeviceQueue::for($this->device->id);
 
         if ($move($queue) === null) {
             $this->send('stop');
@@ -222,7 +215,7 @@ class PlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, 
         $this->playCurrent($queue);
     }
 
-    private function playCurrent(PlayerQueue $queue): void
+    private function playCurrent(DeviceQueue $queue): void
     {
         $track = Track::with(['artist', 'album'])->find($queue->current());
 
@@ -241,7 +234,7 @@ class PlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, 
         ]]);
     }
 
-    private function reportModes(PlayerQueue $queue): void
+    private function reportModes(DeviceQueue $queue): void
     {
         event(new PlaybackModesUpdated(
             deviceId: (string) $this->device->id,

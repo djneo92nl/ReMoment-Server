@@ -1,14 +1,15 @@
 <?php
 
-namespace App\Integrations\ReMoment;
+namespace App\Integrations\Common;
 
 use Illuminate\Support\Facades\Cache;
 
 /**
- * The queue of one ReMoment player. The server owns it; the player only plays the track it is told to.
- * Kept in the cache (a week), so a restart of the player or the server resumes where it was.
+ * The queue of a device that has none of its own (a ReMoment player, a UPnP renderer). The server owns it; the
+ * device only plays the track it is told to. Kept in the cache (a week), so a restart of the device or the
+ * server resumes where it was. The cache key predates the UPnP driver and is kept so stored queues survive.
  */
-class PlayerQueue
+class DeviceQueue
 {
     private const TTL_DAYS = 7;
 
@@ -39,6 +40,25 @@ class PlayerQueue
         ], now()->addDays(self::TTL_DAYS));
     }
 
+    /** @param  int[]  $trackIds */
+    public function replace(array $trackIds): void
+    {
+        $this->trackIds = array_values($trackIds);
+        $this->index = 0;
+    }
+
+    /** Turns shuffle on (the tracks after the current one are shuffled) or off. */
+    public function setShuffle(bool $shuffle): void
+    {
+        $this->shuffle = $shuffle;
+
+        if ($shuffle) {
+            $rest = array_slice($this->trackIds, $this->index + 1);
+            shuffle($rest);
+            $this->trackIds = array_merge(array_slice($this->trackIds, 0, $this->index + 1), $rest);
+        }
+    }
+
     public function current(): ?int
     {
         return $this->trackIds[$this->index] ?? null;
@@ -48,6 +68,20 @@ class PlayerQueue
     public function upNext(int $limit): array
     {
         return array_slice($this->trackIds, $this->index + 1, $limit);
+    }
+
+    /** The track that plays after the current one, without moving to it (null at the end of the queue). */
+    public function peekNext(): ?int
+    {
+        if ($this->repeat === 'one') {
+            return $this->current();
+        }
+
+        if ($this->index + 1 < count($this->trackIds)) {
+            return $this->trackIds[$this->index + 1];
+        }
+
+        return $this->repeat === 'all' ? ($this->trackIds[0] ?? null) : null;
     }
 
     /** Moves to the next track; null at the end of the queue (repeat-all wraps, repeat-one stays). */

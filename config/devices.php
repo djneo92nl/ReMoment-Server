@@ -6,6 +6,8 @@ return [
         \App\Integrations\BangOlufsen\Ase\ConverterDiscovery::class,
         \App\Integrations\Sonos\SonosDiscovery::class,
         \Remoment\MozartDriver\MozartDiscovery::class,
+        // The fallback, last: any other audio MediaRenderer that none of the dedicated drivers claims.
+        \App\Integrations\Upnp\UpnpDiscovery::class,
     ],
 
     // Driver class => its DeviceListenerInterface implementation, run by `php artisan device:listen`.
@@ -16,6 +18,7 @@ return [
         \App\Integrations\Sonos\MusicPlayerDriver::class => \App\Integrations\Sonos\Services\DeviceListener::class,
         \App\Integrations\Spotify\MusicPlayerDriver::class => \App\Integrations\Spotify\Services\DeviceListener::class,
         \Remoment\MozartDriver\MusicPlayerDriver::class => \Remoment\MozartDriver\Services\DeviceListener::class,
+        \App\Integrations\Upnp\MusicPlayerDriver::class => \App\Integrations\Upnp\Services\DeviceListener::class,
     ],
 
     // device_meta keys holding a platform's multiroom peer ID (see MultiRoomInterface::multiRoomMetaKey()).
@@ -115,6 +118,13 @@ return [
         'Sonos Speaker' => [
             'driver_name' => 'Sonos',
             'driver' => \App\Integrations\Sonos\MusicPlayerDriver::class,
+        ],
+    ],
+    // Any UPnP/DLNA MediaRenderer without a dedicated driver; discovered with its own manufacturer and model (see UpnpDiscovery).
+    'UPnP' => [
+        'Generic MediaRenderer' => [
+            'driver_name' => 'UPnP',
+            'driver' => \App\Integrations\Upnp\MusicPlayerDriver::class,
         ],
     ],
 ];

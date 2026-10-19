@@ -28,6 +28,7 @@ docs/
   architecture/
     client-devices.md       DB schema, model, controller, admin UI internals
     device-drivers.md       Driver contracts, existing drivers, guide for adding a new brand
+    upnp-renderer.md        Generic UPnP MediaRenderer fallback driver: server-managed queue, polling listener, discovery precedence, future research (native queues, radio, OpenHome)
     device-discovery.md     Discovery commands, listener startup, device_meta keys
     ase-api-map.md          What the B&O ASE REST API offers beyond the driver (Bluetooth, network, WiSA, sound), per model; the ase:map command
     proxmox-deployment.md   Ansible: LXC container on an existing Proxmox host, MiniDLNA server
@@ -534,6 +535,9 @@ All drivers implement interfaces from `app/Integrations/Contracts/`:
 - Communicates via UPnP SOAP to device IP
 - Library: `duncan3dc/sonos` v3
 - Capabilities: media controls, volume, radio, multiroom, library playback, seek, queue, shuffle, repeat, sources (TV / line-in on soundbars and line-in speakers, by model)
+
+**Generic UPnP MediaRenderer** (`app/Integrations/Upnp/`)
+- Fallback for audio renderers no dedicated driver claims (`DedicatedDrivers`); AVTransport/RenderingControl over SOAP, queue, shuffle, repeat and up next kept by the server (`Common\DeviceQueue`), seek/volume per what the SCPDs list. No multiroom, sources, power or radio. See `docs/architecture/upnp-renderer.md`
 
 **Spotify** (`app/Integrations/Spotify/`)
 - Virtual device — polls Spotify Web API every 3 seconds

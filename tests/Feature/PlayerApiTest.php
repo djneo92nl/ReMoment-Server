@@ -6,8 +6,8 @@ use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
 use App\Domain\Library\LibraryPlayback;
 use App\Events\Device\NowPlayingUpdated;
+use App\Integrations\Common\DeviceQueue;
 use App\Integrations\ReMoment\PlayerDevice;
-use App\Integrations\ReMoment\PlayerQueue;
 use App\Models\Device;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
@@ -75,7 +75,7 @@ class PlayerApiTest extends TestCase
         $this->assertSame($tracks[0]->id, $command['track']['id']);
         $this->assertSame('/stream/'.$tracks[0]->id, $command['track']['url']);
         $this->assertSame([], $command['track']['images']); // the cover is not processed yet; never a remoment:cover pseudo URL
-        $this->assertSame([$tracks[1]->id, $tracks[2]->id], PlayerQueue::for($id)->upNext(10));
+        $this->assertSame([$tracks[1]->id, $tracks[2]->id], DeviceQueue::for($id)->upNext(10));
 
         $tracks[0]->album->update(['images' => [['url' => 'https://img.test/cover.jpg']]]);
         $this->assertSame('https://img.test/cover.jpg', $device->driver->getUpNext(5)[0]->image);

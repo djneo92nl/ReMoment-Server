@@ -71,6 +71,10 @@ Discovery runs through `device:discover` (`MozartDiscovery` is registered under 
 
 Implements media controls, volume, radio, multiroom, library playback, seek, queue (`getUpNext()` reads the Sonos queue after the current track; empty while streaming radio or line-in), shuffle and repeat. Shuffle and repeat share one AVTransport `PlayMode` string (`NORMAL`, `REPEAT_ALL`, `REPEAT_ONE`, `SHUFFLE_NOREPEAT`, `SHUFFLE`, `SHUFFLE_REPEAT_ONE`), mapped by `Sonos\PlayMode` since duncan3dc/sonos has no repeat-one; the listener reads it on every poll. Uses the `duncan3dc/sonos` library (v3) for UPnP/SOAP communication. **Inputs:** `SourcesInterface` / `SourceActivationInterface` (`Connectors/SourceControls`) for soundbars and line-in speakers. `Sonos\SonosInputs` maps the model (`device_product_type`) to its inputs: `tv` for Ray/Beam/Arc/Playbar/Playbase/Amp (optical or HDMI eARC, always one "TV" input), `line_in` for Five/Play:5/Port/Connect/Amp; other models list none. Activating sets the transport URI to the speaker's own stream (`x-sonos-htastream:{uuid}:spdif`, `x-rincon-stream:{uuid}`) and plays; a grouped follower leaves its group first. The listener reports a track-less transport on one of these URIs as a `NowPlaying` with a `Source` (TV / Line-in), so clients get a source logo. Sonos soundbars also switch to TV by themselves when "TV autoplay" is on in the Sonos app.
 
+### Generic UPnP MediaRenderer
+
+**Path:** `app/Integrations/Upnp/`. The fallback for any audio UPnP/DLNA renderer no dedicated driver claims: transport, volume, seek (the last two when the renderer lists them), and a **server-managed queue** (`Common\DeviceQueue`, shared with the ReMoment player) giving library playback, up next, jump, shuffle and repeat. Listener polls once a second and moves the queue on at the end of a track (gapless where the renderer supports `SetNextAVTransportURI`). A dedicated driver always wins at discovery (`DedicatedDrivers`). See [UPnP renderer](upnp-renderer.md), which also lists what is not built and what could be (native queues, radio, OpenHome).
+
 ### Spotify
 
 **Path:** `app/Integrations/Spotify/`
@@ -172,6 +176,7 @@ What the drivers and listeners share instead of each carrying a copy:
 - `App\Integrations\Common\ListenerBackoff` (reconnect pause: 1 s, doubling per failure up to 30 s) and `DeviceCache::markListenerAlive()` / `forgetListener()` (the `listener_running_{id}` heartbeat the UI reads) — all four listeners.
 - `Common\PlaysDlnaLibrary` — `LibraryPlaybackInterface` for ASE and Mozart: the driver implements `startDlna($url)` and `enqueueDlna($url)`. Sonos replaces its queue wholesale and keeps its own.
 - `Common\UpnpMediaRendererDiscovery` — SSDP discovery for ASE and Mozart, each reporting only the models of its `driver_name`.
+- `Common\DeviceQueue` — the server-owned queue of the ReMoment player and the generic UPnP driver; `Common\UpnpSoap` — one UPnP service's SOAP control endpoint (faults become exceptions: the "can't do that" codes `UnsupportedOperationException`).
 - `Cache\Volume::remember()` (cached volume, else read once from the device) and `MultiRoomId::remember()` (peer id cached a week and kept in `device_meta`).
 - `Settings\SoundAdjustment::assertCanSet()` / `AdjustmentRange::assertAccepts()` — the 422 `unsupported` / `invalid` checks of a bass/treble/loudness change.
 - `Capabilities::contractFor($capability)` (the contract behind a capability string) and `DeviceModels` (the brands and models of `config/devices.php`, without its non-brand settings).

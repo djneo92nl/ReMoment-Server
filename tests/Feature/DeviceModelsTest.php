@@ -34,7 +34,7 @@ class DeviceModelsTest extends TestCase
     {
         $groups = (new DeviceDriverManager)->driverGroups();
 
-        $this->assertEqualsCanonicalizing(['ASE', 'Mozart', 'ReMoment Player', 'Spotify', 'Sonos'], array_keys($groups));
+        $this->assertEqualsCanonicalizing(['ASE', 'Mozart', 'ReMoment Player', 'Spotify', 'Sonos', 'UPnP'], array_keys($groups));
         $this->assertTrue($groups['Spotify']['virtual']);
         $this->assertTrue($groups['Sonos']['discoverable']);
     }

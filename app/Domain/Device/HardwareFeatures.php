@@ -2,12 +2,14 @@
 
 namespace App\Domain\Device;
 
+use App\Integrations\Upnp\MusicPlayerDriver as UpnpDriver;
+use App\Integrations\Upnp\UpnpCapabilities;
 use App\Models\Device;
 
 /**
  * What the hardware of a model can do, which a driver can't tell: every ASE
  * speaker answers the WiSA endpoints, but only the Moment has the radio.
- * Declared per model in config/devices.php (`wisa => true`, `speaker =>
+ * (A generic UPnP renderer declares its own at discovery.) Declared per model in config/devices.php (`wisa => true`, `speaker =>
  * 'external'`) and matched on the device's product type.
  */
 final class HardwareFeatures
@@ -21,6 +23,11 @@ final class HardwareFeatures
     /** False only for a hardware-bound capability the device's model doesn't have. */
     public static function allows(Device $device, string $capability): bool
     {
+        // A generic UPnP renderer has what its SCPDs listed (seek, volume), see UpnpCapabilities.
+        if (in_array($capability, UpnpCapabilities::OPTIONAL, true) && is_a($device->device_driver, UpnpDriver::class, true)) {
+            return UpnpCapabilities::has($device, $capability);
+        }
+
         $requires = self::REQUIRES[$capability] ?? null;
 
         return $requires === null || self::has($device, ...$requires);

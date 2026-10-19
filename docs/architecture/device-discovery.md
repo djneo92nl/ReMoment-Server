@@ -13,6 +13,7 @@ One command for every brand. It runs the discoverers registered under `discovere
 A new brand needs a `DiscoveryInterface` implementation in `config('devices.discoverers')`, nothing else.
 
 - **ASE** (`AseDiscovery`) and **Mozart** (`Remoment\MozartDriver\MozartDiscovery`) share `App\Integrations\Common\UpnpMediaRendererDiscovery`: an SSDP M-SEARCH (`SsdpClient`) for `urn:schemas-upnp-org:device:MediaRenderer:1`, then each responder's UPnP XML descriptor is fetched and the driver resolved from `config/devices.php` by manufacturer + model. Each subclass only names its `driver_name` (`ASE` / `Mozart`), so it reports just its own platform's models.
+- **UPnP** (`Upnp\UpnpDiscovery`, registered last): the fallback for every other audio MediaRenderer. A renderer a dedicated driver claims (`DedicatedDrivers::claims()`: its model is listed under another driver, or its manufacturer is a brand in `config/devices.php` that has one) is skipped, as is one whose `upnp_uuid` belongs to a stored device of another driver, one without AVTransport, and one whose `GetProtocolInfo` lists no audio. Brand and product are the renderer's own; control URLs and capabilities go to the meta (`upnp_avtransport_url`, `upnp_renderingcontrol_url`, `upnp_volume_max`, `upnp_capabilities`). `php artisan device:discover --brand=upnp`. See [UPnP renderer](upnp-renderer.md).
 - **Converter** (`ConverterDiscovery`): a BeoLink Converter NL/ML is not a UPnP MediaRenderer and has no multicast announcement the server listens to, so it is found by unicast: `GET http://{ip}:8080/BeoDevice` on every `--host` (and on converters already stored) and kept when `productId.productType` is `BEOLINK_CONVERTER_NL_ML`. Run `php artisan device:discover --brand=converter --host=192.168.1.10`. The meta key is `converter_jid` (`{type}.{item}.{serial}@products.bang-olufsen.com`), deliberately not `ase_jid`, which feeds multiroom peer matching.
 - **Sonos** (`SonosDiscovery`): does not depend on multicast alone. Seeds are the `--host` / "Known device IPs" input, the IPs of Sonos devices already stored, and an SSDP search (`ZonePlayer:1`). The first seed that answers on port 1400 lists the whole household through `ZoneGroupTopology` (`SonosTopology`), so one reachable speaker finds the rest. Stereo-pair secondaries, satellites and Boost bridges are skipped.
 
@@ -57,6 +58,7 @@ Beyond the core `devices` table columns, per-device identifiers are stored in `d
 | Key | Source | Description |
 |-----|--------|-------------|
 | `upnp_uuid` | UPnP/SSDP discovery | Unique device identifier from UPnP |
+| `upnp_location`, `upnp_avtransport_url`, `upnp_renderingcontrol_url`, `upnp_volume_max`, `upnp_capabilities` | Generic UPnP discovery | Descriptor URL, control URLs, volume range, optional capabilities (`seek`, `volume_control`, `gapless`) |
 | `jid` | Mozart mDNS discovery | Jabber ID for B&O Mozart platform devices |
 | `ase_jid` | `MultiRoomInterface::getMultiRoomId()` | B&O JID used for multiroom peer lookup |
 | `sonos_uuid` | `MultiRoomInterface::getMultiRoomId()` | Sonos UUID used for multiroom peer lookup |
