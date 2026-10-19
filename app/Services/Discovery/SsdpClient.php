@@ -77,6 +77,55 @@ class SsdpClient
         return array_values($found);
     }
 
+    /**
+     * M-SEARCH sent straight to one device (unicast, port 1900). Unlike the multicast search this also gets
+     * out of a Docker bridge network: the reply comes back through the NAT entry of the request.
+     *
+     * @return array<int, array{ip: string, location: string, st: string|null, usn: string|null}> one per location
+     */
+    public function searchHost(string $ip, string $st, float $timeout = 2.5): array
+    {
+        $socket = @socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
+        if ($socket === false) {
+            return [];
+        }
+
+        $request = "M-SEARCH * HTTP/1.1\r\n".
+            "HOST: {$ip}:".self::PORT."\r\n".
+            "MAN: \"ssdp:discover\"\r\n".
+            "MX: 1\r\n".
+            "ST: {$st}\r\n".
+            "USER-AGENT: ReMoment/1.0 UPnP/1.1\r\n\r\n";
+
+        $found = [];
+        $start = microtime(true);
+        $pending = [0.0, 0.8];
+
+        while (($elapsed = microtime(true) - $start) < $timeout) {
+            while ($pending !== [] && $elapsed >= $pending[0]) {
+                array_shift($pending);
+                @socket_sendto($socket, $request, strlen($request), 0, $ip, self::PORT);
+            }
+
+            $read = [$socket];
+            $write = $except = [];
+            if (@socket_select($read, $write, $except, 0, 200_000) < 1) {
+                continue;
+            }
+
+            $buf = '';
+            $from = '';
+            $port = 0;
+            if (@socket_recvfrom($socket, $buf, 4096, 0, $from, $port) !== false && ($response = self::parseResponse($buf, $from))) {
+                $found[$response['location']] = $response;
+            }
+        }
+
+        socket_close($socket);
+
+        return array_values($found);
+    }
+
     /** Parse one SSDP response datagram; null when it carries no LOCATION. */
     public static function parseResponse(string $buf, string $from): ?array
     {

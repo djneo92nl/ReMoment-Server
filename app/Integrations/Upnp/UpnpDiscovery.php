@@ -6,7 +6,7 @@ use App\Domain\Device\DedicatedDrivers;
 use App\Domain\Device\DeviceModels;
 use App\Domain\Device\DiscoveredDevice;
 use App\Integrations\Common\UpnpSoap;
-use App\Integrations\Contracts\DiscoveryInterface;
+use App\Integrations\Contracts\HostHintedDiscovery;
 use App\Models\Device;
 use App\Services\Discovery\SsdpClient;
 
@@ -15,16 +15,37 @@ use App\Services\Discovery\SsdpClient;
  * driver claims ({@see DedicatedDrivers}). Registered last under `discoverers`. The renderer's own manufacturer
  * and model are kept as brand and product; the control addresses and what the SCPDs list go to the device's meta.
  */
-class UpnpDiscovery implements DiscoveryInterface
+class UpnpDiscovery implements HostHintedDiscovery
 {
+    private const SEARCH_TARGET = 'urn:schemas-upnp-org:device:MediaRenderer:1';
+
+    /** @var string[] */
+    private array $hosts = [];
+
+    /** @var string[] */
+    private array $diagnostics = [];
+
     public function __construct(private SsdpClient $ssdp) {}
+
+    public function withHosts(array $hosts): static
+    {
+        $this->hosts = array_values(array_unique($hosts));
+
+        return $this;
+    }
+
+    public function diagnostics(): array
+    {
+        return $this->diagnostics;
+    }
 
     public function discover(): array
     {
+        $this->diagnostics = [];
         $definition = DeviceModels::find('UPnP', 'Generic MediaRenderer');
         $discovered = [];
 
-        foreach ($this->ssdp->search('urn:schemas-upnp-org:device:MediaRenderer:1') as $info) {
+        foreach ($this->responders() as $info) {
             $description = DeviceDescription::fetch($info['location']);
 
             if (!$description || !$description->udn || !$this->wanted($description)) {
@@ -43,6 +64,48 @@ class UpnpDiscovery implements DiscoveryInterface
         }
 
         return array_values($discovered);
+    }
+
+    /**
+     * Multicast first; then every given or stored renderer address by unicast, which is the part that works
+     * in a Docker bridge network (multicast does not leave it).
+     *
+     * @return array<string, array{ip: string, location: string, st: string|null, usn: string|null}> by location
+     */
+    private function responders(): array
+    {
+        $responders = [];
+
+        foreach ($this->ssdp->search(self::SEARCH_TARGET) as $info) {
+            $responders[$info['location']] = $info;
+        }
+
+        if ($responders === []) {
+            $this->diagnostics[] = 'No UPnP multicast (SSDP) replies. Normal inside a Docker bridge network: give the renderer\'s IP under "Known device IPs", or run with host networking.';
+        }
+
+        $hosts = array_fill_keys($this->hosts, 'given');
+        foreach (Device::where('device_driver_name', DedicatedDrivers::GENERIC)->whereNotNull('ip_address')->pluck('ip_address') as $ip) {
+            $hosts[$ip] ??= 'stored';
+        }
+
+        foreach ($hosts as $ip => $source) {
+            if (collect($responders)->contains('ip', $ip)) {
+                continue;
+            }
+
+            $answers = $this->ssdp->searchHost($ip, self::SEARCH_TARGET);
+
+            foreach ($answers as $info) {
+                $responders[$info['location']] = $info;
+            }
+
+            if ($answers === []) {
+                $this->diagnostics[] = "{$ip} ({$source}) did not answer a UPnP search on port 1900 (not a MediaRenderer, or it blocks it).";
+            }
+        }
+
+        return $responders;
     }
 
     private function wanted(DeviceDescription $description): bool

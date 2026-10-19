@@ -317,4 +317,23 @@ class UpnpRendererTest extends TestCase
 
         $this->assertSame([], (new UpnpDiscovery($ssdp))->discover());
     }
+
+    public function test_a_given_ip_is_found_by_unicast_when_multicast_gets_nowhere(): void
+    {
+        Http::fake(['*' => Http::response('<root xmlns="urn:schemas-upnp-org:device-1-0"><device><friendlyName>Study</friendlyName><manufacturer>Acme</manufacturer><modelName>Streamer</modelName><UDN>uuid:study</UDN><serviceList><service><serviceType>urn:schemas-upnp-org:service:AVTransport:1</serviceType><controlURL>/av</controlURL></service></serviceList></device></root>')]);
+        $ssdp = $this->partialMock(SsdpClient::class, function ($mock) {
+            $mock->shouldReceive('search')->andReturn([]);
+            $mock->shouldReceive('searchHost')->with('10.0.0.50', 'urn:schemas-upnp-org:device:MediaRenderer:1')->andReturn([['ip' => '10.0.0.50', 'location' => 'http://10.0.0.50:49152/d', 'st' => null, 'usn' => null]]);
+            $mock->shouldReceive('searchHost')->with('10.0.0.51', \Mockery::any())->andReturn([]);
+        });
+
+        $discovery = (new UpnpDiscovery($ssdp))->withHosts(['10.0.0.50', '10.0.0.51']);
+        $found = $discovery->discover();
+
+        $this->assertCount(1, $found);
+        $this->assertSame('10.0.0.50', $found[0]->ip_address);
+        $this->assertSame('http://10.0.0.50:49152/av', $found[0]->meta['upnp_avtransport_url']);
+        $this->assertCount(2, $discovery->diagnostics());
+        $this->assertStringContainsString('10.0.0.51 (given)', $discovery->diagnostics()[1]);
+    }
 }
