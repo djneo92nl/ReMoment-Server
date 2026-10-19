@@ -29,7 +29,8 @@ class SonosDiscovery implements HostHintedDiscovery
 
     public function withHosts(array $hosts): static
     {
-        $this->hosts = array_values(array_unique($hosts));
+        // A descriptor URL is a hint for the UPnP discoverer; Sonos wants addresses.
+        $this->hosts = array_values(array_unique(array_filter($hosts, fn ($h) => filter_var($h, FILTER_VALIDATE_IP))));
 
         return $this;
     }

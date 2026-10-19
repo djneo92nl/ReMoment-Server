@@ -32,7 +32,7 @@ class DiscoverDevices extends Component
         $service = app(NetworkDiscoveryService::class);
         $hosts = array_values(array_filter(
             preg_split('/[\s,;]+/', $this->hosts, -1, PREG_SPLIT_NO_EMPTY),
-            fn ($h) => filter_var($h, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)
+            fn ($h) => filter_var($h, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) || preg_match('#^https?://[^/\s]+#i', $h)
         ));
         $discovered = $service->discover(hosts: $hosts);
         $this->diagnostics = $service->diagnostics;

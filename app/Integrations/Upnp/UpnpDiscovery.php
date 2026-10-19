@@ -17,7 +17,8 @@ use App\Services\Discovery\SsdpClient;
  */
 class UpnpDiscovery implements HostHintedDiscovery
 {
-    private const SEARCH_TARGET = 'urn:schemas-upnp-org:device:MediaRenderer:1';
+    /** Some renderers (Philips TVs) announce only their services, never the device type. */
+    private const SEARCH_TARGETS = [RendererSetup::MEDIA_RENDERER, RendererSetup::AV_TRANSPORT];
 
     /** @var string[] */
     private array $hosts = [];
@@ -59,7 +60,7 @@ class UpnpDiscovery implements HostHintedDiscovery
                 device_product_type: $description->modelName ?? 'MediaRenderer',
                 device_driver: $definition['driver'] ?? MusicPlayerDriver::class,
                 device_driver_name: DedicatedDrivers::GENERIC,
-                meta: $this->meta($description),
+                meta: RendererSetup::meta($description),
             );
         }
 
@@ -76,12 +77,14 @@ class UpnpDiscovery implements HostHintedDiscovery
     {
         $responders = [];
 
-        foreach ($this->ssdp->search(self::SEARCH_TARGET) as $info) {
-            $responders[$info['location']] = $info;
+        foreach (self::SEARCH_TARGETS as $target) {
+            foreach ($this->ssdp->search($target) as $info) {
+                $responders[$info['location']] ??= $info;
+            }
         }
 
         if ($responders === []) {
-            $this->diagnostics[] = 'No UPnP multicast (SSDP) replies. Normal inside a Docker bridge network: give the renderer\'s IP under "Known device IPs", or run with host networking.';
+            $this->diagnostics[] = 'No UPnP multicast (SSDP) replies. Normal inside a Docker bridge network: give the renderer\'s IP (or the URL of its description) under "Known device IPs", or run with host networking.';
         }
 
         $hosts = array_fill_keys($this->hosts, 'given');
@@ -89,19 +92,33 @@ class UpnpDiscovery implements HostHintedDiscovery
             $hosts[$ip] ??= 'stored';
         }
 
-        foreach ($hosts as $ip => $source) {
-            if (collect($responders)->contains('ip', $ip)) {
+        foreach ($hosts as $host => $source) {
+            // The URL of the renderer's description: no search needed (and the only way to a renderer that answers multicast only).
+            if (preg_match('#^https?://#i', $host)) {
+                $responders[$host] ??= ['ip' => (string) parse_url($host, PHP_URL_HOST), 'location' => $host, 'st' => null, 'usn' => null];
+
                 continue;
             }
 
-            $answers = $this->ssdp->searchHost($ip, self::SEARCH_TARGET);
+            if (collect($responders)->contains('ip', $host)) {
+                continue;
+            }
+
+            $answers = [];
+            foreach (self::SEARCH_TARGETS as $target) {
+                $answers = $this->ssdp->searchHost($host, $target);
+
+                if ($answers !== []) {
+                    break;
+                }
+            }
 
             foreach ($answers as $info) {
                 $responders[$info['location']] = $info;
             }
 
             if ($answers === []) {
-                $this->diagnostics[] = "{$ip} ({$source}) did not answer a UPnP search on port 1900 (not a MediaRenderer, or it blocks it).";
+                $this->diagnostics[] = "{$host} ({$source}) did not answer a UPnP search on port 1900. Some renderers answer multicast only: give the URL of its description instead (e.g. http://{$host}:49153/description.xml).";
             }
         }
 
@@ -142,22 +159,5 @@ class UpnpDiscovery implements HostHintedDiscovery
         }
 
         return $sink === '' || stripos($sink, 'audio/') !== false;
-    }
-
-    /** @return array<string, string> */
-    private function meta(DeviceDescription $description): array
-    {
-        $transportActions = $description->actions(DeviceDescription::AV_TRANSPORT);
-        $renderingControl = $description->controlUrl(DeviceDescription::RENDERING_CONTROL);
-        $renderingActions = $renderingControl ? $description->actions(DeviceDescription::RENDERING_CONTROL) : [];
-
-        return array_filter([
-            'upnp_uuid' => $description->udn,
-            'upnp_location' => $description->location,
-            'upnp_avtransport_url' => $description->controlUrl(DeviceDescription::AV_TRANSPORT),
-            'upnp_renderingcontrol_url' => $renderingControl,
-            'upnp_volume_max' => (string) ($description->volumeMax() ?? 100),
-            'upnp_capabilities' => json_encode(UpnpCapabilities::fromActions($transportActions, $renderingActions)),
-        ], fn ($value) => $value !== null);
     }
 }

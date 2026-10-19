@@ -36,7 +36,7 @@ UPnP has no usable queue, so the server owns it: `Common\DeviceQueue` (track ids
 2. skipped when a stored device of another driver has the same `upnp_uuid` (never take over);
 3. skipped without AVTransport, or when `ConnectionManager.GetProtocolInfo` lists no `audio/*` sink (TVs, video renderers); a renderer that does not answer is let through.
 
-The renderer's own manufacturer and model become the device's brand and product; the driver is set explicitly. `config/devices.php` also has `UPnP / Generic MediaRenderer` so the manual form works, but a device needs its control URLs: run `php artisan device:discover --brand=upnp`.
+The renderer's own manufacturer and model become the device's brand and product; the driver is set explicitly. `config/devices.php` also has `UPnP / Generic MediaRenderer` so the manual form works. A device added by hand has no control URLs yet: on first use `RendererSetup::ensure()` finds the renderer at its IP by a unicast search (MediaRenderer, then `upnp:rootdevice`), reads its descriptor and stores the same meta discovery would (the audio-sink filter is not applied: you chose the device). If nothing answers, the listener reports the device unreachable and logs why.
 
 ## Not built yet / future research
 

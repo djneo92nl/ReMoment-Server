@@ -19,8 +19,14 @@ class Renderer
         $meta = fn (string $key) => $device->meta()->where('key', $key)->value('value');
 
         $transport = $meta('upnp_avtransport_url');
+
+        // Added by hand: find the renderer at its IP now (it is stored, so this happens once).
+        if (!$transport && RendererSetup::ensure($device)) {
+            $transport = $meta('upnp_avtransport_url');
+        }
+
         if (!$transport) {
-            throw new \RuntimeException('This renderer has no known control address: run device:discover --brand=upnp.');
+            throw new \RuntimeException("Nothing at {$device->ip_address} answers as a UPnP MediaRenderer (no reply to a search on port 1900).");
         }
 
         $rendering = $meta('upnp_renderingcontrol_url');

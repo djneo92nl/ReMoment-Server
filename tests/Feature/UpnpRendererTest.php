@@ -336,4 +336,24 @@ class UpnpRendererTest extends TestCase
         $this->assertCount(2, $discovery->diagnostics());
         $this->assertStringContainsString('10.0.0.51 (given)', $discovery->diagnostics()[1]);
     }
+
+    public function test_a_device_added_by_hand_finds_its_control_urls_on_first_use(): void
+    {
+        $device = Device::factory()->driver(MusicPlayerDriver::class, 'UPnP')->create(['ip_address' => '10.0.0.60', 'device_brand_name' => 'UPnP', 'device_product_type' => 'Generic MediaRenderer']);
+        $descriptor = '<root xmlns="urn:schemas-upnp-org:device-1-0"><device><friendlyName>TV</friendlyName><manufacturer>Acme</manufacturer><modelName>TV</modelName><UDN>uuid:tv</UDN><serviceList><service><serviceType>urn:schemas-upnp-org:service:AVTransport:1</serviceType><controlURL>/av</controlURL></service></serviceList></device></root>';
+        Http::fake(['http://10.0.0.60:7676/d' => Http::response($descriptor), '*' => Http::response($this->envelope('GetTransportInfo', ['CurrentTransportState' => 'STOPPED']))]);
+        $this->partialMock(SsdpClient::class, fn ($mock) => $mock->shouldReceive('searchHost')->andReturn([['ip' => '10.0.0.60', 'location' => 'http://10.0.0.60:7676/d', 'st' => null, 'usn' => null]]));
+
+        $this->assertSame('STOPPED', $device->driver->renderer()->transportState());
+        $this->assertSame('http://10.0.0.60:7676/av', $device->meta()->where('key', 'upnp_avtransport_url')->value('value'));
+    }
+
+    public function test_a_device_nothing_answers_for_says_so(): void
+    {
+        $device = Device::factory()->driver(MusicPlayerDriver::class, 'UPnP')->create(['ip_address' => '10.0.0.61']);
+        $this->partialMock(SsdpClient::class, fn ($mock) => $mock->shouldReceive('searchHost')->andReturn([]));
+
+        $this->expectExceptionMessage('Nothing at 10.0.0.61 answers as a UPnP MediaRenderer');
+        $device->driver->renderer();
+    }
 }
