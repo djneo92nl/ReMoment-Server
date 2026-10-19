@@ -16,7 +16,7 @@ use Illuminate\Http\Request;
  */
 class StreamController extends Controller
 {
-    public function show(Request $request, Track $track)
+    public function show(Request $request, Track $track, ?string $extension = null)
     {
         $file = $this->fileFor($track, $request->query('profile'));
         abort_if($file === null, 404);
@@ -24,7 +24,13 @@ class StreamController extends Controller
         $store = new FileStore($file->location);
         abort_unless($store->exists($file->path), 404);
 
-        $headers = ['Content-Type' => $file->mime_type ?: 'application/octet-stream', 'Accept-Ranges' => 'bytes'];
+        // The DLNA headers are what a DLNA renderer expects of a media server: a byte-seekable stream, not a live one.
+        $headers = [
+            'Content-Type' => $file->mime_type ?: 'application/octet-stream',
+            'Accept-Ranges' => 'bytes',
+            'transferMode.dlna.org' => 'Streaming',
+            'contentFeatures.dlna.org' => 'DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000',
+        ];
 
         if ($file->location->isLocal()) {
             return response()->file($store->disk()->path($file->path), $headers);

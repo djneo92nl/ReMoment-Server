@@ -117,6 +117,22 @@ class LocalLibraryScanTest extends TestCase
             ->assertStatus(206)->assertHeader('Content-Range', 'bytes 0-9/'.(44 + 8000));
     }
 
+    public function test_stream_answers_with_dlna_headers_and_under_an_address_with_the_file_extension(): void
+    {
+        $library = $this->location('library', 'library');
+        file_put_contents($this->base.'/library/one.wav', $this->wav());
+        app(LocalLibraryScanner::class)->scan($library);
+        $track = Track::firstOrFail();
+
+        $this->get('/stream/'.$track->id)
+            ->assertOk()
+            ->assertHeader('transferMode.dlna.org', 'Streaming')
+            ->assertHeader('contentFeatures.dlna.org');
+        $this->get('/stream/'.$track->id.'.wav', ['Range' => 'bytes=0-9'])->assertStatus(206);
+        $this->assertSame($track->id, \App\Domain\Storage\StreamUrl::trackId(\App\Domain\Storage\StreamUrl::withExtension($track->id, 'WAV')));
+        $this->assertStringEndsWith('/stream/'.$track->id.'.wav', \App\Domain\Storage\StreamUrl::withExtension($track->id, 'WAV'));
+    }
+
     public function test_stream_prefers_the_requested_proxy_and_falls_back_to_the_original(): void
     {
         $library = $this->location('library', 'library');

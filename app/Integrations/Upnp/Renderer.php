@@ -8,6 +8,9 @@ use App\Models\Device;
 /** The AVTransport / RenderingControl calls of one renderer; the driver and the listener both speak through it. */
 class Renderer
 {
+    /** A TV that has to open its media player first (Philips) answers the first load or play only after several seconds. */
+    private const WAKE_SECONDS = 30;
+
     public function __construct(
         private readonly UpnpSoap $transport,
         private readonly ?UpnpSoap $rendering = null,
@@ -59,7 +62,7 @@ class Renderer
 
     public function setUri(string $url, string $didl): void
     {
-        $this->transport->call('SetAVTransportURI', ['InstanceID' => 0, 'CurrentURI' => $url, 'CurrentURIMetaData' => $didl]);
+        $this->transport->call('SetAVTransportURI', ['InstanceID' => 0, 'CurrentURI' => $url, 'CurrentURIMetaData' => $didl], self::WAKE_SECONDS);
     }
 
     public function setNextUri(string $url, string $didl): void
@@ -69,7 +72,7 @@ class Renderer
 
     public function play(): void
     {
-        $this->transport->call('Play', ['InstanceID' => 0, 'Speed' => 1]);
+        $this->transport->call('Play', ['InstanceID' => 0, 'Speed' => 1], self::WAKE_SECONDS);
     }
 
     public function pause(): void

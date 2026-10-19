@@ -29,7 +29,7 @@ Albums indexed before this existed, or retagged since, are filled by `php artisa
 
 ## Streaming
 
-`GET /stream/{track}` (unauthenticated, like the REST API) sends the track's primary original, or with `?profile=low` the proxy of that profile, falling back to the original. Local files get range support (seek). Remote files are redirected to a 30-minute temporary URL when the disk can sign one (S3), else streamed through the server. Missing files give `404`. Not tested yet on real speakers: whether Sonos/ASE follow the redirect.
+`GET /stream/{track}` (unauthenticated, like the REST API) sends the track's primary original, or with `?profile=low` the proxy of that profile, falling back to the original. Local files get range support (seek). Remote files are redirected to a 30-minute temporary URL when the disk can sign one (S3), else streamed through the server. Missing files give `404`. The response carries the DLNA headers a DLNA renderer expects (`transferMode.dlna.org: Streaming`, `contentFeatures.dlna.org` with byte-range seeking), and `/stream/{track}.{extension}` (e.g. `/stream/12.flac`) is the same endpoint under an address with the file extension, which renderers such as TVs use to decide the format; the generic UPnP driver hands renderers that form (`StreamUrl::withExtension()`). Not tested yet on real speakers: whether Sonos/ASE follow the redirect.
 
 ## Queued tasks and the settings page
 

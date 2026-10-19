@@ -19,7 +19,17 @@ use App\Http\Controllers\StreamController;
 use Illuminate\Support\Facades\Route;
 
 // Speakers pull audio here: no session, cookies or CSRF (every request would write a session row), only route binding.
-Route::get('/stream/{track}', [StreamController::class, 'show'])->name('stream')->withoutMiddleware([
+Route::get('/stream/{track}', [StreamController::class, 'show'])->where('track', '[0-9]+')->name('stream')->withoutMiddleware([
+    \Illuminate\Cookie\Middleware\EncryptCookies::class,
+    \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+    \Illuminate\Session\Middleware\StartSession::class,
+    \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+    \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
+    \App\Http\Middleware\RedirectToSetupWizard::class,
+]);
+
+// The same with a file extension (/stream/12.flac): renderers such as TVs decide the format from it.
+Route::get('/stream/{track}.{extension}', [StreamController::class, 'show'])->where(['track' => '[0-9]+', 'extension' => '[A-Za-z0-9]+'])->name('stream.file')->withoutMiddleware([
     \Illuminate\Cookie\Middleware\EncryptCookies::class,
     \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
     \Illuminate\Session\Middleware\StartSession::class,

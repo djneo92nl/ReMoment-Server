@@ -163,6 +163,21 @@ class UpnpRendererTest extends TestCase
         $this->assertSame(['two', 'three'], array_map(fn ($item) => $item->name, $device->driver->getUpNext()));
     }
 
+    public function test_our_own_stream_is_handed_to_the_renderer_with_the_file_extension(): void
+    {
+        $this->fakeRenderer();
+        $device = $this->device();
+        $track = $this->track('own', \App\Domain\Storage\StreamUrl::for(0));
+        Metadata::where('metadatable_id', $track->id)->update(['value' => \App\Domain\Storage\StreamUrl::for($track->id)]);
+        $location = \App\Models\StorageLocation::create(['name' => 'lib', 'driver' => 'local', 'role' => 'library', 'config' => ['root' => '/tmp/lib']]);
+        $file = \App\Models\File::forceCreate(['storage_location_id' => $location->id, 'path' => 'a.flac', 'path_hash' => 'h', 'hash' => 'h', 'size' => 1, 'mtime' => 1, 'mime_type' => 'audio/flac', 'extension' => 'flac', 'status' => 'present']);
+        \App\Models\TrackFile::forceCreate(['track_id' => $track->id, 'file_id' => $file->id, 'role' => 'original', 'is_primary' => true]);
+
+        $device->driver->playLibraryTrack($track->fresh());
+
+        Http::assertSent(fn (Request $r) => str_contains($r->body(), '/stream/'.$track->id.'.flac</CurrentURI>'));
+    }
+
     public function test_next_previous_and_jump_move_the_server_queue(): void
     {
         $this->fakeRenderer();

@@ -23,9 +23,10 @@ class UpnpSoap
 
     /**
      * @param  array<string, scalar>  $arguments  in the order the action defines them
+     * @param  ?int  $timeout  seconds to wait for the answer; the constructor's by default
      * @return array<string, string>
      */
-    public function call(string $action, array $arguments = []): array
+    public function call(string $action, array $arguments = [], ?int $timeout = null): array
     {
         $body = '';
         foreach ($arguments as $name => $value) {
@@ -36,7 +37,7 @@ class UpnpSoap
             .'<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">'
             ."<s:Body><u:{$action} xmlns:u=\"{$this->serviceType}\">{$body}</u:{$action}></s:Body></s:Envelope>";
 
-        $response = Http::timeout($this->timeout)
+        $response = Http::timeout($timeout ?? $this->timeout)
             ->withHeaders(['SOAPAction' => "\"{$this->serviceType}#{$action}\""])
             ->withBody($envelope, 'text/xml; charset="utf-8"')
             ->post($this->controlUrl);

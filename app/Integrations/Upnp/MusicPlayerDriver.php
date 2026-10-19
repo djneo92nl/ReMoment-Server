@@ -114,7 +114,7 @@ class MusicPlayerDriver implements DeviceInfoInterface, LibraryPlaybackInterface
                 album: $track->album?->name,
                 image: PlayerDevice::cover($track),
                 duration: $track->duration,
-                uri: $track->getDlnaUrl(),
+                uri: $this->urlFor($track),
             );
         })->values()->all();
     }
@@ -247,7 +247,7 @@ class MusicPlayerDriver implements DeviceInfoInterface, LibraryPlaybackInterface
         $queue = DeviceQueue::for($this->device->id);
         $id = $queue->peekNext();
         $track = $id ? Track::with(['artist', 'album'])->find($id) : null;
-        $url = $track?->getDlnaUrl();
+        $url = $track ? $this->urlFor($track) : null;
 
         if (!$track || !$url) {
             return;
@@ -309,7 +309,7 @@ class MusicPlayerDriver implements DeviceInfoInterface, LibraryPlaybackInterface
     private function playCurrent(DeviceQueue $queue): void
     {
         $track = Track::with(['artist', 'album'])->find($queue->current());
-        $url = $track?->getDlnaUrl();
+        $url = $track ? $this->urlFor($track) : null;
 
         if (!$track || !$url) {
             throw new \RuntimeException('The queue has no playable track.');
@@ -319,6 +319,18 @@ class MusicPlayerDriver implements DeviceInfoInterface, LibraryPlaybackInterface
         $this->renderer()->setUri($url, $this->didl($track, $url));
         $this->renderer()->play();
         Cache::put(self::playingKey($this->device->id), ['track_id' => $track->id, 'uri' => $url], now()->addDay());
+    }
+
+    /** The URL the renderer gets: our own stream with the file's extension, any other (a DLNA server's) as it is. */
+    private function urlFor(Track $track): ?string
+    {
+        $url = $track->getDlnaUrl();
+
+        if ($url === null || ($id = StreamUrl::trackId($url)) === null) {
+            return $url;
+        }
+
+        return StreamUrl::withExtension($id, $track->trackFiles()->with('file')->get()->pluck('file.extension')->filter()->first());
     }
 
     private function didl(Track $track, string $url): string

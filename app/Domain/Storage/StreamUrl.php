@@ -20,6 +20,12 @@ class StreamUrl
         return self::base().'/stream/'.$trackId;
     }
 
+    /** The address with the file's extension (`/stream/12.flac`), for renderers that decide the format from it. */
+    public static function withExtension(int $trackId, ?string $extension): string
+    {
+        return self::for($trackId).($extension ? '.'.strtolower(ltrim($extension, '.')) : '');
+    }
+
     /** A `/storage/...` file (artwork) of this server as the speaker reaches it; null for anything else. */
     public static function storage(string $url): ?string
     {
@@ -31,6 +37,6 @@ class StreamUrl
     /** The track id when $url is one of our stream URLs, whatever host it was built with. */
     public static function trackId(string $url): ?int
     {
-        return preg_match('#^https?://[^/]+/stream/(\d+)(?:\?.*)?$#', $url, $m) ? (int) $m[1] : null;
+        return preg_match('#^https?://[^/]+/stream/(\d+)(?:\.[A-Za-z0-9]+)?(?:\?.*)?$#', $url, $m) ? (int) $m[1] : null;
     }
 }
