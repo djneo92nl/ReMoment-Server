@@ -61,7 +61,10 @@ class DeviceListener implements DeviceListenerInterface
 
     private int $nextVolumeCheck = 0;
 
-    public function __construct(private readonly Device $device, private ?Renderer $renderer = null) {}
+    /** True while the renderer holds nothing playing (a subclass reports what else the device does then). */
+    protected bool $transportIdle = true;
+
+    public function __construct(protected readonly Device $device, private ?Renderer $renderer = null) {}
 
     public static function forDevice(Device $device): ?static
     {
@@ -116,6 +119,7 @@ class DeviceListener implements DeviceListenerInterface
             return;
         }
 
+        $this->transportIdle = false;
         $this->followQueue($id, $position['uri']);
 
         $nowPlaying = $this->nowPlaying($id, $position);
@@ -149,6 +153,7 @@ class DeviceListener implements DeviceListenerInterface
     private function stopped(string $deviceId): void
     {
         $id = (int) $deviceId;
+        $this->transportIdle = true;
 
         if ($this->lastNowPlayingKey !== null) {
             $this->lastNowPlayingKey = null;

@@ -28,6 +28,7 @@ docs/
   architecture/
     client-devices.md       DB schema, model, controller, admin UI internals
     device-drivers.md       Driver contracts, existing drivers, guide for adding a new brand
+    philips-tv.md           Philips Android TV on top of the UPnP driver (Jointspace v6): pairing command, standby, apps as sources, active app as now playing; what is unverified
     upnp-renderer.md        Generic UPnP MediaRenderer fallback driver: server-managed queue, polling listener, discovery precedence, future research (native queues, radio, OpenHome)
     device-discovery.md     Discovery commands, listener startup, device_meta keys
     ase-api-map.md          What the B&O ASE REST API offers beyond the driver (Bluetooth, network, WiSA, sound), per model; the ase:map command
@@ -538,6 +539,9 @@ All drivers implement interfaces from `app/Integrations/Contracts/`:
 
 **Generic UPnP MediaRenderer** (`app/Integrations/Upnp/`)
 - Fallback for audio renderers no dedicated driver claims (`DedicatedDrivers`); AVTransport/RenderingControl over SOAP, queue, shuffle, repeat and up next kept by the server (`Common\DeviceQueue`), seek/volume per what the SCPDs list. No multiroom, sources, power or radio. See `docs/architecture/upnp-renderer.md`
+
+**Philips Android TV** (`app/Integrations/Philips/`)
+- `VideoPlayerDriver` extends the UPnP driver for a TV paired with `php artisan philips:pair {id}`: standby (no wake), apps as sources, the app in front as now playing. Opt-in; an unpaired Philips TV stays generic UPnP. See `docs/architecture/philips-tv.md`
 
 **Spotify** (`app/Integrations/Spotify/`)
 - Virtual device — polls Spotify Web API every 3 seconds

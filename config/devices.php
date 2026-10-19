@@ -19,6 +19,7 @@ return [
         \App\Integrations\Spotify\MusicPlayerDriver::class => \App\Integrations\Spotify\Services\DeviceListener::class,
         \Remoment\MozartDriver\MusicPlayerDriver::class => \Remoment\MozartDriver\Services\DeviceListener::class,
         \App\Integrations\Upnp\MusicPlayerDriver::class => \App\Integrations\Upnp\Services\DeviceListener::class,
+        \App\Integrations\Philips\VideoPlayerDriver::class => \App\Integrations\Philips\Services\DeviceListener::class,
     ],
 
     // device_meta keys holding a platform's multiroom peer ID (see MultiRoomInterface::multiRoomMetaKey()).
@@ -125,6 +126,15 @@ return [
         'Generic MediaRenderer' => [
             'driver_name' => 'UPnP',
             'driver' => \App\Integrations\Upnp\MusicPlayerDriver::class,
+        ],
+    ],
+    // A Philips Android TV paired with `php artisan philips:pair` (see Philips\Pairing): the UPnP driver plus standby, apps and
+    // the active app. Opt-in: an unpaired Philips TV stays a generic UPnP renderer, so this is not listed under a brand
+    // that discovery would claim a Philips renderer for.
+    'Philips TV' => [
+        'Android TV' => [
+            'driver_name' => 'Philips',
+            'driver' => \App\Integrations\Philips\VideoPlayerDriver::class,
         ],
     ],
 ];

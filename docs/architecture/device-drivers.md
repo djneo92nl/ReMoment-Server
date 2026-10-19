@@ -75,6 +75,10 @@ Implements media controls, volume, radio, multiroom, library playback, seek, que
 
 **Path:** `app/Integrations/Upnp/`. The fallback for any audio UPnP/DLNA renderer no dedicated driver claims: transport, volume, seek (the last two when the renderer lists them), and a **server-managed queue** (`Common\DeviceQueue`, shared with the ReMoment player) giving library playback, up next, jump, shuffle and repeat. Listener polls once a second and moves the queue on at the end of a track (gapless where the renderer supports `SetNextAVTransportURI`). A dedicated driver always wins at discovery (`DedicatedDrivers`). See [UPnP renderer](upnp-renderer.md), which also lists what is not built and what could be (native queues, radio, OpenHome).
 
+### Philips Android TV (Jointspace)
+
+**Path:** `app/Integrations/Philips/`. `VideoPlayerDriver` extends the generic UPnP driver for a **paired** Philips Android TV (`php artisan philips:pair {id}`): playback, queue, volume and seek over UPnP, plus `PowerInterface` (standby only), `SourcesInterface` / `SourceActivationInterface` (the TV's apps) and the app in front reported as the playing source. See [Philips TV](philips-tv.md).
+
 ### Spotify
 
 **Path:** `app/Integrations/Spotify/`
