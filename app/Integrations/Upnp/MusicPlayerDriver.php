@@ -316,8 +316,19 @@ class MusicPlayerDriver implements DeviceInfoInterface, LibraryPlaybackInterface
         }
 
         Cache::forget(self::nextKey($this->device->id));
+
+        // After a track has played, a Philips TV answers the next SetAVTransportURI with error 705 until it is
+        // stopped. A stop is harmless to the others; it is ours, so the listener does not read it as a track ending.
+        Cache::put(self::stoppedKey($this->device->id), true, self::STOPPED_BY_US_SECONDS);
+        try {
+            $this->renderer()->stop();
+        } catch (\Throwable) {
+            // Nothing to stop (NO_MEDIA_PRESENT) is not an error worth stopping the track for.
+        }
+
         $this->renderer()->setUri($url, $this->didl($track, $url));
         $this->renderer()->play();
+        Cache::forget(self::stoppedKey($this->device->id));
         Cache::put(self::playingKey($this->device->id), ['track_id' => $track->id, 'uri' => $url], now()->addDay());
     }
 

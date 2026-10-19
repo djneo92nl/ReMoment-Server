@@ -157,7 +157,7 @@ class UpnpRendererTest extends TestCase
 
         $device->driver->playLibraryTracks(collect($tracks));
 
-        $this->assertSame(['SetAVTransportURI', 'Play'], $this->sent());
+        $this->assertSame(['Stop', 'SetAVTransportURI', 'Play'], $this->sent());
         Http::assertSent(fn (Request $r) => str_contains($r->body(), 'http://dlna.test/one.flac') && str_contains($r->body(), 'DIDL-Lite'));
         $this->assertSame([$tracks[1]->id, $tracks[2]->id], DeviceQueue::for($device->id)->upNext(10));
         $this->assertSame(['two', 'three'], array_map(fn ($item) => $item->name, $device->driver->getUpNext()));
