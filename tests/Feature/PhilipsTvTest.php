@@ -132,7 +132,7 @@ class PhilipsTvTest extends TestCase
 
     public function test_while_upnp_is_idle_the_app_in_front_is_reported_as_the_playing_source(): void
     {
-        Event::fake([NowPlayingUpdated::class, NowPlayingEnded::class]);
+        Event::fake([NowPlayingUpdated::class, NowPlayingEnded::class, \App\Events\Device\DeviceStateChanged::class]);
         $package = 'com.netflix.ninja';
         Http::fake(function (Request $r) use (&$package) {
             if (str_ends_with($r->url(), 'applications')) {
@@ -154,6 +154,13 @@ class PhilipsTvTest extends TestCase
 
         Event::assertDispatched(NowPlayingUpdated::class, fn ($e) => $e->nowPlaying->source?->name === 'Netflix' && $e->nowPlaying->source->category === 'video');
         $this->assertSame(State::Playing, DeviceCache::getState($device->id));
+
+        // Polling again with the app still in front keeps it playing, with no standby in between.
+        $changes = Event::dispatched(\App\Events\Device\DeviceStateChanged::class)->count();
+        $this->travel(5)->seconds();
+        $listener->poll((string) $device->id);
+        $this->assertSame(State::Playing, DeviceCache::getState($device->id));
+        Event::assertDispatchedTimes(\App\Events\Device\DeviceStateChanged::class, $changes);
 
         // Back in the TV's launcher: nothing plays any more.
         $package = 'com.google.android.tvlauncher';

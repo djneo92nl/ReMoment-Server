@@ -149,6 +149,12 @@ class DeviceListener implements DeviceListenerInterface
         $this->preloadWhenNearEnd($id);
     }
 
+    /** The state while the renderer holds nothing playing; a subclass that sees the device doing something else says so. */
+    protected function idleState(): State
+    {
+        return State::Standby;
+    }
+
     /** The renderer holds nothing playing: a track that ended starts the next, anything else ends the now-playing. */
     private function stopped(string $deviceId): void
     {
@@ -181,7 +187,7 @@ class DeviceListener implements DeviceListenerInterface
 
         $this->lastPosition = $this->lastDuration = null;
         $this->wasPlaying = false;
-        DeviceCache::updateState($id, State::Standby);
+        DeviceCache::updateState($id, $this->idleState());
     }
 
     /** Did the track just before the stop play to its end? Without a known duration: it was playing, and we did not stop it. */

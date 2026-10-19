@@ -44,6 +44,12 @@ class DeviceListener extends UpnpListener
         $this->reportActivity($deviceId);
     }
 
+    /** An app in front is the TV playing, whatever the UPnP side holds: no flapping between the two each poll. */
+    protected function idleState(): State
+    {
+        return $this->activePackage !== null ? State::Playing : State::Standby;
+    }
+
     private function reportActivity(string $deviceId): void
     {
         /** @var VideoPlayerDriver $driver */

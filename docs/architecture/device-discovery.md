@@ -34,7 +34,7 @@ One supervisor process boots the application once and **forks one child per devi
 The supervisor:
 
 - restarts a child that exits, with a delay that doubles from 1 s to 30 s while it keeps failing;
-- every `--rescan` seconds (default 15) starts listeners for devices added since, stops those of deleted devices, and restarts one whose IP changed, so adding a device or connecting Spotify needs no restart;
+- every `--rescan` seconds (default 15) starts listeners for devices added since, stops those of deleted devices, and restarts one whose IP or driver changed (a TV paired with `philips:pair` switches driver), so adding a device or connecting Spotify needs no restart;
 - on SIGINT/SIGTERM signals all children at once and gives them 5 s before SIGKILL (a child blocked in a network call only sees the signal when the call returns).
 
 Run it under process management in production; it runs until interrupted (Ctrl+C).

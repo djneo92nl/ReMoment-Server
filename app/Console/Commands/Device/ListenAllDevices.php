@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Log;
  */
 class ListenAllDevices extends Command
 {
-    protected $signature = 'device:listen {--rescan=15 : Seconds between looking for added, removed or re-addressed devices}';
+    protected $signature = 'device:listen {--rescan=15 : Seconds between looking for added, removed, re-addressed or re-driven devices}';
 
     protected $description = 'Start listeners for all configured devices, and keep them running.';
 
@@ -83,6 +83,10 @@ class ListenAllDevices extends Command
             } elseif ($device->ip_address !== $child['ip']) {
                 $this->info("[{$child['label']}] address changed, restarting its listener.");
                 $this->stop($id);
+            } elseif ($device->device_driver !== $child['driver']) {
+                // E.g. a TV paired with philips:pair moves from the UPnP driver to its own.
+                $this->info("[{$child['label']}] driver changed, restarting its listener.");
+                $this->stop($id);
             }
         }
 
@@ -128,6 +132,7 @@ class ListenAllDevices extends Command
         $this->children[$device->id] = [
             'pid' => $pid,
             'ip' => $device->ip_address,
+            'driver' => $device->device_driver,
             'label' => $device->device_name,
             'started' => time(),
         ];
