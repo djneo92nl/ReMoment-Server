@@ -72,9 +72,9 @@ queue_workers: 2
 
 # --- Integrations (env.j2) ---------------------------------------------------------
 # User-Agent for MusicBrainz, Wikipedia and the other metadata APIs; they ask for a contact address.
-metadata_user_agent: "ReMoment/1.0 (remko@pionect.nl)"
+metadata_user_agent: "ReMoment/1.0 (remko@djneo.nl)"
 # Address the speakers fetch own files from; empty = app_url. Use the IP if speakers can't resolve .local.
-stream_base_url: ''
+stream_base_url: http://192.168.1.109
 # MQTT-over-WebSocket for the browser; leave empty to use the request host and port 9001.
 mqtt_public_ws_port: 9001
 mqtt_ws_url: ''

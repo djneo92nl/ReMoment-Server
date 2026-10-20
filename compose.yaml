@@ -113,6 +113,8 @@ services:
         environment:
             LIBRESPOT_NAME: '${LIBRESPOT_NAME:-ReMoment Stream}'
             LIBRESPOT_EVENT_SECRET: '${LIBRESPOT_EVENT_SECRET:-remoment}'
+            # MP3 bitrate of the stream; the encoder runs around the clock, so a Pi may want 192.
+            STREAM_BITRATE: '${LIBRESPOT_STREAM_BITRATE:-320}'
             ICECAST_SOURCE_PASSWORD: '${ICECAST_SOURCE_PASSWORD:-remoment}'
             ICECAST_HOST: 'icecast'
             ICECAST_MOUNT: '${ICECAST_MOUNT:-spotify.mp3}'

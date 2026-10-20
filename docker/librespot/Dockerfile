@@ -5,10 +5,10 @@ RUN cargo install librespot --locked --no-default-features --features "native-tl
 
 FROM debian:bookworm-slim
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg curl ca-certificates libssl3 \
+    && apt-get install -y --no-install-recommends ffmpeg python3-minimal curl ca-certificates libssl3 \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=build /usr/local/cargo/bin/librespot /usr/local/bin/librespot
-COPY run.sh hook.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/run.sh /usr/local/bin/hook.sh
+COPY run.sh hook.sh pcm-filler.py /usr/local/bin/
+RUN chmod +x /usr/local/bin/run.sh /usr/local/bin/hook.sh /usr/local/bin/pcm-filler.py
 VOLUME /cache
 ENTRYPOINT ["/usr/local/bin/run.sh"]

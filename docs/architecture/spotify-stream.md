@@ -14,6 +14,10 @@ Spotify app ──Connect──▶ librespot (--backend pipe) ─PCM─▶ ffmpe
 2. In the Spotify app the user picks the receiver named `LIBRESPOT_NAME` (default "ReMoment Stream").
 3. librespot's `--onevent` hook posts each event; `track_changed` carries name, artists, album, covers and duration (kept in cache `librespot:track`), `playing` / `seeked` the position. The server reports them as the target speaker's now playing (`sourceType` `spotify`, so history, artwork, MQTT and Last.fm work like any play) and sets the Icecast title (`/admin/metadata`).
 
+## Always-on stream
+
+librespot's pipe backend writes nothing while Spotify is idle, so ffmpeg would never connect to Icecast and the mount would not exist: a speaker told to play the stream got a 404. `docker/librespot/pcm-filler.py` sits between librespot and ffmpeg, copies the PCM at real-time pace and writes silence for every 20 ms in which librespot had nothing to give. The mount is therefore always live and a speaker can start the stream before a song plays. The cost is an encoder running around the clock (a little CPU; `LIBRESPOT_STREAM_BITRATE`, default 320, can go down to 192 on a Pi). When librespot or ffmpeg exits the pipeline ends and `run.sh` restarts it after 3 s.
+
 ## Pieces
 
 | What | Where |
@@ -38,6 +42,7 @@ Spotify app ──Connect──▶ librespot (--backend pipe) ─PCM─▶ ffmpe
 - Delay: ffmpeg, Icecast's burst and the speaker's buffer add roughly 5–10 s. Pause/skip in Spotify reach the speaker late; the stream only carries silence while paused.
 - Transport buttons of ReMoment (pause/next) act on the speaker, not on Spotify: pausing the speaker stalls the stream, Spotify keeps playing. Use the Spotify app to control playback. Mapping the receiver at `/settings/spotify-connect` is not needed.
 - Docker Desktop does not pass mDNS: Spotify only finds librespot when the stack runs on a Linux host (prod compose uses `network_mode: host` for librespot). The librespot image builds the binary with cargo (a few minutes on first build).
+- A speaker needs to resolve the stream host: many cannot resolve `.local`, so set `STREAM_BASE_URL` (Ansible `stream_base_url`) to the server's IP.
 - The hook secret and Icecast passwords default to `remoment`: set your own when the LAN is not trusted.
 - Unverified: B&O playback of the stream, Sonos behaviour with Icecast's ICY headers, and the librespot build features on arm64 (Pi).
 - Not built: Snapcast for synced multi-room (Icecast serves one stream; multiroom of speakers that play it is up to their own grouping).
