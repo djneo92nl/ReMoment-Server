@@ -4,7 +4,7 @@
     </x-slot>
 
     @php($tabs = ['services' => ['Services', 'fa-plug'], 'system' => ['System & devices', 'fa-server'], 'queue' => ['Queue', 'fa-list-check']])
-    <div class="max-w-5xl space-y-6"
+    <div class="max-w-4xl space-y-6"
          x-data="{ tab: (new URLSearchParams(location.search).get('tab') || 'services'), pick(t) { this.tab = t; const u = new URL(location); u.searchParams.set('tab', t); history.replaceState(null, '', u); } }">
         <div class="flex flex-wrap gap-1 p-1 bg-gray-100 dark:bg-stone-800/60 rounded-2xl w-fit" role="tablist">
             @foreach($tabs as $key => [$label, $icon])

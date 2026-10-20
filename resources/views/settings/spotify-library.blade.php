@@ -3,7 +3,7 @@
         <x-page-header title="Spotify Library" subtitle="Import saved tracks and playlists from your Spotify account" :back="route('settings.spotify')" />
     </x-slot>
 
-    <div class="max-w-4xl space-y-6">
+    <div class="max-w-2xl space-y-6">
 
         @if(session('success'))
             <x-alert type="success">{{ session('success') }}</x-alert>
