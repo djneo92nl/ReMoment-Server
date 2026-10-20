@@ -91,3 +91,18 @@ analysis_mood_min_score: 0.7
 # Free AcoustID key (https://acoustid.org/new-application) for fingerprint lookups; empty = skip that stage.
 acoustid_api_key: '9qtx6EQ9hh'
 acoustid_min_score: 0.9
+
+# --- Spotify stream (env.j2) -----------------------------------------------------
+# Spotify on any speaker: librespot (a Spotify Connect receiver) -> ffmpeg -> Icecast serves an MP3
+# stream that speakers without Spotify of their own can play, see docs/architecture/spotify-stream.md.
+# true switches the feature on in .env (LIBRESPOT_ENABLED). deploy.yml does not start the containers:
+# on the host, once, run
+#   docker compose -f docker-compose.prod.yml --profile spotify-stream up -d --build
+# then press "Play stream" on a speaker at /settings/spotify-connect and pick the receiver in Spotify.
+librespot_enabled: true
+# Optional, defaults shown. The receiver's name in Spotify's device list.
+# librespot_name: ReMoment Stream
+# Port speakers fetch the stream from (the host's firewall must allow it).
+# icecast_port: 8000
+# The event secret and the Icecast passwords default to `remoment`; to change them put
+# vault_librespot_event_secret, vault_icecast_source_password and vault_icecast_admin_password in vault.yml.
