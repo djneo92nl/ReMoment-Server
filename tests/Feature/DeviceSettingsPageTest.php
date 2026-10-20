@@ -44,19 +44,19 @@ class DeviceSettingsPageTest extends TestCase
         return $this->actingAs(User::factory()->create());
     }
 
-    public function test_the_settings_page_is_admin_only(): void
+    public function test_the_settings_page_is_open_to_guests(): void
     {
         $device = $this->makeDevice();
 
-        $this->get("/devices/{$device->id}/settings")->assertRedirect('/login');
+        $this->get("/devices/{$device->id}/settings")->assertOk()->assertSeeLivewire(DeviceSettings::class);
         $this->admin()->get("/devices/{$device->id}/settings")->assertOk()->assertSeeLivewire(DeviceSettings::class);
     }
 
-    public function test_the_device_page_links_to_settings_for_admins_only(): void
+    public function test_the_device_page_links_to_settings_for_everyone(): void
     {
         $device = $this->makeDevice();
 
-        $this->get("/devices/{$device->id}")->assertOk()->assertDontSee("/devices/{$device->id}/settings");
+        $this->get("/devices/{$device->id}")->assertOk()->assertSee("/devices/{$device->id}/settings");
         $this->admin()->get("/devices/{$device->id}")->assertOk()->assertSee("/devices/{$device->id}/settings");
     }
 
@@ -248,28 +248,32 @@ class DeviceSettingsPageTest extends TestCase
         $this->assertSame([4, 0], FakeSleepDigitsDriver::$digits);
     }
 
-    public function test_guests_cannot_press_number_keys(): void
+    public function test_guests_can_press_number_keys(): void
     {
         FakeSleepDigitsDriver::reset();
         $device = $this->makeDevice(FakeSleepDigitsDriver::class);
 
         Livewire::test(DeviceSettings::class, ['device' => $device])
             ->call('pressDigit', 1)
-            ->assertStatus(403);
+            ->assertOk();
 
-        $this->assertSame([], FakeSleepDigitsDriver::$digits);
+        $this->assertSame([1], FakeSleepDigitsDriver::$digits);
     }
 
-    public function test_guests_cannot_run_actions(): void
+    public function test_guests_can_change_playback_settings_but_not_rename(): void
     {
         $device = $this->makeDevice();
 
         Livewire::test(DeviceSettings::class, ['device' => $device])
             ->call('load')
             ->call('setDiscoverable', true)
-            ->assertStatus(403);
+            ->assertOk();
 
-        $this->assertSame([], FakeSettingsDriver::$calls);
+        Livewire::test(DeviceSettings::class, ['device' => $device])
+            ->call('load')
+            ->set('name', 'Hijacked')
+            ->call('rename')
+            ->assertStatus(403);
     }
 
     private function networkDevice(string $product): Device
@@ -370,6 +374,13 @@ class DeviceSettingsPageTest extends TestCase
             ->assertSet('wirelessSpeakers.scanning', false);
     }
 
+    public function test_guests_do_not_get_the_network_section(): void
+    {
+        $device = $this->networkDevice('BeoSound Essence');
+
+        Livewire::test(DeviceSettings::class, ['device' => $device])->assertSet('capabilities', []);
+    }
+
     public function test_guests_cannot_change_the_network_or_reload(): void
     {
         $device = $this->networkDevice('BeoSound Essence');
@@ -451,12 +462,12 @@ class DeviceSettingsPageTest extends TestCase
         $this->assertStringNotContainsString('localizationNoise', file_get_contents(resource_path('views/livewire/device-settings.blade.php')), 'the page never offers to start the noise');
     }
 
-    public function test_guests_cannot_change_a_speaker(): void
+    public function test_guests_can_change_a_speaker(): void
     {
         $device = $this->wiredDevice('BeoSound Moment');
 
-        Livewire::test(DeviceSettings::class, ['device' => $device])->call('load')->call('setWiredSpeakerType', 'pl_1', 'Line')->assertStatus(403);
+        Livewire::test(DeviceSettings::class, ['device' => $device])->call('load')->call('setWiredSpeakerType', 'pl_1', 'Line')->assertOk();
 
-        $this->assertSame([], FakeWiredSpeakersDriver::$calls);
+        $this->assertNotSame([], FakeWiredSpeakersDriver::$calls);
     }
 }

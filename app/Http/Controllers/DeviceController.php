@@ -62,7 +62,9 @@ class DeviceController extends Controller
 
         $device = Device::create($validated);
 
-        return redirect()->route('devices.show', $device)->with('success', 'Device added successfully.');
+        return $this->fromSettings($request)
+            ? redirect()->route('settings.devices')->with('success', 'Device added successfully.')
+            : redirect()->route('devices.show', $device)->with('success', 'Device added successfully.');
     }
 
     public function show(Device $device)
@@ -141,7 +143,9 @@ class DeviceController extends Controller
 
         $device->update($validated);
 
-        return redirect()->route('devices.show', $device)->with('success', 'Device updated.');
+        return $this->fromSettings($request)
+            ? redirect()->route('settings.devices')->with('success', 'Device updated.')
+            : redirect()->route('devices.show', $device)->with('success', 'Device updated.');
     }
 
     public function playTrack(Track $track, Device $device, LibraryPlayback $library)
@@ -176,11 +180,17 @@ class DeviceController extends Controller
         return back()->with('success', $device->hidden ? "{$device->device_name} hidden." : "{$device->device_name} unhidden.");
     }
 
-    public function destroy(Device $device)
+    /** Add and edit are also reached from Settings › Devices, and return there. */
+    private function fromSettings(Request $request): bool
+    {
+        return $request->input('from', $request->query('from')) === 'settings';
+    }
+
+    public function destroy(Request $request, Device $device)
     {
         $device->meta()->delete();
         $device->delete();
 
-        return redirect()->route('devices.index')->with('success', 'Device removed.');
+        return redirect()->route($this->fromSettings($request) ? 'settings.devices' : 'devices.index')->with('success', 'Device removed.');
     }
 }

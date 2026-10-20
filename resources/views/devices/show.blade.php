@@ -18,14 +18,12 @@
                         <span class="hidden sm:inline">{{ $device->hidden ? 'Unhide' : 'Hide' }}</span>
                     </x-secondary-button>
                 </form>
-                @auth
-                    @if(array_intersect(\App\Livewire\DeviceSettings::SECTIONS, $capabilities))
-                        <x-secondary-button size="md" href="{{ route('devices.settings', $device) }}">
-                            <i class="fa-solid fa-gear"></i>
-                            <span class="hidden sm:inline">Settings</span>
-                        </x-secondary-button>
-                    @endif
-                @endauth
+                @if(array_intersect(auth()->check() ? \App\Livewire\DeviceSettings::SECTIONS : array_diff(\App\Livewire\DeviceSettings::SECTIONS, \App\Livewire\DeviceSettings::ADMIN_SECTIONS), $capabilities))
+                    <x-secondary-button size="md" href="{{ route('devices.settings', $device) }}">
+                        <i class="fa-solid fa-gear"></i>
+                        <span class="hidden sm:inline">Settings</span>
+                    </x-secondary-button>
+                @endif
                 <x-secondary-button size="md" href="{{ route('devices.edit', $device) }}">
                     <i class="fa-solid fa-pen-to-square"></i>
                     <span class="hidden sm:inline">Edit</span>

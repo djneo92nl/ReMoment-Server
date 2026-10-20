@@ -104,7 +104,7 @@
     </x-card>
 
     @foreach($groups as $groupKey => $group)
-        <x-card flush x-data="{ open: false }">
+        <x-card flush x-data="{ open: {{ $group['devices']->isNotEmpty() ? 'true' : 'false' }} }">
 
             <button type="button" @click="open = !open" class="flex w-full items-center justify-between gap-4 px-8 py-5 text-left">
                 <div>
@@ -132,6 +132,10 @@
                                 </div>
                             </div>
                             <div class="flex items-center gap-1">
+                                <a href="{{ route('devices.edit', [$device, 'from' => 'settings']) }}" title="Edit"
+                                   class="flex items-center justify-center w-8 h-8 rounded-xl text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-stone-800 transition-colors">
+                                    <i class="fa-solid fa-pen-to-square text-xs"></i>
+                                </a>
                                 <button wire:click="toggleHidden({{ $device->id }})"
                                         title="{{ $device->hidden ? 'Unhide' : 'Hide' }}"
                                         class="flex items-center justify-center w-8 h-8 rounded-xl text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-stone-800 transition-colors">

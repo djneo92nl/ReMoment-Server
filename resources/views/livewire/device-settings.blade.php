@@ -18,7 +18,7 @@
             @if(!$ready)
                 {!! $skeleton !!}
             @elseif($info)
-                @if($info['renamable'])
+                @if($info['renamable'] && auth()->check())
                     <form wire:submit="rename" class="flex items-center gap-3">
                         <x-text-input type="text" wire:model="name" maxlength="64" aria-label="Device name" class="flex-1" />
                         <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="rename">Rename</x-primary-button>

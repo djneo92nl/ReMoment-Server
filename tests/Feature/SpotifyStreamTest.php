@@ -209,11 +209,11 @@ class SpotifyStreamTest extends TestCase
     {
         Device::factory()->driver(FakeStreamDriver::class)->inState(State::Standby)->create(['device_name' => 'Kitchen Renderer']);
 
-        $this->actingAs(\App\Models\User::factory()->create())->get('/settings/spotify-connect')
+        $this->actingAs(\App\Models\User::factory()->create())->get('/settings/spotify')
             ->assertOk()->assertSee('Spotify stream')->assertSee('Kitchen Renderer')->assertSee('Test Receiver');
 
         config(['librespot.enabled' => false]);
 
-        $this->actingAs(\App\Models\User::factory()->create())->get('/settings/spotify-connect')->assertOk()->assertDontSee('Spotify stream');
+        $this->actingAs(\App\Models\User::factory()->create())->get('/settings/spotify')->assertOk()->assertDontSee('Spotify stream');
     }
 }

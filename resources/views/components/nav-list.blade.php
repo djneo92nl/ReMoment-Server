@@ -26,11 +26,6 @@
         <li><x-nav-item :href="route('stats.index')" icon="chart-simple" :active="$on('stats.*')">Insights</x-nav-item></li>
         <li>
             <x-nav-item :href="route('settings.index')" icon="sliders" :active="$settingsActive">Settings</x-nav-item>
-            @if($settingsActive)
-                <ul class="mt-1 ml-4 space-y-1">
-                    <li><x-nav-item sub :href="route('settings.users')" icon="users" :active="$on('settings.users*')">Users</x-nav-item></li>
-                </ul>
-            @endif
         </li>
     </ul>
 

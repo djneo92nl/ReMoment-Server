@@ -21,12 +21,17 @@ use Livewire\Component;
 /**
  * The settings of one device, section by section for whatever capabilities
  * its driver and hardware have (sound, Bluetooth, device info, sleep timer, number keys, network, wireless speakers). A section that
- * fails shows its own error and leaves the others working. Admin only: the
- * page sits behind the login, and every action checks it again.
+ * fails shows its own error and leaves the others working. Playback-related
+ * settings (sound, input, Bluetooth, speakers, sleep timer) are open to
+ * everyone, like the controls; network and renaming need the admin login, and
+ * every action checks that again.
  */
 class DeviceSettings extends Component
 {
     private const NETWORK_APPLIED = 'Applied. The device may take a moment and may come back on a new address; use Refresh once it is up.';
+
+    /** Sections only the admin may see or change: they can take the device off the network. */
+    public const ADMIN_SECTIONS = ['network_settings'];
 
     public const SECTIONS = ['sound_adjustment', 'wired_speakers', 'bluetooth', 'device_info', 'network_settings', 'wireless_speakers', 'source_activation', 'sleep_timer', 'digits'];
 
@@ -78,7 +83,8 @@ class DeviceSettings extends Component
     public function mount(Device $device): void
     {
         $this->device = $device;
-        $this->capabilities = array_values(array_intersect(self::SECTIONS, DeviceCapabilities::for($device)));
+        $sections = auth()->check() ? self::SECTIONS : array_diff(self::SECTIONS, self::ADMIN_SECTIONS);
+        $this->capabilities = array_values(array_intersect($sections, DeviceCapabilities::for($device)));
     }
 
     public function load(): void
@@ -133,7 +139,7 @@ class DeviceSettings extends Component
 
     public function reload(string $section): void
     {
-        abort_unless(auth()->check(), 403);
+        $this->authorizeSection($section);
         abort_unless(in_array($section, $this->capabilities, true), 404);
 
         $this->read($section);
@@ -202,6 +208,8 @@ class DeviceSettings extends Component
 
     public function rename(): void
     {
+        abort_unless(auth()->check(), 403);
+
         $name = trim($this->name);
         if ($name === '' || mb_strlen($name) > 64) {
             $this->problems['device_info'] = 'The name must be 1 to 64 characters.';
@@ -218,7 +226,7 @@ class DeviceSettings extends Component
     /** Runs a change on the driver, then re-reads the section so the page shows what the device says. */
     private function run(string $section, \Closure $change, ?string $notice = null, bool $reread = true): void
     {
-        abort_unless(auth()->check(), 403);
+        $this->authorizeSection($section);
 
         unset($this->problems[$section], $this->notices[$section]);
 
@@ -235,6 +243,11 @@ class DeviceSettings extends Component
         if ($reread) {
             $this->read($section, keepMessages: true);
         }
+    }
+
+    private function authorizeSection(string $section): void
+    {
+        abort_if(in_array($section, self::ADMIN_SECTIONS, true) && !auth()->check(), 403);
     }
 
     private function read(string $section, bool $keepMessages = false): void

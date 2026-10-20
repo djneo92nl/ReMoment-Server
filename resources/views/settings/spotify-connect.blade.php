@@ -15,50 +15,6 @@
             to appear in the list below.
         </x-alert>
 
-        @if(\App\Domain\Spotify\LibrespotStream::enabled())
-            @php
-                $streamDevices = $localDevices->filter(fn ($d) => in_array('stream_url', \App\Domain\Device\DeviceCapabilities::for($d), true));
-            @endphp
-            <x-card x-data="{ busy: null, done: null, error: null,
-                async play(id) {
-                    this.busy = id; this.done = null; this.error = null;
-                    try {
-                        const r = await fetch('{{ url('/api/devices') }}/' + id + '/spotify-stream', { method: 'POST', headers: { 'Accept': 'application/json' } });
-                        const body = await r.json();
-                        if (r.ok) { this.done = id; } else { this.error = body.message || 'The speaker did not start the stream.'; }
-                    } catch (e) { this.error = 'The server could not be reached.'; }
-                    this.busy = null;
-                } }">
-                <div class="px-8 py-5 space-y-4">
-                    <div>
-                        <p class="text-sm font-medium text-gray-900 dark:text-gray-100">Spotify stream</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            Play the stream on a speaker below, then pick <span class="font-medium">{{ config('librespot.name') }}</span> in the Spotify app.
-                            The speaker needs no Spotify of its own, and from then on counts as the Spotify device (one card, Spotify's own pause and skip). Expect a few seconds of delay.
-                        </p>
-                        <p class="text-xs text-gray-400 dark:text-gray-600 mt-1 break-all">{{ \App\Domain\Spotify\LibrespotStream::url() }}</p>
-                    </div>
-
-                    @forelse($streamDevices as $device)
-                        <div class="flex items-center justify-between gap-4">
-                            <span class="text-sm text-gray-900 dark:text-gray-100">{{ $device->device_name }}</span>
-                            <span class="flex items-center gap-3">
-                                <span x-show="done === {{ $device->id }}" x-cloak class="text-xs text-emerald-600 dark:text-emerald-400">Playing the stream</span>
-                                <x-secondary-button type="button" x-on:click="play({{ $device->id }})" x-bind:disabled="busy !== null">
-                                    <i class="fa-brands fa-spotify"></i>
-                                    Play stream
-                                </x-secondary-button>
-                            </span>
-                        </div>
-                    @empty
-                        <p class="text-xs text-gray-400 dark:text-gray-600">No device can play a stream yet.</p>
-                    @endforelse
-
-                    <p x-show="error" x-cloak x-text="error" class="text-xs text-red-600 dark:text-red-400"></p>
-                </div>
-            </x-card>
-        @endif
-
         <form method="POST" action="{{ route('settings.spotify-connect.save') }}">
             @csrf
 

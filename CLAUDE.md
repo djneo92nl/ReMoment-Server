@@ -317,7 +317,7 @@ DELETE   /api/devices/{id}/bluetooth/devices/{deviceId}   forget a paired device
 GET|PUT  /api/devices/{id}/info               → { name, product_type, firmware, mac_address, renamable }   PUT { name }   (capability `device_info`; ASE, Mozart, Sonos — Sonos can't rename)
 ```
 
-The web page `/devices/{id}/settings` (admin login, `App\Livewire\DeviceSettings`) shows one card per capability the device has.
+The web page `/devices/{id}/settings` (guest-accessible; network and rename need the admin login, `App\Livewire\DeviceSettings`) shows one card per capability the device has.
 
 ```
 GET|PUT  /api/devices/{id}/sleep-timer   → { value, min, max, step, writable }   PUT { minutes } (0 cancels; 0–60)   (capability `sleep_timer`; ASE — the BeoPlay V1 lists it but is `writable: false`)
@@ -789,7 +789,7 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 - `/artists/{id}` — artist page (hero, source switch, popular, albums, similar); `/artists/{id}/settings` (admin) — see `docs/architecture/artist-settings.md`
 - `/albums/{id}` — album detail with track listing
 - `/settings` — overview of listeners, MQTT config
-- `/settings/users` — user management table
+- `/settings/users` — Admin & Apps: the shared admin login (change password) and the apps signed in with it (revoke)
 - `/settings/health` — external services (Spotify/Last.fm/Discogs/TheAudioDB credentials, MusicBrainz, Wikipedia, Cover Art Archive, LRCLIB, storage locations; `Domain/Health/ExternalServices`, one read-only probe each, results cached 15 min, "Check now" re-runs them), supervisor, scheduler, queue worker, pending jobs, MQTT broker and per-device listener health
 - `/settings/devices` — discovered-devices list (scan, add, ignore) on top, drivers grouped by brand below, add by IP (see `docs/architecture/device-discovery.md`); `/devices/discover` redirects here
 - `/settings/dlna` — discover DLNA servers, trigger library scans

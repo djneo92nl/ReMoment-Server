@@ -85,6 +85,8 @@ Route::post('/playlists/{playlist}/play/{device}', [PlaylistController::class, '
 Route::post('/player/select/{device}', [PlayerController::class, 'select'])->name('player.select');
 Route::delete('/player', [PlayerController::class, 'clear'])->name('player.clear');
 
+Route::get('/devices/{device}/settings', fn (\App\Models\Device $device) => view('devices.settings', ['device' => $device]))->name('devices.settings');
+
 Route::get('/dashboard', function () {
     return redirect()->route('devices.index');
 })->middleware(['auth', 'verified'])->name('dashboard');
@@ -98,8 +100,6 @@ Route::middleware('auth')->group(function () {
     Route::delete('/tracks/{track}', [AlbumController::class, 'destroyTrack'])->name('tracks.destroy');
 
     Route::get('/setup', fn () => view('setup.index'))->name('setup.index');
-
-    Route::get('/devices/{device}/settings', fn (\App\Models\Device $device) => view('devices.settings', ['device' => $device]))->name('devices.settings');
 
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
     Route::get('/settings/users', [SettingsController::class, 'users'])->name('settings.users');

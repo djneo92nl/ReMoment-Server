@@ -2,7 +2,7 @@
 
 Settings that change how a device behaves rather than what it plays. Each lives behind its own capability, so a client only offers what `GET /api/devices` lists in `capabilities`. The API is the same for every platform; what a platform can't do is a capability it doesn't list, or a `writable: false` / `422 unsupported`.
 
-No authentication, like the rest of the REST API. The web page `/devices/{id}/settings` is behind the admin login.
+No authentication, like the rest of the REST API. The web page `/devices/{id}/settings` is open to everyone like the controls; only the network section and renaming need the admin login (`DeviceSettings::ADMIN_SECTIONS`).
 
 Errors, as for the controls: `503 unreachable`, `422 unsupported` (device lacks the capability, or the one operation), `422 invalid` (value outside the range / unknown mode / unknown paired device), `502 driver_error` (the device failed, or answered but did not apply the change — every write is read back). Validation errors are Laravel's `422 { message, errors }`.
 

@@ -13,7 +13,7 @@ POST /api/admin/login      body: { "password": "…", "device_name": "Remko's iP
   → 200 { "token": "rmt_…", "token_id": 3, "name": "Remko's iPhone" }
 ```
 
-`device_name` is optional (max 100 characters) and only labels the sign-in under **Settings › Users › Signed-in apps**. The plain `token` is returned **once**; the server keeps only its SHA-256, so it can't be shown again. Store it in the Keychain (or the platform's equivalent), never in plain preferences.
+`device_name` is optional (max 100 characters) and only labels the sign-in under **Settings › Admin & Apps**. The plain `token` is returned **once**; the server keeps only its SHA-256, so it can't be shown again. Store it in the Keychain (or the platform's equivalent), never in plain preferences.
 
 | Status | `error` | When |
 |--------|---------|------|
@@ -45,7 +45,7 @@ DELETE /api/admin/token    → { "status": "ok" }                               
 ## Revoking
 
 - The app signs itself out with `DELETE /api/admin/token`.
-- The admin signs any app out at **Settings › Users › Signed-in apps** (`DELETE /settings/app-tokens/{id}`).
+- The admin signs any app out at **Settings › Admin & Apps** (`DELETE /settings/app-tokens/{id}`).
 - **Changing the admin password signs every app out** (`PasswordController::update` deletes all tokens).
 
 Tokens do not expire on their own.

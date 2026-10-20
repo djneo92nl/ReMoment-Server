@@ -1,31 +1,23 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-page-header title="Users" :subtitle="($users->count()) . ' ' . ($users->count() === 1 ? 'user' : 'users')" :back="route('settings.index')" />
+        <x-page-header title="Admin & Apps" subtitle="The shared admin login and the apps signed in with it" :back="route('settings.index')" />
     </x-slot>
 
     <div class="max-w-4xl">
         <x-card flush>
-
-            <!-- Table header -->
-            <div class="grid grid-cols-12 gap-4 px-8 py-4 border-b border-gray-100 dark:border-stone-800">
-                <div class="col-span-8 text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600">Username</div>
-                <div class="col-span-4 text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600">Joined</div>
-            </div>
-
-            @foreach($users as $user)
-                <div class="grid grid-cols-12 gap-4 items-center px-8 py-5 border-b border-gray-50 dark:border-stone-800/50 last:border-0">
-                    <div class="col-span-8 flex items-center gap-3">
-                        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-gray-200 to-gray-300 dark:from-stone-700 dark:to-stone-600 flex items-center justify-center flex-shrink-0">
-                            <span class="text-sm font-medium text-gray-600 dark:text-gray-400">{{ strtoupper(substr($user->name, 0, 1)) }}</span>
-                        </div>
-                        <div class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ $user->name }}</div>
-                    </div>
-                    <div class="col-span-4 text-sm text-gray-500">{{ $user->created_at->format('M j, Y') }}</div>
+            <div class="flex items-center gap-4 px-8 py-5">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-gray-200 to-gray-300 dark:from-stone-700 dark:to-stone-600 flex items-center justify-center flex-shrink-0">
+                    <i class="fa-solid fa-key text-sm text-gray-600 dark:text-gray-400"></i>
                 </div>
-            @endforeach
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-medium text-gray-900 dark:text-gray-100">Admin login</div>
+                    <div class="text-xs text-gray-500">The one shared login for settings. Everything else is open to anyone on the network.</div>
+                </div>
+                <x-secondary-button size="md" href="{{ route('profile.edit') }}">Change password</x-secondary-button>
+            </div>
         </x-card>
 
-        <x-card flush class="mt-8">
+        <x-card flush class="mt-6">
             <div class="px-8 py-5 border-b border-gray-100 dark:border-stone-800">
                 <h2 class="text-sm font-medium text-gray-900 dark:text-gray-100">Signed-in apps</h2>
                 <p class="mt-1 text-sm text-gray-500">Apps that signed in with the admin password. Changing the password signs them all out.</p>

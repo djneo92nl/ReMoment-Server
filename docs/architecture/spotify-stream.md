@@ -10,7 +10,7 @@ Spotify app ──Connect──▶ librespot (--backend pipe) ─PCM─▶ ffmpe
                               └──────▶ POST /api/librespot/event ──▶ NowPlayingUpdated / ProgressUpdated / NowPlayingEnded
 ```
 
-1. `POST /api/devices/{id}/spotify-stream` (or the card on `/settings/spotify-connect`, MCP tool `spotify_stream`) tells the device to play the stream URL and remembers it as the target (`LibrespotEvents`, cache `librespot:target`, 12 h).
+1. `POST /api/devices/{id}/spotify-stream` (or the card on `/settings/spotify`, MCP tool `spotify_stream`) tells the device to play the stream URL and remembers it as the target (`LibrespotEvents`, cache `librespot:target`, 12 h).
 2. In the Spotify app the user picks the receiver named `LIBRESPOT_NAME` (default "ReMoment Stream").
 3. librespot's `--onevent` hook posts each event; `track_changed` carries name, artists, album, covers and duration (kept in cache `librespot:track`), `playing` / `seeked` the position. Without a Spotify connection the server reports them as the target speaker's now playing (`sourceType` `spotify`, so history, artwork, MQTT and Last.fm work like any play); with Spotify connected and the receiver mapped to the speaker, Spotify's own listener already does that and the hook only sets the Icecast title (`/admin/metadata`), so nothing is reported twice.
 

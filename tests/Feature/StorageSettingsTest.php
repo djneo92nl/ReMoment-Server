@@ -62,12 +62,12 @@ class StorageSettingsTest extends TestCase
     {
         $this->get('/settings/storage')->assertRedirect('/login');
 
-        $this->actingAs($this->admin())->get('/settings/storage')->assertOk()->assertSee('File Storage');
+        $this->actingAs($this->admin())->get('/settings/storage')->assertOk()->assertSee('Files');
     }
 
     public function test_the_settings_index_links_to_it(): void
     {
-        $this->actingAs($this->admin())->get('/settings')->assertOk()->assertSee('File Storage');
+        $this->actingAs($this->admin())->get('/settings')->assertOk()->assertSee('Files');
     }
 
     public function test_a_local_location_is_added_and_a_missing_folder_refused(): void

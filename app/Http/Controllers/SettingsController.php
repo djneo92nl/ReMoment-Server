@@ -13,7 +13,6 @@ use App\Models\Device;
 use App\Models\DeviceMeta;
 use App\Models\DlnaServer;
 use App\Models\Setting;
-use App\Models\User;
 use App\Services\Dlna\DlnaLibraryScanner;
 use App\Services\Dlna\DlnaServerDiscovery;
 use App\Services\LastfmSessionService;
@@ -25,7 +24,7 @@ class SettingsController extends Controller
 {
     public function index()
     {
-        $userCount = User::count();
+        $appTokenCount = \App\Models\AdminToken::count();
         $deviceCount = Device::count();
         $spotifyConnected = app(SpotifyTokenService::class)->isConnected();
         $lastfmConnected = app(LastfmSessionService::class)->isConnected();
@@ -35,7 +34,7 @@ class SettingsController extends Controller
         $pendingClientCount = Client::where('status', 'pending')->count();
 
         return view('settings.index', compact(
-            'userCount', 'deviceCount', 'spotifyConnected', 'lastfmConnected',
+            'appTokenCount', 'deviceCount', 'spotifyConnected', 'lastfmConnected',
             'dlnaServerCount', 'storageLocationCount', 'clientCount', 'pendingClientCount',
         ));
     }
@@ -44,6 +43,7 @@ class SettingsController extends Controller
     {
         return view('settings.spotify', [
             'connected' => $spotify->isConnected(),
+            'localDevices' => Device::where('device_driver', '!=', SpotifyDriver::class)->orderBy('device_name')->get(),
         ]);
     }
 
@@ -94,10 +94,9 @@ class SettingsController extends Controller
 
     public function users()
     {
-        $users = User::orderBy('name')->get();
         $appTokens = \App\Models\AdminToken::orderByDesc('last_used_at')->orderByDesc('id')->get();
 
-        return view('settings.users', compact('users', 'appTokens'));
+        return view('settings.users', compact('appTokens'));
     }
 
     /** Signs an app out: its token stops working. */
