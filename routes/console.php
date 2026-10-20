@@ -12,6 +12,12 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('device:sync-sources')->weekly();
+
+// Finds new devices for the list at /settings/devices; never adds one (DEVICE_AUTO_DISCOVER=false turns it off).
+if (config('devices.auto_discover')) {
+    Schedule::command('device:discover')->hourly()->withoutOverlapping()->runInBackground();
+}
+
 Schedule::command('spotify:sync-library')->daily();
 Schedule::command('artwork:backfill')->daily();
 Schedule::command('artwork:prerender')->daily();

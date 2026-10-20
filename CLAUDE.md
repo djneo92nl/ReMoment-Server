@@ -82,8 +82,8 @@ php artisan test tests/Path/To/TestFile.php
 # Code style
 ./vendor/bin/pint
 
-# Discover devices of every registered brand (SSDP/mDNS/Sonos topology) and store them
-php artisan device:discover [--brand=sonos|ase|mozart] [--host=192.168.1.9]
+# Discover devices of every registered brand (SSDP/mDNS/Sonos topology) and list them at /settings/devices to be added (hourly in the background; --add stores them as devices right away)
+php artisan device:discover [--brand=sonos|ase|mozart] [--host=192.168.1.9] [--add]
 
 # Sync B&O source/JID data for all ASE devices
 php artisan device:sync-sources
@@ -756,6 +756,7 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 - `/settings` — overview of listeners, MQTT config
 - `/settings/users` — user management table
 - `/settings/health` — external services (Spotify/Last.fm/Discogs/TheAudioDB credentials, MusicBrainz, Wikipedia, Cover Art Archive, LRCLIB, storage locations; `Domain/Health/ExternalServices`, one read-only probe each, results cached 15 min, "Check now" re-runs them), supervisor, scheduler, queue worker, pending jobs, MQTT broker and per-device listener health
+- `/settings/devices` — discovered-devices list (scan, add, ignore) on top, drivers grouped by brand below, add by IP (see `docs/architecture/device-discovery.md`); `/devices/discover` redirects here
 - `/settings/dlna` — discover DLNA servers, trigger library scans
 - `/settings/storage` — storage locations (local/S3) for the own music files, queued scan/import/reorganize with live status, file browser (see `docs/architecture/file-storage.md`)
 - `/settings/spotify-connect` — map Spotify Connect speaker names to local devices

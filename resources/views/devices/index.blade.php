@@ -2,7 +2,7 @@
     <x-slot name="header">
         <x-page-header title="Devices">
             <x-slot name="actions">
-                <x-secondary-button href="{{ route('devices.discover') }}">
+                <x-secondary-button href="{{ route('settings.devices') }}">
                     <i class="fa-solid fa-magnifying-glass"></i>
                     <span class="hidden sm:inline">Discover</span>
                 </x-secondary-button>

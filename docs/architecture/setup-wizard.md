@@ -4,7 +4,7 @@ Guides a fresh install (zero devices) through the three things a working system 
 
 ## Steps
 
-1. **Add your devices** — links to `/devices/discover` (network scan, `DiscoverDevices` Livewire component) and `/devices/create` (manual add). Complete once `Device::count() > 0`. Not skippable — there's nothing to control with zero devices.
+1. **Add your devices** — links to `/settings/devices` (network scan into the discovered-devices list, `DeviceDriverManager` Livewire component) and `/devices/create` (manual add). Complete once `Device::count() > 0`. Not skippable — there's nothing to control with zero devices.
 2. **Client devices** — explains the self-registration flow (see `docs/api/client-devices.md`) and links to `/settings/clients` for approval. Complete once `Client::count() > 0`, or explicitly skipped.
 3. **Set up your library** — links to `/settings/dlna` and `/settings/spotify`, with a footnote link to `/settings/lastfm` for scrobbling (not a gated step). Complete once a DLNA server exists or Spotify is connected, or explicitly skipped.
 

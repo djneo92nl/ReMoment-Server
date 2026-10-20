@@ -1,6 +1,6 @@
 # Device Discovery
 
-ReMomentServer can automatically discover devices on the local network via brand-specific `DiscoveryInterface` implementations. Discovery commands create or update `Device` records in the database; they never delete devices.
+ReMomentServer can automatically discover devices on the local network via brand-specific `DiscoveryInterface` implementations. Discovery never adds a device by itself: every scan puts what it finds in the **discovered devices** list (see below) and you add them from `/settings/devices`. It only refreshes devices that are already stored, and never deletes any.
 
 ## Discovery command
 
@@ -8,7 +8,13 @@ ReMomentServer can automatically discover devices on the local network via brand
 php artisan device:discover [--brand=sonos|ase|mozart|converter ...] [--host=192.168.1.9 ...]
 ```
 
-One command for every brand. It runs the discoverers registered under `discoverers` in `config/devices.php` (`--brand` keeps those whose class name contains the given text), passes each `--host` to discoverers that implement `HostHintedDiscovery`, and stores everything found through `App\Domain\Device\DiscoveredDevicePersister`: a device is matched on any identifier in `DiscoveredDevice::$meta` (`upnp_uuid` for ASE and Mozart, `sonos_uuid` for Sonos), else on its IP **within the same brand** (DHCP reuses IPs, a new brand never takes over an old device); it is then updated (an IP change is written back) or created, and its meta keys are upserted. Devices are never deleted. Discoverer notes (e.g. "no multicast replies") are printed after the list. The web "Scan" page uses the same discoverers through `NetworkDiscoveryService`, only listing devices not yet stored.
+One command for every brand. It runs the discoverers registered under `discoverers` in `config/devices.php` (`--brand` keeps those whose class name contains the given text) and passes each `--host` to discoverers that implement `HostHintedDiscovery`. Discoverer notes (e.g. "no multicast replies") are printed after the list. By default the finds only go to the inbox; `--add` stores them as devices right away (for scripts).
+
+## Discovered devices (inbox)
+
+`App\Domain\Device\DiscoveryInbox` keeps what scans found and nobody added yet in the `discovered_devices` table (`DiscoveredDeviceRecord`: IP, name, brand, product, driver, meta, `last_seen_at`, `ignored_at`). Three things feed it: the Scan button on `/settings/devices`, `device:discover`, and the hourly background scan (`Schedule::command('device:discover')` in `routes/console.php`; `DEVICE_AUTO_DISCOVER=false` switches it off where multicast cannot reach the process). `record()` first asks `DiscoveredDevicePersister::known()` whether a find is a stored device: a device is matched on any identifier in `DiscoveredDevice::$meta` (`upnp_uuid` for ASE and Mozart, `sonos_uuid` for Sonos), else on its IP **within the same brand** (DHCP reuses IPs, a new brand never takes over an old device). A known device is refreshed (an IP change is written back, its meta upserted) and is not listed; anything else is upserted by IP, keeping its `ignored_at` and an edited name.
+
+`/settings/devices` shows the list at the top: per row a name you can edit, **Add** (`DiscoveryInbox::add()` → `DiscoveredDevicePersister::persist()`, then the row is removed) and **Ignore**; **Add all** adds every non-ignored row; ignored ones sit under "N ignored" with Restore. Below it the drivers are grouped by brand (`DeviceDriverManager::driverGroups()`): ASE and Mozart under Bang & Olufsen, Philips under UPnP (a driver whose class extends another brand's driver joins that brand), each collapsed with its devices (hide/remove) and an add-by-IP form. `/devices/discover` redirects there.
 
 A new brand needs a `DiscoveryInterface` implementation in `config('devices.discoverers')`, nothing else.
 

@@ -43,7 +43,7 @@ Route::get('/', function () {
     return redirect()->route('devices.index');
 });
 
-Route::get('/devices/discover', fn () => view('devices.discover'))->name('devices.discover');
+Route::redirect('/devices/discover', '/settings/devices')->name('devices.discover');
 Route::resource('devices', DeviceController::class);
 Route::post('/devices/{device}/standby', [DeviceController::class, 'standby'])->name('devices.standby');
 Route::post('/devices/{device}/hidden', [DeviceController::class, 'toggleHidden'])->name('devices.toggle-hidden');

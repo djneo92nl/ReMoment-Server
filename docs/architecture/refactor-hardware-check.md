@@ -31,7 +31,7 @@ All four listeners now share `ListenerBackoff` (reconnect pause) and `DeviceCach
 - [ ] `php artisan device:discover` (no `--brand`) completes without an error and lists your ASE speakers. Before the cleanup `MozartDiscovery` could not even be built.
 - [ ] `--brand=ase`, `--brand=sonos` and `--brand=mozart` each report only their own devices. An Essence, M3 or M5 must **not** appear under Mozart, and a Theatre or other Mozart model not under ASE.
 - [ ] Time a full scan: about 4 to 8 s longer than before is expected.
-- [ ] `/settings/devices` (the driver manager) loads; it used to throw. Scan per driver finds the devices, and the groups list the right models per driver (ASE, Mozart, Sonos, Spotify).
+- [ ] `/settings/devices` (the driver manager) loads; it used to throw. Scan network lists the devices to add, and the brand groups list the right models per driver (Bang & Olufsen with ASE and Mozart, Sonos, Spotify, UPnP with Philips).
 - [ ] Add a device by hand at `/devices/create` and edit one at `/devices/{id}/edit`: the brand and model pickers list the models, and a virtual device (Spotify Connect) needs no IP.
 
 ## 3. Playing the library on a device

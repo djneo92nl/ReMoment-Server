@@ -1,6 +1,9 @@
 <?php
 
 return [
+    // Hourly background scan (`device:discover`); it only fills the discovered-devices list. Turn off where multicast cannot reach this process.
+    'auto_discover' => env('DEVICE_AUTO_DISCOVER', true),
+
     'discoverers' => [
         \App\Integrations\BangOlufsen\Ase\AseDiscovery::class,
         \App\Integrations\BangOlufsen\Ase\ConverterDiscovery::class,

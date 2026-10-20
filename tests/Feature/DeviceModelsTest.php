@@ -34,9 +34,11 @@ class DeviceModelsTest extends TestCase
     {
         $groups = (new DeviceDriverManager)->driverGroups();
 
-        $this->assertEqualsCanonicalizing(['ASE', 'Mozart', 'Philips', 'ReMoment Player', 'Spotify', 'Sonos', 'UPnP'], array_keys($groups));
-        $this->assertTrue($groups['Spotify']['virtual']);
-        $this->assertTrue($groups['Sonos']['discoverable']);
+        $this->assertEqualsCanonicalizing(['bang-olufsen', 'remoment', 'spotify', 'sonos', 'upnp'], array_keys($groups));
+        $this->assertSame(['ASE', 'Mozart'], array_keys($groups['bang-olufsen']['drivers']));
+        $this->assertSame(['UPnP', 'Philips'], array_keys($groups['upnp']['drivers']));
+        $this->assertTrue($groups['spotify']['virtual']);
+        $this->assertFalse($groups['sonos']['virtual']);
     }
 
     public function test_the_add_and_edit_device_pages_render(): void

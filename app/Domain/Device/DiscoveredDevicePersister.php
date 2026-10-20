@@ -14,7 +14,7 @@ class DiscoveredDevicePersister
 {
     public function persist(DiscoveredDevice $found): Device
     {
-        $device = $this->existing($found);
+        $device = $this->known($found);
 
         $data = [
             'ip_address' => $found->ip_address,
@@ -39,7 +39,8 @@ class DiscoveredDevicePersister
         return $device;
     }
 
-    private function existing(DiscoveredDevice $found): ?Device
+    /** The stored device this find is (matched on an identifier, else IP within the brand), if any. */
+    public function known(DiscoveredDevice $found): ?Device
     {
         foreach ($found->meta as $key => $value) {
             $device = Device::whereHas('meta', fn ($q) => $q->where('key', $key)->where('value', $value))->first();

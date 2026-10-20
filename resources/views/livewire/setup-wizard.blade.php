@@ -26,7 +26,7 @@
                         @endif
                     </p>
                     <div class="mt-4 flex flex-wrap gap-3">
-                        <x-primary-button size="md" href="{{ route('devices.discover') }}">
+                        <x-primary-button size="md" href="{{ route('settings.devices') }}">
                             <i class="fa-solid fa-magnifying-glass"></i>Scan Network
                         </x-primary-button>
                         <x-secondary-button size="md" href="{{ route('devices.create') }}">
