@@ -32,11 +32,11 @@ A Pi 2/3 runs tier 0 only (its app image has the tools; the sidecar is optional 
 - **Storage:** `file_analyses`, one row per file (`FileAnalysis`), with typed columns (so smart playlists can range-query them) and `stages` / `errors` JSON. `content_hash` is `files.hash` at analysis time: a changed file starts over. A track reaches its analysis through its primary file (`Track::analysis()`, `Track::sound()`).
 - **Job:** `AnalyzeAudioFile` (unique per file, queue `analysis`, `tries` 1) opens the file once with `FileStore::withLocalPath()` (the real path locally, one download from remote storage), runs the stages still needed, and saves after each. A failing stage records its error (`errors.<stage>`: message, attempts, version) and does not stop the others; the backlog retries it until `analysis.max_attempts` (3) at the same version.
 - **Backlog:** `AudioAnalysis::pending()` lists present, primary, original files with something left to do, newest first. `php artisan library:analyze [--limit=] [--stage=] [--file=ID [--now]] [--dry-run]` queues it; scheduled nightly at 02:00; `LocalLibraryScanner` queues a small batch after a scan.
-- **Essentia stage:** the app decodes to a mono 44.1 kHz WAV with ffmpeg and posts it to `POST /analyze` of the sidecar, so the sidecar needs no access to the music and remote files work. Features the sidecar did not compute (no ML models) are left out of the result instead of blanked.
+- **Essentia stage:** the app decodes to a mono 44.1 kHz WAV with ffmpeg (a branch of the shared decode, see *Reducing CPU load*) and posts it to `POST /analyze` of the sidecar, so the sidecar needs no access to the music and remote files work. Features the sidecar did not compute (no ML models) are left out of the result instead of blanked.
 
 ## Quality (`QualityStage`)
 
-Two ffmpeg runs, no other tool, and no sidecar, so a Pi runs it too:
+The shared decode plus one 30 s excerpt run, no other tool, and no sidecar, so a Pi runs it too:
 
 - **Whole file**, one filter graph of `astats` and `silencedetect` probes (the file is read once and downmixed to stereo): `clipped_samples` (how often the signal sat at its own peak) and `clipping_suspect` (flat tops and at least 50 hits; a limiter touching its ceiling is not clipping), `is_mono` (identical channels) and `phase_issue` (the side signal louder than the mid signal by 6 dB: the channels cancel on a mono speaker), `lead_silence_ms` / `trail_silence_ms` (below -60 dB for 0.3 s), `measured_bit_depth` (lossless files only: a 24-bit file that holds 16-bit samples reads 16) and `decode_warnings` (what the decoder complained about, and a file that decodes more than 2 s shorter than its tags say).
 - **Spectral cutoff**: 30 s from the middle of the track, decoded to mono floats (left channel, so out-of-phase material does not cancel) and analysed in PHP (`App\Domain\Analysis\Spectrum`: Hann-windowed 4096-point FFTs of 48 evenly spaced frames, averaged, in 500 Hz bands from 10 kHz up). `spectral_cutoff_hz` is the lower edge of the first band that is 9 dB or more below the one under it while the top band ends 25 dB or more lower: a cliff, not a roll-off. For a lossless file `lossless_suspect` (0–1) turns it into a verdict: 16–17 kHz 0.95, 18 kHz 0.9, 19 kHz 0.8, 19.5 kHz 0.65, 20 kHz 0.45, 20.5 kHz 0.3, above that 0; for sample rates over 48 kHz a cutoff at 22 or 24 kHz means it began as 44.1 or 48 kHz. Lossy files get the cutoff but no verdict. Tracks that are silent in the excerpt cannot be judged.
@@ -65,6 +65,23 @@ ANALYSIS_ESSENTIA_ML_BUILD=1 docker compose --profile analysis up -d --build ana
 ```
 
 `fetch_models.sh` downloads the models from essentia.upf.edu; the URLs and the model input/output names in `app.py` follow Essentia's model pages and were written without running the container, so check them against https://essentia.upf.edu/models.html when a model is skipped (`/health` lists the models that did load; a missing one only drops its features).
+
+## Reducing CPU load
+
+Analysis is already throttled by design: one `analysis-queue` worker (one file at a time), a sidecar that takes one request at a time, and a bounded nightly batch. To lower the load further, or move it to quiet hours:
+
+| Lever | Effect |
+|-------|--------|
+| `ANALYSIS_BATCH`, `ANALYSIS_SCAN_BATCH` | files queued per nightly run / after a scan; a smaller batch spreads a backlog over more nights |
+| `Schedule::command('library:analyze')->dailyAt(...)` in `routes/console.php` | move the run to when nobody listens |
+| `library:analyze --stage=loudness\|waveform\|quality\|fingerprint\|acoustid\|essentia` | run one stage at a time, e.g. the cheap ones first and `essentia` later |
+| Leave `ANALYSIS_ESSENTIA_URL` unset, or `ANALYSIS_ESSENTIA_ML=false` with the light sidecar build | skips the most expensive stage, or only its TensorFlow models |
+| Docker `cpus:` / `cpu_shares` on the app and `analysis` services (`compose.yaml`), or `nice` on the supervisor program | caps what analysis may take from device listeners and the web UI; **not configured by default** |
+| No `ACOUSTID_API_KEY` | the fingerprint is still stored, no lookup is made (that saves network, not CPU) |
+
+A stage with a bumped `version()` re-runs only that stage, so a changed stage does not redo the others.
+
+**One decode for all stages.** The stages that work on the decoded audio (`DecodedStage`: loudness, waveform, quality's whole-file pass, Essentia) do not each run their own ffmpeg. `AnalyzeAudioFile` runs one (`DecodePass`): the file is decoded once, `asplit` into one filter branch per pending stage (`ebur128`; mono 4 kHz s16 for the waveform; the `astats`/`silencedetect` graph; mono 44.1 kHz WAV for Essentia), each branch's audio going to a temp file or dropped, and the stages read the log (`stderr`) and their file afterwards. A stage that is the only one pending (`--stage=…`) uses the same code with a single branch. If the shared run fails (a broken file), the stages run on their own again so each records its own error. What still runs separately: `fpcalc` (first two minutes, its own decoder) and the 30 s excerpt for the spectral cutoff (seeked to, not decoded from the start). Not done: Essentia on a middle excerpt instead of the whole track, at some cost in BPM/key accuracy on long or varying tracks.
 
 ## Health
 

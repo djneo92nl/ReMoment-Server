@@ -2,7 +2,9 @@
 
 namespace App\Domain\Analysis\Stages;
 
-use App\Domain\Analysis\AnalysisStage;
+use App\Domain\Analysis\DecodeBranch;
+use App\Domain\Analysis\DecodedStage;
+use App\Domain\Analysis\DecodePass;
 use App\Domain\Analysis\Spectrum;
 use App\Domain\Analysis\Tools;
 use App\Models\File;
@@ -10,9 +12,10 @@ use App\Models\FileAnalysis;
 use Illuminate\Support\Facades\Process;
 
 /**
- * What the audio says about the file's quality, from two ffmpeg runs and no other tool:
+ * What the audio says about the file's quality, from the shared decode (`DecodePass`), one short excerpt
+ * decode and no other tool:
  *
- * - **Whole file** (one filter graph of `astats` and `silencedetect` probes): clipping, mono or out-of-phase
+ * - **Whole file** (a filter branch of the shared decode of `astats` and `silencedetect` probes): clipping, mono or out-of-phase
  *   stereo, silence at the start and end, the bit depth the samples really use, and the decoder's warnings
  *   (damaged or truncated files).
  * - **Spectral cutoff** (half a minute from the middle, decoded to mono floats and analysed by `Spectrum`): lossy
@@ -21,7 +24,7 @@ use Illuminate\Support\Facades\Process;
  *   likely a lossless file is a transcode or an upsampled "hi-res" file. It is a hint, never proof: a recording
  *   that is naturally band-limited looks the same, so clients show "suspect", not "fake".
  */
-class QualityStage implements AnalysisStage
+class QualityStage implements DecodedStage
 {
     /** Seconds from the middle of the track the spectrum is measured on (the cutoff belongs to the whole file). */
     private const EXCERPT = 30;
@@ -57,19 +60,21 @@ class QualityStage implements AnalysisStage
 
     public function run(File $file, string $localPath, FileAnalysis $analysis): array
     {
+        return DecodePass::runAlone($this, $file, $localPath, $analysis);
+    }
+
+    public function branch(File $file): DecodeBranch
+    {
+        return new DecodeBranch(self::graph('{in}', '{out}'));
+    }
+
+    public function fromDecode(File $file, string $localPath, FileAnalysis $analysis, DecodePass $pass): array
+    {
         $rate = $file->sample_rate ?: 44100;
 
-        $whole = Process::timeout(600)->run([
-            Tools::ffmpeg(), '-hide_banner', '-nostats', '-i', $localPath, '-vn',
-            '-filter_complex', self::graph(), '-map', '[out]', '-f', 'null', '-',
-        ]);
+        $attributes = self::parse($pass->stderr, $rate, $file);
 
-        if (!$whole->successful()) {
-            throw new \RuntimeException('ffmpeg could not analyse the file: '.self::lastLine($whole->errorOutput()));
-        }
-
-        $attributes = self::parse($whole->errorOutput(), $rate, $file);
-
+        // Only 30 s, seeked to rather than decoded from the start, so it stays a separate (cheap) run.
         $excerpt = Process::timeout(300)->run([
             Tools::ffmpeg(), '-v', 'error', '-ss', (string) self::excerptStart($file->duration), '-t', (string) self::EXCERPT,
             '-i', $localPath, '-vn', '-af', 'pan=mono|c0=c0', '-ar', (string) $rate, '-f', 'f32le', '-',
@@ -83,10 +88,10 @@ class QualityStage implements AnalysisStage
     }
 
     /** The filter graph for the whole file: stereo, split into whole-file statistics, mid, side and silence probes. */
-    public static function graph(): string
+    public static function graph(string $in = '[0:a]', string $out = '[out]'): string
     {
-        return '[0:a]aformat=channel_layouts=stereo,asplit=4[s0][s1][s2][s3];'
-            .'[s0]astats@all=measure_perchannel=none:measure_overall=Peak_count+Flat_factor+Bit_depth+Number_of_samples[out];'
+        return $in.'aformat=channel_layouts=stereo,asplit=4[s0][s1][s2][s3];'
+            .'[s0]astats@all=measure_perchannel=none:measure_overall=Peak_count+Flat_factor+Bit_depth+Number_of_samples'.$out.';'
             .'[s1]pan=mono|c0=0.5*c0+0.5*c1,astats@mid=measure_perchannel=none:measure_overall=RMS_level,anullsink;'
             .'[s2]pan=mono|c0=0.5*c0-0.5*c1,astats@side=measure_perchannel=none:measure_overall=RMS_level,anullsink;'
             .'[s3]silencedetect=noise=-60dB:d=0.3,anullsink';

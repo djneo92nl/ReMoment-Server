@@ -2,19 +2,20 @@
 
 namespace App\Domain\Analysis\Stages;
 
-use App\Domain\Analysis\AnalysisStage;
+use App\Domain\Analysis\DecodeBranch;
+use App\Domain\Analysis\DecodedStage;
+use App\Domain\Analysis\DecodePass;
 use App\Domain\Analysis\Tools;
 use App\Models\File;
 use App\Models\FileAnalysis;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Process;
 
 /**
  * BPM, key, danceability and (when the sidecar runs the ML models) mood, arousal/valence, instrumentalness
  * and genre, computed by the Essentia sidecar (docker/analysis). The audio goes over as a mono 44.1 kHz WAV
- * made here with ffmpeg, so it works for local and remote files and the sidecar needs no access to the music.
+ * made here with ffmpeg (in the shared decode, see `DecodePass`), so it works for local and remote files and the sidecar needs no access to the music.
  */
-class EssentiaStage implements AnalysisStage
+class EssentiaStage implements DecodedStage
 {
     /** Keys are stored with sharps only, so "Bb" and "A#" are one key. */
     private const FLATS = ['Db' => 'C#', 'Eb' => 'D#', 'Gb' => 'F#', 'Ab' => 'G#', 'Bb' => 'A#'];
@@ -36,26 +37,23 @@ class EssentiaStage implements AnalysisStage
 
     public function run(File $file, string $localPath, FileAnalysis $analysis): array
     {
-        $wav = tempnam(sys_get_temp_dir(), 'remoment-essentia-');
+        return DecodePass::runAlone($this, $file, $localPath, $analysis);
+    }
 
+    public function branch(File $file): DecodeBranch
+    {
+        return new DecodeBranch('{in}aformat=channel_layouts=mono,aresample=44100,aformat=sample_fmts=s16{out}', ['-c:a', 'pcm_s16le', '-f', 'wav']);
+    }
+
+    public function fromDecode(File $file, string $localPath, FileAnalysis $analysis, DecodePass $pass): array
+    {
+        $stream = fopen($pass->file($this->key()), 'rb');
         try {
-            $decoded = Process::timeout(600)->run([
-                Tools::ffmpeg(), '-y', '-v', 'error', '-i', $localPath, '-vn', '-ac', '1', '-ar', '44100', '-f', 'wav', $wav,
-            ]);
-            if (!$decoded->successful()) {
-                throw new \RuntimeException('ffmpeg could not decode the file: '.trim(mb_substr($decoded->errorOutput(), 0, 200)));
-            }
-
-            $stream = fopen($wav, 'rb');
-            try {
-                $response = Http::timeout(config('analysis.essentia_timeout'))
-                    ->attach('audio', $stream, 'audio.wav')
-                    ->post(rtrim(config('analysis.essentia_url'), '/').'/analyze');
-            } finally {
-                is_resource($stream) && fclose($stream);
-            }
+            $response = Http::timeout(config('analysis.essentia_timeout'))
+                ->attach('audio', $stream, 'audio.wav')
+                ->post(rtrim(config('analysis.essentia_url'), '/').'/analyze');
         } finally {
-            @unlink($wav);
+            is_resource($stream) && fclose($stream);
         }
 
         if (!$response->successful()) {

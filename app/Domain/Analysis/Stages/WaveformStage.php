@@ -2,17 +2,18 @@
 
 namespace App\Domain\Analysis\Stages;
 
-use App\Domain\Analysis\AnalysisStage;
+use App\Domain\Analysis\DecodeBranch;
+use App\Domain\Analysis\DecodedStage;
+use App\Domain\Analysis\DecodePass;
 use App\Domain\Analysis\Tools;
 use App\Models\File;
 use App\Models\FileAnalysis;
-use Illuminate\Support\Facades\Process;
 
 /**
  * The waveform of a file: `analysis.waveform_points` peak values (0–100, relative to the file's own loudest
  * sample), from the audio decoded by ffmpeg to 4 kHz mono. Enough to draw a track's shape; not for editing.
  */
-class WaveformStage implements AnalysisStage
+class WaveformStage implements DecodedStage
 {
     /** Samples per second the file is decoded to; peaks need no more. */
     private const RATE = 4000;
@@ -34,15 +35,17 @@ class WaveformStage implements AnalysisStage
 
     public function run(File $file, string $localPath, FileAnalysis $analysis): array
     {
-        $result = Process::timeout(600)->run([
-            Tools::ffmpeg(), '-v', 'error', '-i', $localPath, '-vn', '-ac', '1', '-ar', (string) self::RATE, '-f', 's16le', '-',
-        ]);
+        return DecodePass::runAlone($this, $file, $localPath, $analysis);
+    }
 
-        if (!$result->successful()) {
-            throw new \RuntimeException('ffmpeg could not decode the file: '.trim(mb_substr($result->errorOutput(), 0, 200)));
-        }
+    public function branch(File $file): DecodeBranch
+    {
+        return new DecodeBranch('{in}aformat=channel_layouts=mono,aresample='.self::RATE.',aformat=sample_fmts=s16{out}', ['-f', 's16le']);
+    }
 
-        return ['waveform' => self::peaks($result->output(), (int) config('analysis.waveform_points'))];
+    public function fromDecode(File $file, string $localPath, FileAnalysis $analysis, DecodePass $pass): array
+    {
+        return ['waveform' => self::peaks((string) file_get_contents($pass->file($this->key())), (int) config('analysis.waveform_points'))];
     }
 
     /**

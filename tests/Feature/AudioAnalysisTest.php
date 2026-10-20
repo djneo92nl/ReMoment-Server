@@ -93,6 +93,9 @@ class AudioAnalysisTest extends TestCase
 
     private bool $ffmpegFails = false;
 
+    /** @var list<list<string>> the commands of the ffmpeg decode runs */
+    private array $decodes = [];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -109,17 +112,33 @@ class AudioAnalysisTest extends TestCase
 
             return match (true) {
                 str_contains($command, '-version') => Process::result("tool version 1.0\n"),
-                str_contains($command, 'ebur128') => $this->ffmpegFails
-                    ? Process::result('', 'song.flac: Invalid data found when processing input', 1)
-                    : Process::result('', self::EBUR128),
+                str_contains($command, '-filter_complex') => $this->decodePass($process),
                 str_contains($command, 'fpcalc') => Process::result(json_encode(['duration' => 241.3, 'fingerprint' => 'AQADtEmS'])),
-                str_contains($command, 's16le') => Process::result(self::pcm()),
-                str_contains($command, 'filter_complex') => Process::result('', self::QUALITY),
                 str_contains($command, 'f32le') => Process::result(self::floats(16000)),
-                str_contains($command, '-f wav') => Process::result(''),
                 default => Process::result('', "unexpected: {$command}", 1),
             };
         });
+    }
+
+    /** The shared ffmpeg decode: logs what the requested filters print and writes the audio the branches output. */
+    private function decodePass(PendingProcess $process): mixed
+    {
+        $this->decodes[] = $command = (array) $process->command;
+        $line = implode(' ', $command);
+
+        if ($this->ffmpegFails && str_contains($line, 'ebur128')) {
+            return Process::result('', 'song.flac: Invalid data found when processing input', 1);
+        }
+
+        foreach ($command as $i => $argument) {
+            if ($argument === '-f' && ($command[$i + 1] ?? null) === 's16le') {
+                file_put_contents($command[$i + 2], self::pcm());
+            } elseif ($argument === '-f' && ($command[$i + 1] ?? null) === 'wav') {
+                file_put_contents($command[$i + 2], 'RIFF');
+            }
+        }
+
+        return Process::result('', (str_contains($line, 'ebur128') ? self::EBUR128 : '').(str_contains($line, 'astats') ? self::QUALITY : ''));
     }
 
     protected function tearDown(): void
@@ -203,9 +222,12 @@ class AudioAnalysisTest extends TestCase
 
     public function test_without_fpcalc_the_lookup_is_skipped_instead_of_failing(): void
     {
-        Process::fake(fn (PendingProcess $process) => str_contains(implode(' ', (array) $process->command), 'fpcalc')
-            ? Process::result('', 'not found', 127)
-            : Process::result("tool version 1.0\n", self::EBUR128));
+        Process::fake(fn (PendingProcess $process) => match (true) {
+            str_contains(implode(' ', (array) $process->command), 'fpcalc') => Process::result('', 'not found', 127),
+            str_contains(implode(' ', (array) $process->command), '-filter_complex') => $this->decodePass($process),
+            str_contains(implode(' ', (array) $process->command), 'f32le') => Process::result(self::floats(16000)),
+            default => Process::result("tool version 1.0\n"),
+        });
         [$file] = $this->localTrack();
 
         AnalyzeAudioFile::dispatchSync($file);
@@ -287,6 +309,34 @@ class AudioAnalysisTest extends TestCase
 
         $this->assertSame(0, AudioAnalysis::pending()->count());
         $this->assertNotNull($orphan);
+    }
+
+    public function test_the_whole_file_is_decoded_once_for_all_stages(): void
+    {
+        config(['analysis.essentia_url' => 'http://analysis:8090']);
+        Http::fake(['analysis:8090/analyze' => Http::response(['bpm' => 100]), 'api.acoustid.org/*' => Http::response(['status' => 'ok', 'results' => []])]);
+        [$file] = $this->localTrack();
+
+        AnalyzeAudioFile::dispatchSync($file);
+
+        $this->assertCount(1, $this->decodes, 'loudness, waveform, quality and Essentia share one ffmpeg run');
+        $line = implode(' ', $this->decodes[0]);
+        foreach (['ebur128', 'astats@all', 's16le', '-f wav', 'asplit=4'] as $part) {
+            $this->assertStringContainsString($part, $line);
+        }
+        $this->assertSame([], $file->analysis()->first()->errors);
+        $this->assertSame([], glob(sys_get_temp_dir().'/remoment-decode-*'), 'temp files are removed');
+    }
+
+    public function test_a_stage_on_its_own_still_decodes_for_itself(): void
+    {
+        [$file] = $this->localTrack();
+
+        AnalyzeAudioFile::dispatchSync($file, 'loudness');
+
+        $this->assertCount(1, $this->decodes);
+        $this->assertStringNotContainsString('asplit=4[i', implode(' ', $this->decodes[0]));
+        $this->assertSame(-14.1, $file->analysis()->first()->loudness_lufs);
     }
 
     public function test_essentia_results_are_stored_and_flats_become_sharps(): void

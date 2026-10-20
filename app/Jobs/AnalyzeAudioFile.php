@@ -3,6 +3,8 @@
 namespace App\Jobs;
 
 use App\Domain\Analysis\AudioAnalysis;
+use App\Domain\Analysis\DecodedStage;
+use App\Domain\Analysis\DecodePass;
 use App\Domain\Storage\FileStore;
 use App\Models\File;
 use App\Models\FileAnalysis;
@@ -61,18 +63,47 @@ class AnalyzeAudioFile implements ShouldBeUnique, ShouldQueue
         }
 
         (new FileStore($file->location))->withLocalPath($file->path, function (string $path) use ($file, $analysis, $stages) {
-            foreach ($stages as $stage) {
-                try {
-                    $analysis->fill($stage->run($file, $path, $analysis));
-                    $analysis->recordSuccess($stage->key(), $stage->version());
-                } catch (\Throwable $e) {
-                    $analysis->recordError($stage->key(), $stage->version(), $e->getMessage());
-                }
+            $pass = $this->decode($file, $path, $stages);
 
-                $analysis->save();
+            try {
+                foreach ($stages as $stage) {
+                    try {
+                        $analysis->fill($pass && $stage instanceof DecodedStage
+                            ? $stage->fromDecode($file, $path, $analysis, $pass)
+                            : $stage->run($file, $path, $analysis));
+                        $analysis->recordSuccess($stage->key(), $stage->version());
+                    } catch (\Throwable $e) {
+                        $analysis->recordError($stage->key(), $stage->version(), $e->getMessage());
+                    }
+
+                    $analysis->save();
+                }
+            } finally {
+                $pass?->cleanup();
             }
         });
 
         AudioAnalysis::applyEffects($file, $analysis);
+    }
+
+    /**
+     * One ffmpeg decode for every pending stage that works on the decoded audio. Null when fewer than two
+     * need it, or when the shared run failed: the stages then run on their own, so each records its own error.
+     *
+     * @param  array<string, \App\Domain\Analysis\AnalysisStage>  $stages
+     */
+    private function decode(File $file, string $path, array $stages): ?DecodePass
+    {
+        $shared = array_values(array_filter($stages, fn ($stage) => $stage instanceof DecodedStage));
+
+        if (count($shared) < 2) {
+            return null;
+        }
+
+        try {
+            return DecodePass::run($shared, $file, $path);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }
