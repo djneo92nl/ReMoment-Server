@@ -188,21 +188,22 @@
             </div>
 
             {{-- Artwork + what is playing --}}
-            <a href="{{ route('devices.show', $device) }}" style="display:flex;align-items:center;gap:.75rem;flex:1 1 0;min-width:0;max-width:20rem;color:inherit;text-decoration:none">
-                <div style="view-transition-name:np-cover;width:3rem;height:3rem;border-radius:.4rem;overflow:hidden;flex:none;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.35)">
+            {{-- A div, not an <a>: the title and the offline line hold links of their own, and anchors can't nest --}}
+            <div style="display:flex;align-items:center;gap:.75rem;flex:1 1 0;min-width:0;max-width:20rem;color:inherit">
+                <a href="{{ route('devices.show', $device) }}" style="view-transition-name:np-cover;display:flex;flex:none;width:3rem;height:3rem;border-radius:.4rem;overflow:hidden;background:rgba(255,255,255,.12);align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.35);color:inherit;text-decoration:none">
                     @if($thumb)
                         <img src="{{ $thumb }}" alt="" style="width:100%;height:100%;object-fit:cover">
                     @else
                         <i class="fa-solid {{ $radio ? 'fa-tower-broadcast' : 'fa-music' }}" style="opacity:.6;font-size:1.1rem"></i>
                     @endif
-                </div>
+                </a>
                 <div style="min-width:0">
-                    <p class="truncate" style="font-size:.9rem;font-weight:600;line-height:1.3">@if($track && ($trackUrl = \App\Domain\Library\TrackLink::forNowPlaying($nowPlaying)))<a href="{{ $trackUrl }}" style="color:inherit">{{ $title }}</a>@else{{ $title }}@endif</p>
+                    <p class="truncate" style="font-size:.9rem;font-weight:600;line-height:1.3">@if($track && ($trackUrl = \App\Domain\Library\TrackLink::forNowPlaying($nowPlaying)))<a href="{{ $trackUrl }}" style="color:inherit">{{ $title }}</a>@else<a href="{{ route('devices.show', $device) }}" style="color:inherit;text-decoration:none">{{ $title }}</a>@endif</p>
                     @if($line2)<p class="truncate" style="font-size:.78rem;line-height:1.3;{{ $dim }}">{{ $line2 }}</p>@endif
                     @if(!empty($isOfflinePlayer))<p class="truncate" style="font-size:.78rem;line-height:1.3;opacity:.7">Offline · <a href="{{ route('player') }}" target="_blank" rel="noopener" style="text-decoration:underline">open the player</a></p>
                     @elseif($line3)<p class="truncate" style="font-size:.78rem;line-height:1.3;opacity:.5">{{ $line3 }}</p>@endif
                 </div>
-            </a>
+            </div>
 
             {{-- Actions --}}
             <div style="flex:none;display:flex;align-items:center;justify-content:flex-end;gap:.15rem">
