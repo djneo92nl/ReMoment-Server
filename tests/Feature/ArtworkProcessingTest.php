@@ -275,4 +275,16 @@ class ArtworkProcessingTest extends TestCase
         $queued = Queue::pushed(ProcessArtwork::class)->map(fn (ProcessArtwork $job) => $job->originalUrl)->sort()->values()->all();
         $this->assertSame(['https://x.test/no-colors.jpg', 'https://x.test/outdated.jpg'], $queued);
     }
+
+    public function test_one_of_our_own_proxies_reported_by_a_speaker_is_its_originals_entry_on_any_host(): void
+    {
+        $original = 'https://i.scdn.co/image/abc';
+        ArtworkCache::put($original, $this->completeArtworkEntry());
+        $hash = md5($original);
+
+        foreach (['http://192.168.1.30:8080', 'http://192.168.1.212:8080', 'http://10.0.0.5'] as $host) {
+            $this->assertTrue(ArtworkCache::has($host.'/storage/artwork/'.$hash.'/512.jpg'));
+        }
+        $this->assertFalse(ArtworkCache::has('http://192.168.1.212:8080/storage/artwork/'.md5('other').'/512.jpg'));
+    }
 }

@@ -92,8 +92,17 @@ final class ArtworkCache
         return null;
     }
 
+    /**
+     * A speaker that shows one of our proxies reports it back as its image, with whatever host we gave it. That URL
+     * is the entry of the original image it was made from (the hash in its path), so a change of host or network
+     * never makes it a new, unprocessed image.
+     */
     private static function key(string $originalUrl): string
     {
+        if (preg_match('#/storage/artwork/([0-9a-f]{32})/[^/]+$#', $originalUrl, $m)) {
+            return 'artwork:'.$m[1];
+        }
+
         return 'artwork:'.md5($originalUrl);
     }
 }
