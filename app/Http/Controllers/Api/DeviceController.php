@@ -16,6 +16,7 @@ use App\Domain\Library\NotPlayableException;
 use App\Domain\Library\PlaybackFailedException;
 use App\Domain\Library\PlaybackResult;
 use App\Domain\Library\PlaylistMode;
+use App\Domain\Library\SpotifyUri;
 use App\Events\Device\PlaybackModesUpdated;
 use App\Http\Controllers\Api\Concerns\GuardsDeviceAccess;
 use App\Http\Controllers\Controller;
@@ -339,7 +340,10 @@ class DeviceController extends Controller
 
     public function libraryPlay(Request $request, Device $device, LibraryPlayback $library): JsonResponse
     {
-        $request->validate(['track_id' => ['required', 'integer', 'exists:tracks,id']]);
+        $request->validate([
+            'track_id' => ['required_without:spotify_track_id', 'nullable', 'integer', 'exists:tracks,id'],
+            'spotify_track_id' => ['required_without:track_id', 'nullable', 'string', 'regex:/^[A-Za-z0-9]+$/'],
+        ]);
 
         if ($error = $this->assertReachable($device)) {
             return $error;
@@ -347,6 +351,13 @@ class DeviceController extends Controller
 
         if (!LibraryPlayback::availableFor($device)) {
             return $this->unsupported('library_playback');
+        }
+
+        // A Spotify track the library doesn't hold (a row of an album's Spotify side).
+        if (!$request->filled('track_id')) {
+            $uri = SpotifyUri::track($request->string('spotify_track_id')->toString());
+
+            return $this->playFromLibrary(fn () => $library->playSpotifyUri($device, $uri), ['spotify_track_id' => $request->string('spotify_track_id')->toString()]);
         }
 
         $track = Track::with('metadata', 'artist', 'album')->findOrFail($request->integer('track_id'));
@@ -418,6 +429,7 @@ class DeviceController extends Controller
             'album_id' => ['required', 'integer', 'exists:albums,id'],
             'start_track_id' => ['nullable', 'integer', Rule::exists('tracks', 'id')->where('album_id', $request->integer('album_id'))],
             'shuffle' => ['nullable', 'boolean'],
+            'source' => ['nullable', Rule::in(['files', 'dlna', 'spotify'])],
         ]);
 
         if ($error = $this->assertReachable($device)) {
@@ -427,7 +439,7 @@ class DeviceController extends Controller
         $album = Album::findOrFail($data['album_id']);
         $start = isset($data['start_track_id']) ? Track::find($data['start_track_id']) : null;
 
-        return $this->playFromLibrary(fn () => $library->playAlbum($device, $album, $start, $request->boolean('shuffle')), ['album' => $album->name]);
+        return $this->playFromLibrary(fn () => $library->playAlbum($device, $album, $start, $request->boolean('shuffle'), $data['source'] ?? null), ['album' => $album->name]);
     }
 
     /** Plays all library tracks of an artist by DLNA or Spotify; see docs/api/library.md. */
@@ -436,6 +448,7 @@ class DeviceController extends Controller
         $data = $request->validate([
             'artist_id' => ['required', 'integer', 'exists:artists,id'],
             'shuffle' => ['nullable', 'boolean'],
+            'source' => ['nullable', 'in:files,dlna,spotify'],
         ]);
 
         if ($error = $this->assertReachable($device)) {
@@ -444,7 +457,7 @@ class DeviceController extends Controller
 
         $artist = Artist::findOrFail($data['artist_id']);
 
-        return $this->playFromLibrary(fn () => $library->playArtist($device, $artist, $request->boolean('shuffle')), ['artist' => $artist->name]);
+        return $this->playFromLibrary(fn () => $library->playArtist($device, $artist, $request->boolean('shuffle'), $data['source'] ?? null), ['artist' => $artist->name]);
     }
 
     /** Runs a LibraryPlayback call and maps its outcome to the API's responses. */

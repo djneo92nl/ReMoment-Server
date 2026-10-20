@@ -167,6 +167,42 @@ class LibraryApiTest extends TestCase
             ->assertJsonPath('data.0.name', 'Zed');
     }
 
+    public function test_artist_detail_follows_one_source_and_tells_each_album_its_kind(): void
+    {
+        $artist = $this->artist('Foo');
+        $local = $this->album($artist, 'Concrete and Gold');
+        foreach (['a', 'b', 'c', 'd'] as $title) {
+            $this->track($local, $title);
+        }
+        $single = $this->album($artist, 'Everlong UK CD1 (7243 8 84361 2 0)');
+        $this->track($single, 'c');
+        $spotifyOnly = $this->album($artist, 'Wasting Light');
+        $this->track($spotifyOnly, 's', false, 'sp1');
+
+        $local_ = $this->getJson("/api/library/artists/{$artist->id}?source=files")->assertOk()
+            ->assertJsonPath('source', 'files')
+            ->assertJsonPath('sources.0', ['id' => 'files', 'name' => 'Local', 'albums' => 2, 'tracks' => 5])
+            ->assertJsonPath('sources.1', ['id' => 'spotify', 'name' => 'Spotify', 'albums' => 1, 'tracks' => 1]);
+        $this->assertEqualsCanonicalizing(['Concrete and Gold', 'Everlong UK CD1 (7243 8 84361 2 0)'], collect($local_->json('albums'))->pluck('name')->all());
+        $this->assertSame(['album', 'single'], collect($local_->json('albums'))->sortBy('name')->pluck('kind')->values()->all());
+
+        $this->getJson("/api/library/artists/{$artist->id}?source=spotify")->assertOk()
+            ->assertJsonPath('source', 'spotify')->assertJsonPath('albums.0.name', 'Wasting Light');
+
+        $this->getJson("/api/library/artists/{$artist->id}?source=nope")->assertStatus(422);
+    }
+
+    public function test_artist_default_source_is_used_when_the_request_names_none(): void
+    {
+        $artist = $this->artist('Foo');
+        $this->track($this->album($artist, 'Local album'), 'a');
+        $this->track($this->album($artist, 'Spotify album'), 's', false, 'sp1');
+        \App\Domain\Library\ArtistOverrides::setDefaultSource($artist, 'spotify');
+
+        $this->getJson("/api/library/artists/{$artist->id}")->assertJsonPath('source', 'spotify');
+        $this->getJson("/api/library/artists/{$artist->id}?source=files")->assertJsonPath('source', 'files');
+    }
+
     public function test_artist_plays_only_count_visible_tracks_in_the_scope(): void
     {
         $a = $this->artist('A');
@@ -380,6 +416,7 @@ class LibraryApiTest extends TestCase
                 'year' => 2000,
                 'artwork' => null,
                 'favorite' => false,
+                'kind' => 'album',
             ]);
     }
 
@@ -410,8 +447,8 @@ class LibraryApiTest extends TestCase
                 ],
                 'playable' => true,
                 'tracks' => [
-                    ['id' => $one->id, 'name' => 'Intro', 'duration' => 200, 'playable' => true, 'details' => ['genres' => [], 'quality' => null, 'credits' => [], 'isrc' => null, 'explicit' => null, 'popularity' => null, 'listeners' => null, 'playcount' => null, 'analysis' => null]],
-                    ['id' => $two->id, 'name' => 'Apocalypse Please', 'duration' => 200, 'playable' => false, 'details' => ['genres' => [], 'quality' => null, 'credits' => [], 'isrc' => null, 'explicit' => null, 'popularity' => null, 'listeners' => null, 'playcount' => null, 'analysis' => null]],
+                    ['id' => $one->id, 'name' => 'Intro', 'duration' => 200, 'playable' => true, 'favorite' => false, 'details' => ['genres' => [], 'quality' => null, 'credits' => [], 'isrc' => null, 'explicit' => null, 'popularity' => null, 'listeners' => null, 'playcount' => null, 'analysis' => null]],
+                    ['id' => $two->id, 'name' => 'Apocalypse Please', 'duration' => 200, 'playable' => false, 'favorite' => false, 'details' => ['genres' => [], 'quality' => null, 'credits' => [], 'isrc' => null, 'explicit' => null, 'popularity' => null, 'listeners' => null, 'playcount' => null, 'analysis' => null]],
                 ],
             ]);
 

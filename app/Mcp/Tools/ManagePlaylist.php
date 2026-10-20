@@ -2,8 +2,10 @@
 
 namespace App\Mcp\Tools;
 
+use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\PlaylistEditor;
 use App\Domain\Library\SmartPlaylist\SmartPlaylistBuilder;
+use App\Models\Media\Album;
 use App\Models\Media\Playlist;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
@@ -22,6 +24,8 @@ class ManagePlaylist extends Tool
             'name' => $schema->string()->max(255),
             'smart' => $schema->boolean()->description('create: a rule-based playlist'),
             'track_ids' => $schema->array()->items($schema->integer())->description('add_tracks / remove_tracks'),
+            'album_id' => $schema->integer()->description('add_tracks: add the album\'s tracks in album order instead of track_ids'),
+            'source' => $schema->string()->enum(['files', 'dlna', 'spotify'])->description('add_tracks with album_id: only the tracks of this source'),
             'track_id' => $schema->integer()->description('move_track'),
             'direction' => $schema->integer()->description('move_track: -1 or 1')->min(-1)->max(1),
             'rules' => $schema->object()->description('set_rules: the smart playlist definition'),
@@ -35,6 +39,7 @@ class ManagePlaylist extends Tool
             'action' => 'required|in:create,rename,delete,add_tracks,remove_tracks,move_track,set_rules',
             'id' => 'nullable|integer', 'name' => 'nullable|string|max:255', 'smart' => 'nullable|boolean',
             'track_ids' => 'nullable|array', 'track_ids.*' => 'integer|exists:tracks,id',
+            'album_id' => 'nullable|integer|exists:albums,id', 'source' => 'nullable|in:files,dlna,spotify',
             'track_id' => 'nullable|integer', 'direction' => 'nullable|integer|in:-1,1',
             'rules' => 'nullable|array', 'confirm' => 'nullable|boolean',
         ]);
@@ -75,6 +80,13 @@ class ManagePlaylist extends Tool
             case 'remove_tracks':
                 if ($playlist->isSmart()) {
                     return Response::error('unsupported (422): the tracks of a smart playlist come from its rules; use set_rules.');
+                }
+                if ($data['action'] === 'add_tracks' && !empty($data['album_id'])) {
+                    $tracks = LibraryPlayback::albumTracks(Album::findOrFail($data['album_id']));
+                    if (!empty($data['source'])) {
+                        $tracks = $tracks->filter(fn ($t) => in_array($data['source'], $t->sources(), true));
+                    }
+                    $data['track_ids'] = $tracks->pluck('id')->map(fn ($id) => (int) $id)->all();
                 }
                 foreach ($data['track_ids'] ?? [] as $trackId) {
                     $data['action'] === 'add_tracks' ? $editor->addTrack($playlist, $trackId) : $editor->removeTrack($playlist, $trackId);

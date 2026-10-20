@@ -5,18 +5,24 @@ namespace App\Http\Controllers\Api;
 use App\Domain\Artwork\LibraryArtwork;
 use App\Domain\Artwork\LibraryItemArtwork;
 use App\Domain\Artwork\PlaylistArtwork;
+use App\Domain\Library\AlbumKind;
+use App\Domain\Library\AlbumPage;
 use App\Domain\Health\LibraryReports;
 use App\Domain\Library\GenreColors;
 use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\LibrarySources;
 use App\Domain\Library\ListeningModes;
+use App\Domain\Library\Normalizer;
 use App\Domain\Library\PlaylistCoverage;
+use App\Domain\Library\PlaylistEditor;
 use App\Domain\Library\PlaylistMode;
 use App\Domain\Library\RandomAlbum;
 use App\Domain\Library\RecentItems;
 use App\Domain\Library\SmartPlaylist\SmartPlaylistDescriber;
+use App\Domain\Library\SpotifyCatalog;
 use App\Http\Controllers\Controller;
+use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
 use App\Models\Client;
 use App\Models\Device;
 use App\Models\Media\Album;
@@ -25,11 +31,13 @@ use App\Models\Media\Genre;
 use App\Models\Media\Playlist;
 use App\Models\Media\Track;
 use App\Models\Play;
+use App\Services\SpotifyTokenService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
  * Library browsing and favorites for client devices. Shapes are documented
@@ -175,8 +183,21 @@ class LibraryController extends Controller
 
     public function artist(Request $request, Artist $artist): JsonResponse
     {
+        $request->validate(['source' => ['nullable', 'in:files,dlna,spotify']]);
         $hidden = $this->hiddenSources($request);
-        $albums = LibrarySources::albums($artist->albums()->with('artist'), $hidden)->get()
+
+        // One library at a time, like the web page: streaming is never merged with local. The libraries the artist
+        // has tracks in, plus Spotify while it is connected (its side is always one request away).
+        $sources = array_values(array_intersect(LibrarySources::libraryIds(), LibrarySources::ofTracks($artist->tracks()->with(['metadata' => fn ($q) => $q->whereIn('key', ['dlna_url', 'external_id'])])->get())));
+        if (app(SpotifyTokenService::class)->isConnected() && !in_array('spotify', $sources, true)) {
+            $sources[] = 'spotify';
+        }
+        $source = AlbumPage::selectSource($sources, $request->query('source') ?? $artist->metaValue('default_source'), LeadingSource::scope($request->query('scope')));
+
+        $albums = LibrarySources::albums($artist->albums()->with(['artist', 'metadata' => fn ($q) => $q->where('key', 'release_type')]), $hidden)
+            ->when($source !== null, fn ($q) => $q->whereHas('tracks', fn ($t) => LibrarySources::availableFrom($t, $source)))
+            ->withCount(['tracks' => fn ($t) => $source !== null ? LibrarySources::availableFrom($t, $source) : $t])
+            ->get()
             ->sortBy([
                 fn (Album $a, Album $b) => ($b->released_at?->year ?? PHP_INT_MIN) <=> ($a->released_at?->year ?? PHP_INT_MIN),
                 fn (Album $a, Album $b) => strcasecmp($a->name, $b->name),
@@ -192,7 +213,13 @@ class LibraryController extends Controller
                 'fanart' => LibraryItemArtwork::fanart($artist->fanartUrl()),
                 'gallery' => array_values(array_filter(array_map(LibraryItemArtwork::fanart(...), $artist->galleryUrls()))),
             ],
-            'albums' => $albums->map(fn (Album $album) => $this->albumItem($album))->values(),
+            'source' => $source,
+            'sources' => array_map(function (string $id) use ($artist) {
+                $tracks = LibrarySources::availableFrom($artist->tracks(), $id);
+
+                return ['id' => $id, 'name' => LibrarySources::LIBRARIES[$id]['name'], 'albums' => (clone $tracks)->distinct()->count('tracks.album_id'), 'tracks' => (clone $tracks)->count()];
+            }, $sources),
+            'albums' => $albums->map(fn (Album $album) => $this->albumItem($album) + ['kind' => AlbumKind::of($album, $album->tracks_count)])->values(),
         ]);
     }
 
@@ -212,6 +239,7 @@ class LibraryController extends Controller
             'name' => $track->name,
             'duration' => $track->duration,
             'playable' => LibraryPlayback::trackPlayable($track, $device),
+            'favorite' => $track->favorited_at !== null,
             'details' => $track->details(),
         ])->values();
 
@@ -570,15 +598,7 @@ class LibraryController extends Controller
         return response()->json([
             'artists' => $artists->map(fn (Artist $artist) => $this->artistItem($artist))->values(),
             'albums' => $albums->map(fn (Album $album) => $this->albumItem($album))->values(),
-            'tracks' => $tracks->map(fn (Track $track) => [
-                'id' => $track->id,
-                'name' => $track->name,
-                'artist_name' => $track->artist?->name,
-                'album_id' => $track->album_id,
-                'album_name' => $track->album?->name,
-                'duration' => $track->duration,
-                'artwork' => LibraryItemArtwork::forImages($track->album?->images),
-            ])->values(),
+            'tracks' => $tracks->map(fn (Track $track) => $this->searchTrack($track))->values(),
         ]);
     }
 
@@ -594,10 +614,138 @@ class LibraryController extends Controller
             ->orderByDesc('favorited_at')->orderByDesc('artists.id')->get();
         $this->preloadArtwork(albums: $albums, artists: $artists);
 
+        $tracks = LibrarySources::tracks(Track::query()->whereNotNull('favorited_at')->with(['artist', 'album']), $hidden)
+            ->orderByDesc('favorited_at')->orderByDesc('id')->get();
+        $this->preloadArtwork(albums: [...$albums, ...$tracks->pluck('album')->filter()]);
+
         return response()->json([
             'albums' => $albums->map(fn (Album $album) => $this->albumItem($album))->values(),
             'artists' => $artists->map(fn (Artist $artist) => $this->artistItem($artist))->values(),
+            'tracks' => $tracks->map(fn (Track $track) => $this->searchTrack($track))->values(),
         ]);
+    }
+
+    public function favoriteTrack(Request $request, Track $track): JsonResponse
+    {
+        return response()->json(['favorite' => $this->setFavorite($request, $track)]);
+    }
+
+    /** Playlists made on this server (not smart, not synced from Spotify): the ones tracks can be added to. */
+    public function editablePlaylists(): JsonResponse
+    {
+        $playlists = Playlist::query()->where('source', 'local')->orderBy('name')->withCount('tracks')->get();
+
+        return response()->json(['data' => $playlists->map(fn (Playlist $p) => [
+            'id' => $p->id,
+            'name' => $p->name,
+            'track_count' => $p->tracks_count,
+        ])->values()]);
+    }
+
+    public function createPlaylist(Request $request, PlaylistEditor $editor): JsonResponse
+    {
+        $data = $request->validate(['name' => ['required', 'string', 'max:255']]);
+        $playlist = $editor->create(trim($data['name']));
+
+        return response()->json(['id' => $playlist->id, 'name' => $playlist->name, 'track_count' => 0], 201);
+    }
+
+    /**
+     * Adds a track (`track_id`) or an album's tracks (`album_id`, optionally limited to a `source`) to a playlist
+     * made here, in album order, skipping what is already in it.
+     */
+    public function addPlaylistTracks(Request $request, Playlist $playlist, PlaylistEditor $editor): JsonResponse
+    {
+        $data = $request->validate([
+            'track_id' => ['required_without:album_id', 'nullable', 'integer', 'exists:tracks,id'],
+            'album_id' => ['required_without:track_id', 'nullable', 'integer', 'exists:albums,id'],
+            'source' => ['nullable', Rule::in(['files', 'dlna', 'spotify'])],
+        ]);
+
+        if (!$playlist->isEditable()) {
+            return response()->json(['error' => 'unsupported', 'message' => 'Tracks can only be added to playlists made here.'], 422);
+        }
+
+        if (!empty($data['track_id'])) {
+            $ids = [(int) $data['track_id']];
+        } else {
+            $tracks = LibraryPlayback::albumTracks(Album::findOrFail($data['album_id']), $this->hiddenSources($request));
+            if (!empty($data['source'])) {
+                $tracks = $tracks->filter(fn (Track $t) => in_array($data['source'], $t->sources(), true));
+            }
+            $ids = $tracks->pluck('id')->map(fn ($id) => (int) $id)->all();
+        }
+
+        return response()->json(['added' => $editor->addTracks($playlist, $ids), 'track_count' => $playlist->tracks()->count()]);
+    }
+
+    /**
+     * The album as Spotify has it, in album order; each track says which library track holds it (`track_id`, else null).
+     * `422 spotify_unavailable` while Spotify isn't connected, `404` when Spotify doesn't have the album, `502` when it fails.
+     */
+    public function albumSpotify(Album $album, SpotifyCatalog $catalog): JsonResponse
+    {
+        if (!$catalog->available()) {
+            return response()->json(['error' => 'spotify_unavailable', 'message' => 'Spotify is not connected.'], 422);
+        }
+
+        try {
+            $spotify = $catalog->albumTracks($album);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => 'driver_error', 'message' => 'Spotify did not answer: '.$e->getMessage()], 502);
+        }
+        abort_if($spotify === null, 404, 'Spotify does not have this album.');
+
+        $mine = $album->tracks()->get()->keyBy('name_key');
+        usort($spotify, fn ($a, $b) => [$a['disc'] ?? 1, $a['number']] <=> [$b['disc'] ?? 1, $b['number']]);
+        $rows = array_map(fn ($t) => [
+            'spotify_id' => $t['id'],
+            'name' => $t['name'],
+            'number' => $t['number'],
+            'disc' => $t['disc'],
+            'duration' => $t['duration'],
+            'track_id' => ($mine[Normalizer::track($t['name'])] ?? null)?->id,
+        ], $spotify);
+
+        return response()->json([
+            'tracks' => $rows,
+            'missing' => count(array_filter($rows, fn ($r) => $r['track_id'] === null)),
+        ]);
+    }
+
+    /** Adds the album's missing tracks from Spotify (like the web "Fill out album" action). */
+    public function fillAlbumFromSpotify(Album $album, SpotifyTokenService $spotify, SpotifyLibraryImporter $importer): JsonResponse
+    {
+        if (!$spotify->isConnected()) {
+            return response()->json(['error' => 'spotify_unavailable', 'message' => 'Spotify is not connected.'], 422);
+        }
+
+        try {
+            $id = $importer->findAlbumId($album);
+            abort_if($id === null, 404, 'Spotify does not have this album.');
+            $before = $album->tracks()->count();
+            $importer->importAlbum($id, $album);
+        } catch (HttpException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return response()->json(['error' => 'driver_error', 'message' => 'Spotify did not answer: '.$e->getMessage()], 502);
+        }
+
+        return response()->json(['added' => $album->tracks()->count() - $before]);
+    }
+
+    /** @return array<string, mixed> */
+    private function searchTrack(Track $track): array
+    {
+        return [
+            'id' => $track->id,
+            'name' => $track->name,
+            'artist_name' => $track->artist?->name,
+            'album_id' => $track->album_id,
+            'album_name' => $track->album?->name,
+            'duration' => $track->duration,
+            'artwork' => LibraryItemArtwork::forImages($track->album?->images),
+        ];
     }
 
     public function favoriteAlbum(Request $request, Album $album): JsonResponse
@@ -610,7 +758,7 @@ class LibraryController extends Controller
         return response()->json(['favorite' => $this->setFavorite($request, $artist)]);
     }
 
-    private function setFavorite(Request $request, Album|Artist $model): bool
+    private function setFavorite(Request $request, Album|Artist|Track $model): bool
     {
         $request->validate(['favorite' => ['required', 'boolean']]);
         $favorite = $request->boolean('favorite');

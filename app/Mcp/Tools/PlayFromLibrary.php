@@ -19,7 +19,9 @@ class PlayFromLibrary extends Tool
         return [
             'device_id' => $schema->integer()->required(),
             'type' => $schema->string()->enum(['track', 'album', 'artist', 'playlist'])->required(),
-            'id' => $schema->integer()->description('Id of the track, album, artist or playlist')->required(),
+            'id' => $schema->integer()->description('Id of the track, album, artist or playlist (not needed with spotify_track_id)'),
+            'source' => $schema->string()->enum(['files', 'dlna', 'spotify'])->description('album: play only from this path; spotify plays the album from Spotify even when the library has none of its tracks'),
+            'spotify_track_id' => $schema->string()->description('track: a Spotify track id the library does not hold (see album_spotify)'),
             'start_track_id' => $schema->integer()->description('album/playlist: start at this track'),
             'shuffle' => $schema->boolean()->description('album/artist/playlist: shuffle'),
             'playlist_library' => $schema->string()->description('playlist: the library it was browsed in (dlna) to play it locally'),
@@ -29,13 +31,14 @@ class PlayFromLibrary extends Tool
     public function handle(Request $request): Response
     {
         $data = $request->validate([
-            'device_id' => 'required|integer', 'type' => 'required|in:track,album,artist,playlist', 'id' => 'required|integer',
+            'device_id' => 'required|integer', 'type' => 'required|in:track,album,artist,playlist', 'id' => 'required_without:spotify_track_id|nullable|integer',
+            'source' => 'nullable|in:files,dlna,spotify', 'spotify_track_id' => 'nullable|string',
             'start_track_id' => 'nullable|integer', 'shuffle' => 'nullable|boolean', 'playlist_library' => 'nullable|string',
         ]);
 
         $body = match ($data['type']) {
-            'track' => ['track_id' => $data['id']],
-            'album' => ['album_id' => $data['id'], 'start_track_id' => $data['start_track_id'] ?? null, 'shuffle' => $data['shuffle'] ?? null],
+            'track' => ['track_id' => $data['id'] ?? null, 'spotify_track_id' => $data['spotify_track_id'] ?? null],
+            'album' => ['album_id' => $data['id'], 'start_track_id' => $data['start_track_id'] ?? null, 'shuffle' => $data['shuffle'] ?? null, 'source' => $data['source'] ?? null],
             'artist' => ['artist_id' => $data['id'], 'shuffle' => $data['shuffle'] ?? null],
             'playlist' => ['playlist_id' => $data['id'], 'start_track_id' => $data['start_track_id'] ?? null, 'shuffle' => $data['shuffle'] ?? null, 'library' => $data['playlist_library'] ?? null],
         };

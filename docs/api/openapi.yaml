@@ -647,6 +647,10 @@ paths:
         schema: { type: integer }
       - { $ref: "#/components/parameters/client" }
       - { $ref: "#/components/parameters/scope" }
+      - name: source
+        in: query
+        description: The library to show (an artist is never shown merged across libraries). Default the artist's default source, else the one the scope browses.
+        schema: { type: string, enum: [files, dlna, spotify] }
     get:
       tags: [Library]
       operationId: getArtist
@@ -747,6 +751,160 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/FavoriteBody" }
+  /library/albums/{album}/spotify:
+    parameters:
+      - name: album
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Library]
+      summary: The album as Spotify has it (needs Spotify connected on the server)
+      operationId: getAlbumSpotify
+      responses:
+        "200":
+          description: Spotify's tracks in album order; `track_id` is the library track that holds it, else null
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  missing: { type: integer, description: Tracks not in the library }
+                  tracks:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        spotify_id: { type: string }
+                        name: { type: string }
+                        number: { type: integer }
+                        disc: { type: integer }
+                        duration: { type: integer, description: Seconds }
+                        track_id: { type: integer, nullable: true }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "`spotify_unavailable`: Spotify is not connected" }
+        "502": { description: "`driver_error`: Spotify did not answer" }
+  /library/albums/{album}/fill-from-spotify:
+    parameters:
+      - name: album
+        in: path
+        required: true
+        schema: { type: integer }
+    post:
+      tags: [Library]
+      summary: Add the album's missing tracks from Spotify to the library
+      operationId: fillAlbumFromSpotify
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  added: { type: integer }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "`spotify_unavailable`" }
+        "502": { description: "`driver_error`" }
+  /library/tracks/{track}/favorite:
+    parameters:
+      - name: track
+        in: path
+        required: true
+        schema: { type: integer }
+    put:
+      tags: [Library]
+      operationId: favoriteTrack
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FavoriteBody" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FavoriteBody" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /library/editable-playlists:
+    get:
+      tags: [Library]
+      summary: "Playlists made on the server (not smart, not synced from Spotify): the ones tracks can be added to"
+      operationId: listEditablePlaylists
+      responses:
+        "200":
+          description: OK, by name
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        name: { type: string }
+                        track_count: { type: integer }
+  /library/playlists:
+    post:
+      tags: [Library]
+      summary: Create an empty playlist made here
+      operationId: createPlaylist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 255 }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: integer }
+                  name: { type: string }
+                  track_count: { type: integer }
+  /library/playlists/{playlist}/tracks:
+    parameters:
+      - name: playlist
+        in: path
+        required: true
+        schema: { type: integer }
+    post:
+      tags: [Library]
+      summary: Add a track, or an album's tracks in album order, to a playlist made here; tracks already in it are skipped
+      operationId: addPlaylistTracks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: "`track_id` or `album_id`"
+              properties:
+                track_id: { type: integer }
+                album_id: { type: integer }
+                source: { type: string, enum: [files, dlna, spotify], description: "With album_id, only the tracks of that source" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  added: { type: integer }
+                  track_count: { type: integer }
+        "422": { description: "Validation error, or `unsupported` for a smart or Spotify playlist" }
   /library/health:
     get:
       tags: [Library]
@@ -954,6 +1112,9 @@ paths:
                   artists:
                     type: array
                     items: { $ref: "#/components/schemas/ArtistItem" }
+                  tracks:
+                    type: array
+                    items: { $ref: "#/components/schemas/SearchTrack" }
   /library/search:
     get:
       tags: [Library]
@@ -996,9 +1157,10 @@ paths:
           application/json:
             schema:
               type: object
-              required: [track_id]
+              description: "`track_id`, or `spotify_track_id` for a Spotify track the library does not hold"
               properties:
                 track_id: { type: integer }
+                spotify_track_id: { type: string }
       responses:
         "200": { $ref: "#/components/responses/PlayedOk" }
         "422": { $ref: "#/components/responses/DeviceError" }
@@ -1018,6 +1180,7 @@ paths:
                 album_id: { type: integer }
                 start_track_id: { type: integer }
                 shuffle: { type: boolean, default: false }
+                source: { type: string, enum: [files, dlna, spotify], description: "Play only from that path; `spotify` plays the album from Spotify even when the library holds none of its tracks" }
       responses:
         "200": { $ref: "#/components/responses/PlayedOk" }
         "422": { $ref: "#/components/responses/DeviceError" }
@@ -1036,6 +1199,7 @@ paths:
               properties:
                 artist_id: { type: integer }
                 shuffle: { type: boolean, default: false }
+                source: { type: string, enum: [files, dlna, spotify], description: Play only the tracks of this library. }
       responses:
         "200": { $ref: "#/components/responses/PlayedOk" }
         "422": { $ref: "#/components/responses/DeviceError" }
@@ -1716,9 +1880,25 @@ components:
           type: object
           additionalProperties: true
           description: "bio, wikipedia_url, links, images, mood, style, tags, listeners, playcount, fanart (processed artwork object with proxy_bg backdrops, or null) … all may be null; see docs/api/library.md"
+        source: { type: string, enum: [files, dlna, spotify], nullable: true, description: The library the albums are from. }
+        sources:
+          type: array
+          description: The libraries to switch between (where the artist has tracks, plus Spotify while connected).
+          items:
+            type: object
+            properties:
+              id: { type: string, enum: [files, dlna, spotify] }
+              name: { type: string }
+              albums: { type: integer }
+              tracks: { type: integer }
         albums:
           type: array
-          items: { $ref: "#/components/schemas/AlbumItem" }
+          items:
+            allOf:
+              - { $ref: "#/components/schemas/AlbumItem" }
+              - type: object
+                properties:
+                  kind: { type: string, enum: [album, single, live, compilation, edition], description: "Which shelf: single covers singles and EPs, edition special editions and regional pressings." }
     AlbumDetail:
       type: object
       properties:
@@ -1748,6 +1928,7 @@ components:
               name: { type: string }
               duration: { type: integer, nullable: true }
               playable: { type: boolean }
+              favorite: { type: boolean }
               details: { type: object, additionalProperties: true }
     PlaylistDetail:
       type: object

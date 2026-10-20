@@ -34,7 +34,9 @@ Duplicates from before that are merged by an admin running `php artisan library:
 
 ### `GET /api/library/artists/{id}`
 
-`{ "id", "name", "favorite", "genres": [ "Rock", … ], "details": ArtistDetails, "albums": [ AlbumItem, … ] }` — albums newest year first (unknown year last), then by name.
+`{ "id", "name", "favorite", "genres": [ "Rock", … ], "details": ArtistDetails, "source": "files", "sources": [ { "id": "files", "name": "Local", "albums": 8, "tracks": 90 }, … ], "albums": [ AlbumItem + { "kind" }, … ] }` — albums newest year first (unknown year last), then by name.
+
+Streaming is never merged with local: `albums` are those with a track in one library, the selected `source` (`files` | `dlna` | `spotify`, or `null` when the artist has none). Pick it with `?source=`; without it (or when the artist has no tracks there) the server takes the artist's default source (set in the web settings), else the library the scope browses, else the leading one (Local when own files are indexed). `sources` lists the libraries to switch between: where the artist has tracks, plus Spotify while it is connected; `albums`/`tracks` count what the artist holds in that library (0 for a Spotify side the library has nothing of). `kind` per album says which shelf it belongs on: `album` | `single` (singles and EPs) | `live` | `compilation` | `edition` (special editions and regional pressings, which libraries hold as separate albums). It is derived from the album name, the stored release type and the track count (`App\Domain\Library\AlbumKind`), so treat it as a good guess.
 
 **ArtistDetails** — `{ "type": "group"|"person"|…|null, "country": "GB"|null, "area": "London"|null, "begin_date": "1994"|null, "end_date": null, "bio": "…"|null, "wikipedia_url": "…"|null, "links": { "official": "…", "discogs": "…", … } }`. `bio` is the Wikipedia summary, else the Last.fm bio. Dates are MusicBrainz partial dates (`1994`, `1994-05`, `1994-05-12`). `links` keys that may occur: `official`, `wikidata`, `wikipedia`, `discogs`, `allmusic`, `lastfm`, `bandcamp`, `songkick`, `youtube`, `twitter`, `instagram`, `facebook`, `spotify`, `apple_music`, `deezer`, `tidal`. Besides: `"images": { "thumb": "https://…", "fanart": "…", "logo": "…", "banner": "…" }` (TheAudioDB, any key may be absent; remote originals), `"mood"`, `"style"`, `"tags": ["Shoegaze", …]` (Last.fm), `"listeners"`, `"playcount"` (Last.fm, integers). Every field is filled in as enrichment reaches the artist (see `docs/architecture/metadata-enrichment.md`), so all may be `null`/empty.
 
@@ -58,7 +60,7 @@ Duplicates from before that are merged by an admin running `php artisan library:
     "listeners": 1200, "playcount": 99000
   },
   "playable": true,
-  "tracks": [ { "id": 34, "name": "Intro", "duration": 213, "playable": true, "details": TrackDetails } ]
+  "tracks": [ { "id": 34, "name": "Intro", "duration": 213, "playable": true, "favorite": false, "details": TrackDetails } ]
 }
 ```
 
@@ -70,11 +72,11 @@ Duplicates from before that are merged by an admin running `php artisan library:
 
 Tracks are in best-effort album order (by id — there is no track number column). `duration` is seconds or `null`. A track is `playable` when the server has a stream for it: a DLNA URL, or a Spotify URI. With the optional `device_id`, `playable` is for that device: DLNA tracks need a device with a DLNA library driver, Spotify tracks a device that can play Spotify (below). The album is `playable` when any track is.
 
-### `GET /api/library/listening-modes`
-
 ### `GET /api/library/health`
 
 `{ "data": [ { "key": "transcodes", "title": "Suspected transcodes", "description": "…", "count": 3 }, … ] }` — how many findings each library health report has, in a fixed order: `transcodes`, `damaged`, `clipping`, `duplicates`, `lossy`, `incomplete`, `unlinked`, `missing`. Counts only (cached 10 minutes, zero until audio analysis has run); the findings are on the web page `/settings/library-health`. See `docs/architecture/library-health.md` and [sound-and-quality.md](sound-and-quality.md#library-health).
+
+### `GET /api/library/listening-modes`
 
 `{ "data": [ { "key": "party", "name": "Party", "description": "…", "icon": "champagne-glasses", "track_count": 100 }, … ] }` — the listening modes (focus, party, sleep, workout) the library has at least 5 analysed tracks for; empty until audio analysis has run. Play one with `POST /api/devices/{id}/library/play-listening-mode` `{ "mode": "party" }` → `{ "status": "ok", "mode": "party", "queued": 100 }`: a random selection of up to 100 tracks the device can play. `422` `not_playable` when fewer than 5 qualify on that device, `422` `unsupported` without library playback. See `docs/architecture/listening-modes.md`. Not to be confused with a device's `modes` (shuffle/repeat/liked). Client guidance (when to show the row, errors, icons): [sound-and-quality.md](sound-and-quality.md#listening-modes).
 
@@ -219,20 +221,43 @@ Household-wide (there are no user accounts): `albums.favorited_at` / `artists.fa
 ```
 PUT /api/library/albums/{id}/favorite    body: { "favorite": true }   → { "favorite": true }
 PUT /api/library/artists/{id}/favorite   body: { "favorite": true }   → { "favorite": true }
-GET /api/library/favorites               → { "albums": [ AlbumItem ], "artists": [ ArtistItem ] }
+PUT /api/library/tracks/{id}/favorite    body: { "favorite": true }   → { "favorite": true }
+GET /api/library/favorites               → { "albums": [ AlbumItem ], "artists": [ ArtistItem ], "tracks": [ SearchTrack ] }
 ```
 
+A track favorite is the track itself (`tracks.favorited_at`): it shows on the album whatever source is selected. `favorite` is also on each track of `GET /api/library/albums/{id}`.
+
 Favorites are listed most recently favorited first; favoriting an item again keeps its original time. The web album and artist pages show a heart that toggles the same flag (`POST /albums/{id}/favorite`, `POST /artists/{id}/favorite`).
+
+## Playlists made here
+
+```
+GET  /api/library/editable-playlists          → { "data": [ { "id": 3, "name": "Rock", "track_count": 12 } ] }   by name; local playlists only (no smart, no Spotify)
+POST /api/library/playlists                   body: { "name": "Rock" }            → 201 { "id", "name", "track_count": 0 }
+POST /api/library/playlists/{id}/tracks       body: { "track_id": 34 }  or  { "album_id": 12, "source": "dlna" }   → { "added": 3, "track_count": 15 }
+```
+
+An album is added in album order, limited to `source` (`files`, `dlna`, `spotify`) when given; tracks already in the playlist are skipped (`added` counts the new ones). A smart or Spotify playlist answers `422 unsupported`. Same editor as the web UI and MCP `manage_playlist` (`App\Domain\Library\PlaylistEditor`).
+
+## An album on Spotify
+
+```
+GET  /api/library/albums/{id}/spotify               → { "missing": 2, "tracks": [ { "spotify_id", "name", "number", "disc", "duration", "track_id": 34|null } ] }
+POST /api/library/albums/{id}/fill-from-spotify     → { "added": 2 }
+```
+
+Spotify's own track list in album order (cached an hour); `track_id` is the library track that holds it (matched by normalized name), `null` when the library lacks it (`missing` counts those). Both need Spotify connected on the server: `422 spotify_unavailable` otherwise; `404` when Spotify does not have the album, `502 driver_error` when it fails. Fill adds the missing tracks to the library album (the web "Fill out album from Spotify").
 
 ## Play on a device
 
 ```
-POST /api/devices/{id}/library/play-album     body: { "album_id": 12, "start_track_id": 34, "shuffle": false }    → { "status": "ok", "album": "Absolution" }
-POST /api/devices/{id}/library/play-artist    body: { "artist_id": 5, "shuffle": true }                           → { "status": "ok", "artist": "Muse" }
+POST /api/devices/{id}/library/play-album     body: { "album_id": 12, "start_track_id": 34, "shuffle": false, "source": "dlna" }    → { "status": "ok", "album": "Absolution" }
+POST /api/devices/{id}/library/play           body: { "track_id": 34 }  or  { "spotify_track_id": "4uLU6hMCjMI75M1A2tKUQC" }   → { "status": "ok", "track": "Intro" }
+POST /api/devices/{id}/library/play-artist    body: { "artist_id": 5, "shuffle": true, "source": "files" }                           → { "status": "ok", "artist": "Muse" }
 POST /api/devices/{id}/library/play-playlist  body: { "playlist_id": 3, "start_track_id": 12, "shuffle": false, "library": "files" } → { "status": "ok", "playlist": "Discover Weekly", "mode": "library" }   (local mode adds "queued", "skipped"; see below)
 ```
 
-`library` (play-playlist only, optional) is the library the playlist was browsed in; it picks the playback mode (see [Playlists of another library, played locally](#playlists-of-another-library-played-locally)). `start_track_id` (optional) must be a track of that album (or playlist); playback starts there and continues to the end of the album (playlist, in playlist order). `shuffle` (optional, default `false`) shuffles the order (after the start track, if given). An artist plays all its library tracks, grouped by album.
+`source` (play-album, optional: `files`, `dlna` or `spotify`) plays the album from that path only: with `spotify` the album plays from Spotify as its album context (needs a device that plays Spotify), even if the library holds none of its tracks; the others skip tracks without that stream. `spotify_track_id` plays a Spotify track the library does not hold (a row of the album's Spotify side). `library` (play-playlist only, optional) is the library the playlist was browsed in; it picks the playback mode (see [Playlists of another library, played locally](#playlists-of-another-library-played-locally)). `start_track_id` (optional) must be a track of that album (or playlist); playback starts there and continues to the end of the album (playlist, in playlist order). `shuffle` (optional, default `false`) shuffles the order (after the start track, if given). An artist plays all its library tracks, grouped by album; with `source` (optional, also on play-artist) only the tracks of that library, so Play follows the source switch of the artist page.
 
 Two paths, tried in this order:
 

@@ -31,9 +31,10 @@ Device and library tools do not re-implement anything: `ApiBridge` dispatches an
 | `multiroom` | get, join, leave |
 | `device_settings` | sound-adjustment, bluetooth, info (rename), sleep-timer (`docs/api/device-settings.md`) |
 | `search_library`, `browse_library` | search; lists and details of artists, albums, genres, playlists, recent, favorites |
-| `set_favorite` | favorite an album or artist |
-| `play_from_library` | play a track, album, artist or playlist on a device |
-| `manage_playlist` | create (normal or smart), rename, delete (`confirm`), add/remove/move tracks, set smart rules |
+| `set_favorite` | favorite an album, artist or track |
+| `play_from_library` | play a track (or a Spotify track by `spotify_track_id`), an album (optionally limited to a `source`), artist or playlist on a device |
+| `manage_playlist` | create (normal or smart), rename, delete (`confirm`), add (tracks, or an album with `source`)/remove/move tracks, set smart rules |
+| `album_spotify` | an album as Spotify has it (`tracks`, with the library track holding each), or `fill` the library album from it |
 | `library_maintenance` | **ADMIN**: `scan_dlna` and `verify_files` (queued), `enrich`, `merge_duplicates` (`dry_run`, else `confirm`), `sync_genres`, `refresh_smart_playlists` |
 | `remove_library_item` | **ADMIN**, destructive: track, album or artist; `confirm` required, DLNA-available items are kept (tracks: `force`) |
 | `storage` | **ADMIN**: locations, test/scan a location (queued), import, reorganize (`dry_run`, else `confirm`), track files, verify a file |
