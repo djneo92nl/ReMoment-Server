@@ -22,14 +22,6 @@
             force: true
             accept_hostkey: true   # first clone: github.com isn't in known_hosts yet
 
-      - name: Ensure SQLite database file exists
-        ansible.builtin.file:
-            path: "{{ app_dir }}/database/database.sqlite"
-            state: touch
-            mode: '0664'
-            modification_time: preserve
-            access_time: preserve
-
       - name: Ensure storage directories exist
         ansible.builtin.file:
             path: "{{ item }}"
@@ -95,6 +87,37 @@
                 php artisan migrate --force
             chdir: "{{ app_dir }}"
         changed_when: true
+
+      # One-time move from SQLite (the database before MariaDB, docs/architecture/database.md): copies the old file
+      # into MariaDB, then leaves a marker so a later deploy never copies (and truncates) again. A fresh install has
+      # no old file, so nothing happens. Runs before the seed, which would otherwise be overwritten by the copy.
+      - name: Look for a SQLite database to move
+        ansible.builtin.stat:
+            path: "{{ app_dir }}/database/database.sqlite"
+        register: old_sqlite
+
+      - name: Look for the SQLite import marker
+        ansible.builtin.stat:
+            path: "{{ app_dir }}/storage/app/.sqlite-imported"
+        register: sqlite_marker
+
+      - name: Copy the SQLite data into MariaDB
+        ansible.builtin.command:
+            cmd: >
+                docker compose -f docker-compose.prod.yml exec -T -u sail app
+                php artisan db:import-sqlite database/database.sqlite --force
+            chdir: "{{ app_dir }}"
+        when: old_sqlite.stat.exists and old_sqlite.stat.size > 0 and not sqlite_marker.stat.exists
+        register: sqlite_import
+        changed_when: true
+
+      - name: Mark the SQLite data as moved
+        ansible.builtin.file:
+            path: "{{ app_dir }}/storage/app/.sqlite-imported"
+            state: touch
+            mode: '0664'
+        when: sqlite_import is changed
+        # The old file stays on disk as a backup; delete it by hand once the library looks right.
 
       # Creates the admin login on a fresh install (firstOrCreate: never touches an existing one).
       - name: Seed the admin user

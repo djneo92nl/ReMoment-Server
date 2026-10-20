@@ -79,6 +79,8 @@ stream_base_url: http://192.168.1.109
 mqtt_public_ws_port: 9001
 mqtt_ws_url: ''
 # Secrets (Spotify, Last.fm, Discogs, TheAudioDB) live in vault.yml.
+# Database: MariaDB in the compose stack, loopback only. The password is vault_db_password in vault.yml
+# (default `remoment` when unset); changing it later also needs the same change inside MariaDB (ALTER USER).
 
 # --- Audio analysis sidecar (deploy.yml) ----------------------------------------
 # Essentia container (BPM, key, mood), see docs/architecture/audio-analysis.md.

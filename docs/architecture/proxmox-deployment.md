@@ -27,3 +27,7 @@ On the NAS, export both folders to the **PVE host's IP**. Unprivileged container
 ## Audio analysis sidecar
 
 Set `analysis_enabled: true` in `ansible/group_vars/all.yml` and re-run `deploy.yml`. The `.env` template then sets `COMPOSE_PROFILES=analysis` (so `docker compose build/up` includes the Essentia `analysis` service on `127.0.0.1:8090`), `ANALYSIS_ENABLED`, `ANALYSIS_ESSENTIA_URL` and `ACOUSTID_API_KEY` (`acoustid_api_key`). The `analysis-queue` worker is already in `supervisord.prod.conf`. With `analysis_essentia_ml: true` the TensorFlow image is built and ~1 GB of models downloaded on first start into the `remoment-analysis-models` volume; give the container more RAM/CPU (`proxmox_ct_memory` 6144+) first. See `docs/architecture/audio-analysis.md`.
+
+## Database
+
+`deploy.yml` starts a MariaDB container (`docker-compose.prod.yml`, data in the `remoment-mariadb` volume, published on `127.0.0.1:3306` only) and writes the `DB_*` settings into `.env` (`vault_db_password` in `vault.yml`, default `remoment`). An install that still has `database/database.sqlite` has its data copied in once, on the first deploy (`db:import-sqlite`, marker `storage/app/.sqlite-imported`); the old file stays as a backup. Back up the `remoment-mariadb` volume (or `mariadb-dump`), it now holds the library, history, favorites and playlists. See `docs/architecture/database.md`.
