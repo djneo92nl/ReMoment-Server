@@ -49,6 +49,10 @@ The web app shows the *Signal* row **only when something is wrong**, joined with
 - **Errors:** `422 unsupported` when the device has no library playback, `422 not_playable` when fewer than 5 of the mode's tracks can play on that device (pick another device or hide the button), `503` unreachable, `502 driver_error` as for any library play. Offer a mode only on devices that report `library_playback`.
 - The list is cached for 10 minutes on the server; do not poll it.
 
+## Library health
+
+`GET /api/library/health` → `{ "data": [ { "key", "title", "description", "count" } ] }`: how many findings each report has (suspected transcodes, damaged files, clipping, duplicate recordings, lossy files, incomplete albums, files without a track, missing files). A client can show a badge or a summary line from it, for example "3 suspected transcodes". The findings themselves (titles, details, links to albums) are only on the web page, `/settings/library-health`; open it in a browser instead of building a list. Counts are cached for ten minutes and are zero until the analysis has run. Details in `docs/architecture/library-health.md`.
+
 ## Smart playlists
 
 Smart playlists are edited on the web. Clients read `rules_summary` and `rules` of `GET /api/library/playlists/{id}`; the new fields appear there as phrases ("Suspected transcode: yes", "Spectral cutoff at most 18 kHz", "Camelot key is 8A · A minor"). Nothing to implement beyond showing the text.
@@ -57,7 +61,7 @@ Smart playlists are edited on the web. Clients read `rules_summary` and `rules` 
 
 | Client | Uses |
 |--------|------|
-| Web app | everything above: *Sound* and *Signal* rows on the album page's track info, the Listening modes row on the Library page (Local scope), all new smart-playlist fields in the rule editor |
+| Web app | everything above: *Sound* and *Signal* rows on the album page's track info, the Listening modes row on the Library page (Local scope), all new smart-playlist fields in the rule editor, and the Library Health page in Settings (counts and findings) |
 | iOS | `camelot` beside the key (album track info and the track row). Not yet: the quality fields, listening modes |
 | ESP32 | nothing. The mode list and the play call are small enough for a touch remote |
 

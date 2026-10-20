@@ -22,6 +22,10 @@
                              label="Health">
                 Scheduler, queue, broker
             </x-settings-row>
+            <x-settings-row href="{{ route('settings.library-health') }}" icon="fa-solid fa-stethoscope"
+                             label="Library Health">
+                Transcodes, duplicates, incomplete albums
+            </x-settings-row>
             <x-settings-row href="{{ route('settings.dlna') }}" icon="fa-solid fa-server"
                              label="DLNA Library">
                 {{ $dlnaServerCount }} {{ $dlnaServerCount === 1 ? 'server' : 'servers' }}

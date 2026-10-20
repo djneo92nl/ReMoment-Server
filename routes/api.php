@@ -91,6 +91,7 @@ Route::get('/library/listening-modes', [LibraryController::class, 'listeningMode
 Route::get('/library/genres', [LibraryController::class, 'genres']);
 Route::get('/library/genres/{genre:slug}', [LibraryController::class, 'genre']);
 Route::get('/library/playlists', [LibraryController::class, 'playlists']);
+Route::get('/library/health', [LibraryController::class, 'health']);
 Route::get('/library/playlists/{playlist}', [LibraryController::class, 'playlist']);
 Route::get('/library/recent', [LibraryController::class, 'recent']);
 Route::get('/library/favorites', [LibraryController::class, 'favorites']);

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Domain\Artwork\LibraryArtwork;
 use App\Domain\Artwork\LibraryItemArtwork;
 use App\Domain\Artwork\PlaylistArtwork;
+use App\Domain\Health\LibraryReports;
 use App\Domain\Library\GenreColors;
 use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibraryPlayback;
@@ -238,6 +239,18 @@ class LibraryController extends Controller
 
         return response()->json(['points' => $points, 'duration' => $track->duration])
             ->header('Cache-Control', 'public, max-age=3600');
+    }
+
+    /** How many findings each library health report has; the findings themselves are on the web page. */
+    public function health(): JsonResponse
+    {
+        $counts = LibraryReports::counts();
+
+        return response()->json(['data' => array_values(array_map(
+            fn (string $key, array $definition) => ['key' => $key, 'title' => $definition['title'], 'description' => $definition['description'], 'count' => $counts[$key] ?? 0],
+            array_keys(LibraryReports::definitions()),
+            LibraryReports::definitions(),
+        ))]);
     }
 
     /** The listening modes (focus, party, …) the library has enough analysed tracks for; see docs/architecture/listening-modes.md. */

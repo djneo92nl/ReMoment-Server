@@ -8,6 +8,7 @@ use App\Http\Controllers\GenreController;
 use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\LastfmAuthController;
 use App\Http\Controllers\LibraryController;
+use App\Http\Controllers\LibraryHealthController;
 use App\Http\Controllers\PlayerController;
 use App\Http\Controllers\PlaylistController;
 use App\Http\Controllers\ProfileController;
@@ -102,6 +103,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings/users', [SettingsController::class, 'users'])->name('settings.users');
     Route::delete('/settings/app-tokens/{token}', [SettingsController::class, 'revokeAppToken'])->name('settings.app-tokens.destroy');
     Route::get('/settings/health', [SettingsController::class, 'health'])->name('settings.health');
+    Route::get('/settings/library-health', [LibraryHealthController::class, 'index'])->name('settings.library-health');
+    Route::get('/settings/library-health/{report}', [LibraryHealthController::class, 'show'])->name('settings.library-health.show');
 
     Route::get('/settings/devices', [SettingsController::class, 'devices'])->name('settings.devices');
 

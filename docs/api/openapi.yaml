@@ -747,6 +747,29 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/FavoriteBody" }
+  /library/health:
+    get:
+      tags: [Library]
+      summary: How many findings each library health report has
+      operationId: libraryHealth
+      description: Counts only, cached for ten minutes and zero until audio analysis has run. The findings are on the web page /settings/library-health.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        key: { type: string, enum: [transcodes, damaged, clipping, duplicates, lossy, incomplete, unlinked, missing] }
+                        title: { type: string, example: Suspected transcodes }
+                        description: { type: string }
+                        count: { type: integer }
   /library/listening-modes:
     get:
       tags: [Library]
