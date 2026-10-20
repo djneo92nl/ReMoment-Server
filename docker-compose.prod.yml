@@ -24,10 +24,33 @@ services:
             - '${MUSIC_DIR:-/srv/music}:${MUSIC_DIR:-/srv/music}'
             - '${LIBRARY_DIR:-/srv/library}:${LIBRARY_DIR:-/srv/library}'
         depends_on:
+            mariadb:
+                condition: service_healthy
             redis:
                 condition: service_healthy
             meilisearch:
                 condition: service_healthy
+        restart: unless-stopped
+
+    # The app runs on the host network, so MariaDB is published on loopback only.
+    mariadb:
+        image: 'mariadb:11.4'
+        environment:
+            MARIADB_ROOT_PASSWORD: '${DB_PASSWORD}'
+            MARIADB_DATABASE: '${DB_DATABASE:-remoment}'
+            MARIADB_USER: '${DB_USERNAME:-remoment}'
+            MARIADB_PASSWORD: '${DB_PASSWORD}'
+        ports:
+            - '127.0.0.1:3306:3306'
+        volumes:
+            - 'remoment-mariadb:/var/lib/mysql'
+        networks:
+            - remoment
+        healthcheck:
+            test: [CMD, healthcheck.sh, '--connect', '--innodb_initialized']
+            interval: 5s
+            retries: 10
+            timeout: 5s
         restart: unless-stopped
 
     redis:
@@ -135,6 +158,7 @@ networks:
         driver: bridge
 
 volumes:
+    remoment-mariadb:
     remoment-librespot-cache:
     remoment-analysis-models:
     remoment-redis:

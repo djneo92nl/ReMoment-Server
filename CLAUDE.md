@@ -28,6 +28,7 @@ docs/
     device-settings.md      Sound adjustment (bass/treble/loudness), Bluetooth pairing, device name: endpoints, shapes, per-platform support
   architecture/
     client-devices.md       DB schema, model, controller, admin UI internals
+    database.md             MariaDB (SQLite for tests only): why, .env settings, db:import-sqlite, recovering a corrupt file, driver-specific SQL
     device-drivers.md       Driver contracts, existing drivers, guide for adding a new brand
     philips-tv.md           Philips Android TV on top of the UPnP driver (Jointspace v6): pairing command, standby, apps as sources, active app as now playing; what is unverified
     tv-devices.md           How a TV is modelled: sources/inputs, playback, power, RemoteControlInterface (remote keys); what the TV phase still has to do (Philips, BeoVision)
@@ -84,6 +85,9 @@ php artisan test tests/Path/To/TestFile.php
 
 # Code style
 ./vendor/bin/pint
+
+# Copy the data of a SQLite file into the configured MariaDB (after `php artisan migrate`); see docs/architecture/database.md
+php artisan db:import-sqlite path/to/database.sqlite [--force]
 
 # Discover devices of every registered brand (SSDP/mDNS/Sonos topology) and list them at /settings/devices to be added (hourly in the background; --add stores them as devices right away)
 php artisan device:discover [--brand=sonos|ase|mozart] [--host=192.168.1.9] [--add]
@@ -738,6 +742,7 @@ See `docs/architecture/device-drivers.md` for the Mozart driver's contracts and 
 
 Defined in `compose.yaml` via Laravel Sail:
 - **laravel.test** – PHP 8.4 app server (port 80)
+- **mariadb** – the database (named volume, not a bind mount; see `docs/architecture/database.md`)
 - **redis** – cache, sessions, and queue backend
 - **mosquitto** – MQTT broker (port 1883; WebSockets on 9001 for browser live updates)
 - **meilisearch** – search (port 7700)

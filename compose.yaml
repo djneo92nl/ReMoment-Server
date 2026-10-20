@@ -25,8 +25,32 @@ services:
         networks:
             - sail
         depends_on:
-            - redis
-            - meilisearch
+            mariadb:
+                condition: service_healthy
+            redis:
+                condition: service_started
+            meilisearch:
+                condition: service_started
+    # The database lives in a named volume, never a macOS bind mount: SQLite's file locking does not survive
+    # the host/VM boundary (docs/architecture/database.md).
+    mariadb:
+        image: 'mariadb:11.4'
+        ports:
+            - '${FORWARD_DB_PORT:-3306}:3306'
+        environment:
+            MARIADB_ROOT_PASSWORD: '${DB_PASSWORD:-remoment}'
+            MARIADB_DATABASE: remoment
+            MARIADB_USER: remoment
+            MARIADB_PASSWORD: '${DB_PASSWORD:-remoment}'
+        volumes:
+            - 'sail-mariadb:/var/lib/mysql'
+        networks:
+            - sail
+        healthcheck:
+            test: [CMD, healthcheck.sh, '--connect', '--innodb_initialized']
+            interval: 5s
+            retries: 10
+            timeout: 5s
     redis:
         image: 'redis:alpine'
         ports:
@@ -130,6 +154,8 @@ networks:
     sail:
         driver: bridge
 volumes:
+    sail-mariadb:
+        driver: local
     sail-librespot-cache:
     sail-analysis-models:
     sail-redis:
