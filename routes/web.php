@@ -12,6 +12,7 @@ use App\Http\Controllers\LibraryHealthController;
 use App\Http\Controllers\PlayerController;
 use App\Http\Controllers\PlaylistController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\QueueController;
 use App\Http\Controllers\RadioStationController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SpotifyAuthController;
@@ -61,6 +62,7 @@ Route::post('/artists/{artist}/play/{device}', [ArtistController::class, 'play']
 Route::post('/artists/{artist}/favorite', [ArtistController::class, 'favorite'])->name('artists.favorite');
 Route::get('/albums', [AlbumController::class, 'index'])->name('albums.index');
 Route::get('/albums/{album}', [AlbumController::class, 'show'])->name('albums.show');
+Route::post('/devices/{device}/queue', [QueueController::class, 'store'])->name('devices.queue.add');
 Route::post('/albums/{album}/play/{device}', [AlbumController::class, 'play'])->name('albums.play');
 Route::post('/albums/{album}/fill', [AlbumController::class, 'fill'])->name('albums.fill');
 Route::post('/albums/{album}/favorite', [AlbumController::class, 'favorite'])->name('albums.favorite');

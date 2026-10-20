@@ -90,11 +90,50 @@ services:
             - remoment
         restart: unless-stopped
 
+    # Opt-in Spotify stream: docker compose --profile spotify-stream up -d, then set LIBRESPOT_ENABLED=true
+    # (docs/architecture/spotify-stream.md). Icecast is published on ICECAST_PORT for the speakers; librespot
+    # runs on the host network so Spotify's zeroconf discovery reaches the LAN, and reaches Icecast and the app on 127.0.0.1.
+    icecast:
+        profiles: [spotify-stream]
+        build:
+            context: './docker/icecast'
+        image: 'remoment/icecast:latest'
+        environment:
+            ICECAST_SOURCE_PASSWORD: '${ICECAST_SOURCE_PASSWORD:-remoment}'
+            ICECAST_ADMIN_USER: '${ICECAST_ADMIN_USER:-admin}'
+            ICECAST_ADMIN_PASSWORD: '${ICECAST_ADMIN_PASSWORD:-remoment}'
+        ports:
+            - '${ICECAST_PORT:-8000}:8000'
+        networks:
+            - remoment
+        restart: unless-stopped
+
+    librespot:
+        profiles: [spotify-stream]
+        network_mode: host
+        build:
+            context: './docker/librespot'
+        image: 'remoment/librespot:latest'
+        environment:
+            LIBRESPOT_NAME: '${LIBRESPOT_NAME:-ReMoment Stream}'
+            LIBRESPOT_EVENT_SECRET: '${LIBRESPOT_EVENT_SECRET:-remoment}'
+            ICECAST_SOURCE_PASSWORD: '${ICECAST_SOURCE_PASSWORD:-remoment}'
+            ICECAST_HOST: '127.0.0.1'
+            ICECAST_PORT: '${ICECAST_PORT:-8000}'
+            ICECAST_MOUNT: '${ICECAST_MOUNT:-spotify.mp3}'
+            REMOMENT_URL: 'http://127.0.0.1:${APP_PORT:-80}'
+        volumes:
+            - 'remoment-librespot-cache:/cache'
+        depends_on:
+            - icecast
+        restart: unless-stopped
+
 networks:
     remoment:
         driver: bridge
 
 volumes:
+    remoment-librespot-cache:
     remoment-analysis-models:
     remoment-redis:
     remoment-meilisearch:

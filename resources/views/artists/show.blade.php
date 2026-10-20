@@ -76,6 +76,9 @@
                                             @endif
                                         </div>
                                         <span class="flex-none text-xs tabular-nums text-gray-400 dark:text-stone-500">{{ number_format($track->plays_count) }} {{ Str::plural('play', $track->plays_count) }}</span>
+                                        @if($pinned)
+                                            <x-menu label="Options"><x-queue-menu-items type="track" :id="$track->id" :label="$track->name" /></x-menu>
+                                        @endif
                                     </div>
                                 @endforeach
                             </div>

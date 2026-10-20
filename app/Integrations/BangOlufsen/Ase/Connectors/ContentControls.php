@@ -16,6 +16,12 @@ trait ContentControls
      * cover, because the speaker keeps nothing else to show; a speaker that rejects those fields gets the plain
      * item, which is what DLNA servers' tracks always use.
      */
+    /** A stream URL goes to the speaker like a DLNA stream; it has no end and no track record (unverified on hardware). */
+    public function playStreamUrl(string $url, string $title, ?string $art = null): void
+    {
+        $this->playDlnaTrack($url);
+    }
+
     public function playDlnaTrack(string $url, bool $instant = true, ?Track $track = null): void
     {
         $path = 'BeoZone/Zone/PlayQueue'.($instant ? '?instantplay' : '');

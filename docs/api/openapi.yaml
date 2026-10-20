@@ -202,6 +202,70 @@ paths:
                   up_next:
                     type: array
                     items: { $ref: "#/components/schemas/QueueItem" }
+    post:
+      tags: [Playback]
+      summary: Add a track, album, artist or playlist to the queue, or play it next (capabilities queue_add, queue_next)
+      operationId: addToQueue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, id]
+              properties:
+                type: { type: string, enum: [track, album, artist, playlist] }
+                id: { type: integer }
+                next: { type: boolean, description: "Right after the current track instead of at the end" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  next: { type: boolean }
+                  tracks: { type: integer }
+        "422": { $ref: "#/components/responses/DeviceError" }
+    delete:
+      tags: [Playback]
+      summary: Empty the queue after the current track (capability queue_clear)
+      operationId: clearQueue
+      responses:
+        "200": { description: OK }
+        "422": { $ref: "#/components/responses/DeviceError" }
+  /devices/{device}/queue/{position}:
+    parameters:
+      - { $ref: "#/components/parameters/device" }
+      - { name: position, in: path, required: true, description: "Up-next position, 1 = the first entry of GET /queue", schema: { type: integer, minimum: 1 } }
+    delete:
+      tags: [Playback]
+      summary: Remove the entry at `position` (capability queue_remove)
+      operationId: removeFromQueue
+      parameters:
+        - { name: expect, in: query, description: "The uri the client saw at that position; a changed queue is refused (422 invalid)", schema: { type: string } }
+      responses:
+        "200": { description: OK }
+        "422": { $ref: "#/components/responses/DeviceError" }
+    put:
+      tags: [Playback]
+      summary: Move the entry at `position` to position `to` (capability queue_move)
+      operationId: moveInQueue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to]
+              properties:
+                to: { type: integer, minimum: 1 }
+                expect: { type: string }
+      responses:
+        "200": { description: OK }
+        "422": { $ref: "#/components/responses/DeviceError" }
   /devices/{device}/queue/jump:
     parameters: [{ $ref: "#/components/parameters/device" }]
     post:
@@ -480,6 +544,41 @@ paths:
                 properties:
                   status: { type: string }
                   station: { type: string }
+  /spotify-stream:
+    get:
+      tags: [Radio]
+      summary: The Spotify stream (librespot to Icecast) - whether it is on, the receiver's name and the MP3 stream URL
+      operationId: getSpotifyStream
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled: { type: boolean }
+                  name: { type: string }
+                  url: { type: string, nullable: true }
+  /devices/{device}/spotify-stream:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    post:
+      tags: [Radio]
+      summary: Play the Spotify stream on this device (capability stream_url); pick the receiver by name in Spotify
+      operationId: playSpotifyStream
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  url: { type: string }
+                  receiver: { type: string }
+        "422":
+          description: Stream not enabled, or the device cannot play a stream
   /radio/{station}/favorite:
     parameters:
       - name: station
@@ -1576,7 +1675,7 @@ components:
       enum: [off, all, one]
     Capability:
       type: string
-      enum: [media_controls, volume_control, radio_control, source_control, source_activation, multi_room, library_playback, seek, queue, queue_jump, shuffle, repeat, like, power, sound_adjustment, bluetooth, device_info, battery, network_settings, wireless_speakers, wired_speakers, sleep_timer, digits, remote_control, source_controls]
+      enum: [media_controls, volume_control, radio_control, source_control, source_activation, multi_room, library_playback, seek, queue, queue_jump, queue_add, queue_next, queue_remove, queue_move, queue_clear, shuffle, repeat, like, power, sound_adjustment, bluetooth, device_info, battery, network_settings, wireless_speakers, wired_speakers, sleep_timer, digits, remote_control, stream_url, source_controls]
     Battery:
       type: object
       nullable: true

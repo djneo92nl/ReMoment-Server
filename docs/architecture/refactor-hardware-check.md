@@ -138,6 +138,16 @@ Four listeners publish through `MqttService::publishIfChanged()`. Use `mosquitto
 - [ ] `RegisteredUser`, password-reset and email-verification controllers: there is no registration, as intended; `/login` and the profile password change still work.
 - [ ] `getCurrentPlayingAttribute()` is gone from every driver: a client or script of yours doesn't call `$device->currentPlaying`.
 
+## 13. Queue editing
+
+Capabilities and endpoints: `docs/api/queue.md`. Edits are for a device you are playing on; try them from the player bar's Up next panel, then the REST calls.
+
+- [ ] **UPnP renderer / ReMoment player**: with an album playing, "Add to queue" and "Play next" on the album page; remove, move up/down and Clear in the panel. A renderer with gapless support still moves on to the right track after you changed the next one.
+- [ ] **Sonos**: the same; check that "Play next" lands right after the playing track and that a move puts the entry where the panel shows it (positions are zero-based inside the library).
+- [ ] **Spotify**: "Add to queue" appends to Spotify's queue; the panel shows no remove, move or Clear.
+- [ ] **B&O ASE**: add, remove and Clear work. **Unverified**: "Play next" (`POST PlayQueue?id=<plid>` inserting before that item) and move (`PUT PlayQueue/<plid>?id=<before>`); note the status codes if they fail, and whether moving to the end is possible (the driver refuses it for now). Old converter firmware answers 501 for the whole PlayQueue.
+- [ ] **Mozart (needs a device)**: the spec (6.2.0.44) only has add-to-queue and clear. Check: add (`POST /api/v1/playback/queue`), clear, and "Play next" (`PlayQueueItem.index`: does 1 mean right after the playing item, 0?). Then probe what the device offers for the rest and implement it in `beo-mozart-php` (`PlaybackApi`) and the driver: reading the queue (`QueueInterface`, also `queue_jump`), removing and moving an item. `queueHasBeenChanged` on the WebSocket could drive a live refresh. Until then Mozart reports `queue_add`, `queue_next` and `queue_clear` only.
+
 ## If something fails
 
 Each phase is its own set of commits on `main`, so a bad one can be reverted alone. The most likely suspects, by symptom:

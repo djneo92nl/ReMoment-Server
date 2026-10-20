@@ -44,6 +44,7 @@
                                             @endif
                                         </p>
                                     </div>
+                                    <x-menu label="Options"><x-queue-menu-items type="track" :id="$track->id" :label="$track->name" /></x-menu>
                                 </div>
                             @endforeach
                         </div>
@@ -83,6 +84,13 @@
                         <i class="fa-solid fa-play text-xs"></i>
                         Play
                     </x-play-button>
+                @endif
+
+                @if($playlist->tracks->isNotEmpty() && app(\App\Support\SelectedDevice::class)->device())
+                    <div class="mt-3 flex items-center justify-between text-xs text-gray-400 dark:text-gray-600">
+                        Queue on the pinned player
+                        <x-menu label="Queue" icon="list-ol"><x-queue-menu-items type="playlist" :id="$playlist->id" :label="$playlist->name" /></x-menu>
+                    </div>
                 @endif
             </x-card>
 

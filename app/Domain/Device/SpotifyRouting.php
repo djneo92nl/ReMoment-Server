@@ -6,8 +6,13 @@ use App\Domain\Device\Cache\Modes;
 use App\Events\Device\PlaybackModesUpdated;
 use App\Integrations\Contracts\LikeInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
+use App\Integrations\Contracts\QueueAddInterface;
+use App\Integrations\Contracts\QueueClearInterface;
 use App\Integrations\Contracts\QueueInterface;
 use App\Integrations\Contracts\QueueJumpInterface;
+use App\Integrations\Contracts\QueueMoveInterface;
+use App\Integrations\Contracts\QueuePlayNextInterface;
+use App\Integrations\Contracts\QueueRemoveInterface;
 use App\Integrations\Contracts\RepeatInterface;
 use App\Integrations\Contracts\SeekInterface;
 use App\Integrations\Contracts\ShuffleInterface;
@@ -37,6 +42,11 @@ final class SpotifyRouting
         SeekInterface::class,
         QueueInterface::class,
         QueueJumpInterface::class,
+        QueueAddInterface::class,
+        QueuePlayNextInterface::class,
+        QueueRemoveInterface::class,
+        QueueMoveInterface::class,
+        QueueClearInterface::class,
         ShuffleInterface::class,
         RepeatInterface::class,
         LikeInterface::class,

@@ -13,6 +13,7 @@ All contracts live in `app/Integrations/Contracts/`.
 | `VolumeControlInterface` | `setVolume(int): int`, `getVolume(): int`, `incrementVolume()`, `decrementVolume()`, `mute()`, `unmute()`, `isMuted(): bool` | If device supports volume |
 | `SeekInterface` | `seek(int $seconds)` | If device can jump within the current track (Sonos, Spotify, Mozart) |
 | `QueueInterface` | `getUpNext(int $limit = 20): QueueItem[]` — tracks after the current one; `[]` when not playing from a queue | If device exposes its play queue (Sonos, Spotify) |
+| `QueueAddInterface` / `QueuePlayNextInterface` / `QueueRemoveInterface` / `QueueMoveInterface` / `QueueClearInterface` | `addToQueue(Collection $tracks)` / `playNext(Collection $tracks)` / `removeFromQueue(int $position, ?string $expect)` / `moveInQueue(int $from, int $to, ?string $expect)` / `clearQueue()` — positions as in `getUpNext()`, `$expect` the uri seen there (mismatch → `\InvalidArgumentException`) | One per thing the platform can do: Sonos and UPnP/ReMoment all, ASE all (play next/move unverified), Spotify add only, Mozart add/play next/clear. See `docs/api/queue.md` |
 | `ShuffleInterface` | `setShuffle(bool $shuffle)` | If device can switch shuffle with an explicit on/off (Sonos, Spotify, Mozart) |
 | `RepeatInterface` | `setRepeat(RepeatMode $mode)` — `Off`, `All`, `One` | If device can set repeat explicitly (Sonos, Spotify, Mozart) |
 | `LikeInterface` | `setLiked(bool $liked)` — like/save the playing track | If the service has a per-user library (Spotify) |
@@ -90,7 +91,7 @@ Virtual device — implements `MediaControlsInterface`, `SeekInterface`, `QueueI
 
 `App\Domain\Device\SpotifyRouting` makes the routed speaker and the Spotify device one device:
 
-- `driverFor(Device, contract)` — the driver that executes a contract for a device. For the routed speaker, the contracts in `DELEGATED_CONTRACTS` (`MediaControlsInterface`, `SeekInterface`, `QueueInterface`, `ShuffleInterface`, `RepeatInterface`, `LikeInterface`) resolve to the Spotify device's driver; everything else (volume, mute, power, sources, multiroom, radio, library) to the speaker's own. The API `DeviceController` and the `DeviceCard` Livewire component pick drivers through it, so the `instanceof` (422) check sees the merged set.
+- `driverFor(Device, contract)` — the driver that executes a contract for a device. For the routed speaker, the contracts in `DELEGATED_CONTRACTS` (`MediaControlsInterface`, `SeekInterface`, `QueueInterface`, `QueueJumpInterface`, the five queue edit contracts, `ShuffleInterface`, `RepeatInterface`, `LikeInterface`) resolve to the Spotify device's driver; everything else (volume, mute, power, sources, multiroom, radio, library) to the speaker's own. The API `DeviceController` and the `DeviceCard` Livewire component pick drivers through it, so the `instanceof` (422) check sees the merged set.
 - `capabilities(Device)` — `Capabilities::forDriver()` plus Spotify's delegated capabilities while routed; used by `DeviceListResource` (and so every endpoint returning devices) and the web device page.
 - `visible(Collection)` — drops the Spotify device from a list while the routed speaker is in it; used by `GET /api/devices`, the client endpoints and `/devices`.
 - `modesDeviceId(Device)` — where an API mode change is recorded (the routed speaker, also when requested on the Spotify device).

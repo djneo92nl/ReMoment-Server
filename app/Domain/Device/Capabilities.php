@@ -11,9 +11,15 @@ use App\Integrations\Contracts\LikeInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
 use App\Integrations\Contracts\NetworkSettingsInterface;
+use App\Integrations\Contracts\PlayStreamUrlInterface;
 use App\Integrations\Contracts\PowerInterface;
+use App\Integrations\Contracts\QueueAddInterface;
+use App\Integrations\Contracts\QueueClearInterface;
 use App\Integrations\Contracts\QueueInterface;
 use App\Integrations\Contracts\QueueJumpInterface;
+use App\Integrations\Contracts\QueueMoveInterface;
+use App\Integrations\Contracts\QueuePlayNextInterface;
+use App\Integrations\Contracts\QueueRemoveInterface;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\RemoteControlInterface;
 use App\Integrations\Contracts\RepeatInterface;
@@ -45,6 +51,11 @@ final class Capabilities
         'seek' => SeekInterface::class,
         'queue' => QueueInterface::class,
         'queue_jump' => QueueJumpInterface::class,
+        'queue_add' => QueueAddInterface::class,
+        'queue_next' => QueuePlayNextInterface::class,
+        'queue_remove' => QueueRemoveInterface::class,
+        'queue_move' => QueueMoveInterface::class,
+        'queue_clear' => QueueClearInterface::class,
         'shuffle' => ShuffleInterface::class,
         'repeat' => RepeatInterface::class,
         'like' => LikeInterface::class,
@@ -59,6 +70,7 @@ final class Capabilities
         'sleep_timer' => SleepTimerInterface::class,
         'digits' => DigitsInterface::class,
         'remote_control' => RemoteControlInterface::class,
+        'stream_url' => PlayStreamUrlInterface::class,
     ];
 
     /** The driver contract behind a capability, null for an unknown one (or a dynamic one like source_controls). */

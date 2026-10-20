@@ -25,9 +25,10 @@ Device and library tools do not re-implement anything: `ApiBridge` dispatches an
 | `list_devices`, `get_device` | `GET /devices`, `GET /devices/{id}` (now playing, capabilities, modes) |
 | `playback_control` | play, pause, stop, next, previous, seek, shuffle, repeat, like, power |
 | `volume` | read or set volume and mute |
-| `queue` | list Up Next, or jump to a position |
+| `queue` | `action`: `list` (default) Up Next, `jump`, `add` / `next` (track, album, artist or playlist at the end / after the current track), `remove`, `move`, `clear` (`confirm=true`); see `docs/api/queue.md` |
 | `sources` | list/activate sources; list/run source controls (CD, FM presets) |
 | `radio` | list stations, play one, favorite one |
+| `spotify_stream` | the Spotify stream's address and receiver name; with `device_id` start it on that device (`stream_url`) |
 | `multiroom` | get, join, leave |
 | `device_settings` | sound-adjustment, bluetooth, info (rename), sleep-timer (`docs/api/device-settings.md`) |
 | `search_library`, `browse_library` | search; lists and details of artists, albums, genres, playlists, recent, favorites |

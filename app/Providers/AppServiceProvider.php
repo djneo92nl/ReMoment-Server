@@ -9,6 +9,7 @@ use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
 use App\Events\Device\PlaybackModesUpdated;
 use App\Events\Device\ProgressUpdated;
+use App\Events\Device\QueueUpdated;
 use App\Events\Device\VolumeUpdated;
 use App\Listeners\Device\ClosePlaybackHistory;
 use App\Listeners\Device\DispatchArtworkProcessing;
@@ -18,6 +19,7 @@ use App\Listeners\Device\PublishModesToMqtt;
 use App\Listeners\Device\PublishMultiRoomToMqtt;
 use App\Listeners\Device\PublishNowPlayingToMqtt;
 use App\Listeners\Device\PublishProgressToMqtt;
+use App\Listeners\Device\PublishQueueToMqtt;
 use App\Listeners\Device\PublishStateToMqtt;
 use App\Listeners\Device\PublishVolumeToMqtt;
 use App\Listeners\Device\StorePlaybackHistory;
@@ -70,6 +72,8 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(PlaybackModesUpdated::class, HoldOwnModesWhileSpotifyRouted::class);
         Event::listen(PlaybackModesUpdated::class, UpdateDeviceCache::class);
         Event::listen(PlaybackModesUpdated::class, PublishModesToMqtt::class);
+
+        Event::listen(QueueUpdated::class, PublishQueueToMqtt::class);
 
         Event::listen(MultiRoomUpdated::class, UpdateDeviceCache::class);
         Event::listen(MultiRoomUpdated::class, PublishMultiRoomToMqtt::class);

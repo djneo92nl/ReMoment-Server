@@ -78,6 +78,26 @@ class ReMomentMcpTest extends TestCase
             ->assertHasErrors(['unsupported (422)']);
     }
 
+    public function test_the_queue_tool_edits_the_queue_through_the_api(): void
+    {
+        $device = $this->device(\Tests\Support\FakeQueueEditDriver::class, State::Playing);
+        $track = $this->makeLibraryTrack(Album::create(['name' => 'A', 'artist_id' => Artist::create(['name' => 'B'])->id]), 'One');
+
+        ReMomentServer::tool(Tools\Queue::class, ['device_id' => $device->id])->assertOk()->assertSee('Next Song');
+        ReMomentServer::tool(Tools\Queue::class, ['device_id' => $device->id, 'action' => 'add', 'type' => 'track', 'id' => $track->id])->assertOk()->assertSee('"tracks":1');
+        ReMomentServer::tool(Tools\Queue::class, ['device_id' => $device->id, 'action' => 'next', 'type' => 'track', 'id' => $track->id])->assertOk()->assertSee('"next":true');
+        ReMomentServer::tool(Tools\Queue::class, ['device_id' => $device->id, 'action' => 'remove', 'position' => 1, 'expect' => 'fake:1'])->assertOk();
+        ReMomentServer::tool(Tools\Queue::class, ['device_id' => $device->id, 'action' => 'move', 'position' => 2, 'to' => 1])->assertOk();
+        ReMomentServer::tool(Tools\Queue::class, ['device_id' => $device->id, 'action' => 'clear'])->assertHasErrors(['confirmation_required']);
+        ReMomentServer::tool(Tools\Queue::class, ['device_id' => $device->id, 'action' => 'clear', 'confirm' => true])->assertOk();
+        ReMomentServer::tool(Tools\Queue::class, ['device_id' => $device->id, 'action' => 'jump', 'position' => 2])->assertOk();
+
+        $this->assertSame(
+            [['addToQueue', [$track->id]], ['playNext', [$track->id]], ['removeFromQueue', [1, 'fake:1']], ['moveInQueue', [2, 1, null]], ['clearQueue', null], ['skipToQueuePosition', 2]],
+            array_values(array_filter(FakePlayerDriver::$calls, fn ($call) => $call[0] !== 'getUpNext')),
+        );
+    }
+
     public function test_volume_reads_both_values_and_sets_them(): void
     {
         $device = $this->device();

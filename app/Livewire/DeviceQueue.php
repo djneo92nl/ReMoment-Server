@@ -3,20 +3,29 @@
 namespace App\Livewire;
 
 use App\Domain\Artwork\LibraryItemArtwork;
+use App\Domain\Device\DeviceCapabilities;
 use App\Domain\Device\SpotifyRouting;
 use App\Domain\Device\State;
 use App\Integrations\Contracts\QueueInterface;
+use App\Livewire\Concerns\EditsQueue;
 use App\Models\Device;
 use Livewire\Component;
 
 class DeviceQueue extends Component
 {
+    use EditsQueue;
+
     public Device $device;
 
     public int $limit = 10;
 
     /** Deferred until wire:init so the page renders before the device round trip. */
     public bool $ready = false;
+
+    protected function queueDevice(): ?Device
+    {
+        return $this->device;
+    }
 
     public function load(): void
     {
@@ -44,6 +53,8 @@ class DeviceQueue extends Component
             }
         }
 
-        return view('livewire.device-queue', compact('items', 'error'));
+        $capabilities = DeviceCapabilities::for($this->device);
+
+        return view('livewire.device-queue', compact('items', 'error', 'capabilities'));
     }
 }

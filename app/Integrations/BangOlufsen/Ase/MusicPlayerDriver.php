@@ -26,8 +26,14 @@ use App\Integrations\Contracts\MultiRoomInterface;
 use App\Integrations\Contracts\MultiRoomStatusInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
 use App\Integrations\Contracts\NetworkSettingsInterface;
+use App\Integrations\Contracts\PlayStreamUrlInterface;
 use App\Integrations\Contracts\PowerInterface;
+use App\Integrations\Contracts\QueueAddInterface;
+use App\Integrations\Contracts\QueueClearInterface;
 use App\Integrations\Contracts\QueueInterface;
+use App\Integrations\Contracts\QueueMoveInterface;
+use App\Integrations\Contracts\QueuePlayNextInterface;
+use App\Integrations\Contracts\QueueRemoveInterface;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\SessionHostInterface;
 use App\Integrations\Contracts\SleepTimerInterface;
@@ -40,7 +46,7 @@ use App\Integrations\Contracts\WirelessSpeakersInterface;
 use App\Models\Device;
 use App\Models\RadioStation;
 
-class MusicPlayerDriver implements BluetoothInterface, DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MultiRoomStatusInterface, MusicPlayerDriverInterface, NetworkSettingsInterface, PowerInterface, QueueInterface, RadioControlInterface, SessionHostInterface, SleepTimerInterface, SoundAdjustmentInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface, WiredSpeakersInterface, WirelessSpeakersInterface
+class MusicPlayerDriver implements BluetoothInterface, DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MultiRoomStatusInterface, MusicPlayerDriverInterface, NetworkSettingsInterface, PlayStreamUrlInterface, PowerInterface, QueueAddInterface, QueueClearInterface, QueueInterface, QueueMoveInterface, QueuePlayNextInterface, QueueRemoveInterface, RadioControlInterface, SessionHostInterface, SleepTimerInterface, SoundAdjustmentInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface, WiredSpeakersInterface, WirelessSpeakersInterface
 {
     use BluetoothControls;
     use ContentControls;
@@ -77,11 +83,18 @@ class MusicPlayerDriver implements BluetoothInterface, DeviceInfoInterface, Libr
 
     public function canPlayRadioStation(RadioStation $station): bool
     {
-        return $station->getMeta('beoradio') !== null;
+        return $station->getMeta('beoradio') !== null || $station->streamUrl() !== null;
     }
 
     public function playRadioStation(RadioStation $station): void
     {
-        $this->playBeoRadioStation($station->getMeta('beoradio'));
+        // BeoRadio first; a station with only a stream URL is played like a DLNA stream (unverified on hardware).
+        if (($id = $station->getMeta('beoradio')) !== null) {
+            $this->playBeoRadioStation($id);
+
+            return;
+        }
+
+        $this->playStreamUrl($station->streamUrl() ?? throw new \RuntimeException('This station has no stream URL.'), $station->name);
     }
 }

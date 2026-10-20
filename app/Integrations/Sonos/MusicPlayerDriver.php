@@ -11,8 +11,14 @@ use App\Integrations\Contracts\LibraryPlaybackInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
+use App\Integrations\Contracts\PlayStreamUrlInterface;
+use App\Integrations\Contracts\QueueAddInterface;
+use App\Integrations\Contracts\QueueClearInterface;
 use App\Integrations\Contracts\QueueInterface;
 use App\Integrations\Contracts\QueueJumpInterface;
+use App\Integrations\Contracts\QueueMoveInterface;
+use App\Integrations\Contracts\QueuePlayNextInterface;
+use App\Integrations\Contracts\QueueRemoveInterface;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\RepeatInterface;
 use App\Integrations\Contracts\SeekInterface;
@@ -36,7 +42,7 @@ use duncan3dc\Sonos\Tracks\Track as SonosTrack;
 use duncan3dc\Sonos\Utils\Time;
 use Illuminate\Support\Collection as TrackCollection;
 
-class MusicPlayerDriver implements BatteryInterface, DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, QueueInterface, QueueJumpInterface, RadioControlInterface, RepeatInterface, SeekInterface, ShuffleInterface, SoundAdjustmentInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
+class MusicPlayerDriver implements BatteryInterface, DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, PlayStreamUrlInterface, QueueAddInterface, QueueClearInterface, QueueInterface, QueueJumpInterface, QueueMoveInterface, QueuePlayNextInterface, QueueRemoveInterface, RadioControlInterface, RepeatInterface, SeekInterface, ShuffleInterface, SoundAdjustmentInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
 {
     use MultiRoomControls;
     use SettingsControls;
@@ -72,14 +78,33 @@ class MusicPlayerDriver implements BatteryInterface, DeviceInfoInterface, Librar
 
     public function canPlayRadioStation(RadioStation $station): bool
     {
-        return $station->getMeta('tunein') !== null;
+        return $station->getMeta('tunein') !== null || $station->streamUrl() !== null;
     }
 
     public function playRadioStation(RadioStation $station): void
     {
         $id = $station->getMeta('tunein');
+
+        // No TuneIn id: the plain stream URL (Sonos reads the title from the stream itself).
+        if ($id === null) {
+            $this->playStreamUrl($station->streamUrl() ?? throw new \RuntimeException('This station has no stream URL.'), $station->name);
+
+            return;
+        }
+
         $uri = "x-sonosapi-stream:{$id}?sid=254&flags=8224&sn=0";
-        $this->deviceApiClient()->useStream(new Stream($uri, $station->name));
+        $this->useSonosStream($uri, $station->name);
+    }
+
+    protected function useSonosStream(string $uri, string $title): void
+    {
+        $this->deviceApiClient()->useStream(new Stream($uri, $title));
+    }
+
+    /** `x-rincon-mp3radio://` is how a Sonos plays a plain HTTP MP3 stream. */
+    public function playStreamUrl(string $url, string $title, ?string $art = null): void
+    {
+        $this->useSonosStream(preg_replace('#^https?://#', 'x-rincon-mp3radio://', $url), $title);
     }
 
     public function play(): void
@@ -203,6 +228,111 @@ class MusicPlayerDriver implements BatteryInterface, DeviceInfoInterface, Librar
         // getStateDetails() numbers the playing track from zero, as selectTrack() does
         $api->selectTrack($api->getStateDetails()->getNumber() + max(1, $position));
         $api->play();
+    }
+
+    public function addToQueue(TrackCollection $tracks): void
+    {
+        $api = $this->deviceApiClient();
+        $this->assertPlayingFromQueue($api);
+
+        $api->getQueue()->addTracks($this->sonosTracks($tracks));
+    }
+
+    public function playNext(TrackCollection $tracks): void
+    {
+        $api = $this->deviceApiClient();
+        $this->assertPlayingFromQueue($api);
+
+        // Zero-based: the playing track is number N, so the next one goes in at N + 1.
+        $api->getQueue()->addTracks($this->sonosTracks($tracks), $api->getStateDetails()->getNumber() + 1);
+    }
+
+    public function removeFromQueue(int $position, ?string $expect = null): void
+    {
+        $api = $this->deviceApiClient();
+        $index = $this->queueIndex($api, $position, $expect);
+
+        $api->getQueue()->removeTrack($index);
+    }
+
+    public function moveInQueue(int $from, int $to, ?string $expect = null): void
+    {
+        $api = $this->deviceApiClient();
+        $source = $this->queueIndex($api, $from, $expect);
+        $target = $this->queueIndex($api, $to);
+
+        if ($source === $target) {
+            return;
+        }
+
+        // ReorderTracksInQueue counts from one and inserts before an index of the queue as it is now.
+        $api->soap('AVTransport', 'ReorderTracksInQueue', [
+            'UpdateID' => 0,
+            'StartingIndex' => $source + 1,
+            'NumberOfTracks' => 1,
+            'InsertBefore' => $target > $source ? $target + 2 : $target + 1,
+        ]);
+    }
+
+    /** Empties the queue after the playing track. */
+    public function clearQueue(): void
+    {
+        $api = $this->deviceApiClient();
+        $state = $api->getStateDetails();
+
+        if ($state->isStreaming()) {
+            $api->getQueue()->clear();
+
+            return;
+        }
+
+        $queue = $api->getQueue();
+        $after = count($queue) - ($state->getNumber() + 1);
+
+        if ($after > 0) {
+            $queue->removeTracks(range($state->getNumber() + 1, $state->getNumber() + $after));
+        }
+    }
+
+    private function assertPlayingFromQueue(Controller $api): void
+    {
+        if ($api->getStateDetails()->isStreaming()) {
+            throw new \InvalidArgumentException('Nothing is playing from the queue; start playback first.');
+        }
+    }
+
+    /** The zero-based queue index of up-next `$position`, checked against `$expect` (the uri the caller saw there). */
+    private function queueIndex(Controller $api, int $position, ?string $expect = null): int
+    {
+        $this->assertPlayingFromQueue($api);
+
+        $index = $api->getStateDetails()->getNumber() + $position;
+        $track = $position >= 1 ? ($api->getQueue()->getTracks($index, 1)[0] ?? null) : null;
+
+        if ($track === null) {
+            throw new \InvalidArgumentException("There is no queue position {$position}.");
+        }
+
+        if ($expect !== null && $track->getUri() !== $expect) {
+            throw new \InvalidArgumentException('The queue has changed; reload it and try again.');
+        }
+
+        return $index;
+    }
+
+    /** @return SonosTrack[] the tracks with a DLNA stream, as queue items */
+    private function sonosTracks(TrackCollection $tracks): array
+    {
+        $playable = $tracks->filter(fn (Track $track) => (bool) $track->getDlnaUrl())->values();
+
+        if ($playable->isEmpty()) {
+            throw new \InvalidArgumentException("None of these tracks can be played on {$this->device->device_name}.");
+        }
+
+        return $playable->map(fn (Track $track) => (new SonosTrack($this->sonosStreamUrl($track->getDlnaUrl())))
+            ->setTitle($track->name)
+            ->setArtist($track->artist?->name ?? '')
+            ->setAlbum($track->album?->name ?? ''))->all();
     }
 
     /**

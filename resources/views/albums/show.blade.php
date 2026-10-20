@@ -129,7 +129,7 @@
                                     <x-menu.item icon="tv" @click="$dispatch('play-on-device', {{ \Illuminate\Support\Js::from(['action' => $playAction, 'label' => $track->name]) }})">Play on device&hellip;</x-menu.item>
                                 @endif
                                 <x-menu.item icon="list-ul" @click="$dispatch('add-to-playlist', {{ \Illuminate\Support\Js::from(['track_id' => $track->id, 'label' => $track->name]) }})">Add to playlist&hellip;</x-menu.item>
-                                {{-- Queue ("play next", "add to queue") joins here once a pinned player reports `queue_add` --}}
+                                <x-queue-menu-items type="track" :id="$track->id" :label="$track->name" />
                                 @if($hasInfo)
                                     <x-menu.item icon="circle-info" @click="panel = panel === 'info' ? null : 'info'">Track details</x-menu.item>
                                 @endif

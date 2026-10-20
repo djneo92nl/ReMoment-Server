@@ -478,6 +478,9 @@
   .fpanel .q-sub { font-size: 12px; opacity: 0.6; }
   .fpanel .q-dur { font-size: 12px; opacity: 0.55; flex: none; font-variant-numeric: tabular-nums; }
   .fpanel .q-msg { font-size: 14px; opacity: 0.7; margin: 0; }
+  #queue-list .q-li { display: flex; align-items: center; gap: 2px; }
+  #queue-list .q-x { flex: none; width: 30px; height: 30px; border: 0; border-radius: 50%; background: none; color: inherit; opacity: .65; cursor: pointer; font-size: 12px; }
+  #queue-list .q-x:hover { opacity: 1; background: rgba(255,255,255,0.12); }
   #queue-list { list-style: none; margin: 0; padding: 0 8px 0 0; overflow-y: auto; min-height: 0; flex: 1 1 auto; }
   .fpanel .q-row.now .q-name { color: var(--accent, #e8a46b); }
 
@@ -906,6 +909,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (msg.kind === 'volume' && msg.data && msg.data.volume != null) {
       currentVolume = msg.data.volume;
       updateVolumeUI();
+    } else if (msg.kind === 'queue') {
+      clearTimeout(pushQueueDebounce);
+      pushQueueDebounce = setTimeout(loadQueue, 150);
     } else if (msg.kind === 'state' || msg.kind === 'data') {
       clearTimeout(pushPollDebounce);
       pushPollDebounce = setTimeout(pollNow, 150);
@@ -1536,7 +1542,8 @@ async function toggleMute() {
   } catch(e) {}
 }
 
-// ── Up next (queue, queue_jump) ──────────────────────────────
+let pushQueueDebounce = null;
+// ── Up next (queue, queue_jump, queue_remove) ──────────────────────────────
 let openPanel = null;
 const PANELS = {
   queue:   { el: 'queue-panel',  btn: 'btn-queue',   load: () => loadQueue() },
@@ -1582,6 +1589,7 @@ function qArt(a) {
 async function loadQueue() {
   if (!deviceId || openPanel !== 'queue') return;
   const canJump = deviceCaps.includes('queue_jump');
+  const canRemove = deviceCaps.includes('queue_remove');
   const now = document.getElementById('track-name-inner').textContent;
   document.getElementById('queue-now').innerHTML = (currentArtUrl || now !== '—')
     ? '<div class="q-row now"><span class="eq"><i></i><i></i><i></i></span><span class="q-art">' + (currentArtUrl ? '<img src="' + qEsc(currentArtUrl) + '" alt="">' : '') + '</span><span class="q-txt"><span class="q-name">' + qEsc(now) + '</span><span class="q-sub">' + qEsc(document.getElementById('artist-name').textContent) + '</span></span></div>'
@@ -1594,11 +1602,13 @@ async function loadQueue() {
     msg.textContent = items.length ? '' : 'Nothing queued after the current track.';
     list.innerHTML = items.map((it, i) => {
       const sub = [it.artist, it.album].filter(Boolean).join(' · ');
-      return '<li><' + (canJump ? 'button type="button" data-pos="' + (i + 1) + '" title="Play from here"' : 'div') + ' class="q-row">'
+      return '<li class="q-li"><' + (canJump ? 'button type="button" data-pos="' + (i + 1) + '" title="Play from here"' : 'div') + ' class="q-row">'
         + '<span class="q-n">' + (i + 1) + '</span>' + qArt(it.artwork)
         + '<span class="q-txt"><span class="q-name">' + qEsc(it.name) + '</span>' + (sub ? '<span class="q-sub">' + qEsc(sub) + '</span>' : '') + '</span>'
         + (it.duration ? '<span class="q-dur">' + fmtTime(it.duration) + '</span>' : '')
-        + '</' + (canJump ? 'button' : 'div') + '></li>';
+        + '</' + (canJump ? 'button' : 'div') + '>'
+        + (canRemove ? '<button type="button" class="q-x" data-remove="' + (i + 1) + '" data-uri="' + qEsc(it.uri || '') + '" title="Remove from the queue"><i class="fa-solid fa-xmark"></i></button>' : '')
+        + '</li>';
     }).join('');
   } catch(e) {
     list.innerHTML = '';
@@ -1607,6 +1617,23 @@ async function loadQueue() {
 }
 
 document.getElementById('queue-list').addEventListener('click', async e => {
+  const rm = e.target.closest('[data-remove]');
+  if (rm) {
+    const uri = rm.getAttribute('data-uri');
+    const msg = document.getElementById('queue-msg');
+    try {
+      const r = await fetch(`/api/devices/${deviceId}/queue/${rm.getAttribute('data-remove')}` + (uri ? '?expect=' + encodeURIComponent(uri) : ''), { method: 'DELETE', headers: { 'Accept': 'application/json' } });
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        await loadQueue();
+        msg.textContent = body.message || 'The queue could not be changed.';
+        setTimeout(() => { if (msg.textContent === (body.message || 'The queue could not be changed.')) loadQueue(); }, 4000);
+        return;
+      }
+    } catch(err) {}
+    loadQueue();
+    return;
+  }
   const row = e.target.closest('[data-pos]');
   if (!row) return;
   try {

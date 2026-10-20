@@ -79,6 +79,21 @@
                     @endforeach
                 @endif
 
+                {{-- Queue edits: on the pinned player, when it can (queue_add / queue_next) --}}
+                @if($playable && $direct)
+                    @php $queueCapabilities = \App\Domain\Device\DeviceCapabilities::for($pinned); @endphp
+                    @foreach([['queue_next', 'Play next', true, 'forward-step'], ['queue_add', 'Add to queue', false, 'list-ol']] as [$capability, $text, $next, $icon])
+                        @if(in_array($capability, $queueCapabilities, true))
+                            <form method="POST" action="{{ route('devices.queue.add', $pinned) }}">
+                                @csrf
+                                <input type="hidden" name="type" value="album"><input type="hidden" name="id" value="{{ $album->id }}">
+                                <input type="hidden" name="label" value="{{ $album->name }}"><input type="hidden" name="next" value="{{ $next ? 1 : 0 }}">
+                                <button type="submit" class="{{ $secondary }}" title="{{ $text }} on {{ $pinned->device_name }}" data-test="album-{{ $capability }}"><i class="fa-solid fa-{{ $icon }} text-sm"></i>{{ $text }}</button>
+                            </form>
+                        @endif
+                    @endforeach
+                @endif
+
                 <button type="button" class="{{ $secondary }}" title="Add to playlist" data-test="album-add-to-playlist"
                         @click="$dispatch('add-to-playlist', {{ \Illuminate\Support\Js::from(['album_id' => $album->id, 'source' => $page->source, 'label' => $album->name]) }})"><i class="fa-solid fa-list-ul text-sm"></i>Add to playlist</button>
 

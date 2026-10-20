@@ -47,6 +47,56 @@ class DeviceQueue
         $this->index = 0;
     }
 
+    /** @param  int[]  $trackIds  added after the last track */
+    public function append(array $trackIds): void
+    {
+        $this->trackIds = array_merge($this->trackIds, array_values($trackIds));
+    }
+
+    /** @param  int[]  $trackIds  put right after the current track, in this order */
+    public function insertNext(array $trackIds): void
+    {
+        $at = $this->trackIds ? $this->index + 1 : 0;
+        array_splice($this->trackIds, $at, 0, array_values($trackIds));
+    }
+
+    /** The track `$position` places after the current one (1 = the first of upNext()), null when there is none. */
+    public function at(int $position): ?int
+    {
+        return $position >= 1 ? ($this->trackIds[$this->index + $position] ?? null) : null;
+    }
+
+    /** Removes the entry `$position` places after the current one; false when there is none. */
+    public function remove(int $position): bool
+    {
+        if ($this->at($position) === null) {
+            return false;
+        }
+
+        array_splice($this->trackIds, $this->index + $position, 1);
+
+        return true;
+    }
+
+    /** Moves the entry at up-next position `$from` so it ends up at `$to`; false when either is outside the up-next list. */
+    public function move(int $from, int $to): bool
+    {
+        if ($this->at($from) === null || $this->at($to) === null) {
+            return false;
+        }
+
+        [$id] = array_splice($this->trackIds, $this->index + $from, 1);
+        array_splice($this->trackIds, $this->index + $to, 0, [$id]);
+
+        return true;
+    }
+
+    /** Drops everything after the current track. */
+    public function clear(): void
+    {
+        $this->trackIds = array_slice($this->trackIds, 0, $this->trackIds ? $this->index + 1 : 0);
+    }
+
     /** Turns shuffle on (the tracks after the current one are shuffled) or off. */
     public function setShuffle(bool $shuffle): void
     {

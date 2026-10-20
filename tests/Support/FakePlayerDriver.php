@@ -45,7 +45,7 @@ class FakePlayerDriver implements MediaControlsInterface, MultiRoomInterface, Mu
         self::$peers = [];
     }
 
-    private function record(string $method, mixed $argument = null): void
+    protected function record(string $method, mixed $argument = null): void
     {
         if (self::$throw) {
             throw self::$throw;

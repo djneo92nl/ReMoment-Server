@@ -90,10 +90,45 @@ services:
         networks:
             - sail
 
+    # Opt-in Spotify stream: docker compose --profile spotify-stream up -d, then LIBRESPOT_ENABLED=true and
+    # ICECAST_INTERNAL_URL=http://icecast:8000 (docs/architecture/spotify-stream.md). Docker Desktop does not pass mDNS,
+    # so Spotify finds librespot only when the app runs on a Linux host (use docker-compose.prod.yml there).
+    icecast:
+        profiles: [spotify-stream]
+        build:
+            context: './docker/icecast'
+        environment:
+            ICECAST_SOURCE_PASSWORD: '${ICECAST_SOURCE_PASSWORD:-remoment}'
+            ICECAST_ADMIN_USER: '${ICECAST_ADMIN_USER:-admin}'
+            ICECAST_ADMIN_PASSWORD: '${ICECAST_ADMIN_PASSWORD:-remoment}'
+        ports:
+            - '${ICECAST_PORT:-8000}:8000'
+        networks:
+            - sail
+
+    librespot:
+        profiles: [spotify-stream]
+        build:
+            context: './docker/librespot'
+        environment:
+            LIBRESPOT_NAME: '${LIBRESPOT_NAME:-ReMoment Stream}'
+            LIBRESPOT_EVENT_SECRET: '${LIBRESPOT_EVENT_SECRET:-remoment}'
+            ICECAST_SOURCE_PASSWORD: '${ICECAST_SOURCE_PASSWORD:-remoment}'
+            ICECAST_HOST: 'icecast'
+            ICECAST_MOUNT: '${ICECAST_MOUNT:-spotify.mp3}'
+            REMOMENT_URL: 'http://laravel.test'
+        volumes:
+            - 'sail-librespot-cache:/cache'
+        depends_on:
+            - icecast
+        networks:
+            - sail
+
 networks:
     sail:
         driver: bridge
 volumes:
+    sail-librespot-cache:
     sail-analysis-models:
     sail-redis:
         driver: local

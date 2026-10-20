@@ -9,7 +9,10 @@ use App\Domain\Device\State;
 use App\Domain\Media\AlbumData;
 use App\Domain\Media\ArtistData;
 use App\Domain\Media\NowPlaying;
+use App\Domain\Media\Radio;
 use App\Domain\Media\TrackData;
+use App\Domain\Radio\IcyReader;
+use App\Domain\Radio\StreamTitles;
 use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
 use App\Events\Device\PlaybackModesUpdated;
@@ -24,6 +27,7 @@ use App\Integrations\Upnp\Renderer;
 use App\Integrations\Upnp\UpnpCapabilities;
 use App\Models\Device;
 use App\Models\Media\Track;
+use App\Models\RadioStation;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -183,6 +187,7 @@ class DeviceListener implements DeviceListenerInterface
 
             event(new NowPlayingEnded(deviceId: $deviceId));
             MusicPlayerDriver::forgetPlaying($id);
+            MusicPlayerDriver::forgetRadio($id);
         }
 
         $this->lastPosition = $this->lastDuration = null;
@@ -277,6 +282,10 @@ class DeviceListener implements DeviceListenerInterface
     /** What the renderer reports about the track; a renderer that drops our metadata gets it from the queue's track. */
     private function nowPlaying(int $id, array $position): NowPlaying
     {
+        if ($radio = $this->radioNowPlaying($id, $position)) {
+            return $radio;
+        }
+
         $meta = DidlLite::parse($position['metadata']);
         $ours = MusicPlayerDriver::playing($id);
 
@@ -300,6 +309,39 @@ class DeviceListener implements DeviceListenerInterface
             position: $position['position'] ?? 0,
             type: 'music',
             platform: 'media',
+        );
+    }
+
+    /**
+     * The station the server started on this renderer, while that stream still plays: the station is the radio, the
+     * stream's ICY title ("Artist - Song", kept fresh by {@see StreamTitles}) the song. Null for anything else.
+     *
+     * @param  array{uri: string}  $position
+     */
+    private function radioNowPlaying(int $id, array $position): ?NowPlaying
+    {
+        $ours = MusicPlayerDriver::radio($id);
+
+        if ($ours === null || $ours['uri'] !== $position['uri'] || !($station = RadioStation::with('meta')->find($ours['station_id']))) {
+            return null;
+        }
+
+        StreamTitles::touch($station);
+
+        $images = $station->image_url ? [$station->image_url] : [];
+        $title = StreamTitles::get($station->id);
+        [$artistName, $song] = $title !== null ? IcyReader::split($title) : [null, $station->name];
+
+        return new NowPlaying(
+            track: new TrackData(
+                name: $song,
+                artist: $artistName !== null ? new ArtistData(name: $artistName) : null,
+                images: $images,
+            ),
+            position: 0,
+            type: 'music',
+            platform: 'radio',
+            radio: new Radio(name: $station->name, genre: $station->genre, images: $images, id: $station->streamUrl()),
         );
     }
 

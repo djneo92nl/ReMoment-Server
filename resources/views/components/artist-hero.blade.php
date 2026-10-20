@@ -115,9 +115,14 @@
                     @endforeach
                 @endif
 
-                @if($admin)
+                @if($admin || $pinned)
                     <x-menu label="More" :button="$round">
-                        <a href="{{ route('artists.settings', $artist) }}" role="menuitem" class="flex w-full items-center gap-2.5 px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-stone-700"><i class="fa-solid fa-sliders w-4 text-xs text-gray-400"></i>Artist settings</a>
+                        @if($playable && $direct)
+                            <x-queue-menu-items type="artist" :id="$artist->id" :label="$artist->name" />
+                        @endif
+                        @if($admin)
+                            <a href="{{ route('artists.settings', $artist) }}" role="menuitem" class="flex w-full items-center gap-2.5 px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-stone-700"><i class="fa-solid fa-sliders w-4 text-xs text-gray-400"></i>Artist settings</a>
+                        @endif
                     </x-menu>
                 @endif
             </div>

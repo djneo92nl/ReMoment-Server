@@ -142,6 +142,39 @@ class PlayerBarTest extends TestCase
             ->assertSet('panel', 'multiroom');
     }
 
+    public function test_the_queue_panel_edits_the_queue_with_the_row_it_was_shown_for(): void
+    {
+        \Tests\Support\FakePlayerDriver::reset();
+        $device = Device::factory()->driver(\Tests\Support\FakeQueueEditDriver::class)->create();
+        DeviceCache::updateState($device->id, State::Playing);
+        cache()->put("listener_running_{$device->id}", true, 60);
+
+        Livewire::withCookie(SelectedDevice::COOKIE, (string) $device->id)
+            ->test(PlayerBar::class)
+            ->call('openPanel', 'queue')
+            ->assertSee('Remove from the queue')
+            ->assertSee('Clear')
+            ->call('removeFromQueue', 1, 'fake:1')
+            ->call('moveInQueue', 2, 1, null)
+            ->call('clearQueue')
+            ->assertSet('queueError', null);
+
+        $this->assertSame([['removeFromQueue', [1, 'fake:1']], ['moveInQueue', [2, 1, null]], ['clearQueue', null]], array_values(array_filter(\Tests\Support\FakePlayerDriver::$calls, fn ($call) => $call[0] !== 'getUpNext')));
+    }
+
+    public function test_a_refused_queue_edit_is_shown(): void
+    {
+        \Tests\Support\FakePlayerDriver::reset();
+        $device = Device::factory()->driver(\Tests\Support\FakeQueueEditDriver::class)->create();
+        DeviceCache::updateState($device->id, State::Playing);
+        \Tests\Support\FakePlayerDriver::$throw = new \InvalidArgumentException('The queue has changed; reload it and try again.');
+
+        Livewire::withCookie(SelectedDevice::COOKIE, (string) $device->id)
+            ->test(PlayerBar::class)
+            ->call('removeFromQueue', 1, 'old')
+            ->assertSet('queueError', 'The queue has changed; reload it and try again.');
+    }
+
     private function renderPlayButton($devices, Device $pinned): string
     {
         $this->app->instance('request', Request::create('/', 'GET', [], [SelectedDevice::COOKIE => (string) $pinned->id]));

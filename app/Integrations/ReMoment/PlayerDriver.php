@@ -9,11 +9,17 @@ use App\Domain\Device\RepeatMode;
 use App\Domain\Storage\StreamUrl;
 use App\Events\Device\PlaybackModesUpdated;
 use App\Integrations\Common\DeviceQueue;
+use App\Integrations\Common\EditsDeviceQueue;
 use App\Integrations\Contracts\LibraryPlaybackInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
+use App\Integrations\Contracts\QueueAddInterface;
+use App\Integrations\Contracts\QueueClearInterface;
 use App\Integrations\Contracts\QueueInterface;
 use App\Integrations\Contracts\QueueJumpInterface;
+use App\Integrations\Contracts\QueueMoveInterface;
+use App\Integrations\Contracts\QueuePlayNextInterface;
+use App\Integrations\Contracts\QueueRemoveInterface;
 use App\Integrations\Contracts\RepeatInterface;
 use App\Integrations\Contracts\SeekInterface;
 use App\Integrations\Contracts\ShuffleInterface;
@@ -27,9 +33,21 @@ use Illuminate\Support\Collection;
  * A ReMoment player (browser tab, app, ESP32) that plays the server's own files. The player does the
  * playing; this driver keeps the queue and turns every control into a command for it (PlayerCommands).
  */
-class PlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, MusicPlayerDriverInterface, QueueInterface, QueueJumpInterface, RepeatInterface, SeekInterface, ShuffleInterface, VolumeControlInterface
+class PlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, MusicPlayerDriverInterface, QueueAddInterface, QueueClearInterface, QueueInterface, QueueJumpInterface, QueueMoveInterface, QueuePlayNextInterface, QueueRemoveInterface, RepeatInterface, SeekInterface, ShuffleInterface, VolumeControlInterface
 {
+    use EditsDeviceQueue;
+
     public function __construct(public Device $device) {}
+
+    protected function canQueue(Track $track): bool
+    {
+        return self::playable($track, $this->device);
+    }
+
+    protected function queueUri(Track $track): ?string
+    {
+        return StreamUrl::for($track->id);
+    }
 
     public function play(): void
     {

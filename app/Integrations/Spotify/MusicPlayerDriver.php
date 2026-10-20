@@ -4,9 +4,11 @@ namespace App\Integrations\Spotify;
 
 use App\Domain\Device\QueueItem;
 use App\Domain\Device\RepeatMode;
+use App\Domain\Library\LibraryPlayback;
 use App\Integrations\Contracts\LikeInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
+use App\Integrations\Contracts\QueueAddInterface;
 use App\Integrations\Contracts\QueueInterface;
 use App\Integrations\Contracts\QueueJumpInterface;
 use App\Integrations\Contracts\RepeatInterface;
@@ -14,9 +16,10 @@ use App\Integrations\Contracts\SeekInterface;
 use App\Integrations\Contracts\ShuffleInterface;
 use App\Models\Device;
 use App\Services\SpotifyTokenService;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
-class MusicPlayerDriver implements LikeInterface, MediaControlsInterface, MusicPlayerDriverInterface, QueueInterface, QueueJumpInterface, RepeatInterface, SeekInterface, ShuffleInterface
+class MusicPlayerDriver implements LikeInterface, MediaControlsInterface, MusicPlayerDriverInterface, QueueAddInterface, QueueInterface, QueueJumpInterface, RepeatInterface, SeekInterface, ShuffleInterface
 {
     public function __construct(public Device $device) {}
 
@@ -72,6 +75,22 @@ class MusicPlayerDriver implements LikeInterface, MediaControlsInterface, MusicP
     {
         for ($i = 0; $i < max(1, $position); $i++) {
             $this->api()->next();
+        }
+    }
+
+    /** Spotify only appends, and always to the end of the user's queue (no play next, remove or move). */
+    public function addToQueue(Collection $tracks): void
+    {
+        $uris = $tracks->map(fn ($track) => LibraryPlayback::spotifyUri($track))->filter()->values();
+
+        if ($uris->isEmpty()) {
+            throw new \InvalidArgumentException('None of these tracks are on Spotify.');
+        }
+
+        $api = $this->api();
+
+        foreach ($uris as $uri) {
+            $api->queue($uri);
         }
     }
 

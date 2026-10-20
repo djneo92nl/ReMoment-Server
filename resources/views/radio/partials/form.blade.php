@@ -2,6 +2,7 @@
     $knownPlatforms = [
         'beoradio' => ['label' => 'B&O Radio ID', 'hint' => 'contentId from the B&O notification stream, e.g. 6336061628069729'],
         'tunein'   => ['label' => 'TuneIn ID',    'hint' => 'TuneIn station ID, e.g. s15200 — used by Sonos'],
+        'url'      => ['label' => 'Stream URL',   'hint' => 'https://… plain MP3/AAC stream — any device that can play a stream; B&O and Sonos prefer their own ID above'],
     ];
     $existingMeta = isset($radio) ? $radio->meta->keyBy('key') : collect();
 @endphp

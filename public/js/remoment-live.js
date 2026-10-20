@@ -5,6 +5,8 @@
  * re-emits each message as { deviceId, kind, data, retained }. Nothing is
  * rendered here: Livewire components use it to trigger $wire.$refresh(),
  * and /receiver uses it to re-fetch the device instead of polling.
+ * A `queue` message (non-retained ping after a queue edit) refreshes the Up next lists through liveDevice
+ * and re-reads the queue in /receiver.
  *
  * Requires mqtt.js (window.mqtt) to be loaded first. If the broker can't be
  * reached, RemomentLive.connected stays false and callers keep polling.
@@ -100,6 +102,43 @@
             destroy() {
                 this._off && this._off();
                 clearInterval(this._timer);
+            },
+        }));
+
+        // Drag-to-reorder for a Livewire queue list: put on the <ol>, rows carry data-pos (1 = first of
+        // Up next) and data-uri. A drop calls moveInQueue(from, to, uri-of-the-dragged-row); the
+        // up/down buttons stay as the fallback. Nothing is rendered here.
+        Alpine.data('queueSort', () => ({
+            from: null,
+            uri: null,
+            row(e) { return e.target.closest('[data-pos]'); },
+            start(e) {
+                const row = this.row(e);
+                if (!row) return;
+                this.from = parseInt(row.dataset.pos, 10);
+                this.uri = row.dataset.uri || null;
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', this.uri || String(this.from));
+                row.style.opacity = '.4';
+            },
+            over(e) {
+                if (this.from === null) return;
+                e.preventDefault();
+                const row = this.row(e);
+                this.$root.querySelectorAll('[data-pos]').forEach(r => { r.style.boxShadow = r === row ? 'inset 0 2px 0 currentColor' : ''; });
+            },
+            drop(e) {
+                const row = this.row(e);
+                const from = this.from, uri = this.uri;
+                this.end();
+                if (!row || from === null) return;
+                e.preventDefault();
+                const to = parseInt(row.dataset.pos, 10);
+                if (to !== from) this.$wire.moveInQueue(from, to, uri);
+            },
+            end() {
+                this.from = this.uri = null;
+                this.$root.querySelectorAll('[data-pos]').forEach(r => { r.style.opacity = ''; r.style.boxShadow = ''; });
             },
         }));
 

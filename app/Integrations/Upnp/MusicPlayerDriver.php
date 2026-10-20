@@ -8,16 +8,25 @@ use App\Domain\Device\PlaybackModes;
 use App\Domain\Device\QueueItem;
 use App\Domain\Device\RepeatMode;
 use App\Domain\Device\Settings\DeviceInfo;
+use App\Domain\Radio\StreamTitles;
 use App\Domain\Storage\StreamUrl;
 use App\Events\Device\PlaybackModesUpdated;
 use App\Integrations\Common\DeviceQueue;
+use App\Integrations\Common\EditsDeviceQueue;
 use App\Integrations\Common\UnsupportedOperationException;
 use App\Integrations\Contracts\DeviceInfoInterface;
 use App\Integrations\Contracts\LibraryPlaybackInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
+use App\Integrations\Contracts\PlayStreamUrlInterface;
+use App\Integrations\Contracts\QueueAddInterface;
+use App\Integrations\Contracts\QueueClearInterface;
 use App\Integrations\Contracts\QueueInterface;
 use App\Integrations\Contracts\QueueJumpInterface;
+use App\Integrations\Contracts\QueueMoveInterface;
+use App\Integrations\Contracts\QueuePlayNextInterface;
+use App\Integrations\Contracts\QueueRemoveInterface;
+use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\RepeatInterface;
 use App\Integrations\Contracts\SeekInterface;
 use App\Integrations\Contracts\ShuffleInterface;
@@ -26,6 +35,7 @@ use App\Integrations\ReMoment\PlayerDevice;
 use App\Models\Device;
 use App\Models\Media\Playlist;
 use App\Models\Media\Track;
+use App\Models\RadioStation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
@@ -35,14 +45,39 @@ use Illuminate\Support\Facades\Cache;
  * moves it on when a track ends. Seek and volume depend on what the renderer's SCPDs list
  * ({@see UpnpCapabilities}, applied by HardwareFeatures). See docs/architecture/upnp-renderer.md.
  */
-class MusicPlayerDriver implements DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MusicPlayerDriverInterface, QueueInterface, QueueJumpInterface, RepeatInterface, SeekInterface, ShuffleInterface, VolumeControlInterface
+class MusicPlayerDriver implements DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MusicPlayerDriverInterface, PlayStreamUrlInterface, QueueAddInterface, QueueClearInterface, QueueInterface, QueueJumpInterface, QueueMoveInterface, QueuePlayNextInterface, QueueRemoveInterface, RadioControlInterface, RepeatInterface, SeekInterface, ShuffleInterface, VolumeControlInterface
 {
+    use EditsDeviceQueue;
+
     /** How long we remember that we stopped the renderer ourselves, so the listener doesn't read it as a track ending. */
     private const STOPPED_BY_US_SECONDS = 20;
 
     private ?Renderer $renderer = null;
 
     public function __construct(public Device $device) {}
+
+    protected function canQueue(Track $track): bool
+    {
+        return (bool) $track->getDlnaUrl();
+    }
+
+    protected function queueUri(Track $track): ?string
+    {
+        return $this->urlFor($track);
+    }
+
+    protected function queueActive(): bool
+    {
+        return self::playing($this->device->id) !== null;
+    }
+
+    /** The track after the current one may have changed: what the renderer holds ahead of time must follow. */
+    protected function queueEdited(int $position): void
+    {
+        if ($position === 1) {
+            $this->refreshPreloaded();
+        }
+    }
 
     /** Connecting is lazy: building the driver (capability checks, lists) never waits for the renderer. */
     public function renderer(): Renderer
@@ -186,6 +221,62 @@ class MusicPlayerDriver implements DeviceInfoInterface, LibraryPlaybackInterface
     public function setDeviceName(string $name): void
     {
         throw new UnsupportedOperationException('A UPnP renderer cannot be renamed from here.');
+    }
+
+    public function radioPlatform(): string
+    {
+        return 'url';
+    }
+
+    public function canPlayRadioStation(RadioStation $station): bool
+    {
+        return $station->streamUrl() !== null;
+    }
+
+    /** The stream goes to the renderer as it is; our listener adds the station and, from the ICY title, the song. */
+    public function playRadioStation(RadioStation $station): void
+    {
+        $url = $station->streamUrl() ?? throw new UnsupportedOperationException('This station has no stream URL.');
+
+        $this->playStreamUrl($url, $station->name, ($cover = LibraryItemArtwork::proxy($station->image_url, 320)) ? (StreamUrl::storage($cover) ?? $cover) : null);
+
+        Cache::put(self::radioKey($this->device->id), ['station_id' => $station->id, 'uri' => $url], now()->addDay());
+        StreamTitles::touch($station);
+    }
+
+    /** @return array{station_id: int, uri: string}|null the station the server started on this renderer */
+    public static function radio(int $deviceId): ?array
+    {
+        return Cache::get(self::radioKey($deviceId));
+    }
+
+    public static function forgetRadio(int $deviceId): void
+    {
+        Cache::forget(self::radioKey($deviceId));
+    }
+
+    private static function radioKey(int $deviceId): string
+    {
+        return "upnp:{$deviceId}:radio";
+    }
+
+    /** A live stream has no end: nothing of ours is "playing" afterwards, so the listener never moves the queue on. */
+    public function playStreamUrl(string $url, string $title, ?string $art = null): void
+    {
+        self::forgetPlaying($this->device->id);
+        self::forgetRadio($this->device->id);
+
+        Cache::put(self::stoppedKey($this->device->id), true, self::STOPPED_BY_US_SECONDS);
+        try {
+            $this->renderer()->stop();
+        } catch (\Throwable) {
+            // Nothing to stop (NO_MEDIA_PRESENT) is fine.
+        }
+
+        $didl = DidlLite::build(url: $url, title: $title, artist: null, album: null, art: $art, duration: null, mime: 'audio/mpeg');
+        $this->renderer()->setUri($url, $didl);
+        $this->renderer()->play();
+        Cache::forget(self::stoppedKey($this->device->id));
     }
 
     public function playLibraryTrack(Track $track): void

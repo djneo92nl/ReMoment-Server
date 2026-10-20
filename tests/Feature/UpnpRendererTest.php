@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Domain\Device\DedicatedDrivers;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
+use App\Domain\Radio\StreamTitles;
 use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
 use App\Integrations\Common\DeviceQueue;
@@ -16,17 +17,21 @@ use App\Integrations\Upnp\MusicPlayerDriver;
 use App\Integrations\Upnp\Services\DeviceListener;
 use App\Integrations\Upnp\UpnpCapabilities;
 use App\Integrations\Upnp\UpnpDiscovery;
+use App\Jobs\PollRadioTitle;
 use App\Models\Device;
 use App\Models\DeviceMeta;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
 use App\Models\Media\Metadata;
 use App\Models\Media\Track;
+use App\Models\RadioStation;
 use App\Services\Discovery\SsdpClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 /** The generic UPnP MediaRenderer driver: SOAP, queue, listener and discovery against a faked renderer. */
@@ -178,6 +183,47 @@ class UpnpRendererTest extends TestCase
         Http::assertSent(fn (Request $r) => str_contains($r->body(), '/stream/'.$track->id.'.flac</CurrentURI>'));
     }
 
+    public function test_the_queue_can_be_edited_while_something_plays(): void
+    {
+        $this->fakeRenderer();
+        $device = $this->device();
+        $tracks = [$this->track('one'), $this->track('two'), $this->track('three')];
+        $extra = [$this->track('four'), $this->track('five')];
+        $device->driver->playLibraryTracks(collect($tracks));
+        DeviceCache::updateState($device->id, State::Playing);
+
+        $this->postJson("/api/devices/{$device->id}/queue", ['type' => 'track', 'id' => $extra[0]->id])->assertOk();
+        $this->postJson("/api/devices/{$device->id}/queue", ['type' => 'track', 'id' => $extra[1]->id, 'next' => true])->assertOk();
+        $this->assertSame(['five', 'two', 'three', 'four'], array_map(fn ($i) => $i->name, $device->driver->getUpNext()));
+
+        $this->putJson("/api/devices/{$device->id}/queue/4", ['to' => 1, 'expect' => 'http://dlna.test/four.flac'])->assertOk();
+        $this->deleteJson("/api/devices/{$device->id}/queue/2?expect=http://dlna.test/five.flac")->assertOk();
+        $this->assertSame(['four', 'two', 'three'], array_map(fn ($i) => $i->name, $device->driver->getUpNext()));
+
+        $this->deleteJson("/api/devices/{$device->id}/queue/1?expect=http://dlna.test/wrong.flac")->assertStatus(422)->assertJsonPath('error', 'invalid');
+        $this->assertCount(3, $device->driver->getUpNext());
+
+        $this->deleteJson("/api/devices/{$device->id}/queue")->assertOk();
+        $this->assertSame([], $device->driver->getUpNext());
+        $this->assertSame($tracks[0]->id, DeviceQueue::for($device->id)->current());
+    }
+
+    public function test_adding_needs_something_playing_and_a_playable_track(): void
+    {
+        $this->fakeRenderer();
+        $device = $this->device();
+        $track = $this->track('one');
+        DeviceCache::updateState($device->id, State::Standby);
+
+        $this->postJson("/api/devices/{$device->id}/queue", ['type' => 'track', 'id' => $track->id])
+            ->assertStatus(422)->assertJsonPath('error', 'invalid');
+
+        $device->driver->playLibraryTracks(collect([$track]));
+        Metadata::where('metadatable_id', $track->id)->delete();
+        $this->postJson("/api/devices/{$device->id}/queue", ['type' => 'track', 'id' => $track->id])
+            ->assertStatus(422)->assertJsonPath('error', 'invalid');
+    }
+
     public function test_next_previous_and_jump_move_the_server_queue(): void
     {
         $this->fakeRenderer();
@@ -272,6 +318,51 @@ class UpnpRendererTest extends TestCase
 
         Event::assertDispatched(NowPlayingUpdated::class, fn ($e) => $e->nowPlaying->track->name === 'Other');
         $this->assertSame([], $device->driver->getUpNext());
+    }
+
+    public function test_a_station_with_a_stream_url_plays_and_shows_the_icy_title_as_its_song(): void
+    {
+        Queue::fake();
+        Event::fake([NowPlayingUpdated::class]);
+        $this->fakeRenderer();
+        $device = $this->device();
+        $station = RadioStation::create(['name' => 'Radio Test', 'genre' => 'Pop']);
+        $station->setMeta('url', 'http://stream.test/radio.mp3');
+
+        $this->assertTrue($device->driver->canPlayRadioStation($station->fresh('meta')));
+        $device->driver->playRadioStation($station->fresh('meta'));
+
+        $this->assertSame(['Stop', 'SetAVTransportURI', 'Play'], $this->sent());
+        Http::assertSent(fn (Request $r) => str_contains($r->body(), 'http://stream.test/radio.mp3</CurrentURI>'));
+        Queue::assertPushed(PollRadioTitle::class);
+
+        $listener = DeviceListener::forDevice($device->fresh());
+        $this->renderer = ['state' => 'PLAYING', 'uri' => 'http://stream.test/radio.mp3', 'meta' => '', 'duration' => '0:00:00', 'position' => '0:00:10', 'volume' => '40'];
+
+        // No title yet: the station is what plays.
+        $listener->poll((string) $device->id);
+        Event::assertDispatched(NowPlayingUpdated::class, fn ($e) => $e->nowPlaying->radio?->name === 'Radio Test' && $e->nowPlaying->track->name === 'Radio Test' && $e->nowPlaying->platform === 'radio');
+
+        // The poll job found a song: it becomes the track, the station stays the radio.
+        StreamTitles::put($station->id, 'Some Artist - Some Song');
+        $listener->poll((string) $device->id);
+        Event::assertDispatched(NowPlayingUpdated::class, fn ($e) => $e->nowPlaying->track->name === 'Some Song' && $e->nowPlaying->track->artist?->name === 'Some Artist' && $e->nowPlaying->radio?->name === 'Radio Test');
+    }
+
+    public function test_a_station_without_a_stream_url_is_not_playable_and_other_uris_are_not_radio(): void
+    {
+        Event::fake([NowPlayingUpdated::class]);
+        $this->fakeRenderer();
+        $device = $this->device();
+
+        $this->assertFalse($device->driver->canPlayRadioStation(RadioStation::create(['name' => 'No URL'])->load('meta')));
+
+        // Radio is remembered for the stream we started only: another URI is shown as the renderer reports it.
+        Cache::put("upnp:{$device->id}:radio", ['station_id' => 999, 'uri' => 'http://stream.test/radio.mp3'], 60);
+        $this->renderer = ['state' => 'PLAYING', 'uri' => 'http://elsewhere/song.mp3', 'meta' => DidlLite::build('http://elsewhere/song.mp3', 'Other', 'Them', null, null, null, 'audio/mpeg'), 'duration' => '0:03:00', 'position' => '0:00:10', 'volume' => '40'];
+        DeviceListener::forDevice($device->fresh())->poll((string) $device->id);
+
+        Event::assertDispatched(NowPlayingUpdated::class, fn ($e) => $e->nowPlaying->track->name === 'Other' && $e->nowPlaying->radio === null);
     }
 
     public function test_volume_is_scaled_to_the_renderers_range(): void

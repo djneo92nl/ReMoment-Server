@@ -14,6 +14,7 @@ use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\MultiRoomId;
 use App\Domain\Device\RepeatMode;
 use App\Domain\Device\State;
+use App\Integrations\Common\AddsToDlnaQueue;
 use App\Integrations\Common\PlaysDlnaLibrary;
 use App\Integrations\Common\UnsupportedOperationException;
 use App\Integrations\Contracts\BatteryInterface;
@@ -24,6 +25,9 @@ use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
 use App\Integrations\Contracts\PowerInterface;
+use App\Integrations\Contracts\QueueAddInterface;
+use App\Integrations\Contracts\QueueClearInterface;
+use App\Integrations\Contracts\QueuePlayNextInterface;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\RepeatInterface;
 use App\Integrations\Contracts\SeekInterface;
@@ -39,8 +43,9 @@ use App\Models\RadioStation;
 use Djneo92nl\BeoMozart\Enums\PlaybackCommand;
 use Djneo92nl\BeoMozart\MozartClient;
 
-class MusicPlayerDriver implements BatteryInterface, BluetoothInterface, DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, PowerInterface, RadioControlInterface, RepeatInterface, SeekInterface, SessionHostInterface, ShuffleInterface, SoundAdjustmentInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
+class MusicPlayerDriver implements BatteryInterface, BluetoothInterface, DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, PowerInterface, QueueAddInterface, QueueClearInterface, QueuePlayNextInterface, RadioControlInterface, RepeatInterface, SeekInterface, SessionHostInterface, ShuffleInterface, SoundAdjustmentInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
 {
+    use AddsToDlnaQueue;
     use PlaysDlnaLibrary;
     use SettingsControls;
 
@@ -302,6 +307,33 @@ class MusicPlayerDriver implements BatteryInterface, BluetoothInterface, DeviceI
     protected function enqueueDlna(string $url, ?\App\Models\Media\Track $track = null): void
     {
         $this->client->playback()->enqueue('track', 'dlna', $url);
+    }
+
+    // --- Queue edits ---
+    // The spec (6.2.0.44) has add-to-queue and clear only; it has no way to read, remove or move queue
+    // items, so those contracts are not implemented until a device shows how (refactor-hardware-check.md).
+
+    /**
+     * Puts tracks right after the playing one: `PlayQueueItem.index` is the queue position the item is
+     * added at (the spec gives the field no description; 1 is assumed to be the item after the playing
+     * one). Unverified on hardware.
+     */
+    public function playNext(\Illuminate\Support\Collection $tracks): void
+    {
+        $playable = $tracks->filter(fn (Track $track) => (bool) $track->getDlnaUrl())->values();
+
+        if ($playable->isEmpty()) {
+            throw new \InvalidArgumentException('None of these tracks have a playable DLNA stream.');
+        }
+
+        foreach ($playable as $i => $track) {
+            $this->client->playback()->enqueue('track', 'dlna', $track->getDlnaUrl(), index: 1 + $i);
+        }
+    }
+
+    public function clearQueue(): void
+    {
+        $this->client->playback()->clearQueue();
     }
 
     // --- RadioControlInterface ---

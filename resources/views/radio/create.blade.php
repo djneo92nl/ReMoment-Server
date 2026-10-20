@@ -3,7 +3,15 @@
         <x-page-header title="Add Radio Station" subtitle="Register a known station for cross-device playback" :back="route('radio.index')" />
     </x-slot>
 
-    <div class="max-w-2xl">
+    <div class="max-w-2xl space-y-6">
+        <x-card class="p-8 md:p-10">
+            <p class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">Find a station</p>
+            <livewire:radio-station-search />
+            <p class="mt-4 text-xs text-gray-400 dark:text-gray-600">
+                <a href="{{ route('radio.index') }}" class="underline">Done adding? Back to radio.</a>
+            </p>
+        </x-card>
+
         <x-card class="p-8 md:p-10">
             <form method="POST" action="{{ route('radio.store') }}">
                 @csrf

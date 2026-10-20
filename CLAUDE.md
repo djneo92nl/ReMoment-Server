@@ -20,6 +20,7 @@ docs/
     client-devices.md       Client device registration flow, all endpoints, firmware guide
     library.md              Library browse (artists, albums, playlists), favorites, play album/artist/playlist on a device (DLNA or Spotify), playlist artwork
     source-controls.md      Per-source controls (change disc, FM presets) from control profiles: GET/POST /api/devices/{id}/controls, resolution, transports
+    queue.md                Editing the queue: add, play next, remove, move, clear (queue_add/next/remove/move/clear), positions, `expect`, per-platform support
     server-info.md          GET /api/info bootstrap endpoint (API/MQTT/artwork addresses for clients)
     mcp.md                  MCP server at /mcp for AI agents: tools, admin-token gating, how tools reuse the REST API
     admin-auth.md           Token login of the single admin for apps: POST /api/admin/login, bearer tokens, revocation, what it gates
@@ -45,6 +46,8 @@ docs/
     live-updates.md          MQTT-over-WebSocket push to Livewire + /receiver, topics, fallback polling
     library-health.md        Reports on the own files: suspected transcodes, damaged, clipping, duplicates, lossy, incomplete albums, orphans
     listening-modes.md       Focus / Party / Sleep / Workout: preset smart-playlist definitions over the audio analysis, API and Library page row
+    similar-tracks.md        Plan (not built) for similar tracks / radio from the EffNet embeddings; the sqlite-vec spike's measurements and what the build must do
+    spotify-stream.md        Spotify on any speaker: librespot → ffmpeg → Icecast MP3 stream, `stream_url` capability, --onevent hook as now playing, opt-in compose profile
     smart-playlists.md       Rule-based playlists (source smart): rules JSON, SmartFields registry, builder, editor, daily refresh
     sd-card-export.md        Admin zip of recent covers/backgrounds + logos in the touch client's SD layout
     refactor-hardware-check.md  Checklist for real devices after the duplicate-code cleanup: listeners, discovery, DLNA playback, volume, multiroom, API errors, artwork, MQTT
@@ -160,7 +163,7 @@ Response: `{ "data": DeviceDetailResource }`
 
 `state` values: `playing` | `standby` | `paused` | `unreachable`
 
-`capabilities` values: `media_controls` | `volume_control` | `radio_control` | `source_control` | `source_activation` | `multi_room` | `library_playback` | `seek` | `queue` | `queue_jump` | `shuffle` | `repeat` | `like` | `power` | `sound_adjustment` | `bluetooth` | `device_info` | `battery` | `network_settings` | `wireless_speakers` | `wired_speakers` | `sleep_timer` | `digits` | `remote_control` | `source_controls`
+`capabilities` values: `media_controls` | `volume_control` | `radio_control` | `source_control` | `source_activation` | `multi_room` | `library_playback` | `seek` | `queue` | `queue_jump` | `queue_add` | `queue_next` | `queue_remove` | `queue_move` | `queue_clear` | `shuffle` | `repeat` | `like` | `power` | `sound_adjustment` | `bluetooth` | `device_info` | `battery` | `network_settings` | `wireless_speakers` | `wired_speakers` | `sleep_timer` | `digits` | `remote_control` | `stream_url` | `source_controls`
 
 `multiroom` is `{ role, host, listeners }` (role `standalone` | `host` | `listener`, `host` and `listeners` as `{ id, name }`) or `null` while unknown — ASE devices only for now, read by their listener (`MultiRoomStatusInterface`, `MultiRoomUpdated` → cache + MQTT `/multiroom`, checked every 5 s); the device card shows a badge.
 
@@ -318,6 +321,16 @@ GET      /api/devices/{id}/wireless-speakers   POST …/wireless-speakers/scan {
 GET      /api/devices/{id}/wired-speakers   PUT …/wired-speakers/{pl_1|pl_2} { type?, sound? }   (capability `wired_speakers`; which speaker type is on each wired output: **only models with external speakers**, Essence and Moment, via `speaker => 'external'` in config/devices.php / `HardwareFeatures`)
 ```
 
+### Spotify stream
+
+`stream_url` (UPnP, Sonos, ASE unverified) plays a live MP3 stream; the opt-in librespot + Icecast containers turn Spotify Connect into one (`docs/architecture/spotify-stream.md`).
+
+```
+GET  /api/spotify-stream                  → { enabled, name, url }
+POST /api/devices/{id}/spotify-stream     → { status, url, receiver }   (needs LIBRESPOT_ENABLED and `stream_url`; the user then picks the receiver in Spotify)
+POST /api/librespot/event                 the container's --onevent hook, header X-Librespot-Secret; becomes the speaker's now playing
+```
+
 ### Source controls
 
 `source_controls` is reported while the playing source has controls a transport can deliver (CD changer, tape, FM presets); full description in `docs/api/source-controls.md`.
@@ -331,6 +344,8 @@ Profiles are in `config/control-profiles.php`; `App\Domain\Control\SourceControl
 
 ### Up Next (queue)
 
+Editing (add, play next, remove, move, clear) has its own capabilities and endpoints, see `docs/api/queue.md` and [Queue editing](#queue-editing).
+
 Requires `queue` (Sonos, Spotify).
 
 ```
@@ -342,6 +357,17 @@ GET  /api/devices/{id}/queue?limit=20  → { "up_next": [ QueueItem, … ] }
 **QueueItem shape:** `{ "name": "…", "artist": "…"|null, "album": "…"|null, "image": "https://…"|null, "duration": 200|null, "uri": "…"|null, "artwork": { hash, proxy_120, proxy_320, colors, safe_colors }|null }`. `artwork` is the small library artwork object (see Library): the item's `image` is processed through the artwork pipeline (queued at most once an hour per image, never waited for), so it is `null` until processed.
 
 Validation errors return Laravel's standard `422` `{ "message", "errors" }`. Unknown devices and routes return `404`.
+
+### Queue editing
+
+```
+POST   /api/devices/{id}/queue              { type: track|album|artist|playlist, id, next?: bool }   → { status, next, tracks }   (`queue_add`; `next` needs `queue_next`)
+DELETE /api/devices/{id}/queue/{position}   ?expect=<uri>                                            → { status, position }       (`queue_remove`)
+PUT    /api/devices/{id}/queue/{position}   { to, expect? }                                          → { status, position }       (`queue_move`)
+DELETE /api/devices/{id}/queue                                                                       → { status }                 (`queue_clear`: everything after the current track)
+```
+
+`position` is the up-next position (1 = first of `GET …/queue`). `expect` is the `uri` the client saw there: when the queue has changed, the driver refuses (`422 invalid`) instead of editing the wrong entry, and the client re-reads. Contracts `QueueAddInterface`, `QueuePlayNextInterface`, `QueueRemoveInterface`, `QueueMoveInterface`, `QueueClearInterface` (all in `DELEGATED_CONTRACTS`); the drivers take the tracks they can play (a DLNA stream, a Spotify URI) from `Domain\Library\QueueTracks` and skip the rest. Support: UPnP/ReMoment (`Common\EditsDeviceQueue` on `DeviceQueue`) all five, Sonos all five, ASE add/remove/clear (play next and move unverified on hardware), Spotify add only, Mozart add, play next and clear (no queue read/remove/move in its spec). Web: `POST /devices/{device}/queue` (`devices.queue.add`) for the album page's buttons; the player bar's Up next panel and the device page's Up Next card remove, move and clear via `Livewire\Concerns\EditsQueue`; MCP `queue` tool actions.
 
 ### Sources
 
@@ -379,9 +405,9 @@ GET  /api/devices/{id}/radio                → { "stations": [ RadioStationItem
 POST /api/devices/{id}/radio/{station_id}   → { "status": "ok", "station": "Radio 1" }
 ```
 
-`station_id` is the `RadioStation` model ID. The device must have `radio_control` capability and a compatible radio platform. `GET` lists exactly the stations with an identifier for the device's platform (`beoradio` for ASE/Mozart, `tunein` for Sonos), ordered by name like `/radio`; `422` without `radio_control`, `503` while unreachable (building the driver may contact the device).
+`station_id` is the `RadioStation` model ID. The device must have `radio_control` capability and a compatible radio platform. `GET` lists exactly the stations with an identifier for the device's platform (`beoradio` for ASE/Mozart, `tunein` for Sonos, `url` for generic UPnP). **Native identifiers win:** a station with a `beoradio` / `tunein` id plays through the speaker's own radio even when it also has a stream `url`; the plain stream URL (`PlayStreamUrlInterface`, see `docs/architecture/spotify-stream.md`) is only the fallback on ASE and Sonos and the only way on UPnP. Stations are added by hand or from the radio-browser.info search on `/radio/create` (`Domain\Radio\RadioBrowser`, `Livewire\RadioStationSearch`); a UPnP renderer's now playing for such a station is the station plus the song from the stream's ICY title (`Domain\Radio\IcyReader`, polled by `Jobs\PollRadioTitle` through `StreamTitles`, one chain per station while a device plays it; Sonos and ASE report their own titles), ordered by name like `/radio`; `422` without `radio_control`, `503` while unreachable (building the driver may contact the device).
 
-**RadioStationItem shape:** `{ "id": 3, "name": "Radio 1", "genre": null, "favorite": false, "artwork": { "kind": "radio", "proxy_512": "…", … } | null }`. `genre` is always `null` for now (stations have no genre field). `favorite` is household-wide (`radio_stations.favorited_at`); `PUT /api/radio/{station_id}/favorite` with `{ "favorite": true }` → `{ "favorite": true }` sets it. The `/radio` web page lists favorites first; the API list stays by name. `artwork` is the same object as `now_playing.artwork`: the station's `image_url`, else the generated radio logo. An `image_url` that isn't processed yet gives `null` and is queued (at most once an hour per image), so the request never waits for a download.
+**RadioStationItem shape:** `{ "id": 3, "name": "Radio 1", "genre": null, "favorite": false, "artwork": { "kind": "radio", "proxy_512": "…", … } | null }`. `genre` is the station's genre when it was added from the radio-browser.info search, else `null`. `favorite` is household-wide (`radio_stations.favorited_at`); `PUT /api/radio/{station_id}/favorite` with `{ "favorite": true }` → `{ "favorite": true }` sets it. The `/radio` web page lists favorites first; the API list stays by name. `artwork` is the same object as `now_playing.artwork`: the station's `image_url`, else the generated radio logo. An `image_url` that isn't processed yet gives `null` and is queued (at most once an hour per image), so the request never waits for a download.
 
 ### Multiroom
 
@@ -476,6 +502,7 @@ The Mosquitto broker runs in Docker on port 1883. Each device's MQTT base topic 
 | `remoment/player/{id}/battery` | Battery level or charging changes (retained) | `{ "level": 87, "charging": false }` — only for devices that have a battery; same object as the REST `battery` |
 | `remoment/player/{id}/multiroom` | Multiroom role changes (retained) | `{ "role": "host", "host": null, "listeners": [{ "id": 4, "name": "Beoplayer M5" }] }` — `role` is `standalone` / `host` (others listen to it) / `listener` (`host` names the device it is joined to); same object as the REST `multiroom`, `null` there while unknown |
 | `remoment/player/{id}/modes` | Shuffle/repeat/liked changes (retained) | `{ "shuffle": true, "repeat": "off", "liked": null }` — as `now_playing.modes`; `null` = unknown/unsupported. While Spotify is routed to a speaker, Spotify's modes are published on the speaker's id; afterwards its own (or all `null`) |
+| `remoment/player/{id}/queue` | Queue edited through the server (add, play next, remove, move, clear), **not** retained | `1` — a ping: re-read `GET /api/devices/{id}/queue` |
 
 `/data` is retained so a client subscribing later (e.g. after switching device) gets the current track at once; when the device goes to standby or becomes unreachable the server publishes an empty retained payload, which also removes the retained track from the broker, so clients must treat an empty `/data` as "nothing playing". It is republished from the cache when a device comes back, and identical payloads aren't repeated. `artwork` is absent in the MQTT payload if a real image is not yet processed; `kind` is `album` | `radio` | `source` as in the REST API. Published by the `PublishNowPlayingToMqtt`, `PublishProgressToMqtt`, `PublishStateToMqtt`, `PublishVolumeToMqtt`, `PublishBatteryToMqtt` and `PublishModesToMqtt` listeners. The server only publishes and never subscribes. Browsers subscribe over the WebSocket listener on port 9001 to drive live UI refreshes; see `docs/architecture/live-updates.md`.
 

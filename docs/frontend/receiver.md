@@ -20,7 +20,7 @@ A standalone Blade template with no Livewire dependency — plain JS fetching `G
 | Volume control | Slider, debounced 200ms, hidden on TV UA and Chromecast; updates live from the `volume` MQTT topic |
 | Mute | Speaker icon (`#vol-mute`) toggles `PUT /api/devices/{id}/mute`; `#vol-row.muted` dims the slider |
 | Panels | One floating panel at a time above the bar (`togglePanel`): Up next, Multiroom (`GET …/multiroom`, join a playing player, leave group) and the player switcher; closes on outside click or Escape |
-| Up next | Queue button in the bar (`queue` capability) opens a panel above it, like the sticky bar's: the playing track, then `GET /api/devices/{id}/queue?limit=50`; with `queue_jump` a click plays from there (`POST …/queue/jump`). Reloads on track change while open; closes on outside click or Escape |
+| Up next | Queue button in the bar (`queue` capability) opens a panel above it, like the sticky bar's: the playing track, then `GET /api/devices/{id}/queue?limit=50`; with `queue_jump` a click plays from there (`POST …/queue/jump`). With `queue_remove` each row has an x (`DELETE …/queue/{position}?expect=<uri>`, then the list is re-read; a refused edit, 422, shows in the panel for 4 s). Reloads on track change and on the MQTT `queue` ping while open; closes on outside click or Escape |
 | Lyrics view | Toggle button (`#btn-lyrics`, last button in the bar, accent while active, only shown when the track has lyrics) swaps meta panel ↔ 3-line teleprompter (previous / current / next) |
 | Synced lyrics | LRC timestamps → binary search per second for current line |
 | Plain lyrics | Proportional estimate when no timestamps available |

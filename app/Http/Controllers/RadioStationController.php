@@ -40,9 +40,11 @@ class RadioStationController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'image_url' => ['nullable', 'url', 'max:2048'],
+            'genre' => ['nullable', 'string', 'max:100'],
+            'identifiers.url' => ['nullable', 'url', 'max:2048'],
         ]);
 
-        $station = RadioStation::create($validated);
+        $station = RadioStation::create(collect($validated)->only(['name', 'image_url', 'genre'])->all());
 
         foreach ($request->input('identifiers', []) as $platform => $identifier) {
             $identifier = trim((string) $identifier);
@@ -66,9 +68,11 @@ class RadioStationController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'image_url' => ['nullable', 'url', 'max:2048'],
+            'genre' => ['nullable', 'string', 'max:100'],
+            'identifiers.url' => ['nullable', 'url', 'max:2048'],
         ]);
 
-        $radio->update($validated);
+        $radio->update(collect($validated)->only(['name', 'image_url', 'genre'])->all());
 
         foreach ($request->input('identifiers', []) as $platform => $identifier) {
             $identifier = trim((string) $identifier);

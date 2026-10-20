@@ -14,6 +14,7 @@ class RadioStation extends Model
     protected $fillable = [
         'name',
         'image_url',
+        'genre',
         'favorited_at',
         'last_played_at',
     ];
@@ -35,8 +36,7 @@ class RadioStation extends Model
         return [
             'id' => $this->id,
             'name' => $this->name,
-            // RadioStation has no genre yet; kept in the shape for clients.
-            'genre' => null,
+            'genre' => $this->genre,
             'favorite' => $this->favorited_at !== null,
             'artwork' => RadioStationArtwork::resolve($this),
         ];
@@ -55,6 +55,12 @@ class RadioStation extends Model
     public function getMeta(string $key): ?string
     {
         return $this->meta->firstWhere('key', $key)?->value;
+    }
+
+    /** The plain stream URL (identifier `url`), playable by any device that can play a stream. */
+    public function streamUrl(): ?string
+    {
+        return $this->getMeta('url');
     }
 
     public function setMeta(string $key, string $value): void

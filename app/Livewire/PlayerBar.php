@@ -21,6 +21,7 @@ use App\Integrations\Contracts\RepeatInterface;
 use App\Integrations\Contracts\ShuffleInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Livewire\Concerns\ControlsPlayback;
+use App\Livewire\Concerns\EditsQueue;
 use App\Livewire\Concerns\ManagesMultiroom;
 use App\Models\Device;
 use App\Support\SelectedDevice;
@@ -31,6 +32,7 @@ use Livewire\Component;
 class PlayerBar extends Component
 {
     use ControlsPlayback;
+    use EditsQueue;
     use ManagesMultiroom;
 
     /** The panel floating above the bar: 'queue', 'players' or 'multiroom'; null while closed. */
@@ -144,6 +146,11 @@ class PlayerBar extends Component
     protected function multiroomDevice(): Device
     {
         return $this->device() ?? throw new \LogicException('No player is pinned.');
+    }
+
+    protected function queueDevice(): ?Device
+    {
+        return $this->playbackDevice();
     }
 
     protected function playbackDevice(): ?Device
