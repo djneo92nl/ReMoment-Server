@@ -53,6 +53,17 @@ class MultiRoomGroupsTest extends TestCase
         $this->assertSame([$m5->id], $shown->pluck('id')->all());
     }
 
+    public function test_a_listener_keeps_its_card_when_the_host_status_does_not_list_it(): void
+    {
+        $m3 = $this->makeDevice('Beoplay M3', 'm3');
+        $m5 = $this->makeDevice('Beoplayer M5', 'm5');
+        MultiRoom::put($m5->id, MultiRoomStatus::joined('m3'));
+
+        $shown = MultiRoomGroups::withoutListeners(Device::all());
+
+        $this->assertEqualsCanonicalizing([$m3->id, $m5->id], $shown->pluck('id')->all());
+    }
+
     public function test_the_host_card_lists_its_members(): void
     {
         $m3 = $this->makeDevice('Beoplay M3', 'm3');
