@@ -35,6 +35,7 @@ docs/
     ase-api-map.md          What the B&O ASE REST API offers beyond the driver (Bluetooth, network, WiSA, sound), per model; the ase:map command
     proxmox-deployment.md   Ansible: LXC container on an existing Proxmox host, MiniDLNA server
     discovery-for-clients.md mDNS advertisement (_remoment._tcp via host Avahi) so clients find the server
+    system-requirements.md  Hardware tiers for the full server (Pi minimum up to Essentia + ML), what runs, disk and network needs
     audio-analysis.md       Analysis of the own audio files: loudness, ReplayGain, Chromaprint/AcoustID, Essentia sidecar (BPM, key, mood), `analysis` queue, library:analyze, smart fields
     metadata-enrichment.md  Per-source enrichment jobs (MusicBrainz track/artist/album, Wikipedia, Cover Art Archive, lyrics, Spotify, Last.fm, TheAudioDB, Discogs), DLNA tags, canonical genres: markers, retries, rate limits, library:enrich
     artist-settings.md      Admin page per artist: photo/backdrop choice, MusicBrainz/Spotify/Last.fm mappings, details overrides, files, default source; the `manual` metadata source
@@ -42,8 +43,8 @@ docs/
     lastfm.md                Scrobbling, now-playing, auth flow, artist enrichment, backfill
     library-identity.md      One record per artist/album/track across sources: name keys, find-or-create, library:merge-duplicates
     live-updates.md          MQTT-over-WebSocket push to Livewire + /receiver, topics, fallback polling
-    listening-modes.md       Focus / Party / Sleep / Workout: preset smart-playlist definitions over the audio analysis, API and Library page row
     library-health.md        Reports on the own files: suspected transcodes, damaged, clipping, duplicates, lossy, incomplete albums, orphans
+    listening-modes.md       Focus / Party / Sleep / Workout: preset smart-playlist definitions over the audio analysis, API and Library page row
     smart-playlists.md       Rule-based playlists (source smart): rules JSON, SmartFields registry, builder, editor, daily refresh
     sd-card-export.md        Admin zip of recent covers/backgrounds + logos in the touch client's SD layout
     refactor-hardware-check.md  Checklist for real devices after the duplicate-code cleanup: listeners, discovery, DLNA playback, volume, multiroom, API errors, artwork, MQTT
