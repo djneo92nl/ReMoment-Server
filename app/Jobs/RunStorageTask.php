@@ -41,7 +41,7 @@ class RunStorageTask implements ShouldBeUnique, ShouldQueue
 
         $message = match ($this->task) {
             StorageTasks::SCAN => $this->scan($scanner),
-            StorageTasks::IMPORT => $files->importInbox($this->keepSource).' files imported'.($this->keepSource ? ' (originals kept in the inbox).' : '.'),
+            StorageTasks::IMPORT => $this->import($files),
             StorageTasks::REORGANIZE => count($files->reorganize()).' files moved.',
             default => throw new \InvalidArgumentException("Unknown storage task {$this->task}."),
         };
@@ -52,6 +52,16 @@ class RunStorageTask implements ShouldBeUnique, ShouldQueue
     public function failed(\Throwable $e): void
     {
         StorageTasks::put($this->task, $this->locationId, ['state' => 'failed', 'message' => $e->getMessage()]);
+    }
+
+    private function import(LibraryFiles $files): string
+    {
+        $started = microtime(true);
+        $moved = $files->importInbox($this->keepSource, function (array $state) use ($started) {
+            StorageTasks::put($this->task, $this->locationId, ['state' => 'running', 'started' => $started] + $state);
+        });
+
+        return $moved.' files imported'.($this->keepSource ? ' (originals kept in the inbox)' : '').', in '.gmdate('H:i:s', (int) (microtime(true) - $started)).'.';
     }
 
     private function scan(LocalLibraryScanner $scanner): string

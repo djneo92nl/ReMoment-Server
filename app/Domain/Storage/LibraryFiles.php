@@ -94,27 +94,44 @@ class LibraryFiles
      *
      * Then queues enrichment and analysis for a batch of the new tracks, as a scan does.
      *
+     * @param  callable(array{total: int, done: int, moved: int, skipped: int, current: string}): void|null  $progress  called as files are handled
      * @return int files moved (copied)
      */
-    public function importInbox(bool $keepSource = false): int
+    public function importInbox(bool $keepSource = false, ?callable $progress = null): int
     {
         $library = StorageLocation::library() ?? throw new \InvalidArgumentException('Add a library storage location first.');
         $inbox = StorageLocation::inbox() ?? throw new \InvalidArgumentException('Add an inbox storage location first.');
 
         $store = new FileStore($inbox);
-        $moved = 0;
+        $paths = array_keys(iterator_to_array($store->files()));
+        $state = ['total' => count($paths), 'done' => 0, 'moved' => 0, 'skipped' => 0, 'current' => ''];
+        $report = function (string $path) use (&$state, $progress) {
+            $state['done']++;
+            $state['current'] = basename($path);
+            if ($progress && ($state['done'] % 3 === 1 || $state['done'] === $state['total'])) {
+                $progress($state);
+            }
+        };
 
-        foreach ($store->files() as $path => $_) {
+        foreach ($paths as $path) {
             if ($keepSource && $this->inLibrary($library, $store, $path)) {
+                $state['skipped']++;
+                $report($path);
+
                 continue;
             }
 
             [$file] = $this->indexer->index($inbox, $path, $store);
             if ($file && $file->storage_location_id === $inbox->id) {
                 $this->place($file, $library, $keepSource);
-                $moved++;
+                $state['moved']++;
+            } else {
+                $state['skipped']++;
             }
+            $report($path);
         }
+
+        $moved = $state['moved'];
 
         if ($moved > 0) { // like a scan: a bounded batch now, the daily jobs work off the rest
             Enrichment::queueBacklog(Enrichment::SCAN_BATCH);

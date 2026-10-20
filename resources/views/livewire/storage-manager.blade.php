@@ -175,6 +175,16 @@
                     @if($taskStatus)
                         <p class="text-xs mt-0.5 {{ $taskStatus['state'] === 'failed' ? 'text-red-500' : (in_array($taskStatus['state'], ['queued', 'running']) ? 'text-amber-500' : 'text-gray-400 dark:text-gray-600') }}">
                             @if(in_array($taskStatus['state'], ['queued', 'running']))<i class="fa-solid fa-spinner fa-spin mr-1"></i>{{ ucfirst($taskStatus['state']) }}…
+                                @isset($taskStatus['total'])
+                                    {{ number_format($taskStatus['done']) }} / {{ number_format($taskStatus['total']) }} files
+                                    ({{ $taskStatus['total'] ? round($taskStatus['done'] / $taskStatus['total'] * 100) : 100 }}%)
+                                    &middot; {{ number_format($taskStatus['moved']) }} imported, {{ number_format($taskStatus['skipped']) }} skipped
+                                    @php($elapsed = max(1, microtime(true) - ($taskStatus['started'] ?? microtime(true))))
+                                    @if($taskStatus['done'] > 0 && $taskStatus['total'] > $taskStatus['done'])
+                                        &middot; ~{{ gmdate('H:i:s', (int) ($elapsed / $taskStatus['done'] * ($taskStatus['total'] - $taskStatus['done']))) }} left
+                                    @endif
+                                    <span class="block text-gray-400 dark:text-gray-600 font-mono truncate max-w-xl">{{ $taskStatus['current'] }}</span>
+                                @endisset
                             @else {{ $taskStatus['state'] === 'failed' ? 'Failed: ' : 'Last run: ' }}{{ $taskStatus['message'] ?? '' }} @endif
                         </p>
                     @endif

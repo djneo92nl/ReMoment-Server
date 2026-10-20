@@ -159,7 +159,7 @@ class StorageSettingsTest extends TestCase
 
         StorageTasks::queue('import');
 
-        $this->assertSame('1 files imported.', StorageTasks::status('import')['message']);
+        $this->assertStringStartsWith('1 files imported, in ', StorageTasks::status('import')['message']);
         $this->assertFileExists($this->base.'/library/Unknown Artist/Unknown Album/x.wav');
     }
 
