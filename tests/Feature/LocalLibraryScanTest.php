@@ -284,6 +284,21 @@ class LocalLibraryScanTest extends TestCase
         $this->assertSame('http://192.168.1.48:8080/stream/'.$track->id, Track::find($track->id)->getDlnaUrl());
     }
 
+    public function test_the_stream_url_follows_the_address_of_the_request_when_nothing_is_configured(): void
+    {
+        config(['app.url' => 'http://remoment.test', 'app.stream_url' => null]);
+
+        $this->app->instance('request', \Illuminate\Http\Request::create('http://192.168.1.212:8080/library'));
+        $this->assertSame('http://192.168.1.212:8080/stream/7', \App\Domain\Storage\StreamUrl::for(7));
+
+        $this->app->instance('request', \Illuminate\Http\Request::create('http://remoment.test/library'));
+        $this->assertSame('http://remoment.test/stream/7', \App\Domain\Storage\StreamUrl::for(7));
+
+        config(['app.stream_url' => 'http://10.0.0.5:8080']);
+        $this->app->instance('request', \Illuminate\Http\Request::create('http://192.168.1.212:8080/library'));
+        $this->assertSame('http://10.0.0.5:8080/stream/7', \App\Domain\Storage\StreamUrl::for(7));
+    }
+
     public function test_the_stream_answers_without_a_session_or_cookies(): void
     {
         $library = $this->location('library', 'library');

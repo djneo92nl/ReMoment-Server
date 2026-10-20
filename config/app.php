@@ -59,7 +59,7 @@ return [
 
     /*
      * Where speakers pull our own audio files from (see App\Domain\Storage\StreamUrl). Must be an address the
-     * speakers can reach, e.g. http://192.168.1.48:8080; empty means APP_URL.
+     * speakers can reach, e.g. http://192.168.1.48:8080; empty follows the address of the web request, else APP_URL.
      */
     'stream_url' => env('STREAM_BASE_URL'),
 
