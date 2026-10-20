@@ -55,6 +55,9 @@ class Track extends Model
             if ($track->isDirty('name') || $track->name_key === null) {
                 $track->name_key = Normalizer::track($track->name);
             }
+            if (mb_strlen((string) $track->name) > 255) {
+                $track->name = Normalizer::storedName($track->name);
+            }
         });
     }
 

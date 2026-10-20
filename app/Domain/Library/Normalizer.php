@@ -41,6 +41,16 @@ final class Normalizer
         'tracks', 'with', 'year', 're', 'master', 'mastered', 'reissue',
     ];
 
+    /**
+     * The name as stored: the `name` columns are 255 characters. A DLNA tag can hold a whole credits list as
+     * "artist" (1,400 characters seen), which SQLite stored as is and MariaDB refuses. The key is taken from the
+     * full name first, so a later lookup of the same long name still finds this record.
+     */
+    public static function storedName(?string $name): ?string
+    {
+        return $name === null ? null : mb_substr($name, 0, 255);
+    }
+
     public static function artist(?string $name): string
     {
         $name = self::clean($name);

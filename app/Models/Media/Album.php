@@ -47,6 +47,9 @@ class Album extends Model
             if ($album->isDirty('name') || $album->name_key === null) {
                 $album->name_key = Normalizer::album($album->name);
             }
+            if (mb_strlen((string) $album->name) > 255) {
+                $album->name = Normalizer::storedName($album->name);
+            }
         });
     }
 

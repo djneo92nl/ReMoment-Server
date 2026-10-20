@@ -35,8 +35,12 @@ php artisan db:import-sqlite path/to/database.sqlite --force
 
 `App\Console\Commands\Database\ImportSqlite` copies every table the target has (columns present on both sides), with foreign key checks off, and prints source and target row counts. Rows MariaDB's strict mode rejects are skipped and listed. It does not copy `migrations`, `sessions`, `cache`, `jobs`, `job_batches` or `lost_and_found`.
 
-A corrupt file is recovered first: `sqlite3 database.sqlite ".recover" | sqlite3 recovered.sqlite`, then imported. Rows that landed in the wrong table through corruption (queue job JSON in `metadata`, an oversized artist name) fail the import and are skipped, which is what you want.
+A corrupt file is recovered first: `sqlite3 database.sqlite ".recover" | sqlite3 recovered.sqlite`, then imported. Rows that landed in the wrong table through corruption (queue job JSON in `metadata`) fail the import and are skipped, which is what you want. A string over 255 characters (SQLite never enforced the column length: a DLNA tag held a 1,400-character credits list as artist) is shortened and the row kept; `Artist`, `Album` and `Track` shorten such names on save too (`Normalizer::storedName()`, the key is taken from the full name).
 
 ## Driver-specific SQL
 
 Code that must differ per driver branches on `DB::getDriverName() === 'sqlite'`, because tests run on SQLite: `Play::secondsListened()` and `StatsController` (`HOUR()`, `DAYOFWEEK()` on MariaDB, `strftime`/`julianday` on SQLite). Keep both branches when you add such a query.
+
+## Leaving the streaming library data behind
+
+`php artisan library:drop-streaming [--dry-run] [--force]` removes the library data of DLNA and Spotify: tracks of those sources that no own file backs (the radio stubs and anything available from `files` stay), their albums and artists, and the Spotify playlists. It reuses `LibraryRemover::track($track, force: true)`, so plays of a removed track stay as text plays (names, cover, duration). Favorites on removed rows are lost. The production deploy runs it once after the SQLite import (`ansible/deploy.yml`); afterwards the daily `spotify:sync-library` and a manual `php artisan library:scan` bring the streaming library back.

@@ -75,8 +75,20 @@ class ImportSqlite extends Command
                             $target->table($table)->insert($row);
                             $copied++;
                         } catch (Throwable $e) {
-                            $skipped++;
-                            $this->warn("  {$table}: skipped a row (".mb_substr($e->getMessage(), 0, 160).')');
+                            // SQLite never enforced column lengths (a credits list stored as an artist name):
+                            // keep the row, shortened, rather than orphaning what points at it.
+                            $short = array_map(fn ($v) => is_string($v) && mb_strlen($v) > 255 ? mb_substr($v, 0, 255) : $v, $row);
+                            try {
+                                if ($short === $row) {
+                                    throw $e;
+                                }
+                                $target->table($table)->insert($short);
+                                $copied++;
+                                $this->warn("  {$table}: id ".($row['id'] ?? '?').' had a value over 255 characters, shortened');
+                            } catch (Throwable $e) {
+                                $skipped++;
+                                $this->warn("  {$table}: skipped a row (".mb_substr($e->getMessage(), 0, 160).')');
+                            }
                         }
                     }
                 }

@@ -111,6 +111,16 @@
         register: sqlite_import
         changed_when: true
 
+      # DLNA and Spotify library data is not carried over: the daily Spotify sync and a `library:scan` bring it back.
+      - name: Drop the streaming library data (it is reloaded afterwards)
+        ansible.builtin.command:
+            cmd: >
+                docker compose -f docker-compose.prod.yml exec -T -u sail app
+                php artisan library:drop-streaming --force
+            chdir: "{{ app_dir }}"
+        when: sqlite_import is changed
+        changed_when: true
+
       - name: Mark the SQLite data as moved
         ansible.builtin.file:
             path: "{{ app_dir }}/storage/app/.sqlite-imported"

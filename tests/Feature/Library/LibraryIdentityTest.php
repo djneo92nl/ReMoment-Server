@@ -294,4 +294,15 @@ class LibraryIdentityTest extends TestCase
         $this->assertSame($artist->id, LibraryIdentity::artist('COLDPLAY', 'spotify')->id);
         $this->assertSame('coldplay', DB::table('artists')->value('name_key'));
     }
+
+    public function test_a_name_over_255_characters_is_stored_shortened_and_found_again(): void
+    {
+        $credits = 'Florence + The Machine, '.str_repeat('Emile Haynie, ', 100);
+
+        $artist = LibraryIdentity::artist($credits, 'dlna');
+
+        $this->assertSame(255, mb_strlen($artist->fresh()->name));
+        $this->assertSame($artist->id, LibraryIdentity::artist($credits, 'dlna')->id);
+        $this->assertSame(1, Artist::count());
+    }
 }

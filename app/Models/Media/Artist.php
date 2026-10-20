@@ -38,6 +38,9 @@ class Artist extends Model
             if ($artist->isDirty('name') || $artist->name_key === null) {
                 $artist->name_key = Normalizer::artist($artist->name);
             }
+            if (mb_strlen((string) $artist->name) > 255) {
+                $artist->name = Normalizer::storedName($artist->name);
+            }
         });
     }
 

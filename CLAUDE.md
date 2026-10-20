@@ -113,6 +113,9 @@ php artisan playlists:refresh-smart [--playlist=ID]
 # Rebuild canonical genres from stored genre metadata (after changing GenreNormalizer)
 php artisan library:sync-genres
 
+# Remove the DLNA/Spotify library data (tracks without an own file, Spotify playlists); the Spotify sync and library:scan bring it back. Used once by the production SQLite→MariaDB move
+php artisan library:drop-streaming [--dry-run] [--force]
+
 # Merge library duplicates across sources (DLNA / Spotify / plays) — dry run first
 php artisan library:merge-duplicates --dry-run
 php artisan library:merge-duplicates [--force]
