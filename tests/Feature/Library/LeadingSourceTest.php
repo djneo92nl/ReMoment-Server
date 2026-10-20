@@ -80,7 +80,7 @@ class LeadingSourceTest extends TestCase
     {
         $this->actingAs(\App\Models\User::factory()->create())
             ->post('/settings/library', ['leading_source' => 'spotify'])
-            ->assertRedirect('/settings/library');
+            ->assertRedirect('/settings/storage?tab=library');
 
         $this->assertSame('spotify', Setting::get(LeadingSource::SETTING));
     }

@@ -28,12 +28,21 @@
 
         <x-settings-group title="Music library">
             <x-settings-row href="{{ route('settings.storage') }}" icon="fa-solid fa-hard-drive"
-                             label="Files">
-                {{ $storageLocationCount }} {{ $storageLocationCount === 1 ? 'location' : 'locations' }}
+                             label="Files & Import">
+                Browse, import, {{ $storageLocationCount }} {{ $storageLocationCount === 1 ? 'location' : 'locations' }}
+                &middot; leads: {{ ['files' => 'Local files', 'dlna' => 'DLNA', 'spotify' => 'Spotify', 'all' => 'everything'][\App\Domain\Library\LeadingSource::leading()] }}
             </x-settings-row>
-            <x-settings-row href="{{ route('settings.library') }}" icon="fa-solid fa-compact-disc"
-                             label="Library">
-                Leading source: {{ ['files' => 'Local files', 'dlna' => 'DLNA', 'spotify' => 'Spotify', 'all' => 'everything'][\App\Domain\Library\LeadingSource::leading()] }}
+            <x-settings-row href="{{ route('settings.library-health') }}" icon="fa-solid fa-stethoscope"
+                             label="Library Health">
+                @if($libraryIssueCount > 0)
+                    <span class="inline-flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>{{ number_format($libraryIssueCount) }} to review
+                    </span>
+                @else
+                    <span class="inline-flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Nothing to review
+                    </span>
+                @endif
             </x-settings-row>
         </x-settings-group>
 
@@ -67,11 +76,15 @@
         <x-settings-group title="System">
             <x-settings-row href="{{ route('settings.health') }}" icon="fa-solid fa-heart-pulse"
                              label="Health">
-                Scheduler, queue, broker
-            </x-settings-row>
-            <x-settings-row href="{{ route('settings.library-health') }}" icon="fa-solid fa-stethoscope"
-                             label="Library Health">
-                Transcodes, duplicates, incomplete albums
+                @if($healthProblems === [])
+                    <span class="inline-flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Scheduler and queue running
+                    </span>
+                @else
+                    <span class="inline-flex items-center gap-1.5 text-red-500">
+                        <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>{{ implode(' and ', $healthProblems) }} not running
+                    </span>
+                @endif
             </x-settings-row>
             <x-settings-row href="{{ route('settings.mqtt') }}" icon="fa-solid fa-tower-broadcast"
                              label="MQTT">

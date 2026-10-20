@@ -7,6 +7,7 @@
         <x-alert type="error">{{ session('error') }}</x-alert>
     @endif
 
+    @if($section === 'all')
     <x-card flush>
         <div class="px-8 py-6 border-b border-gray-100 dark:border-stone-800 flex items-center justify-between gap-4">
             <div>
@@ -157,15 +158,20 @@
         @endif
     </x-card>
 
+    @endif
+
     <x-card class="px-8 py-6 space-y-4">
-        <p class="text-sm font-medium text-gray-900 dark:text-gray-100"><i class="fa-solid fa-folder-tree mr-1.5 text-gray-400"></i>Library tasks</p>
-        @foreach([
+        <p class="text-sm font-medium text-gray-900 dark:text-gray-100"><i class="fa-solid {{ $section === 'import' ? 'fa-inbox' : 'fa-folder-tree' }} mr-1.5 text-gray-400"></i>{{ $section === 'import' ? 'Import inbox' : 'Library tasks' }}</p>
+        @foreach(array_filter([
             ['import', 'Import inbox', 'Moves the audio files in the inbox into the library, organized by artist and album.', $importStatus, $hasInbox],
             ['reorganize', 'Reorganize library', 'Moves every library file to its {artist}/{album}/{track} path, for example after tags changed.', $reorganizeStatus, true],
-        ] as [$method, $label, $help, $taskStatus, $enabled])
+        ], fn ($task) => ($task[0] === 'import') === ($section === 'import')) as [$method, $label, $help, $taskStatus, $enabled])
             <div class="flex items-center justify-between gap-6" data-test="task-{{ $method }}">
                 <div>
                     <p class="text-xs font-medium text-gray-700 dark:text-gray-300">{{ $label }}</p>
+                    @if($method === 'import' && !$hasInbox)
+                        <p class="text-xs text-amber-500 mt-0.5">No inbox location yet: add one under Locations &amp; tasks.</p>
+                    @endif
                     <p class="text-xs text-gray-400 dark:text-gray-600 mt-0.5">{{ $help }}</p>
                     @if($method === 'import')
                         <label class="flex items-center gap-1.5 mt-1 text-xs text-gray-500 dark:text-gray-400">

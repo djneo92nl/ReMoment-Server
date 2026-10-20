@@ -1,9 +1,9 @@
-<x-app-layout>
-    <x-slot name="header">
-        <x-page-header title="Library" subtitle="Which source leads the library" :back="route('settings.index')" />
-    </x-slot>
-
-    <div class="max-w-2xl space-y-6">
+@php
+    $mode = \App\Domain\Library\LeadingSource::mode();
+    $leading = \App\Domain\Library\LeadingSource::leading();
+    $addPlayed = \App\Domain\Library\LibrarySettings::addPlayedTracks();
+@endphp
+<div class="space-y-6">
         @if(session('success'))
             <x-alert type="success">{{ session('success') }}</x-alert>
         @endif
@@ -37,5 +37,4 @@
             <x-primary-button>Save</x-primary-button>
             </form>
         </x-card>
-    </div>
-</x-app-layout>
+</div>

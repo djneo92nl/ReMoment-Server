@@ -641,7 +641,7 @@ Run `php artisan storage:link` once on new environments to create the `public/st
 
 ### Playback History
 
-`StorePlaybackHistory` (queued) persists each play to the `plays` table via the `Play` Eloquent model, finding the track (and its artist/album) through `LibraryIdentity`, so a play counts for the scanned or imported track. `ClosePlaybackHistory` sets `ended_at` when playback stops. Library creation from plays is behind the setting `library_add_played_tracks` (default off, `/settings/library`, `LibrarySettings::addPlayedTracks()`): off, only a track already in the library is matched (`LibraryIdentity::lookupTrack`); any other is logged with `track_id` null and its `track_name`, `artist_name`, `album_name`, `image_url` and `duration` on the play (so history, the artwork proxy and Last.fm still work), and nothing is added to the library. Plays can be browsed at `/history`.
+`StorePlaybackHistory` (queued) persists each play to the `plays` table via the `Play` Eloquent model, finding the track (and its artist/album) through `LibraryIdentity`, so a play counts for the scanned or imported track. `ClosePlaybackHistory` sets `ended_at` when playback stops. Library creation from plays is behind the setting `library_add_played_tracks` (default off, `/settings/storage` › Library, `LibrarySettings::addPlayedTracks()`): off, only a track already in the library is matched (`LibraryIdentity::lookupTrack`); any other is logged with `track_id` null and its `track_name`, `artist_name`, `album_name`, `image_url` and `duration` on the play (so history, the artwork proxy and Last.fm still work), and nothing is added to the library. Plays can be browsed at `/history`.
 
 ### DLNA Library
 
@@ -656,7 +656,7 @@ DLNA servers are discovered on the network and their tracks imported into the sh
 
 ### Leading source
 
-`App\Domain\Library\LeadingSource`: the own files (library `files`, kind `local`) lead when indexed, else DLNA when it has imported tracks, else Spotify (DLNA, Spotify and future Tidal/Deezer are kind `streaming`; scope `local` = own files, `streaming` = all of those; setting at `/settings/library`). Web pages and `/api/library/*` default to that source's scope; `?scope=local|streaming|all` overrides it, nothing is deleted. See `docs/architecture/library-identity.md`.
+`App\Domain\Library\LeadingSource`: the own files (library `files`, kind `local`) lead when indexed, else DLNA when it has imported tracks, else Spotify (DLNA, Spotify and future Tidal/Deezer are kind `streaming`; scope `local` = own files, `streaming` = all of those; setting at `/settings/storage` › Library). Web pages and `/api/library/*` default to that source's scope; `?scope=local|streaming|all` overrides it, nothing is deleted. See `docs/architecture/library-identity.md`.
 
 ### Library Identity
 
@@ -793,7 +793,7 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 - `/settings/health` — external services (Spotify/Last.fm/Discogs/TheAudioDB credentials, MusicBrainz, Wikipedia, Cover Art Archive, LRCLIB, storage locations; `Domain/Health/ExternalServices`, one read-only probe each, results cached 15 min, "Check now" re-runs them), supervisor, scheduler, queue worker, pending jobs, MQTT broker and per-device listener health
 - `/settings/devices` — discovered-devices list (scan, add, ignore) on top, drivers grouped by brand below, add by IP (see `docs/architecture/device-discovery.md`); `/devices/discover` redirects here
 - `/settings/dlna` — discover DLNA servers, trigger library scans
-- `/settings/storage` — storage locations (local/S3) for the own music files, queued scan/import/reorganize with live status, file browser (see `docs/architecture/file-storage.md`)
+- `/settings/storage` — Files & Import: file browser, upload and inbox import, storage locations (local/S3) with queued scan/reorganize and live status, and the Library tab (leading source, played tracks) (see `docs/architecture/file-storage.md`)
 - `/settings/spotify-connect` — map Spotify Connect speaker names to local devices
 - `/settings/clients` — manage client device registrations; approve/reject pending, assign devices, view tokens; build/download the SD card artwork zips, one per screen size (see `docs/architecture/sd-card-export.md`)
 

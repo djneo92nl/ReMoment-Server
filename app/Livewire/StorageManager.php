@@ -12,6 +12,9 @@ use Livewire\Component;
 /** /settings/storage: where the audio files live (local folder or S3), and the queued scan/import/reorganize tasks. */
 class StorageManager extends Component
 {
+    /** `all` = locations and library tasks; `import` = only the inbox import, shown on the Import tab. */
+    public string $section = 'all';
+
     /** `new` while adding, a location id while editing. */
     public int|string|null $editing = null;
 

@@ -65,9 +65,17 @@ class StorageSettingsTest extends TestCase
         $this->actingAs($this->admin())->get('/settings/storage')->assertOk()->assertSee('Files');
     }
 
+    public function test_the_import_and_library_tabs_are_on_the_page(): void
+    {
+        $this->actingAs($this->admin())->get('/settings/storage')->assertOk()
+            ->assertSee('data-test="tab-import"', false)->assertSee('data-test="tab-library"', false)
+            ->assertSee('Import inbox')->assertSee('Add music')->assertSee('The leading source');
+        $this->actingAs($this->admin())->get('/settings/library')->assertRedirect('/settings/storage?tab=library');
+    }
+
     public function test_the_settings_index_links_to_it(): void
     {
-        $this->actingAs($this->admin())->get('/settings')->assertOk()->assertSee('Files');
+        $this->actingAs($this->admin())->get('/settings')->assertOk()->assertSee('Files & Import');
     }
 
     public function test_a_local_location_is_added_and_a_missing_folder_refused(): void

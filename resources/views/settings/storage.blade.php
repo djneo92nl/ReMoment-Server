@@ -1,9 +1,9 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-page-header title="File Storage" subtitle="Where your own music files live (see docs/architecture/file-storage.md)" :back="route('settings.index')" />
+        <x-page-header title="Files" subtitle="Your own music: browse, import, locations and which source leads" :back="route('settings.index')" />
     </x-slot>
 
-    @php($tabs = ['files' => ['Files', 'fa-folder-tree'], 'upload' => ['Upload', 'fa-cloud-arrow-up'], 'locations' => ['Locations & tasks', 'fa-hard-drive']])
+    @php($tabs = ['files' => ['Files', 'fa-folder-tree'], 'import' => ['Import', 'fa-cloud-arrow-up'], 'locations' => ['Locations & tasks', 'fa-hard-drive'], 'library' => ['Library', 'fa-compact-disc']])
     <div class="max-w-6xl space-y-6"
          x-data="{ tab: (new URLSearchParams(location.search).get('tab') || 'files'), pick(t) { this.tab = t; const u = new URL(location); u.searchParams.set('tab', t); history.replaceState(null, '', u); } }">
         <div class="flex flex-wrap gap-1 p-1 bg-gray-100 dark:bg-stone-800/60 rounded-2xl w-fit" role="tablist">
@@ -17,7 +17,11 @@
         </div>
 
         <div x-show="tab === 'files'"><livewire:storage-files /></div>
-        <div x-show="tab === 'upload'" x-cloak><livewire:library-uploader /></div>
+        <div x-show="tab === 'import'" x-cloak class="space-y-6">
+            <livewire:storage-manager section="import" />
+            <livewire:library-uploader />
+        </div>
         <div x-show="tab === 'locations'" x-cloak><livewire:storage-manager /></div>
+        <div x-show="tab === 'library'" x-cloak class="max-w-2xl">@include('settings.partials.library-form')</div>
     </div>
 </x-app-layout>

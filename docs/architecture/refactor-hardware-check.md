@@ -125,7 +125,7 @@ Four listeners publish through `MqttService::publishIfChanged()`. Use `mosquitto
 `StorePlaybackHistory` and "Add to library" share `NowPlayingTrackResolver`, the metadata services share `MetadataHttp`, and enrichment jobs use shared savers.
 
 - [ ] Play a track from Spotify on a speaker with Spotify Connect mapped: it shows up once in `/history`, with the right device (the speaker, not the Spotify device), and `ImportSpotifyAlbum` pulls in the album if the library has it switched on.
-- [ ] With `library_add_played_tracks` off (`/settings/library`), a track the library doesn't have is logged as text; with it on, the artist, album and track are created.
+- [ ] With `library_add_played_tracks` off (`/settings/storage` › Library), a track the library doesn't have is logged as text; with it on, the artist, album and track are created.
 - [ ] Radio with artist and title keeps its station on the play.
 - [ ] `php artisan library:enrich --limit=5`: MusicBrainz, lyrics (LRCLIB), Discogs (with a token), TheAudioDB, Last.fm and the Cover Art Archive all run; check the queue worker log for 429 or 5xx **retries** rather than failures, and for the User-Agent in your own request logs (or set `METADATA_USER_AGENT`).
 - [ ] Last.fm scrobble and now-playing still reach Last.fm (they go through `MetadataHttp::request()` for the User-Agent).

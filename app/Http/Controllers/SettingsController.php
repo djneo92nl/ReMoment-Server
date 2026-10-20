@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Artwork\SdCardExport;
+use App\Domain\Health\Heartbeat;
+use App\Domain\Health\LibraryReports;
 use App\Domain\Lastfm\ScrobbleSources;
 use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibrarySettings;
@@ -33,10 +35,24 @@ class SettingsController extends Controller
         $clientCount = Client::count();
         $pendingClientCount = Client::where('status', 'pending')->count();
 
-        return view('settings.index', compact(
+        $healthProblems = array_keys(array_filter([
+            'Scheduler' => !self::beating(Heartbeat::SCHEDULER),
+            'Queue worker' => !self::beating(Heartbeat::QUEUE),
+        ]));
+        $libraryIssueCount = array_sum(LibraryReports::counts());
+
+        return view('settings.index', compact('healthProblems', 'libraryIssueCount',
             'appTokenCount', 'deviceCount', 'spotifyConnected', 'lastfmConnected',
             'dlnaServerCount', 'storageLocationCount', 'clientCount', 'pendingClientCount',
         ));
+    }
+
+    /** Same threshold as the Health page: the scheduler beats every minute. */
+    private static function beating(string $key): bool
+    {
+        $last = Heartbeat::last($key);
+
+        return $last !== null && $last->diffInSeconds(now()) < 180;
     }
 
     public function spotify(SpotifyTokenService $spotify)
@@ -68,11 +84,7 @@ class SettingsController extends Controller
 
     public function library()
     {
-        return view('settings.library', [
-            'mode' => LeadingSource::mode(),
-            'leading' => LeadingSource::leading(),
-            'addPlayed' => LibrarySettings::addPlayedTracks(),
-        ]);
+        return redirect()->route('settings.storage', ['tab' => 'library']);
     }
 
     public function librarySave(Request $request)
@@ -84,7 +96,7 @@ class SettingsController extends Controller
         Setting::set(LeadingSource::SETTING, $validated['leading_source']);
         Setting::set(LibrarySettings::ADD_PLAYED_TRACKS, $request->boolean('add_played_tracks') ? '1' : '0');
 
-        return redirect()->route('settings.library')->with('success', 'Library settings saved.');
+        return redirect()->route('settings.storage', ['tab' => 'library'])->with('success', 'Library settings saved.');
     }
 
     public function mqtt()
