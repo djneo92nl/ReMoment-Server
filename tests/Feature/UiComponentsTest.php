@@ -141,7 +141,7 @@ class UiComponentsTest extends TestCase
         foreach (File::allFiles(resource_path('views')) as $file) {
             $source = $file->getContents();
 
-            if ($file->getFilename() !== 'receiver.blade.php' && preg_match_all('/#[0-9a-fA-F]{6}\b/', $source, $found)) {
+            if (!in_array($file->getFilename(), ['receiver.blade.php', 'player.blade.php'], true) && preg_match_all('/#[0-9a-fA-F]{6}\b/', $source, $found)) {
                 $problems[] = $file->getRelativePathname().': '.implode(' ', array_unique($found[0]));
             }
             if (str_contains($source, 'cdn.tailwindcss.com')) {

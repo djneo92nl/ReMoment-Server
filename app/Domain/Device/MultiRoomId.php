@@ -22,6 +22,12 @@ final class MultiRoomId
             return $cached;
         }
 
+        if ($stored = $device->meta()->where('key', $metaKey)->value('value')) {
+            Cache::put($cacheKey, $stored, self::TTL_SECONDS);
+
+            return $stored;
+        }
+
         $id = $find();
 
         if ($id) {
