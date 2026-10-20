@@ -16,12 +16,14 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
+use Tests\Support\FakesSpotify;
 use Tests\Support\FakeStreamDriver;
 use Tests\TestCase;
 
 /** Spotify through the server: the stream URL, playing it on a device, and librespot's --onevent hook. */
 class SpotifyStreamTest extends TestCase
 {
+    use FakesSpotify;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -118,6 +120,51 @@ class SpotifyStreamTest extends TestCase
 
         $this->hook(['event' => 'session_disconnected'])->assertOk();
         Event::assertDispatched(NowPlayingEnded::class, fn ($e) => $e->deviceId === '7');
+    }
+
+    public function test_playing_the_stream_maps_the_receiver_to_that_speaker_and_moves_it(): void
+    {
+        $first = Device::factory()->driver(FakeStreamDriver::class)->inState(State::Standby)->create();
+        $second = Device::factory()->driver(FakeStreamDriver::class)->inState(State::Standby)->create();
+
+        $this->postJson("/api/devices/{$first->id}/spotify-stream")->assertOk();
+        $this->assertSame($first->id, DeviceMeta::where('key', 'spotify_connect_name')->where('value', 'Test Receiver')->value('device_id'));
+
+        $this->postJson("/api/devices/{$second->id}/spotify-stream")->assertOk();
+        $this->assertSame([$second->id], DeviceMeta::where('key', 'spotify_connect_name')->where('value', 'Test Receiver')->pluck('device_id')->all());
+    }
+
+    public function test_spotifys_own_listener_reports_the_playback_so_the_hook_stays_quiet(): void
+    {
+        Http::fake();
+        Event::fake([NowPlayingUpdated::class, ProgressUpdated::class, NowPlayingEnded::class]);
+        $this->connectSpotify();
+        $device = Device::factory()->driver(FakeStreamDriver::class)->inState(State::Standby)->create();
+        $this->postJson("/api/devices/{$device->id}/spotify-stream")->assertOk();
+
+        $this->hook(['event' => 'track_changed', 'track_id' => 'x', 'name' => 'Song', 'artists' => 'Artist'])->assertOk();
+        $this->hook(['event' => 'playing', 'track_id' => 'x'])->assertOk();
+        $this->hook(['event' => 'session_disconnected'])->assertOk();
+
+        Event::assertNotDispatched(NowPlayingUpdated::class);
+        Event::assertNotDispatched(ProgressUpdated::class);
+        Event::assertNotDispatched(NowPlayingEnded::class);
+        // The title still reaches Icecast.
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), '/admin/metadata'));
+    }
+
+    public function test_the_hook_still_reports_when_spotify_is_not_connected(): void
+    {
+        Http::fake();
+        Event::fake([NowPlayingUpdated::class]);
+        $this->disconnectSpotify();
+        $device = Device::factory()->driver(FakeStreamDriver::class)->inState(State::Standby)->create();
+        $this->postJson("/api/devices/{$device->id}/spotify-stream")->assertOk();
+
+        $this->hook(['event' => 'track_changed', 'track_id' => 'x', 'name' => 'Song', 'artists' => 'Artist'])->assertOk();
+        $this->hook(['event' => 'playing', 'track_id' => 'x'])->assertOk();
+
+        Event::assertDispatched(NowPlayingUpdated::class, fn ($e) => $e->deviceId === (string) $device->id);
     }
 
     public function test_the_track_title_goes_to_icecast(): void

@@ -16,8 +16,9 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * The librespot container's `--onevent` hook calls in here (POST /api/librespot/event). While a speaker plays
- * the Icecast stream ({@see self::target()}) the events become its now playing, and the title goes into Icecast's
- * stream metadata for speakers that show it. See docs/architecture/spotify-stream.md.
+ * the Icecast stream ({@see self::target()}) the events become its now playing, unless Spotify's own listener already
+ * reports it ({@see LibrespotStream::polledFor()}); the title always goes into Icecast's stream metadata for speakers
+ * that show it. See docs/architecture/spotify-stream.md.
  */
 class LibrespotEvents
 {
@@ -56,7 +57,9 @@ class LibrespotEvents
 
         $deviceId = self::target();
 
-        if ($deviceId === null) {
+        // With Spotify connected and the receiver mapped to the speaker, Spotify's own listener reports the playback
+        // for it (and the Spotify card folds into the speaker's): reporting it here too would double every event.
+        if ($deviceId === null || LibrespotStream::polledFor($deviceId)) {
             return;
         }
 

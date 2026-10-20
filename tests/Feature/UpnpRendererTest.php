@@ -365,6 +365,18 @@ class UpnpRendererTest extends TestCase
         Event::assertDispatched(NowPlayingUpdated::class, fn ($e) => $e->nowPlaying->track->name === 'Other' && $e->nowPlaying->radio === null);
     }
 
+    public function test_the_loaded_url_is_what_the_renderer_reports(): void
+    {
+        $this->fakeRenderer();
+        $device = $this->device();
+
+        $this->renderer['uri'] = 'http://192.168.1.48:8123/spotify.mp3';
+        $this->assertSame('http://192.168.1.48:8123/spotify.mp3', $device->driver->loadedStreamUrl());
+
+        $this->renderer['uri'] = '';
+        $this->assertNull($device->driver->loadedStreamUrl());
+    }
+
     public function test_volume_is_scaled_to_the_renderers_range(): void
     {
         $this->fakeRenderer();

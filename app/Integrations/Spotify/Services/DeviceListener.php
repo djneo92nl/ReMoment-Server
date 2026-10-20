@@ -131,7 +131,7 @@ class DeviceListener implements DeviceListenerInterface
 
             // Paused on a mapped speaker: stay routed, so play/next on it still
             // reach Spotify — unless the speaker now plays something by itself.
-            if ($localDeviceId !== null && DeviceCache::getState($localDeviceId) !== State::Playing) {
+            if ($localDeviceId !== null && !SpotifyRouting::speakerPlaysByItself($localDeviceId, $playback['device']['name'] ?? null)) {
                 DeviceCache::setSpotifyRoutedDevice($localDeviceId);
             } else {
                 $localDeviceId = null;

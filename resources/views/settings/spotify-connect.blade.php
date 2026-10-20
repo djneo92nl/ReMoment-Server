@@ -34,7 +34,7 @@
                         <p class="text-sm font-medium text-gray-900 dark:text-gray-100">Spotify stream</p>
                         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                             Play the stream on a speaker below, then pick <span class="font-medium">{{ config('librespot.name') }}</span> in the Spotify app.
-                            The speaker needs no Spotify of its own. Expect a few seconds of delay.
+                            The speaker needs no Spotify of its own, and from then on counts as the Spotify device (one card, Spotify's own pause and skip). Expect a few seconds of delay.
                         </p>
                         <p class="text-xs text-gray-400 dark:text-gray-600 mt-1 break-all">{{ \App\Domain\Spotify\LibrespotStream::url() }}</p>
                     </div>

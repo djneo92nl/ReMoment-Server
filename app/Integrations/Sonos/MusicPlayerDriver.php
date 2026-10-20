@@ -21,6 +21,7 @@ use App\Integrations\Contracts\QueuePlayNextInterface;
 use App\Integrations\Contracts\QueueRemoveInterface;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\RepeatInterface;
+use App\Integrations\Contracts\ReportsStreamUrlInterface;
 use App\Integrations\Contracts\SeekInterface;
 use App\Integrations\Contracts\ShuffleInterface;
 use App\Integrations\Contracts\SoundAdjustmentInterface;
@@ -42,7 +43,7 @@ use duncan3dc\Sonos\Tracks\Track as SonosTrack;
 use duncan3dc\Sonos\Utils\Time;
 use Illuminate\Support\Collection as TrackCollection;
 
-class MusicPlayerDriver implements BatteryInterface, DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, PlayStreamUrlInterface, QueueAddInterface, QueueClearInterface, QueueInterface, QueueJumpInterface, QueueMoveInterface, QueuePlayNextInterface, QueueRemoveInterface, RadioControlInterface, RepeatInterface, SeekInterface, ShuffleInterface, SoundAdjustmentInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
+class MusicPlayerDriver implements BatteryInterface, DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MusicPlayerDriverInterface, PlayStreamUrlInterface, QueueAddInterface, QueueClearInterface, QueueInterface, QueueJumpInterface, QueueMoveInterface, QueuePlayNextInterface, QueueRemoveInterface, RadioControlInterface, RepeatInterface, ReportsStreamUrlInterface, SeekInterface, ShuffleInterface, SoundAdjustmentInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface
 {
     use MultiRoomControls;
     use SettingsControls;
@@ -99,6 +100,11 @@ class MusicPlayerDriver implements BatteryInterface, DeviceInfoInterface, Librar
     protected function useSonosStream(string $uri, string $title): void
     {
         $this->deviceApiClient()->useStream(new Stream($uri, $title));
+    }
+
+    public function loadedStreamUrl(): ?string
+    {
+        return $this->deviceApiClient()->getStateDetails()->getStream()?->getUri();
     }
 
     /** `x-rincon-mp3radio://` is how a Sonos plays a plain HTTP MP3 stream. */

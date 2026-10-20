@@ -28,6 +28,7 @@ use App\Integrations\Contracts\QueuePlayNextInterface;
 use App\Integrations\Contracts\QueueRemoveInterface;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\RepeatInterface;
+use App\Integrations\Contracts\ReportsStreamUrlInterface;
 use App\Integrations\Contracts\SeekInterface;
 use App\Integrations\Contracts\ShuffleInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
@@ -45,7 +46,7 @@ use Illuminate\Support\Facades\Cache;
  * moves it on when a track ends. Seek and volume depend on what the renderer's SCPDs list
  * ({@see UpnpCapabilities}, applied by HardwareFeatures). See docs/architecture/upnp-renderer.md.
  */
-class MusicPlayerDriver implements DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MusicPlayerDriverInterface, PlayStreamUrlInterface, QueueAddInterface, QueueClearInterface, QueueInterface, QueueJumpInterface, QueueMoveInterface, QueuePlayNextInterface, QueueRemoveInterface, RadioControlInterface, RepeatInterface, SeekInterface, ShuffleInterface, VolumeControlInterface
+class MusicPlayerDriver implements DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MusicPlayerDriverInterface, PlayStreamUrlInterface, QueueAddInterface, QueueClearInterface, QueueInterface, QueueJumpInterface, QueueMoveInterface, QueuePlayNextInterface, QueueRemoveInterface, RadioControlInterface, RepeatInterface, ReportsStreamUrlInterface, SeekInterface, ShuffleInterface, VolumeControlInterface
 {
     use EditsDeviceQueue;
 
@@ -258,6 +259,11 @@ class MusicPlayerDriver implements DeviceInfoInterface, LibraryPlaybackInterface
     private static function radioKey(int $deviceId): string
     {
         return "upnp:{$deviceId}:radio";
+    }
+
+    public function loadedStreamUrl(): ?string
+    {
+        return $this->renderer()->positionInfo()['uri'] ?: null;
     }
 
     /** A live stream has no end: nothing of ours is "playing" afterwards, so the listener never moves the queue on. */

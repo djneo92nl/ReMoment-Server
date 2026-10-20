@@ -3,6 +3,7 @@
 namespace App\Domain\Device;
 
 use App\Domain\Device\Cache\Modes;
+use App\Domain\Spotify\LibrespotStream;
 use App\Events\Device\PlaybackModesUpdated;
 use App\Integrations\Contracts\LikeInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
@@ -57,6 +58,22 @@ final class SpotifyRouting
         $id = DeviceCache::getSpotifyRoutedDeviceId();
 
         return $id === null ? null : (int) $id;
+    }
+
+    /**
+     * While Spotify is paused, does the speaker play something by itself, so that routing must end? A speaker plays
+     * by itself when it reports `playing`. The librespot receiver is the exception: its speaker keeps `playing` the
+     * (silent) stream while Spotify is paused, so it counts only once the stream is no longer what it plays.
+     */
+    public static function speakerPlaysByItself(int $deviceId, ?string $spotifyDeviceName): bool
+    {
+        if (DeviceCache::getState($deviceId) !== State::Playing) {
+            return false;
+        }
+
+        $isReceiver = LibrespotStream::enabled() && $spotifyDeviceName === (string) config('librespot.name');
+
+        return !($isReceiver && LibrespotStream::stillStreaming($deviceId));
     }
 
     public static function isSpotify(Device $device): bool

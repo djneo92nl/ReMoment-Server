@@ -47,6 +47,7 @@ class SpotifyStreamController extends Controller
 
             $driver->playStreamUrl($url, LibrespotStream::title(), $logo);
             LibrespotEvents::setTarget($device->id);
+            LibrespotStream::routeTo($device->id);
 
             return ['status' => 'ok', 'url' => $url, 'receiver' => config('librespot.name')];
         });
