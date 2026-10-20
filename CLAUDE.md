@@ -29,6 +29,7 @@ docs/
     client-devices.md       DB schema, model, controller, admin UI internals
     device-drivers.md       Driver contracts, existing drivers, guide for adding a new brand
     philips-tv.md           Philips Android TV on top of the UPnP driver (Jointspace v6): pairing command, standby, apps as sources, active app as now playing; what is unverified
+    tv-devices.md           How a TV is modelled: sources/inputs, playback, power, RemoteControlInterface (remote keys); what the TV phase still has to do (Philips, BeoVision)
     upnp-renderer.md        Generic UPnP MediaRenderer fallback driver: server-managed queue, polling listener, discovery precedence, future research (native queues, radio, OpenHome)
     device-discovery.md     Discovery commands, listener startup, device_meta keys
     ase-api-map.md          What the B&O ASE REST API offers beyond the driver (Bluetooth, network, WiSA, sound), per model; the ase:map command
@@ -157,7 +158,7 @@ Response: `{ "data": DeviceDetailResource }`
 
 `state` values: `playing` | `standby` | `paused` | `unreachable`
 
-`capabilities` values: `media_controls` | `volume_control` | `radio_control` | `source_control` | `source_activation` | `multi_room` | `library_playback` | `seek` | `queue` | `queue_jump` | `shuffle` | `repeat` | `like` | `power` | `sound_adjustment` | `bluetooth` | `device_info` | `battery` | `network_settings` | `wireless_speakers` | `wired_speakers` | `sleep_timer` | `digits` | `source_controls`
+`capabilities` values: `media_controls` | `volume_control` | `radio_control` | `source_control` | `source_activation` | `multi_room` | `library_playback` | `seek` | `queue` | `queue_jump` | `shuffle` | `repeat` | `like` | `power` | `sound_adjustment` | `bluetooth` | `device_info` | `battery` | `network_settings` | `wireless_speakers` | `wired_speakers` | `sleep_timer` | `digits` | `remote_control` | `source_controls`
 
 `multiroom` is `{ role, host, listeners }` (role `standalone` | `host` | `listener`, `host` and `listeners` as `{ id, name }`) or `null` while unknown — ASE devices only for now, read by their listener (`MultiRoomStatusInterface`, `MultiRoomUpdated` → cache + MQTT `/multiroom`, checked every 5 s); the device card shows a badge.
 

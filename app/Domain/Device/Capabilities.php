@@ -15,6 +15,7 @@ use App\Integrations\Contracts\PowerInterface;
 use App\Integrations\Contracts\QueueInterface;
 use App\Integrations\Contracts\QueueJumpInterface;
 use App\Integrations\Contracts\RadioControlInterface;
+use App\Integrations\Contracts\RemoteControlInterface;
 use App\Integrations\Contracts\RepeatInterface;
 use App\Integrations\Contracts\SeekInterface;
 use App\Integrations\Contracts\ShuffleInterface;
@@ -57,6 +58,7 @@ final class Capabilities
         'wired_speakers' => WiredSpeakersInterface::class,
         'sleep_timer' => SleepTimerInterface::class,
         'digits' => DigitsInterface::class,
+        'remote_control' => RemoteControlInterface::class,
     ];
 
     /** The driver contract behind a capability, null for an unknown one (or a dynamic one like source_controls). */

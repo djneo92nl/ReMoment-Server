@@ -1389,7 +1389,7 @@ components:
       enum: [off, all, one]
     Capability:
       type: string
-      enum: [media_controls, volume_control, radio_control, source_control, source_activation, multi_room, library_playback, seek, queue, queue_jump, shuffle, repeat, like, power, sound_adjustment, bluetooth, device_info, battery, network_settings, wireless_speakers, wired_speakers, sleep_timer, digits, source_controls]
+      enum: [media_controls, volume_control, radio_control, source_control, source_activation, multi_room, library_playback, seek, queue, queue_jump, shuffle, repeat, like, power, sound_adjustment, bluetooth, device_info, battery, network_settings, wireless_speakers, wired_speakers, sleep_timer, digits, remote_control, source_controls]
     Battery:
       type: object
       nullable: true
