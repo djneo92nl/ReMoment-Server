@@ -7,6 +7,7 @@ use App\Domain\Radio\RadioBrowser;
 use App\Domain\Radio\StreamTitles;
 use App\Jobs\PollRadioTitle;
 use App\Livewire\RadioStationSearch;
+use App\Livewire\RadioStreamFinder;
 use App\Models\RadioStation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -118,5 +119,55 @@ class RadioStationSearchTest extends TestCase
         $this->assertSame('https://stream.test/hand.mp3', RadioStation::where('name', 'By hand')->first()->streamUrl());
 
         $this->post('/radio', ['name' => 'Bad', 'identifiers' => ['url' => 'not a url']])->assertSessionHasErrors('identifiers.url');
+    }
+
+    public function test_the_edit_form_inputs_are_styled_and_hold_the_saved_identifiers(): void
+    {
+        $station = RadioStation::create(['name' => 'Energy 98', 'genre' => 'Dance']);
+        $station->setMeta('tunein', 's15200');
+        $station->setMeta('url', 'https://stream.test/energy.mp3');
+
+        $html = $this->actingAs(\App\Models\User::factory()->create())->get("/radio/{$station->id}/edit")->assertOk()
+            ->assertSee('Find the stream URL')->getContent();
+
+        // Every identifier input keeps its classes (a quoting slip in the Blade attribute once dropped them) and its value.
+        preg_match_all('/<input[^>]*>/s', $html, $inputs);
+        foreach (['beoradio', 'tunein', 'url'] as $platform) {
+            $tag = collect($inputs[0])->first(fn ($input) => str_contains($input, 'identifiers['.$platform.']'));
+            $this->assertNotNull($tag, $platform);
+            $this->assertStringContainsString('rounded-xl', $tag, $platform);
+        }
+        $this->assertStringContainsString('value="s15200"', $html);
+        // The form's Alpine state starts with the saved values (Laravel's @js writes them as JSON.parse('...') with \u0022 quotes).
+        $state = html_entity_decode($html);
+        $this->assertStringContainsString('stream.test', $state);
+        $this->assertStringContainsString('\u0022genre\u0022:\u0022Dance\u0022', $state);
+        $this->assertStringContainsString('name="genre"', $html);
+    }
+
+    public function test_the_edit_form_saves_url_genre_and_clears_the_url(): void
+    {
+        $station = RadioStation::create(['name' => 'Energy 98']);
+
+        $this->patch("/radio/{$station->id}", ['name' => 'Energy 98', 'genre' => 'Dance', 'identifiers' => ['url' => 'https://stream.test/energy.mp3', 'tunein' => '']])->assertRedirect();
+        $station = $station->fresh('meta');
+        $this->assertSame('Dance', $station->genre);
+        $this->assertSame('https://stream.test/energy.mp3', $station->streamUrl());
+
+        $this->patch("/radio/{$station->id}", ['name' => 'Energy 98', 'identifiers' => ['url' => '']])->assertRedirect();
+        $this->assertNull($station->fresh('meta')->streamUrl());
+    }
+
+    public function test_the_stream_finder_searches_by_the_stations_name_and_hands_the_pick_to_the_form(): void
+    {
+        Http::fake(['*' => Http::response([['name' => '181.FM Energy 98', 'url' => 'https://stream.test/energy.mp3', 'favicon' => 'https://img.test/e.png', 'tags' => 'dance', 'codec' => 'MP3', 'hls' => 0]])]);
+
+        Livewire::test(RadioStreamFinder::class, ['name' => '181.FM Energy 98'])
+            ->assertSet('query', '181.FM Energy 98')
+            ->call('search')
+            ->assertSee('181.FM Energy 98')
+            ->call('pick', 0)
+            ->assertDispatched('radio-url-picked', url: 'https://stream.test/energy.mp3', image_url: 'https://img.test/e.png', genre: 'Dance')
+            ->assertSee('Filled in');
     }
 }

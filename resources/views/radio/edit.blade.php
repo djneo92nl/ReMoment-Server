@@ -5,6 +5,10 @@
 
     <div class="max-w-2xl">
         <x-card class="p-8 md:p-10">
+            <livewire:radio-stream-finder :name="$radio->name" />
+
+            <hr class="my-8 border-gray-100 dark:border-stone-800">
+
             <form method="POST" action="{{ route('radio.update', $radio) }}">
                 @csrf @method('PATCH')
 
