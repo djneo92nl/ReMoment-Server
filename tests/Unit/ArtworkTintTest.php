@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Domain\Artwork\ArtworkTint;
 use App\Domain\Artwork\Hsl;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class ArtworkTintTest extends TestCase
@@ -43,7 +44,7 @@ class ArtworkTintTest extends TestCase
         $this->assertEqualsWithDelta(Hsl::fromHex('#2255cc')[0], $hue, 6);
     }
 
-    /** @dataProvider covers */
+    #[DataProvider('covers')]
     public function test_ink_always_reads_on_both_variants(string $cover): void
     {
         $tint = ArtworkTint::for([$cover]);
