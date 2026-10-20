@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Domain\Storage\FileStore;
 use App\Domain\Storage\StorageTasks;
 use App\Models\StorageLocation;
+use App\Services\Local\LocalLibraryScanner;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 
@@ -143,6 +144,12 @@ class StorageManager extends Component
     public function scan(int $id): void
     {
         $location = StorageLocation::findOrFail($id);
+
+        if (!LocalLibraryScanner::scannable($location)) {
+            session()->flash('error', 'The inbox is not scanned; use Import inbox.');
+
+            return;
+        }
 
         StorageTasks::queue(StorageTasks::SCAN, $id)
             ? session()->flash('success', "Scan of {$location->name} queued.")

@@ -163,6 +163,15 @@ class LibraryFiles
         $this->releaseTracks($trackIds);
     }
 
+    /** Drops the file's row (and tracks left without a file) but leaves the file itself where it is. */
+    public function forgetFile(File $file): void
+    {
+        $trackIds = $file->trackFiles()->pluck('track_id')->all();
+        $file->delete();
+
+        $this->releaseTracks($trackIds);
+    }
+
     /** Removes every file of the track (original and proxies), then the track itself. */
     public function deleteTrack(Track $track): void
     {

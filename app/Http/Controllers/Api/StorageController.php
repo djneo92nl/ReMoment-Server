@@ -69,6 +69,10 @@ class StorageController extends Controller
     /** With `queue=1` the scan runs on the queue (202, or 409 when one is already queued or running). */
     public function scan(Request $request, StorageLocation $location, LocalLibraryScanner $scanner): JsonResponse
     {
+        if (!LocalLibraryScanner::scannable($location)) {
+            return response()->json(['error' => 'inbox', 'message' => 'The inbox is not scanned; import it instead.'], 422);
+        }
+
         if ($request->boolean('queue')) {
             return StorageTasks::queue(StorageTasks::SCAN, $location->id)
                 ? response()->json(['status' => 'queued'], 202)

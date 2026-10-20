@@ -53,6 +53,37 @@ class LocalLibraryScanTest extends TestCase
         return str_repeat("\xFF\xFB\x90\x00".str_repeat("\0", 413), 40);
     }
 
+    public function test_scanning_the_inbox_does_not_index_anything(): void
+    {
+        $inbox = $this->location('inbox', 'inbox');
+        file_put_contents($this->base.'/inbox/one.wav', $this->wav());
+
+        $this->assertSame(0, app(LocalLibraryScanner::class)->scan($inbox));
+        $this->assertSame(0, File::count());
+        $this->assertSame(0, Track::count());
+    }
+
+    public function test_purge_forgets_indexed_inbox_files_but_keeps_them_on_disk(): void
+    {
+        $library = $this->location('library', 'library');
+        $inbox = $this->location('inbox', 'inbox');
+        file_put_contents($this->base.'/inbox/one.wav', $this->wav(1));
+        file_put_contents($this->base.'/library/two.wav', $this->wav(2));
+
+        $scanner = app(LocalLibraryScanner::class);
+        $scanner->scan($library);
+        // an earlier version of the scan indexed the inbox too
+        app(\App\Domain\Storage\FileIndexer::class)->index($inbox, 'one.wav');
+        $this->assertSame(2, Track::count());
+
+        $this->artisan('library:purge-inbox-index')->assertSuccessful();
+
+        $this->assertSame(1, Track::count());
+        $this->assertSame('two', Track::firstOrFail()->name);
+        $this->assertSame(1, File::count());
+        $this->assertFileExists($this->base.'/inbox/one.wav');
+    }
+
     public function test_scan_indexes_a_file_and_skips_it_when_unchanged(): void
     {
         $library = $this->location('library', 'library');

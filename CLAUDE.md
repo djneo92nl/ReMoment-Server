@@ -118,7 +118,7 @@ php artisan library:merge-duplicates --dry-run
 php artisan library:merge-duplicates [--force]
 
 # Index audio files of the storage locations (local/S3), stream them from this server; see docs/architecture/file-storage.md
-php artisan library:scan-files [location]
+php artisan library:scan-files [location]   # never the inbox; library:purge-inbox-index [--dry-run] forgets rows an older scan made for it
 php artisan library:extract-covers [--limit=50]   # covers embedded in the own files → albums without an image (also run by every file scan)
 php artisan library:import                  # inbox → library, organized by artist/album
 php artisan library:reorganize [--dry-run]

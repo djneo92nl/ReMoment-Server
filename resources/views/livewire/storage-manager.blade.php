@@ -121,10 +121,14 @@
                                 @endif
                             </p>
                             <p class="mt-1 text-xs text-gray-400 dark:text-gray-600">
-                                {{ number_format($location->files_count) }} {{ $location->files_count === 1 ? 'file' : 'files' }}
-                                &middot; {{ $location->last_scanned_at ? 'scanned '.$location->last_scanned_at->diffForHumans() : 'never scanned' }}
+                                @if($location->role === 'inbox')
+                                    Not part of the library until imported
+                                @else
+                                    {{ number_format($location->files_count) }} {{ $location->files_count === 1 ? 'file' : 'files' }}
+                                    &middot; {{ $location->last_scanned_at ? 'scanned '.$location->last_scanned_at->diffForHumans() : 'never scanned' }}
+                                @endif
                             </p>
-                            @if($status)
+                            @if($status && $location->role !== 'inbox')
                                 <p class="mt-1 text-xs {{ $status['state'] === 'failed' ? 'text-red-500' : (in_array($status['state'], ['queued', 'running']) ? 'text-amber-500' : 'text-gray-400 dark:text-gray-600') }}" data-test="scan-status-{{ $location->id }}">
                                     @if($status['state'] === 'queued')
                                         <i class="fa-solid fa-clock mr-1"></i>Scan queued…
@@ -140,7 +144,9 @@
                             @endif
                         </div>
                         <div class="flex items-center gap-1.5">
-                            <button wire:click="scan({{ $location->id }})" class="px-3 py-1.5 text-xs font-medium text-white bg-gray-900 dark:bg-gray-100 dark:text-gray-900 hover:bg-gray-700 rounded-xl transition-colors"><i class="fa-solid fa-rotate mr-1"></i>Scan</button>
+                            @if($location->role !== 'inbox')
+                                <button wire:click="scan({{ $location->id }})" class="px-3 py-1.5 text-xs font-medium text-white bg-gray-900 dark:bg-gray-100 dark:text-gray-900 hover:bg-gray-700 rounded-xl transition-colors"><i class="fa-solid fa-rotate mr-1"></i>Scan</button>
+                            @endif
                             <button wire:click="test({{ $location->id }})" class="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-stone-800 hover:bg-gray-200 dark:hover:bg-stone-700 rounded-xl transition-colors">Test</button>
                             <button wire:click="edit({{ $location->id }})" class="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-stone-800 hover:bg-gray-200 dark:hover:bg-stone-700 rounded-xl transition-colors">Edit</button>
                             <button wire:click="delete({{ $location->id }})" wire:confirm="Remove {{ $location->name }}? Its files are not touched." class="px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors">Remove</button>

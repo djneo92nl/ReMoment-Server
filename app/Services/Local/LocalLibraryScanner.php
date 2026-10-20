@@ -27,8 +27,13 @@ class LocalLibraryScanner
      */
     public function scan(StorageLocation $location, ?callable $progress = null): int
     {
-        $store = new FileStore($location);
         $this->counts = [];
+
+        if (!static::scannable($location)) { // the inbox only reaches the library through LibraryFiles::importInbox()
+            return 0;
+        }
+
+        $store = new FileStore($location);
         $seen = [];
         $handled = 0;
 
@@ -58,6 +63,12 @@ class LocalLibraryScanner
         AudioAnalysis::queueBacklog((int) config('analysis.scan_batch'));
 
         return $handled;
+    }
+
+    /** Inbox files are indexed only while they are imported, so they never show up in the library before. */
+    public static function scannable(StorageLocation $location): bool
+    {
+        return $location->role !== StorageLocation::ROLE_INBOX;
     }
 
     /** @return array<string, int> */

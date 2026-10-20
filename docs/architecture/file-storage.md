@@ -33,6 +33,8 @@ Albums indexed before this existed, or retagged since, are filled by `php artisa
 
 ## Queued tasks and the settings page
 
+The inbox is never scanned: `LocalLibraryScanner` skips it (the settings page has no Scan button for it, `library:scan-files` leaves it out, the API answers 422 `inbox`), so its files are indexed only while `importInbox` moves them into the library. Rows an older scan left behind are removed by `php artisan library:purge-inbox-index [--dry-run]` (files on disk stay; tracks only they made go).
+
 Scanning, importing the inbox and reorganizing can take long, so the web UI and `?queue=1` run them on the queue (`App\Jobs\RunStorageTask`, one per kind, per location for scans; `ShouldBeUnique`). `App\Domain\Storage\StorageTasks` queues them and keeps their state (`queued` | `running` | `done` | `failed`, a summary message, progress while scanning) in the cache for a day; a task queued or running for over two hours counts as lost (no worker) and can be queued again. The queue worker must be running (`composer dev`, supervisor). An import (like a scan) ends by queueing enrichment and audio analysis for a bounded batch of the new tracks (`Enrichment::SCAN_BATCH`, `analysis.scan_batch`); the daily `library:enrich` / `library:analyze` work off the rest.
 
 `/settings/storage` (admin login; three Alpine tabs, `?tab=files|upload|locations`: Livewire `StorageFiles`, `LibraryUploader`, `StorageManager`):

@@ -19,10 +19,17 @@ class ScanLocalFiles extends Command
         $arg = $this->argument('location');
         $locations = $arg
             ? StorageLocation::where('id', $arg)->orWhere('name', $arg)->get()
-            : StorageLocation::all();
+            : StorageLocation::where('role', '!=', StorageLocation::ROLE_INBOX)->get();
 
         if ($locations->isEmpty()) {
             $this->error($arg ? "No storage location '{$arg}'." : 'No storage locations. Add one first.');
+
+            return self::FAILURE;
+        }
+
+        $locations = $locations->filter(fn ($l) => LocalLibraryScanner::scannable($l))->values();
+        if ($locations->isEmpty()) {
+            $this->error('The inbox is not scanned; its files reach the library with library:import.');
 
             return self::FAILURE;
         }
