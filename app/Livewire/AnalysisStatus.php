@@ -21,7 +21,7 @@ class AnalysisStatus extends Component
 
     public function runBacklog(): void
     {
-        $queued = AudioAnalysis::queueBacklog((int) config('analysis.batch'));
+        $queued = AudioAnalysis::queueBacklog(AudioAnalysis::nightlyLimit());
         AnalysisProgress::forget();
         $this->toast($queued > 0 ? "Queued {$queued} files." : 'Nothing left to analyse.');
     }
@@ -100,7 +100,10 @@ class AnalysisStatus extends Component
             'currentFile' => $current ? File::find($current['file_id']) : null,
             'queued' => $queue['count'] ?? 0,
             'perDay' => $perDay,
-            'nights' => $backlog > 0 && config('analysis.batch') > 0 ? (int) ceil($backlog / config('analysis.batch')) : 0,
+            'perFile' => $perFile = AnalysisActivity::secondsPerFile(),
+            'nightFiles' => AudioAnalysis::nightlyLimit(),
+            'nights' => $backlog > 0 ? (int) ceil($backlog / AudioAnalysis::nightlyLimit()) : 0,
+            'backlogHours' => $perFile ? round($backlog * $perFile / 3600, 1) : null,
             'sidecar' => AnalysisProgress::sidecar(),
             'durations' => collect(array_keys(AudioAnalysis::stages()))->prepend('decode')->mapWithKeys(fn ($s) => [$s => AnalysisActivity::averageSeconds($s)])->filter()->all(),
             'problems' => $this->problems(),

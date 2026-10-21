@@ -20,7 +20,13 @@ return [
     /** Seconds one file may take (all stages); keep `DB_QUEUE_RETRY_AFTER` above it. */
     'timeout' => (int) env('ANALYSIS_TIMEOUT', 900),
 
-    /** Files `library:analyze` queues per run (the nightly schedule). */
+    /**
+     * Hours of work the nightly `library:analyze` queues: it takes as many files as fit at the measured time per
+     * file (see AnalysisActivity::secondsPerFile), the rest follows the next night.
+     */
+    'night_hours' => (float) env('ANALYSIS_NIGHT_HOURS', 6),
+
+    /** Files `library:analyze` queues per run until the time per file has been measured (a fresh install). */
     'batch' => (int) env('ANALYSIS_BATCH', 100),
 
     /** Files queued right after a file scan. */

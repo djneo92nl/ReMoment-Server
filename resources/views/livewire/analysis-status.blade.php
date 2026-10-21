@@ -37,13 +37,17 @@
         <dl class="mt-6 pt-6 border-t border-gray-100 dark:border-stone-800 grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
             <div class="flex justify-between gap-4"><dt class="text-gray-500">In the analysis queue</dt><dd class="tabular-nums text-gray-900 dark:text-gray-100" data-test="queued">{{ number_format($queued) }} jobs</dd></div>
             <div class="flex justify-between gap-4"><dt class="text-gray-500">Last 24 hours</dt><dd class="tabular-nums text-gray-900 dark:text-gray-100" data-test="per-day">{{ number_format($perDay) }} files</dd></div>
-            <div class="flex justify-between gap-4"><dt class="text-gray-500">Schedule</dt><dd class="text-gray-900 dark:text-gray-100">nightly 02:00 · {{ config('analysis.batch') }} files · {{ config('analysis.scan_batch') }} after a scan</dd></div>
+            <div class="flex justify-between gap-4"><dt class="text-gray-500">Schedule</dt><dd class="text-right text-gray-900 dark:text-gray-100">nightly 02:00 · up to {{ rtrim(rtrim(number_format(config('analysis.night_hours'), 1), '0'), '.') }} h of work ({{ number_format($nightFiles) }} files{{ $perFile ? '' : ', not measured yet' }})</dd></div>
             <div class="flex justify-between gap-4"><dt class="text-gray-500">Last activity</dt><dd class="text-gray-900 dark:text-gray-100">{{ $lastRun ? \Illuminate\Support\Carbon::parse($lastRun)->diffForHumans() : 'never' }}</dd></div>
         </dl>
 
         @if($progress['enabled'] && $progress['backlog'] > 0)
             <p class="mt-4 text-sm text-gray-500" data-test="eta">
-                At {{ config('analysis.batch') }} files a night the {{ number_format($progress['backlog']) }} waiting files take about {{ $nights }} {{ \Illuminate\Support\Str::plural('night', $nights) }}.
+                @if($backlogHours !== null)
+                    A file takes about {{ $perFile }} s here, so the {{ number_format($progress['backlog']) }} waiting files are about {{ $backlogHours }} hours of work: {{ $nights }} {{ \Illuminate\Support\Str::plural('night', $nights) }} at {{ rtrim(rtrim(number_format(config('analysis.night_hours'), 1), '0'), '.') }} h a night.
+                @else
+                    Not enough runs measured yet for an estimate; each night queues {{ number_format($nightFiles) }} files until it has.
+                @endif
                 @if($perDay > 0) The last 24 hours did {{ number_format($perDay) }}. @endif
             </p>
         @endif

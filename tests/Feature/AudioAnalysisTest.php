@@ -664,4 +664,20 @@ class AudioAnalysisTest extends TestCase
 
         $this->get("/albums/{$track->album_id}")->assertOk()->assertSee('Not analysed yet');
     }
+
+    public function test_the_nightly_run_queues_what_fits_in_the_time_window(): void
+    {
+        config(['analysis.batch' => 100, 'analysis.night_hours' => 6, 'analysis.essentia_url' => 'http://analysis:8090']);
+        $this->assertNull(AnalysisActivity::secondsPerFile());
+        $this->assertSame(100, AudioAnalysis::nightlyLimit(), 'nothing measured yet: the fixed batch');
+
+        AnalysisActivity::finish('decode', 20);
+        AnalysisActivity::finish('loudness', 10);
+        AnalysisActivity::finish('essentia', 40);
+        $this->assertSame(70.0, AnalysisActivity::secondsPerFile());
+        $this->assertSame(308, AudioAnalysis::nightlyLimit(), '6 h = 21600 s at 70 s a file');
+
+        config(['analysis.night_hours' => 1]);
+        $this->assertSame(51, AudioAnalysis::nightlyLimit());
+    }
 }

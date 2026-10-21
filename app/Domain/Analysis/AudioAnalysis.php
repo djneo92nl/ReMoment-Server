@@ -99,6 +99,19 @@ class AudioAnalysis
         return $found;
     }
 
+    /**
+     * How many files a night's run queues: what fits in `analysis.night_hours` at the measured time per file,
+     * or `analysis.batch` while nothing was measured yet.
+     */
+    public static function nightlyLimit(): int
+    {
+        $perFile = AnalysisActivity::secondsPerFile();
+
+        return $perFile === null || $perFile <= 0
+            ? max(1, (int) config('analysis.batch'))
+            : max(1, (int) floor((float) config('analysis.night_hours') * 3600 / $perFile));
+    }
+
     /** Queues up to $limit files that still need analysis; returns how many. */
     public static function queueBacklog(int $limit, ?string $only = null): int
     {

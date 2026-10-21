@@ -10,7 +10,7 @@ use Illuminate\Console\Command;
 class AnalyzeLibrary extends Command
 {
     protected $signature = 'library:analyze
-        {--limit= : Maximum number of files to queue (default: analysis.batch)}
+        {--limit= : Maximum number of files to queue (default: what fits in analysis.night_hours)}
         {--stage= : Only this stage: loudness, waveform, quality, fingerprint, acoustid or essentia}
         {--file= : Analyse this file id (a stage that already ran at its current version is skipped)}
         {--now : Run in this process instead of queueing (for one file, to see errors)}
@@ -48,7 +48,7 @@ class AnalyzeLibrary extends Command
             return self::SUCCESS;
         }
 
-        $limit = max(1, (int) ($this->option('limit') ?: config('analysis.batch')));
+        $limit = max(1, (int) ($this->option('limit') ?: AudioAnalysis::nightlyLimit()));
         $queued = AudioAnalysis::queueBacklog($limit, $only);
 
         $this->info($queued === 0 ? 'Nothing to analyse.' : "Queued analysis of {$queued} file(s) on the '".config('analysis.queue')."' queue; the rest follows on later runs.");

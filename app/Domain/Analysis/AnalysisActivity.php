@@ -50,4 +50,16 @@ class AnalysisActivity
 
         return $samples ? round(array_sum($samples) / count($samples), 1) : null;
     }
+
+    /**
+     * Seconds one file takes with every stage this install runs (the shared decode plus each stage, from the
+     * measured averages); null until anything was measured.
+     */
+    public static function secondsPerFile(): ?float
+    {
+        $keys = ['decode', ...array_keys(AudioAnalysis::enabledStages())];
+        $times = array_filter(array_map(self::averageSeconds(...), $keys));
+
+        return $times ? round(array_sum($times), 1) : null;
+    }
 }

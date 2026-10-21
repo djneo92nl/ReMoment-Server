@@ -20,7 +20,8 @@ A Pi 2/3 runs tier 0 only (its app image has the tools; the sidecar is optional 
 | `ANALYSIS_ENABLED` | `false` | master switch |
 | `ANALYSIS_QUEUE` | `analysis` | queue name; the supervisor program `analysis-queue` works it (`docker/8.4/supervisord*.conf`), `composer dev` listens to `default,analysis` |
 | `ANALYSIS_TIMEOUT` | `900` | seconds per file; `DB_QUEUE_RETRY_AFTER` (now 1800) must stay above it |
-| `ANALYSIS_BATCH` / `ANALYSIS_SCAN_BATCH` | `100` / `25` | files queued by the nightly `library:analyze` / after a file scan |
+| `ANALYSIS_NIGHT_HOURS` | `6` | hours of work the nightly `library:analyze` queues: as many files as fit at the measured time per file (`AudioAnalysis::nightlyLimit()`, from the averages `AnalysisActivity` keeps), the rest follows the next night |
+| `ANALYSIS_BATCH` / `ANALYSIS_SCAN_BATCH` | `100` / `25` | files queued by the nightly run until a time per file has been measured / after a file scan |
 | `ACOUSTID_API_KEY`, `ACOUSTID_MIN_SCORE` | – / `0.9` | free key from acoustid.org; fingerprints leave the server only when it is set |
 | `ANALYSIS_ESSENTIA_URL` | – | `http://analysis:8090` (dev compose) or `http://127.0.0.1:8090` (prod, host networking) |
 | `ANALYSIS_ESSENTIA_ML` | `false` | the sidecar runs the TensorFlow models; files analysed without them are analysed again |
@@ -72,7 +73,7 @@ Analysis is already throttled by design: one `analysis-queue` worker (one file a
 
 | Lever | Effect |
 |-------|--------|
-| `ANALYSIS_BATCH`, `ANALYSIS_SCAN_BATCH` | files queued per nightly run / after a scan; a smaller batch spreads a backlog over more nights |
+| `ANALYSIS_NIGHT_HOURS`, `ANALYSIS_SCAN_BATCH` | hours of work queued per nightly run / files after a scan; fewer hours spread a backlog over more nights |
 | `Schedule::command('library:analyze')->dailyAt(...)` in `routes/console.php` | move the run to when nobody listens |
 | `library:analyze --stage=loudness\|waveform\|quality\|fingerprint\|acoustid\|essentia` | run one stage at a time, e.g. the cheap ones first and `essentia` later |
 | Leave `ANALYSIS_ESSENTIA_URL` unset, or `ANALYSIS_ESSENTIA_ML=false` with the light sidecar build | skips the most expensive stage, or only its TensorFlow models |
@@ -91,7 +92,7 @@ A stage with a bumped `version()` re-runs only that stage, so a changed stage do
 
 `/settings/analysis` (admin login, like all of `/settings`; Livewire `AnalysisStatus`, refreshes every 5 s) answers "how far is it":
 
-- **Summary**: own files, fully analysed (every stage this install can run is done), waiting, with problems; jobs in the `analysis` queue, files finished in the last 24 h, the schedule, and how many nights the backlog takes at `ANALYSIS_BATCH` a night. "Queue a batch now" runs what the nightly command does.
+- **Summary**: own files, fully analysed (every stage this install can run is done), waiting, with problems; jobs in the `analysis` queue, files finished in the last 24 h, the schedule, and, from the measured time per file, how many hours of work and nights the backlog is at `ANALYSIS_NIGHT_HOURS` a night. "Queue a batch now" runs what the nightly command does.
 - **Stages**: per stage a progress bar with done / waiting (and how many of those are *to redo* because the file changed or the stage's version moved on) / failed (retried) / gave up (`analysis.max_attempts` reached). A stage this install cannot run (no ffmpeg, fpcalc, `ACOUSTID_API_KEY`, `ANALYSIS_ESSENTIA_URL`, or analysis off) is greyed with the reason, so "not configured" is not mistaken for "failed". All of it comes from `App\Domain\Analysis\AnalysisProgress`, which applies the same rules as `AudioAnalysis::pendingStages()` over `AudioAnalysis::inScope()` (one pass, cached 60 s).
 - **Now**: the stage and file the worker is on (`AnalysisActivity`: cache key `analysis:current`, written by `AnalyzeAudioFile` before each stage and on the shared decode, TTL one job timeout) and the average seconds per stage over the last 50 runs (`analysis:durations:{stage}`). A worker that dies leaves a stale entry that expires with the TTL.
 - **Essentia sidecar**: reachable or not, ML build or not, the models it loaded (`/health`, cached 30 s), and a warning when it disagrees with `ANALYSIS_ESSENTIA_ML`.
