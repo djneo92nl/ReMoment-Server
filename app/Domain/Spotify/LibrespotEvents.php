@@ -10,6 +10,8 @@ use App\Domain\Media\TrackData;
 use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
 use App\Events\Device\ProgressUpdated;
+use App\Integrations\Contracts\PlaysSpotifyItemsInterface;
+use App\Models\Device;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -57,6 +59,10 @@ class LibrespotEvents
 
         $deviceId = self::target();
 
+        if ($deviceId !== null && $name === 'track_changed' && trim((string) ($event['item'] ?? '')) !== '') {
+            $this->handOverItem($deviceId, $event);
+        }
+
         // With Spotify connected and the receiver mapped to the speaker, Spotify's own listener reports the playback
         // for it (and the Spotify card folds into the speaker's): reporting it here too would double every event.
         if ($deviceId === null || LibrespotStream::polledFor($deviceId)) {
@@ -69,6 +75,38 @@ class LibrespotEvents
             'session_disconnected', 'stopped' => $this->end($deviceId),
             default => null,
         };
+    }
+
+    /**
+     * The container cut this track into its own item (`item` is its number): hand it to the speaker, which plays it after
+     * the track that is playing, with the title and cover of this track. Only a speaker that plays the Spotify stream
+     * right now gets it, so a speaker the user has moved on to something else is never taken over.
+     */
+    private function handOverItem(int $deviceId, array $event): void
+    {
+        if (!LibrespotStream::tracksEnabled()) {
+            return;
+        }
+
+        $driver = Device::find($deviceId)?->driver;
+
+        if (!$driver instanceof PlaysSpotifyItemsInterface) {
+            return;
+        }
+
+        $track = $this->track($event);
+        $item = (int) $event['item'];
+
+        try {
+            if ($driver->playsSpotifyStream()) {
+                $driver->playSpotifyItem(
+                    LibrespotStream::trackUrl($item), $track['name'], $track['artist'] ?: null, $track['album'] ?: null,
+                    LibrespotStream::coverUrl($item), $track['duration'] ?: null,
+                );
+            }
+        } catch (\Throwable $e) {
+            Log::warning("Could not hand Spotify track item {$item} to device {$deviceId}: ".$e->getMessage());
+        }
     }
 
     /** @return array{id: string, name: string, artist: string, album: string, images: list<string>, duration: int} */

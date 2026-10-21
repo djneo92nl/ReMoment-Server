@@ -18,6 +18,24 @@ Spotify app ──Connect──▶ librespot (--backend pipe) ─PCM─▶ ffmpe
 
 librespot's pipe backend writes nothing while Spotify is idle, so ffmpeg would never connect to Icecast and the mount would not exist: a speaker told to play the stream got a 404. `docker/librespot/pcm-filler.py` sits between librespot and ffmpeg, copies the PCM at real-time pace and writes silence for every 20 ms in which librespot had nothing to give. The mount is therefore always live and a speaker can start the stream before a song plays. The cost is an encoder running around the clock (a little CPU; `LIBRESPOT_STREAM_BITRATE`, default 320, can go down to 192 on a Pi). When librespot or ffmpeg exits the pipeline ends and `run.sh` restarts it after 3 s.
 
+## Per-track items (experimental, UPnP only)
+
+The endless stream has one title (the ICY title) and one image: the Spotify logo set at start. A renderer reads art from the metadata of the item it plays, and cannot be told "the art changed" without restarting the item, so per-track art needs **one item per track**. With `LIBRESPOT_TRACKS=true` (Ansible `librespot_tracks`) the container does that next to the Icecast stream, which stays as it is.
+
+```
+librespot ─PCM─▶ pcm-filler.py ─▶ ffmpeg ─▶ Icecast            (the endless stream, as before)
+                      │  cut at the track boundaries
+                      └─▶ track_spool.py: one ffmpeg per track ─▶ /tracks/N.mp3 (+ /tracks/N.jpg) on TRACK_PORT (8010)
+```
+
+- **Exact boundaries.** `hook.sh` reports `track_changed` to the filler first (`POST 127.0.0.1:TRACK_PORT/_event`, answered with the item number `N`); the boundary is the bytes already read plus those still unread in the pipe (`FIONREAD`), so the tail of one track never lands in the next. Silence stays in the current item.
+- **The item.** An MP3 with an ID3v2.3 tag written by `track_spool.py` itself (title, artist, album, duration, the cover as the front-cover picture): ffmpeg's MP3 muxer drops the whole tag when its output is a pipe. The cover is fetched from Spotify's https URL once and cut down to a 320 px baseline JPEG, served as `/tracks/N.jpg` over plain http, so a renderer that cannot do TLS can show it.
+- **Served from the start.** `/tracks/N.mp3` is close-delimited (HTTP/1.0) and always starts at the track's first byte, even while it is still being encoded; a renderer that fetches the next item only when the previous one has drained its buffer (5-10 s after the next track began) still gets all of it. It ends when the next track begins. The last 4 are kept.
+- **Handing it over** (`PlaysSpotifyItemsInterface`, UPnP driver): the hook event (`item` field) reaches `LibrespotEvents::handOverItem()`, which gives the item to the speaker, but only when the speaker plays the Spotify stream or an item right now (`playsSpotifyStream()`: PLAYING and a URL of ours loaded), so a speaker the user moved on is never taken over. The first track stops the silent stream and starts its own item (`SetAVTransportURI` with a DIDL carrying title, artist, album, cover URL and duration); every later one is queued behind the playing item with `SetNextAVTransportURI`, so a gapless renderer moves on by itself and the listener promotes it (`upnp:{id}:spotify_item`: playing and queued). A renderer that ignores the hint stops at the end of the track and the listener starts the queued item (one poll of delay; the whole track is still there). Pressing stop on the speaker ends the items.
+- **Still true:** the speaker lags Spotify by its buffer (5-10 s), so a skip in Spotify reaches the speaker's display late, the same as the endless stream. Not covered: Sonos and B&O (each takes items differently; they keep the endless stream), pausing is silence in the current item.
+- **Tests.** The container's Python (splitter, spool, the filler end to end with real ffmpeg): `python3 -m unittest discover -s docker/librespot/tests` (needs ffmpeg and ffprobe, not part of `composer test`). The PHP side: `tests/Feature/SpotifyTrackItemsTest.php`.
+- **Unverified on hardware:** which renderers honour `SetNextAVTransportURI`, read the ID3 cover, or show the DIDL art; how the hand-over behaves when tracks are skipped quickly. This is a spike: try it on one renderer before relying on it.
+
 ## Pieces
 
 | What | Where |

@@ -9,6 +9,7 @@ use App\Domain\Device\QueueItem;
 use App\Domain\Device\RepeatMode;
 use App\Domain\Device\Settings\DeviceInfo;
 use App\Domain\Radio\StreamTitles;
+use App\Domain\Spotify\LibrespotStream;
 use App\Domain\Storage\StreamUrl;
 use App\Events\Device\PlaybackModesUpdated;
 use App\Integrations\Common\DeviceQueue;
@@ -18,6 +19,7 @@ use App\Integrations\Contracts\DeviceInfoInterface;
 use App\Integrations\Contracts\LibraryPlaybackInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
+use App\Integrations\Contracts\PlaysSpotifyItemsInterface;
 use App\Integrations\Contracts\PlayStreamUrlInterface;
 use App\Integrations\Contracts\QueueAddInterface;
 use App\Integrations\Contracts\QueueClearInterface;
@@ -46,7 +48,7 @@ use Illuminate\Support\Facades\Cache;
  * moves it on when a track ends. Seek and volume depend on what the renderer's SCPDs list
  * ({@see UpnpCapabilities}, applied by HardwareFeatures). See docs/architecture/upnp-renderer.md.
  */
-class MusicPlayerDriver implements DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MusicPlayerDriverInterface, PlayStreamUrlInterface, QueueAddInterface, QueueClearInterface, QueueInterface, QueueJumpInterface, QueueMoveInterface, QueuePlayNextInterface, QueueRemoveInterface, RadioControlInterface, RepeatInterface, ReportsStreamUrlInterface, SeekInterface, ShuffleInterface, VolumeControlInterface
+class MusicPlayerDriver implements DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MusicPlayerDriverInterface, PlaysSpotifyItemsInterface, PlayStreamUrlInterface, QueueAddInterface, QueueClearInterface, QueueInterface, QueueJumpInterface, QueueMoveInterface, QueuePlayNextInterface, QueueRemoveInterface, RadioControlInterface, RepeatInterface, ReportsStreamUrlInterface, SeekInterface, ShuffleInterface, VolumeControlInterface
 {
     use EditsDeviceQueue;
 
@@ -261,6 +263,108 @@ class MusicPlayerDriver implements DeviceInfoInterface, LibraryPlaybackInterface
         return "upnp:{$deviceId}:radio";
     }
 
+    public function playsSpotifyStream(): bool
+    {
+        if (!in_array($this->renderer()->transportState(), ['PLAYING', 'TRANSITIONING'], true)) {
+            return false;
+        }
+
+        $uri = $this->renderer()->positionInfo()['uri'];
+
+        return $uri !== '' && (LibrespotStream::isStreamUrl($uri) || LibrespotStream::isTrackUrl($uri));
+    }
+
+    /**
+     * One MP3 per track, served by the librespot container: queued behind the track that plays (the renderer moves on
+     * by itself where it can; the listener starts it where it cannot), or started at once when the renderer still
+     * plays the endless stream, the silence before the first track. The item's own DIDL carries title, artist,
+     * album and the cover as a plain http URL, which is the point.
+     */
+    public function playSpotifyItem(string $url, string $title, ?string $artist, ?string $album, ?string $art, ?int $duration): void
+    {
+        $didl = DidlLite::build(url: $url, title: $title, artist: $artist, album: $album, art: $art, duration: $duration, mime: 'audio/mpeg');
+        $uri = $this->renderer()->positionInfo()['uri'];
+
+        // The renderer may have moved on to the queued item since the listener last looked.
+        if (($queued = self::spotifyItem($this->device->id)['next']['uri'] ?? null) !== null && $uri === $queued) {
+            self::promoteSpotifyItem($this->device->id);
+        }
+
+        $current = self::spotifyItem($this->device->id);
+
+        if ($current !== null && $uri === $current['uri']) {
+            try {
+                $this->renderer()->setNextUri($url, $didl);
+            } catch (\Throwable) {
+                // A renderer without a next item: the listener starts it when the current one ends.
+            }
+
+            Cache::put(self::spotifyItemKey($this->device->id), ['uri' => $current['uri'], 'next' => ['uri' => $url, 'didl' => $didl]], now()->addDay());
+
+            return;
+        }
+
+        $this->startSpotifyItem($url, $didl);
+    }
+
+    /** The queued item of a renderer that did not move on by itself (it stopped at the end of the track): start it. */
+    public function startPendingSpotifyItem(): bool
+    {
+        $item = self::spotifyItem($this->device->id);
+
+        if ($item === null || $item['next'] === null || Cache::get(self::stoppedKey($this->device->id))) {
+            return false;
+        }
+
+        $this->startSpotifyItem($item['next']['uri'], $item['next']['didl']);
+
+        return true;
+    }
+
+    private function startSpotifyItem(string $url, string $didl): void
+    {
+        self::forgetPlaying($this->device->id);
+        self::forgetRadio($this->device->id);
+
+        Cache::put(self::stoppedKey($this->device->id), true, self::STOPPED_BY_US_SECONDS);
+        try {
+            $this->renderer()->stop();
+        } catch (\Throwable) {
+            // Nothing to stop is fine.
+        }
+
+        $this->renderer()->setUri($url, $didl);
+        $this->renderer()->play();
+        Cache::forget(self::stoppedKey($this->device->id));
+        Cache::put(self::spotifyItemKey($this->device->id), ['uri' => $url, 'next' => null], now()->addDay());
+    }
+
+    /** @return array{uri: string, next: array{uri: string, didl: string}|null}|null the track item the renderer plays and the one queued behind it */
+    public static function spotifyItem(int $deviceId): ?array
+    {
+        return Cache::get(self::spotifyItemKey($deviceId));
+    }
+
+    /** The renderer moved on to the queued item by itself. */
+    public static function promoteSpotifyItem(int $deviceId): void
+    {
+        $item = self::spotifyItem($deviceId);
+
+        if ($item !== null && $item['next'] !== null) {
+            Cache::put(self::spotifyItemKey($deviceId), ['uri' => $item['next']['uri'], 'next' => null], now()->addDay());
+        }
+    }
+
+    public static function forgetSpotifyItem(int $deviceId): void
+    {
+        Cache::forget(self::spotifyItemKey($deviceId));
+    }
+
+    private static function spotifyItemKey(int $deviceId): string
+    {
+        return "upnp:{$deviceId}:spotify_item";
+    }
+
     public function loadedStreamUrl(): ?string
     {
         return $this->renderer()->positionInfo()['uri'] ?: null;
@@ -379,6 +483,7 @@ class MusicPlayerDriver implements DeviceInfoInterface, LibraryPlaybackInterface
 
     public static function forgetPlaying(int $deviceId): void
     {
+        self::forgetSpotifyItem($deviceId);
         Cache::forget(self::playingKey($deviceId));
         Cache::forget(self::nextKey($deviceId));
     }

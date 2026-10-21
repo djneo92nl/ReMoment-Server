@@ -106,5 +106,9 @@ librespot_enabled: true
 # librespot_name: ReMoment Stream
 # Port speakers fetch the stream from (the host's firewall must allow it).
 # icecast_port: 8000
+# Experimental: one MP3 per track (own title and cover per item, UPnP renderers only), see
+# docs/architecture/spotify-stream.md. Needs the librespot container rebuilt, and its port open on the host.
+# librespot_tracks: false
+# librespot_track_port: 8010
 # The event secret and the Icecast passwords default to `remoment`; to change them put
 # vault_librespot_event_secret, vault_icecast_source_password and vault_icecast_admin_password in vault.yml.

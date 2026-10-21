@@ -64,7 +64,7 @@ class SpotifyStreamController extends Controller
             return response()->json(['error' => 'forbidden'], 403);
         }
 
-        $events->handle($request->only(['event', 'track_id', 'position_ms', 'duration_ms', 'name', 'artists', 'album', 'covers']));
+        $events->handle($request->only(['event', 'track_id', 'position_ms', 'duration_ms', 'name', 'artists', 'album', 'covers', 'item']));
 
         return response()->json(['status' => 'ok']);
     }

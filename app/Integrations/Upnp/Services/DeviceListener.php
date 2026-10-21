@@ -125,6 +125,7 @@ class DeviceListener implements DeviceListenerInterface
 
         $this->transportIdle = false;
         $this->followQueue($id, $position['uri']);
+        $this->followSpotifyItem($id, $position['uri']);
 
         $nowPlaying = $this->nowPlaying($id, $position);
         $key = md5(json_encode([$nowPlaying->track?->name, $nowPlaying->track?->artist?->name, $nowPlaying->album?->name, $position['uri']]));
@@ -165,6 +166,11 @@ class DeviceListener implements DeviceListenerInterface
         $id = (int) $deviceId;
         $this->transportIdle = true;
 
+        // A Spotify track item ended and the renderer did not move on to the queued one by itself: start it.
+        if ($this->driver()->startPendingSpotifyItem()) {
+            return;
+        }
+
         if ($this->lastNowPlayingKey !== null) {
             $this->lastNowPlayingKey = null;
 
@@ -203,6 +209,16 @@ class DeviceListener implements DeviceListenerInterface
         }
 
         return $this->lastPosition !== null && $this->lastPosition >= $this->lastDuration - self::END_MARGIN_SECONDS;
+    }
+
+    /** The renderer moved on to the queued Spotify track item (gapless): it is the current one now. */
+    private function followSpotifyItem(int $id, string $uri): void
+    {
+        $item = MusicPlayerDriver::spotifyItem($id);
+
+        if ($item !== null && ($item['next']['uri'] ?? null) === $uri) {
+            MusicPlayerDriver::promoteSpotifyItem($id);
+        }
     }
 
     /** Keeps the queue in step with what the renderer plays: a gapless hand-over moves it on, a foreign track drops it. */

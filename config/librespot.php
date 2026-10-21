@@ -27,6 +27,13 @@ return [
         'admin_password' => env('ICECAST_ADMIN_PASSWORD', 'remoment'),
     ],
 
+    // One MP3 per Spotify track (container: TRACKS_ENABLED), so a renderer gets the title and cover of each track as its
+    // own item instead of one title for the endless stream. UPnP renderers only for now. See docs/architecture/spotify-stream.md.
+    'tracks' => [
+        'enabled' => (bool) env('LIBRESPOT_TRACKS', false),
+        'port' => (int) env('LIBRESPOT_TRACK_PORT', 8010),
+    ],
+
     // Shared secret of the container's --onevent hook (sent as the X-Librespot-Secret header).
     'event_secret' => env('LIBRESPOT_EVENT_SECRET', 'remoment'),
 
