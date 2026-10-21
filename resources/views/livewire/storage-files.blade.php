@@ -119,8 +119,8 @@
                                     @else
                                         <x-badge class="whitespace-nowrap" data-test="chip-parsed">not parsed</x-badge>
                                     @endif
-                                    @if($file->analysis && !empty($file->analysis->stages))
-                                        <x-badge class="whitespace-nowrap" title="Loudness / fingerprint analysis done">analysed</x-badge>
+                                    @if($track && \App\Domain\Analysis\AudioAnalysis::enabled())
+                                        <x-analysis-dots :analysis="$file->analysis" :hash="$file->hash" data-test="chip-analysis" />
                                     @endif
                                     @if($file->isHidden())
                                         <x-badge class="whitespace-nowrap" data-test="chip-hidden"><i class="fa-regular fa-eye-slash"></i>hidden</x-badge>

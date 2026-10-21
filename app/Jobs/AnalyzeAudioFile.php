@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Domain\Analysis\AnalysisActivity;
 use App\Domain\Analysis\AudioAnalysis;
 use App\Domain\Analysis\DecodedStage;
 use App\Domain\Analysis\DecodePass;
@@ -67,6 +68,9 @@ class AnalyzeAudioFile implements ShouldBeUnique, ShouldQueue
 
             try {
                 foreach ($stages as $stage) {
+                    AnalysisActivity::start($file, $stage->key());
+                    $startedAt = microtime(true);
+
                     try {
                         $analysis->fill($pass && $stage instanceof DecodedStage
                             ? $stage->fromDecode($file, $path, $analysis, $pass)
@@ -76,9 +80,12 @@ class AnalyzeAudioFile implements ShouldBeUnique, ShouldQueue
                         $analysis->recordError($stage->key(), $stage->version(), $e->getMessage());
                     }
 
+                    $analysis->analyzed_at = now();
                     $analysis->save();
+                    AnalysisActivity::finish($stage->key(), microtime(true) - $startedAt);
                 }
             } finally {
+                AnalysisActivity::finish();
                 $pass?->cleanup();
             }
         });
@@ -100,9 +107,17 @@ class AnalyzeAudioFile implements ShouldBeUnique, ShouldQueue
             return null;
         }
 
+        AnalysisActivity::start($file, 'decode');
+        $startedAt = microtime(true);
+
         try {
-            return DecodePass::run($shared, $file, $path);
+            $pass = DecodePass::run($shared, $file, $path);
+            AnalysisActivity::finish('decode', microtime(true) - $startedAt);
+
+            return $pass;
         } catch (\Throwable) {
+            AnalysisActivity::finish();
+
             return null;
         }
     }

@@ -27,7 +27,7 @@ class FileAnalysis extends Model
         'arousal' => 'float', 'valence' => 'float', 'instrumental' => 'float',
         'mood_tags' => 'array', 'genre_tags' => 'array', 'waveform' => 'array', 'stages' => 'array', 'errors' => 'array',
         'lossless_suspect' => 'float', 'clipping_suspect' => 'boolean', 'is_mono' => 'boolean', 'phase_issue' => 'boolean',
-        'decode_warnings' => 'array',
+        'decode_warnings' => 'array', 'analyzed_at' => 'datetime',
     ];
 
     public function file(): BelongsTo

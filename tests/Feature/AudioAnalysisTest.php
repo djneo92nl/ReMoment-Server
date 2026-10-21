@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Analysis\AnalysisActivity;
+use App\Domain\Analysis\AnalysisProgress;
 use App\Domain\Analysis\AudioAnalysis;
 use App\Domain\Analysis\Stages\EssentiaStage;
 use App\Domain\Analysis\Stages\LoudnessStage;
@@ -12,6 +14,7 @@ use App\Domain\Library\LibraryMerger;
 use App\Domain\Storage\FileIndexer;
 use App\Jobs\AnalyzeAudioFile;
 use App\Jobs\EnrichTrackMusicBrainz;
+use App\Livewire\AnalysisStatus;
 use App\Models\File;
 use App\Models\FileAnalysis;
 use App\Models\Media\Album;
@@ -19,6 +22,7 @@ use App\Models\Media\Artist;
 use App\Models\Media\Track;
 use App\Models\StorageLocation;
 use App\Models\TrackFile;
+use App\Models\User;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Process\PendingProcess;
@@ -26,6 +30,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Sleep;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 /** Audio analysis of the own files: stages, the job, the backlog, what it does for the library, and where it shows. */
@@ -524,5 +529,139 @@ class AudioAnalysisTest extends TestCase
             ->assertJsonPath('points', [1, 2, 50, 100])->assertJsonPath('duration', 200);
 
         $this->get("/albums/{$track->album_id}")->assertOk()->assertSee('aria-label="Waveform"', false)->assertSee('Waveform');
+    }
+
+    public function test_progress_counts_done_failed_waiting_and_given_up_per_stage(): void
+    {
+        $this->fakeAcoustId();
+        [$done] = $this->localTrack('Done', 'h1');
+        [$broken] = $this->localTrack('Broken', 'h2');
+        $this->localTrack('Untouched', 'h3');
+
+        AnalyzeAudioFile::dispatchSync($done);
+        $this->ffmpegFails = true;
+        AnalyzeAudioFile::dispatchSync($broken);
+
+        $progress = AnalysisProgress::compute();
+        $this->assertSame(3, $progress['files']);
+        $this->assertSame(1, $progress['complete']);
+        $this->assertSame(1, $progress['with_problems']);
+        $this->assertSame(2, $progress['backlog'], 'the failed file and the untouched one');
+        $this->assertEquals(['done' => 1, 'failed' => 1, 'pending' => 1, 'gave_up' => 0], array_intersect_key($progress['stages']['loudness'], array_flip(['done', 'failed', 'pending', 'gave_up'])));
+        $this->assertFalse($progress['stages']['essentia']['enabled']);
+        $this->assertStringContainsString('ANALYSIS_ESSENTIA_URL', $progress['stages']['essentia']['reason']);
+
+        AnalyzeAudioFile::dispatchSync($broken);
+        AnalyzeAudioFile::dispatchSync($broken);
+        $progress = AnalysisProgress::compute();
+        $this->assertSame(1, $progress['stages']['loudness']['gave_up']);
+        $this->assertSame(0, $progress['stages']['loudness']['failed']);
+        $this->assertSame(1, $progress['backlog'], 'a given-up stage no longer counts as waiting');
+    }
+
+    public function test_a_bumped_stage_version_counts_as_waiting_and_stale(): void
+    {
+        $this->fakeAcoustId();
+        [$file] = $this->localTrack();
+        AnalyzeAudioFile::dispatchSync($file);
+
+        $analysis = $file->analysis()->first();
+        $analysis->forceFill(['stages' => array_merge($analysis->stages, ['quality' => ['version' => '0', 'at' => now()->toIso8601String()]])])->save();
+
+        $quality = AnalysisProgress::compute()['stages']['quality'];
+        $this->assertSame(0, $quality['done']);
+        $this->assertSame(1, $quality['pending']);
+        $this->assertSame(1, $quality['stale']);
+    }
+
+    public function test_the_job_leaves_a_timestamp_and_stage_timings_and_no_running_marker(): void
+    {
+        $this->fakeAcoustId();
+        [$file] = $this->localTrack();
+
+        AnalyzeAudioFile::dispatchSync($file);
+
+        $this->assertNotNull($file->analysis()->first()->analyzed_at);
+        $this->assertSame(1, AnalysisProgress::filesLastDay());
+        $this->assertNull(AnalysisActivity::current());
+        $this->assertNotNull(AnalysisActivity::averageSeconds('loudness'));
+    }
+
+    public function test_a_running_stage_is_shown_until_it_finishes(): void
+    {
+        [$file] = $this->localTrack();
+
+        AnalysisActivity::start($file, 'quality');
+        $this->assertSame('quality', AnalysisActivity::current()['stage']);
+
+        AnalysisActivity::finish();
+        $this->assertNull(AnalysisActivity::current());
+    }
+
+    public function test_the_status_page_needs_the_admin_login_and_shows_stages_and_problems(): void
+    {
+        $this->fakeAcoustId();
+        [$file] = $this->localTrack('Broken');
+        $this->ffmpegFails = true;
+        AnalyzeAudioFile::dispatchSync($file);
+        AnalysisProgress::forget();
+
+        $this->get('/settings/analysis')->assertRedirect();
+
+        $this->actingAs(User::factory()->create());
+        $this->get('/settings/analysis')->assertOk()->assertSee('Audio analysis');
+        $this->get('/settings')->assertOk()->assertSee('Audio analysis');
+
+        Livewire::test(AnalysisStatus::class)
+            ->assertSee('Stages')
+            ->assertSeeHtml('data-test="stage-loudness"')
+            ->assertSeeHtml('data-test="stage-disabled-essentia"')
+            ->assertSee('could not decode')
+            ->assertSeeHtml("data-test=\"problem-{$file->id}-loudness\"");
+    }
+
+    public function test_retry_forgets_the_error_and_queues_only_that_stage(): void
+    {
+        $this->fakeAcoustId();
+        [$file] = $this->localTrack();
+        $this->ffmpegFails = true;
+        AnalyzeAudioFile::dispatchSync($file);
+        $this->assertArrayHasKey('loudness', $file->analysis()->first()->errors);
+
+        Queue::fake();
+        $this->actingAs(User::factory()->create());
+        Livewire::test(AnalysisStatus::class)->call('retry', $file->id, 'loudness');
+
+        $this->assertArrayNotHasKey('loudness', $file->analysis()->first()->errors);
+        Queue::assertPushed(AnalyzeAudioFile::class, fn ($job) => $job->file->is($file) && $job->only === 'loudness');
+    }
+
+    public function test_the_status_page_says_when_analysis_is_off(): void
+    {
+        config(['analysis.enabled' => false]);
+        $this->actingAs(User::factory()->create());
+
+        Livewire::test(AnalysisStatus::class)->assertSeeHtml('data-test="analysis-off"');
+    }
+
+    public function test_per_file_stage_states_for_the_file_list_and_track_panel(): void
+    {
+        $this->fakeAcoustId();
+        [$file] = $this->localTrack();
+        $this->assertSame('pending', AnalysisProgress::forFile(null)['loudness']['state']);
+
+        AnalyzeAudioFile::dispatchSync($file);
+        $states = AnalysisProgress::forFile($file->analysis()->first(), $file->hash);
+        $this->assertSame('done', $states['loudness']['state']);
+        $this->assertNotNull($states['loudness']['at']);
+
+        $this->assertSame('pending', AnalysisProgress::forFile($file->analysis()->first(), 'another-hash')['loudness']['state'], 'a changed file starts over');
+    }
+
+    public function test_the_album_page_says_when_a_track_is_not_analysed_yet(): void
+    {
+        [, $track] = $this->localTrack();
+
+        $this->get("/albums/{$track->album_id}")->assertOk()->assertSee('Not analysed yet');
     }
 }

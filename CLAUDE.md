@@ -790,6 +790,7 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 - `/albums/{id}` — album detail with track listing
 - `/settings` — overview of listeners, MQTT config
 - `/settings/users` — Admin & Apps: the shared admin login (change password) and the apps signed in with it (revoke)
+- `/settings/analysis` — audio analysis status: per-stage progress, what runs now, sidecar, problems with retry (see `docs/architecture/audio-analysis.md`)
 - `/settings/health` — external services (Spotify/Last.fm/Discogs/TheAudioDB credentials, MusicBrainz, Wikipedia, Cover Art Archive, LRCLIB, storage locations; `Domain/Health/ExternalServices`, one read-only probe each, results cached 15 min, "Check now" re-runs them), supervisor, scheduler, queue worker, pending jobs, MQTT broker and per-device listener health
 - `/settings/devices` — discovered-devices list (scan, add, ignore) on top, drivers grouped by brand below, add by IP (see `docs/architecture/device-discovery.md`); `/devices/discover` redirects here
 - `/settings/dlna` — discover DLNA servers, trigger library scans

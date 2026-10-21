@@ -11,7 +11,7 @@ class AnalyzeLibrary extends Command
 {
     protected $signature = 'library:analyze
         {--limit= : Maximum number of files to queue (default: analysis.batch)}
-        {--stage= : Only this stage: loudness, fingerprint, acoustid or essentia}
+        {--stage= : Only this stage: loudness, waveform, quality, fingerprint, acoustid or essentia}
         {--file= : Analyse this file id (a stage that already ran at its current version is skipped)}
         {--now : Run in this process instead of queueing (for one file, to see errors)}
         {--dry-run : Only count what still needs analysis}';

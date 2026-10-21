@@ -13,6 +13,7 @@ use App\Jobs\AnalyzeAudioFile;
 use App\Models\File;
 use App\Models\FileAnalysis;
 use App\Models\TrackFile;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 /**
@@ -65,6 +66,14 @@ class AudioAnalysis
             && !$analysis->gaveUp($stage->key(), $stage->version()));
     }
 
+    /** The files that can be analysed: present, and the primary original of a track. */
+    public static function inScope(): Builder
+    {
+        return File::query()
+            ->where('status', File::PRESENT)
+            ->whereIn('id', TrackFile::query()->where('role', TrackFile::ORIGINAL)->where('is_primary', true)->select('file_id'));
+    }
+
     /** Files with something left to analyse, newest first, up to $limit (null = all, to count them). */
     public static function pending(?int $limit = null, ?string $only = null): Collection
     {
@@ -75,9 +84,7 @@ class AudioAnalysis
             return $found;
         }
 
-        File::query()
-            ->where('status', File::PRESENT)
-            ->whereIn('id', TrackFile::query()->where('role', TrackFile::ORIGINAL)->where('is_primary', true)->select('file_id'))
+        self::inScope()
             ->with('analysis')
             ->orderByDesc('id')
             ->lazyById(500)

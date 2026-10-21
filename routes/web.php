@@ -105,6 +105,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings/users', [SettingsController::class, 'users'])->name('settings.users');
     Route::delete('/settings/app-tokens/{token}', [SettingsController::class, 'revokeAppToken'])->name('settings.app-tokens.destroy');
     Route::get('/settings/health', [SettingsController::class, 'health'])->name('settings.health');
+    Route::get('/settings/analysis', fn () => view('settings.analysis'))->name('settings.analysis');
     Route::get('/settings/library-health', [LibraryHealthController::class, 'index'])->name('settings.library-health');
     Route::get('/settings/library-health/{report}', [LibraryHealthController::class, 'show'])->name('settings.library-health.show');
 

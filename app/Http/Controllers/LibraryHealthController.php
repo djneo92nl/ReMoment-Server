@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Analysis\AnalysisProgress;
 use App\Domain\Health\LibraryReports;
 
 /** The library health reports (`App\Domain\Health\LibraryReports`): counts per report, and one report's findings. */
@@ -9,7 +10,7 @@ class LibraryHealthController extends Controller
 {
     public function index()
     {
-        return view('settings.library-health', ['definitions' => LibraryReports::definitions(), 'counts' => LibraryReports::counts()]);
+        return view('settings.library-health', ['definitions' => LibraryReports::definitions(), 'counts' => LibraryReports::counts(), 'analysis' => AnalysisProgress::get()]);
     }
 
     public function show(string $report)

@@ -87,6 +87,20 @@ A stage with a bumped `version()` re-runs only that stage, so a changed stage do
 
 `/settings/health`, group *Analysis*: `ffmpeg`, `fpcalc`, AcoustID (an invalid probe fingerprint tells a valid key from a rejected one) and the Essentia sidecar (also warns when its ML setting differs from `ANALYSIS_ESSENTIA_ML`). All show *disabled* while analysis is off.
 
+## Status page
+
+`/settings/analysis` (admin login, like all of `/settings`; Livewire `AnalysisStatus`, refreshes every 5 s) answers "how far is it":
+
+- **Summary**: own files, fully analysed (every stage this install can run is done), waiting, with problems; jobs in the `analysis` queue, files finished in the last 24 h, the schedule, and how many nights the backlog takes at `ANALYSIS_BATCH` a night. "Queue a batch now" runs what the nightly command does.
+- **Stages**: per stage a progress bar with done / waiting (and how many of those are *to redo* because the file changed or the stage's version moved on) / failed (retried) / gave up (`analysis.max_attempts` reached). A stage this install cannot run (no ffmpeg, fpcalc, `ACOUSTID_API_KEY`, `ANALYSIS_ESSENTIA_URL`, or analysis off) is greyed with the reason, so "not configured" is not mistaken for "failed". All of it comes from `App\Domain\Analysis\AnalysisProgress`, which applies the same rules as `AudioAnalysis::pendingStages()` over `AudioAnalysis::inScope()` (one pass, cached 60 s).
+- **Now**: the stage and file the worker is on (`AnalysisActivity`: cache key `analysis:current`, written by `AnalyzeAudioFile` before each stage and on the shared decode, TTL one job timeout) and the average seconds per stage over the last 50 runs (`analysis:durations:{stage}`). A worker that dies leaves a stale entry that expires with the TTL.
+- **Essentia sidecar**: reachable or not, ML build or not, the models it loaded (`/health`, cached 30 s), and a warning when it disagrees with `ANALYSIS_ESSENTIA_ML`.
+- **Problems**: every stage error (`file_analyses.errors`), filterable by stage, with message and tries; *Retry* forgets the error and queues just that stage, *Analyse file* queues all pending stages of the file.
+
+`file_analyses.analyzed_at` (set by the job each time a stage finishes, successfully or not) feeds the 24-hour rate and "last activity".
+
+Elsewhere: `/settings/storage` shows one dot per stage on every parsed file (`<x-analysis-dots>`: green done, grey waiting, amber failed, red gave up; the title lists them), `/settings/library-health` shows "Analysed N of M own files" above the counts (a 0 may only mean "not looked at yet"), and the track info panel on `/albums/{id}` has an *Analysis* line while a track's own file is not fully analysed. The Sound line also gives loudness range, true peak and PLR.
+
 ## Tests
 
 `tests/Feature/AudioAnalysisTest.php` fakes `Process` (ffmpeg, fpcalc) and `Http` (AcoustID, sidecar); `tests/Feature/Library/SmartAnalysisFieldsTest.php` covers the rules. `phpunit.xml` blanks the API keys so a developer's `.env` never makes tests call the real services.

@@ -62,6 +62,9 @@
                             $sound['bpm'] ? round($sound['bpm']).' BPM' : null,
                             $sound['key'] ? $sound['key'].' '.$sound['mode'].($sound['camelot'] ? ' ('.$sound['camelot'].')' : '') : null,
                             $sound['loudness'] !== null ? number_format($sound['loudness'], 1).' LUFS' : null,
+                            $sound['loudness_range'] !== null ? number_format($sound['loudness_range'], 1).' LU range' : null,
+                            $sound['true_peak'] !== null ? number_format($sound['true_peak'], 1).' dBTP' : null,
+                            $sound['plr'] !== null ? 'PLR '.number_format($sound['plr'], 1) : null,
                         ])->filter()->implode(' · ') : '';
                         $signalLine = $sound ? collect([
                             ($sound['lossless_suspect'] ?? 0) >= 0.5 ? 'Suspected transcode, spectrum ends at '.number_format($sound['spectral_cutoff_hz'] / 1000, 1).' kHz' : null,
@@ -70,9 +73,21 @@
                             ($sound['phase_issue'] ?? false) ? 'Channels out of phase' : null,
                             ! empty($sound['decode_warnings']) ? 'Decoder warnings: '.implode('; ', $sound['decode_warnings']) : null,
                         ])->filter()->implode(' · ') : '';
+                        $analysisLine = '';
+                        if (\App\Domain\Analysis\AudioAnalysis::enabled() && in_array('files', $track->sources(), true)) {
+                            $stageStates = collect(\App\Domain\Analysis\AnalysisProgress::forFile($track->analysis))->filter(fn ($st) => $st['enabled']);
+                            $stagesDone = $stageStates->where('state', 'done')->count();
+                            $stagesFailed = $stageStates->whereIn('state', ['failed', 'gave_up'])->keys();
+                            $analysisLine = match (true) {
+                                $stagesFailed->isNotEmpty() => $stagesFailed->implode(', ').' failed ('.$stagesDone.' of '.$stageStates->count().' stages done)',
+                                $stagesDone === 0 => 'Not analysed yet',
+                                $stagesDone < $stageStates->count() => $stagesDone.' of '.$stageStates->count().' stages done, the rest waits',
+                                default => '',
+                            };
+                        }
                         $waveform = $track->waveform();
                         $plays = (int) ($track->plays_count ?? 0);
-                        $hasInfo = $waveform || $quality || $credits || $trackGenres || $isrc || $popularity !== null || $listeners || $soundLine !== '' || $signalLine !== '' || ($sound && $sound['mood']) || $plays > 0;
+                        $hasInfo = $waveform || $quality || $credits || $trackGenres || $isrc || $popularity !== null || $listeners || $soundLine !== '' || $signalLine !== '' || $analysisLine !== '' || ($sound && $sound['mood']) || $plays > 0;
                         $removable = auth()->check() && $track->isRemovable();
                         // With a player pinned, a play button only where it can play the track; without one the button opens the player panel.
                         $canPlayHere = $pinned ? ($page->playable[$track->id] ?? false) : \App\Domain\Library\LibraryPlayback::trackPlayable($track);
@@ -171,6 +186,10 @@
                                     @if($signalLine !== '')
                                         <dt class="text-gray-400 dark:text-gray-600">Signal</dt>
                                         <dd class="text-gray-700 dark:text-gray-300">{{ $signalLine }}</dd>
+                                    @endif
+                                    @if($analysisLine !== '')
+                                        <dt class="text-gray-400 dark:text-gray-600">Analysis</dt>
+                                        <dd class="text-gray-700 dark:text-gray-300" data-test="analysis-line">@auth<a href="{{ route('settings.analysis') }}" class="hover:underline">{{ $analysisLine }}</a>@else{{ $analysisLine }}@endauth</dd>
                                     @endif
                                     @if($sound && $sound['danceability'] !== null)
                                         <dt class="text-gray-400 dark:text-gray-600">Danceability</dt>

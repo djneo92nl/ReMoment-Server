@@ -32,6 +32,10 @@
                 Browse, import, {{ $storageLocationCount }} {{ $storageLocationCount === 1 ? 'location' : 'locations' }}
                 &middot; leads: {{ ['files' => 'Local files', 'dlna' => 'DLNA', 'spotify' => 'Spotify', 'all' => 'everything'][\App\Domain\Library\LeadingSource::leading()] }}
             </x-settings-row>
+            <x-settings-row href="{{ route('settings.analysis') }}" icon="fa-solid fa-wave-square"
+                             label="Audio analysis">
+                Stages, progress and problems &middot; {{ config('analysis.enabled') ? 'on' : 'off' }}
+            </x-settings-row>
             <x-settings-row href="{{ route('settings.library-health') }}" icon="fa-solid fa-stethoscope"
                              label="Library Health">
                 @if($libraryIssueCount > 0)
