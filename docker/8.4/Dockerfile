@@ -6,6 +6,9 @@ ARG WWWGROUP
 ARG NODE_VERSION=22
 ARG MYSQL_CLIENT="mysql-client"
 ARG POSTGRES_VERSION=18
+# The oldest PHP the image may ship. CVE-2026-109618 / CVE-2026-109619 (unauthenticated RCE) are fixed in 8.4.27; the build
+# fails below it, so an image never carries an older 8.4, not even from a cached package layer (rebuild with --no-cache).
+ARG PHP_MIN_VERSION=8.4.27
 
 WORKDIR /var/www/html
 
@@ -56,6 +59,9 @@ RUN apt-get update && apt-get upgrade -y \
     && apt-get -y autoremove \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+RUN php -r "exit(version_compare(PHP_VERSION, '$PHP_MIN_VERSION', '>=') ? 0 : 1);" \
+    || (echo "PHP $(php -r 'echo PHP_VERSION;') is older than $PHP_MIN_VERSION: rebuild without the layer cache (docker compose build --pull --no-cache app) once the PPA publishes the fixed release" >&2; exit 1)
 
 RUN setcap "cap_net_bind_service=+ep" /usr/bin/php8.4
 

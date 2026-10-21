@@ -42,7 +42,9 @@
 
       - name: Build Docker image
         ansible.builtin.command:
-            cmd: docker compose -f docker-compose.prod.yml build --pull
+            # -e rebuild_image=true rebuilds the app image without the layer cache, which is the only way an apt layer
+            # (PHP from the ondrej PPA) picks up a newer package. docker/8.4/Dockerfile refuses to build below PHP_MIN_VERSION.
+            cmd: "docker compose -f docker-compose.prod.yml build --pull{{ ' --no-cache app' if (rebuild_image | default(false) | bool) else '' }}"
             chdir: "{{ app_dir }}"
         changed_when: true
 
