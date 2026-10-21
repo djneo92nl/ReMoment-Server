@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\DeviceSettingsController;
 use App\Http\Controllers\Api\InfoController;
 use App\Http\Controllers\Api\LibraryController;
+use App\Http\Controllers\Api\LiteArtworkController;
 use App\Http\Controllers\Api\PlayerController;
 use App\Http\Controllers\Api\QueueController;
 use App\Http\Controllers\Api\SourceControlsController;
@@ -14,6 +15,10 @@ use App\Http\Controllers\Api\StorageController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/info', InfoController::class);
+
+// Tiny GIF/BMP/PGM covers for old clients: /api/artwork/{hash}/64.gif?colors=16, the hash is the artwork `hash` of a track or `lite` of a play command.
+Route::get('/artwork/{hash}/{size}.{format}', [LiteArtworkController::class, 'show'])
+    ->where(['hash' => '[0-9a-f]{32}', 'size' => '[0-9]+', 'format' => 'gif|bmp|pgm']);
 
 Route::get('/players', [PlayerController::class, 'index']);
 Route::post('/players/register', [PlayerController::class, 'register']);

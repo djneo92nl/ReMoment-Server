@@ -36,9 +36,10 @@ class PlayerController extends Controller
             'capabilities.*' => ['string'],
             'formats' => ['nullable', 'array'],
             'formats.*' => ['string', 'max:100'],
+            'profile' => ['nullable', 'string', 'max:50'],
         ]);
 
-        [$device, $token] = PlayerDevice::register($data['token'] ?? null, $data['name'], $data['kind'], $data['capabilities'] ?? null, $data['formats'] ?? null, $data['adopt_device_id'] ?? null);
+        [$device, $token] = PlayerDevice::register($data['token'] ?? null, $data['name'], $data['kind'], $data['capabilities'] ?? null, $data['formats'] ?? null, $data['adopt_device_id'] ?? null, $data['profile'] ?? null);
 
         // A player that registers is online until it misses its heartbeats.
         DeviceCache::markListenerAlive($device->id);

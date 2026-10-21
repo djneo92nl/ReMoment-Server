@@ -6,6 +6,7 @@ use App\Domain\Artwork\LibraryItemArtwork;
 use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\QueueItem;
 use App\Domain\Device\RepeatMode;
+use App\Domain\Storage\Proxies;
 use App\Domain\Storage\StreamUrl;
 use App\Events\Device\PlaybackModesUpdated;
 use App\Integrations\Common\DeviceQueue;
@@ -28,6 +29,7 @@ use App\Models\Device;
 use App\Models\Media\Playlist;
 use App\Models\Media\Track;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 /**
  * A ReMoment player (browser tab, app, ESP32) that plays the server's own files. The player does the
@@ -191,16 +193,19 @@ class PlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, 
         $this->playLibraryTracks($tracks);
     }
 
-    /** The server's own file for the track, in a format this player decodes. */
+    /** The server's own file for the track, in a format this player decodes (itself or as a proxy). */
     public static function playable(Track $track, Device $device): bool
     {
         if (!$track->isOwnFile()) {
             return false;
         }
 
-        $mime = $track->trackFiles()->with('file')->get()->pluck('file.mime_type')->filter()->first();
+        return PlayerDevice::source($device, self::mimeOf($track)) !== false;
+    }
 
-        return $mime === null || in_array($mime, PlayerDevice::formats($device), true);
+    private static function mimeOf(Track $track): ?string
+    {
+        return $track->trackFiles()->with('file')->get()->pluck('file.mime_type')->filter()->first();
     }
 
     /** Called when the player reports that a track ended: plays the next one, or stops at the end. */
@@ -241,15 +246,55 @@ class PlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, 
             throw new \RuntimeException('The queue has no playable track.');
         }
 
+        $mime = self::mimeOf($track);
+        $profile = PlayerDevice::source($this->device, $mime);
+
+        if ($profile === false) {
+            throw new \RuntimeException("Track {$track->id} is in a format this player cannot play.");
+        }
+
+        if ($profile !== null && !Proxies::request($track, $profile, $this->device->id)) {
+            if (!Proxies::original($track) || !Proxies::enabled()) {
+                throw new \RuntimeException("Track {$track->id} cannot be converted to {$profile}.");
+            }
+
+            // The proxy is being made: stop what plays now; proxyReady() sends the play when it is there.
+            $this->send('pause');
+
+            return;
+        }
+
+        $artwork = LibraryItemArtwork::forUrl(PlayerDevice::cover($track));
+
         $this->send('play', ['track' => [
             'id' => $track->id,
-            'url' => '/stream/'.$track->id,
+            'url' => '/stream/'.$track->id.($profile ? '?profile='.$profile : ''),
+            'profile' => $profile,
+            'mime' => $profile ? Proxies::mime($profile) : $mime,
             'name' => $track->name,
             'artist' => $track->artist?->name,
             'album' => $track->album?->name,
             'duration' => $track->duration,
-            'images' => array_values(array_filter([LibraryItemArtwork::proxy(PlayerDevice::cover($track), 320)])),
+            'images' => array_values(array_filter([LibraryItemArtwork::webUrl($artwork['proxy_320'] ?? null)])),
+            'lite' => $artwork ? '/api/artwork/'.$artwork['hash'] : null,
         ]]);
+    }
+
+    /** A proxy this player waited for is made: plays it if that track is still the current one. */
+    public function proxyReady(int $trackId): void
+    {
+        $queue = DeviceQueue::for($this->device->id);
+
+        if ((int) $queue->current() === $trackId) {
+            $this->playCurrent($queue);
+        }
+    }
+
+    /** The proxy could not be made: nothing plays, rather than a format the player cannot decode. */
+    public function proxyFailed(int $trackId): void
+    {
+        Log::warning("Player {$this->device->id}: no proxy for track {$trackId}, stopping.");
+        $this->send('stop');
     }
 
     private function reportModes(DeviceQueue $queue): void

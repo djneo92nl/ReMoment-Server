@@ -6,7 +6,7 @@ ReMoment can serve its own music files instead of relying on a DLNA server. File
 
 - `storage_locations` — `name`, `driver` (`local` | `s3`), encrypted JSON `config` (local: `root`; s3: `bucket`, `region`, `key`, `secret`, `endpoint`, `use_path_style_endpoint`, `prefix`), `role` (`library` = the organized home of files, `inbox` = where imports arrive), `last_scanned_at`. `StorageLocation::disk()` builds the Flysystem disk (`Storage::build`). Several locations can exist at once; all feed one library. Secrets never leave the server (the API shows `config` without `key`/`secret`).
 - `files` — one row per stored file: `storage_location_id`, `path` (relative to the location root), `hash` (sha256 of the content), `size`, `mtime`, `mime_type`, `extension`, audio properties, `status` (`present` | `missing`). A file knows nothing about tracks and can exist without one.
-- `track_files` — links a track to its files: `role` (`original` | `proxy`), `profile` (e.g. `mp3-320`), `derived_from_file_id`, `is_primary`. A track can have several files; proxy *generation* (transcoding) is not built yet, the schema and stream selection are.
+- `track_files` — links a track to its files: `role` (`original` | `proxy`), `profile` (e.g. `mp3-320`), `derived_from_file_id`, `is_primary`. A track can have several files. Proxy files made by the server (low-bitrate copies for players) are not kept here but on the private disk, see *Proxies* below; a `proxy` row in `track_files` is still honoured by `/stream` if one is added by hand.
 
 ## Code (`app/Domain/Storage/`)
 
@@ -30,6 +30,10 @@ Albums indexed before this existed, or retagged since, are filled by `php artisa
 ## Streaming
 
 `GET /stream/{track}` (unauthenticated, like the REST API) sends the track's primary original, or with `?profile=low` the proxy of that profile, falling back to the original. Local files get range support (seek). Remote files are redirected to a 30-minute temporary URL when the disk can sign one (S3), else streamed through the server. Missing files give `404`. The response carries the DLNA headers a DLNA renderer expects (`transferMode.dlna.org: Streaming`, `contentFeatures.dlna.org` with byte-range seeking), and `/stream/{track}.{extension}` (e.g. `/stream/12.flac`) is the same endpoint under an address with the file extension, which renderers such as TVs use to decide the format; the generic UPnP driver hands renderers that form (`StreamUrl::withExtension()`). Not tested yet on real speakers: whether Sonos/ASE follow the redirect.
+
+## Proxies
+
+`App\Domain\Storage\Proxies` and the `TranscodeProxy` job make smaller copies of a file for players that cannot decode it (`config/proxies.php`, profiles `mp3-lo` and `mp3-mid`; see [players.md](../api/players.md#proxies)). A proxy lives at `proxies/{profile}/{first 32 chars of the original's sha256}.{ext}` on the private `local` disk, so it follows the content (a retagged or replaced file gets a new one), is invisible to scans, the organizer and the files browser, and `Proxies::prune()` keeps the folder under `PROXIES_MAX_MB`. `GET /stream/{track}?profile=…` serves a ready proxy with range support; otherwise it queues one and answers with the original.
 
 ## Queued tasks and the settings page
 
@@ -95,4 +99,4 @@ POST            /api/admin/files/{id}/verify              → { result: ok | mis
 
 ## Not built yet
 
-ffmpeg proxies, `X-Accel-Redirect`/sendfile handoff, S3 against a real bucket, a `local` entry in `LibrarySources`.
+`X-Accel-Redirect`/sendfile handoff, S3 against a real bucket, a `local` entry in `LibrarySources`.

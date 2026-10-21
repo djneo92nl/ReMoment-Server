@@ -131,6 +131,10 @@ ReMoment server (PHP)                       netlink sidecar (Python, host networ
 - **License and relationship.** Apache 2.0 with a NOTICE that must be kept; changed files must be marked. The project is not ours: ask the author before depending on it, and consume it as a dependency, not as copied code. Its readme also states it is unaffiliated with Bang & Olufsen; keep the same position.
 - **Scope.** Speakers only, files only. Radio could later use the same decode path; DSP and non-B&O targets are out.
 
+## Dumb clients (retro handhelds and computers)
+
+The player protocol is deliberately small enough for old hardware: plain HTTP/1.0 (no TLS, no MQTT needed: commands can be long-polled), a few JSON fields and one MP3 URL per track. A client registers with `kind: "retro"`, the `formats` it decodes and optionally a `profile` (`mp3-lo` for mono 22 kHz 48 kbit/s); the server converts the file on demand (`Proxies`, see [file-storage.md](file-storage.md#proxies)) and sends `play` when the proxy is ready. Covers come as tiny GIF/BMP/PGM through `GET /api/artwork/{hash}/{size}.{format}` (`App\Domain\Artwork\LiteArtwork`, cut on demand from the processed 320 px cover; see [players.md](../api/players.md#lite-artwork)). Not built: a continuous per-device Icecast stream for clients that can only open one live URL (the Spotify stream's `icecast` container could carry it); the lite covers are not on the MQTT `/data` topic yet, only in the `play` command.
+
 ## Later: ESP32 player
 
 Not part of this plan, only the shape so nothing built now blocks it:

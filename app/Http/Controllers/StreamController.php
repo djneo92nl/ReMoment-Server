@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Storage\FileStore;
+use App\Domain\Storage\Proxies;
 use App\Models\File;
 use App\Models\Media\Track;
 use App\Models\TrackFile;
@@ -10,7 +11,8 @@ use Illuminate\Http\Request;
 
 /**
  * Serves a track's file to a device, unauthenticated like the REST API. The file is the primary original,
- * or with `?profile=` the proxy of that profile (falling back to the original). A local file is sent with
+ * or with `?profile=` the proxy of that profile (made on demand, see Proxies; the original is sent until it
+ * is ready, so a DLNA renderer that asks for a profile never gets an error). A local file is sent with
  * range support (seek); a remote one is redirected to a short-lived URL when the disk can sign one, else
  * streamed through the server.
  */
@@ -18,6 +20,19 @@ class StreamController extends Controller
 {
     public function show(Request $request, Track $track, ?string $extension = null)
     {
+        $profile = $request->query('profile');
+
+        if (is_string($profile) && Proxies::known($profile)) {
+            if ($path = Proxies::readyPath($track, $profile)) {
+                return response()->file(Proxies::disk()->path($path), [
+                    'Content-Type' => Proxies::mime($profile),
+                    'Accept-Ranges' => 'bytes',
+                ]);
+            }
+
+            Proxies::request($track, $profile);
+        }
+
         $file = $this->fileFor($track, $request->query('profile'));
         abort_if($file === null, 404);
 

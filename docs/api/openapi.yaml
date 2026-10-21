@@ -28,6 +28,7 @@ tags:
   - name: Library
   - name: Library playback
   - name: Clients
+  - name: Players
   - name: Admin
 
 paths:
@@ -1570,6 +1571,147 @@ paths:
                     items: { $ref: "#/components/schemas/PrecacheArtwork" }
                   next_cursor: { type: string, nullable: true }
 
+  /players:
+    get:
+      tags: [Players]
+      summary: The existing players, so a new client can take one over
+      operationId: listPlayers
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/PlayerSummary" }
+  /players/register:
+    post:
+      tags: [Players]
+      summary: Register a player (idempotent per token)
+      description: |
+        A player plays the server's own files and then shows up as a normal device. Send the `token` from
+        the first registration on every later call (keep it in flash, keychain or `localStorage`); omit it the
+        first time. A client without a token can send `adopt_device_id` to take over an existing player: it
+        gets a token of its own and the device keeps its name, kind and formats. See `docs/api/players.md`.
+      operationId: registerPlayer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PlayerRegistration" }
+      responses:
+        "201":
+          description: Registered (also for a repeat call with a known token)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlayerRegistered" }
+        "422": { description: Invalid request }
+  /players/{token}/commands:
+    parameters:
+      - $ref: "#/components/parameters/playerToken"
+    get:
+      tags: [Players]
+      summary: Commands for the player (the HTTP alternative to MQTT `remoment/playercmd/{device_id}`)
+      description: |
+        Returns the commands with an id above `since`, oldest first; the last 50 are kept for 5 minutes. With
+        `wait` the call holds for up to that many seconds (max 25) until a command arrives, so an old client
+        with no MQTT can long-poll. Also counts as a sign of life. Start `since` at `last_command_id` from
+        registration, and ignore ids already seen.
+      operationId: getPlayerCommands
+      parameters:
+        - { name: since, in: query, schema: { type: integer, default: 0 } }
+        - { name: wait, in: query, schema: { type: integer, minimum: 0, maximum: 25, default: 0 }, description: "Seconds to wait for a command" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  commands:
+                    type: array
+                    items: { $ref: "#/components/schemas/PlayerCommand" }
+        "404": { description: Unknown token }
+  /players/{token}/state:
+    parameters:
+      - $ref: "#/components/parameters/playerToken"
+    put:
+      tags: [Players]
+      summary: "Report what the player is doing (on every change and about every 5 s: this is the heartbeat)"
+      description: |
+        No report for 10 s makes the device `unreachable`. Send `ended: true` when the track finishes: the server
+        then sends the next `play`, or `stop` at the end of the queue.
+      operationId: putPlayerState
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PlayerState" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+        "404": { description: Unknown token }
+        "422": { description: Invalid request }
+  /artwork/{hash}/{size}.{format}:
+    parameters:
+      - { name: hash, in: path, required: true, description: "`hash` of a library artwork object, or the last segment of `lite` in a `play` command", schema: { type: string, pattern: "^[0-9a-f]{32}$" } }
+      - { name: size, in: path, required: true, schema: { type: integer, enum: [32, 48, 64, 96, 120, 160] } }
+      - { name: format, in: path, required: true, schema: { type: string, enum: [gif, bmp, pgm] } }
+    get:
+      tags: [Players]
+      summary: A tiny cover for old or small screens
+      description: |
+        A square GIF, uncompressed 8-bit BMP or binary PGM (P5), cut on the first request from the processed
+        320 px cover and kept. `404` also means the cover is not processed yet: show a placeholder and try
+        again on the next track.
+      operationId: getLiteArtwork
+      parameters:
+        - { name: colors, in: query, description: "Palette size (grey levels for a PGM)", schema: { type: integer, enum: [2, 4, 16, 64, 256], default: 16 } }
+      responses:
+        "200":
+          description: The image
+          content:
+            image/gif: { schema: { type: string, format: binary } }
+            image/bmp: { schema: { type: string, format: binary } }
+            image/x-portable-graymap: { schema: { type: string, format: binary } }
+        "404": { description: "Unknown size or format, or the cover is not processed yet" }
+        "422": { description: "`colors` is not one of the allowed values" }
+  /stream/{track}:
+    servers:
+      - url: http://remoment.local
+        description: Not under /api
+    parameters:
+      - { name: track, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Players]
+      summary: The audio of one of the server's own tracks (the `url` of a `play` command)
+      description: |
+        Unauthenticated, byte ranges supported (seek). Without `profile` it is the original file. With a
+        `profile` it is a smaller MP3 made on demand (`mp3-lo`: mono, 22.05 kHz, 48 kbit/s; `mp3-mid`: stereo,
+        44.1 kHz, 128 kbit/s); until that proxy exists the original is sent and the proxy is queued, so a client
+        that was told a `profile` by a `play` command always finds it ready. `/stream/{track}.{ext}` is the same
+        file under an address with its extension. Plain HTTP/1.0 works.
+      operationId: streamTrack
+      parameters:
+        - { name: profile, in: query, schema: { type: string, enum: [mp3-lo, mp3-mid] } }
+      responses:
+        "200":
+          description: The audio file
+          content:
+            "*/*": { schema: { type: string, format: binary } }
+        "206": { description: Partial content (Range request) }
+        "404": { description: The track has no file }
+
 components:
   securitySchemes:
     adminToken:
@@ -1591,6 +1733,12 @@ components:
       name: cursor
       in: query
       description: Opaque; pass back `next_cursor` until it is null
+      schema: { type: string }
+    playerToken:
+      name: token
+      in: path
+      required: true
+      description: "`player_token` from POST /players/register (secret: the only credential of the player endpoints)"
       schema: { type: string }
     client:
       name: client
@@ -2105,3 +2253,95 @@ components:
         devices:
           type: array
           items: { $ref: "#/components/schemas/DeviceList" }
+
+    PlayerSummary:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        kind: { $ref: "#/components/schemas/PlayerKind" }
+        state: { type: string }
+    PlayerKind:
+      type: string
+      description: Display only. `retro` is for old handhelds and computers.
+      enum: [web, ios, esp32, retro]
+    PlayerRegistration:
+      type: object
+      required: [name, kind]
+      properties:
+        token: { type: string, description: "From the first registration; omit the first time" }
+        adopt_device_id: { type: integer, description: "Take over this existing player (only when `token` is not known)" }
+        name: { type: string }
+        kind: { $ref: "#/components/schemas/PlayerKind" }
+        capabilities:
+          type: array
+          description: "Optional controls the player supports (default all). `media_controls` and `library_playback` are always on."
+          items: { type: string, enum: [seek, queue, queue_jump, shuffle, repeat, volume_control] }
+        formats:
+          type: array
+          description: "MIME types the player decodes (default: mp3, aac, flac, ogg, wav)"
+          items: { type: string, example: audio/mpeg }
+        profile:
+          type: string
+          enum: [mp3-lo, mp3-mid]
+          description: "Wants this proxy of every track, even one it could decode (a slow link or a small decoder). Unknown values are ignored."
+    PlayerRegistered:
+      type: object
+      properties:
+        player_token: { type: string }
+        device_id: { type: integer }
+        name: { type: string }
+        command_topic: { type: string, example: remoment/playercmd/12 }
+        last_command_id: { type: integer, description: "Poll commands after this id" }
+        mqtt:
+          type: object
+          properties:
+            host: { type: string }
+            port: { type: integer }
+            ws_port: { type: integer }
+    PlayerCommand:
+      type: object
+      description: |
+        `op` decides the other fields. `play`: `track`. `seek`: `position` (seconds). `volume`: `volume` (0-100).
+        `mute`: `muted`. `resume`, `pause` and `stop` have none. `next`, `previous`, queue jumps, shuffle and
+        repeat are resolved by the server into `play` or `stop`. A `pause` right after a skip means the proxy of
+        the next track is being made; the `play` follows.
+      required: [id, op]
+      properties:
+        id: { type: integer, description: "Rises per player; ignore ids you have seen" }
+        op: { type: string, enum: [play, resume, pause, stop, seek, volume, mute] }
+        track: { $ref: "#/components/schemas/PlayerTrack" }
+        position: { type: number }
+        volume: { type: integer, minimum: 0, maximum: 100 }
+        muted: { type: boolean }
+    PlayerTrack:
+      type: object
+      properties:
+        id: { type: integer }
+        url: { type: string, example: "/stream/42?profile=mp3-lo", description: "A path: prefix the server's address" }
+        profile: { type: string, nullable: true, description: "Proxy profile of `url`, null for the original" }
+        mime: { type: string, nullable: true, description: "MIME type of what `url` serves" }
+        name: { type: string }
+        artist: { type: string, nullable: true }
+        album: { type: string, nullable: true }
+        duration: { type: integer, nullable: true }
+        images:
+          type: array
+          description: "Cover paths (320 px JPEG); empty until the cover is processed"
+          items: { type: string }
+        lite:
+          type: string
+          nullable: true
+          example: /api/artwork/9e107d9d372bb6826bd81d3542a419d6
+          description: "Base of the tiny covers: add `/{size}.{gif|bmp|pgm}` (GET /artwork/{hash}/{size}.{format}). Null until the cover is processed."
+    PlayerState:
+      type: object
+      required: [state]
+      properties:
+        state: { type: string, enum: [playing, paused, stopped] }
+        track_id: { type: integer, nullable: true }
+        position: { type: number, minimum: 0 }
+        duration: { type: number, minimum: 0 }
+        volume: { type: integer, minimum: 0, maximum: 100 }
+        muted: { type: boolean }
+        ended: { type: boolean, description: "The track finished; the server sends the next `play` (or `stop`)" }

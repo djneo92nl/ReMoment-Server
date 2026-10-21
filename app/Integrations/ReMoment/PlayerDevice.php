@@ -3,13 +3,14 @@
 namespace App\Integrations\ReMoment;
 
 use App\Domain\Artwork\LibraryArtwork;
+use App\Domain\Storage\Proxies;
 use App\Models\Device;
 use App\Models\DeviceMeta;
 use Illuminate\Support\Str;
 
 class PlayerDevice
 {
-    public const KINDS = ['web', 'ios', 'esp32'];
+    public const KINDS = ['web', 'ios', 'esp32', 'retro'];
 
     /** Capabilities every kind of player has; the rest is reported by the player at registration. */
     public const OPTIONAL = ['seek', 'queue', 'queue_jump', 'shuffle', 'repeat', 'volume_control'];
@@ -40,7 +41,7 @@ class PlayerDevice
      * @param  string[]|null  $formats  MIME types the player decodes (null: the defaults)
      * @return array{0: Device, 1: string} the device and the player token (new when none was given or it was unknown)
      */
-    public static function register(?string $token, string $name, string $kind, ?array $capabilities = null, ?array $formats = null, ?int $adopt = null): array
+    public static function register(?string $token, string $name, string $kind, ?array $capabilities = null, ?array $formats = null, ?int $adopt = null, ?string $profile = null): array
     {
         $device = $token ? self::findByToken($token) : null;
         $adopted = false;
@@ -75,6 +76,7 @@ class PlayerDevice
             self::setMeta($device, 'player_kind', $kind);
             self::setMeta($device, 'player_capabilities', json_encode(array_values(array_intersect($capabilities ?? self::OPTIONAL, self::OPTIONAL))));
             self::setMeta($device, 'player_formats', json_encode($formats ?: self::DEFAULT_FORMATS));
+            self::setMeta($device, 'player_profile', Proxies::known($profile) ? $profile : '');
         }
 
         return [$device, $token];
@@ -90,6 +92,40 @@ class PlayerDevice
     public static function formats(Device $device): array
     {
         return self::jsonMeta($device, 'player_formats', self::DEFAULT_FORMATS);
+    }
+
+    /** The proxy profile the player asked for at registration (a small copy of every track), or null. */
+    public static function profile(Device $device): ?string
+    {
+        $profile = DeviceMeta::where('device_id', $device->id)->where('key', 'player_profile')->value('value');
+
+        return Proxies::known($profile) ? $profile : null;
+    }
+
+    /**
+     * What a track whose file has this MIME type is played from: the original (null) or a proxy profile.
+     * A requested profile always wins; else the original when the player decodes it; else the first
+     * profile in a format it decodes. False when the player can play it neither way.
+     */
+    public static function source(Device $device, ?string $mime): string|false|null
+    {
+        if ($profile = self::profile($device)) {
+            return $profile;
+        }
+
+        $formats = self::formats($device);
+
+        if ($mime === null || in_array($mime, $formats, true)) {
+            return null;
+        }
+
+        foreach (Proxies::profiles() as $name => $profile) {
+            if (in_array($profile['mime'], $formats, true) && Proxies::enabled()) {
+                return $name;
+            }
+        }
+
+        return false;
     }
 
     public static function kind(Device $device): string
