@@ -12,13 +12,10 @@ cover, for renderers that show per-item art. The boundary of a track is exact: w
 the position is the bytes already read plus those still unread in the pipe, so the tail of the previous track
 never lands in the next one.
 """
-import array
 import collections
-import fcntl
 import os
 import select
 import sys
-import termios
 import threading
 import time
 
@@ -32,6 +29,10 @@ SILENCE = bytes(CHUNK)
 
 def pipe_pending(fd):
     """Bytes written to the pipe and not yet read."""
+    import array
+    import fcntl
+    import termios
+
     buf = array.array("i", [0])
     try:
         fcntl.ioctl(fd, termios.FIONREAD, buf, True)
@@ -100,11 +101,18 @@ def main():
     splitter = None
 
     if os.environ.get("TRACKS_ENABLED", "false").lower() == "true":
-        from track_spool import TrackSpool
+        # The per-track items are an extra: whatever goes wrong here (a missing module, the port taken) must never
+        # stop the endless stream, which is the job of this loop.
+        try:
+            from track_spool import TrackSpool
 
-        spool = TrackSpool(port=int(os.environ.get("TRACK_PORT", "8010")), bitrate=int(os.environ.get("STREAM_BITRATE", "320")))
-        spool.serve_in_background()
-        splitter = Splitter(spool, stdin)
+            spool = TrackSpool(port=int(os.environ.get("TRACK_PORT", "8010")), bitrate=int(os.environ.get("STREAM_BITRATE", "320")))
+            spool.serve_in_background()
+            splitter = Splitter(spool, stdin)
+            pipe_pending(stdin)  # fails now, not at the first track, if the platform cannot do it
+        except Exception as e:
+            print(f"per-track items disabled: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+            splitter = None
 
     while True:
         if len(buffer) < MAX_BUFFER and select.select([stdin], [], [], 0)[0]:
