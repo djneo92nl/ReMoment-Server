@@ -24,7 +24,7 @@ UPnP has no usable queue, so the server owns it: `Common\DeviceQueue` (track ids
 - A track started from the renderer's own app is shown as now-playing but has no queue: `upnp:{id}:playing` (what the server last started) is dropped and `getUpNext()` answers `[]`.
 - Every track is started with `Stop`, `SetAVTransportURI`, `Play`: after a track has played, a Philips TV answers the next `SetAVTransportURI` with UPnP error 705 until it has been stopped (the stop is flagged as ours, so the listener does not read it as a track ending; a failing stop is ignored).
 - `SetAVTransportURI` and `Play` wait up to 30 s (`Renderer::WAKE_SECONDS`): a TV that has to open its media player first answers the first one late. Our own files are given as `/stream/{id}.{ext}` with DLNA headers (see file-storage.md).
-- Tracks need a stream URL the renderer can reach: DLNA URLs work as they are; own files use `StreamUrl::for()`, so `STREAM_BASE_URL` (or `APP_URL`) must be the server's current LAN address: a stale one (the Mac got a new DHCP address) shows up as the TV saying the file cannot be played, with no `/stream` request in the server log.
+- Tracks need a stream URL the renderer can reach: DLNA URLs work as they are; own files use `StreamUrl::for()`, so unless `STREAM_BASE_URL` is left unset (then the address the request came in on is used, which follows the machine between networks, but only for requests made through an IP or real hostname, not `localhost` or `*.test`) it, or `APP_URL`, must be the server's current LAN address: a stale one (the Mac got a new DHCP address) shows up as the TV saying the file cannot be played, with no `/stream` request in the server log.
 
 ## Listener
 
@@ -39,6 +39,16 @@ UPnP has no usable queue, so the server owns it: `Common\DeviceQueue` (track ids
 3. skipped without AVTransport, or when `ConnectionManager.GetProtocolInfo` lists no `audio/*` sink (TVs, video renderers); a renderer that does not answer is let through.
 
 The renderer's own manufacturer and model become the device's brand and product; the driver is set explicitly. `config/devices.php` also has `UPnP / Generic MediaRenderer` so the manual form works. A device added by hand has no control URLs yet: on first use `RendererSetup::ensure()` finds the renderer at its IP by a unicast search (MediaRenderer, then `upnp:rootdevice`), reads its descriptor and stores the same meta discovery would (the audio-sink filter is not applied: you chose the device). If nothing answers, the listener reports the device unreachable and logs why.
+
+## Verified on hardware: Philips Streamium MCi900
+
+An old (2008-era firmware, Allegro RomPager 4.64) Streamium HiFi player; plays through this driver with album art and track info on its screen. What is particular about it:
+
+- **Two UPnP devices on two ports, and only one is advertised.** Port 80 is a *MediaServer* (ContentDirectory; its own UDN, empty library when no disk content) and is what SSDP, multicast or unicast, shows. The *MediaRenderer* is at `http://{ip}:7123/` (7124 serves the same document) and answers no SSDP search, so `device:discover` never lists it. Add it by the description URL: `php artisan device:discover --host=http://192.168.3.33:7123/ --add`, or give that URL under "Known device IPs" (`UpnpDiscovery` takes any `http(s)://` entry as a descriptor, no search). The URL is then kept as the `upnp_location` meta, which `RendererSetup::ensure()` reads first, so a later IP change needs only that value updated. The rest of the box: 8889 is the presentation page, 21/23 (FTP/telnet) answer `execve failed!`, 139 and 50019 are silent.
+- **Services** (control URLs on port 7123: `/UD/action?0` RenderingControl, `?1` ConnectionManager, `?2` AVTransport): AVTransport has `SetAVTransportURI`, `Play`, `Pause`, `Stop`, `Seek`, `Next`, `Previous`, but **no `SetNextAVTransportURI`**, so no gapless (the server queue and a short gap between tracks). With nothing loaded `GetCurrentTransportActions` lists only `Play,Stop,Pause`. RenderingControl has `GetVolume`/`SetVolume`/`GetMute`/`SetMute`; the volume range is 0-64 (`upnp_volume_max`). Discovery records `seek` and `volume_control`.
+- **Formats** (`GetProtocolInfo` sink): MP3, AAC, M4A, WAV, WMA/ASF, Ogg, `audio/x-flac` and a few streaming types. MP3 verified; FLAC listed but untested.
+- **Slow to react.** A `SetAVTransportURI` pointing at an unreachable address leaves the transport on `PLAYING` at 0:00 for roughly 15 s while the box retries it, before it takes a new URI; a stale `STREAM_BASE_URL` (see above) therefore looks like a player that accepts the track and never plays. Check the server log for a `/stream/{id}.mp3` request.
+- The device clock is stuck in 2008 (`Date:` headers); nothing here depends on it. A freshly paired box plays at volume 2 of 64.
 
 ## Not built yet / future research
 
