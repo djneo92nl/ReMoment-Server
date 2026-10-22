@@ -42,6 +42,8 @@ The renderer's own manufacturer and model become the device's brand and product;
 
 ## Verified on hardware: Philips Streamium MCi900
 
+The driver built on this is described in [philips-streamium.md](philips-streamium.md).
+
 An old (2008-era firmware, Allegro RomPager 4.64) Streamium HiFi player; plays through this driver with album art and track info on its screen. What is particular about it:
 
 - **Two UPnP devices on two ports, and only one is advertised.** Port 80 is a *MediaServer* (ContentDirectory; its own UDN, empty library when no disk content) and is what SSDP, multicast or unicast, shows. The *MediaRenderer* is at `http://{ip}:7123/` (7124 serves the same document) and answers no SSDP search, so `device:discover` never lists it. Add it by the description URL: `php artisan device:discover --host=http://192.168.3.33:7123/ --add`, or give that URL under "Known device IPs" (`UpnpDiscovery` takes any `http(s)://` entry as a descriptor, no search). The URL is then kept as the `upnp_location` meta, which `RendererSetup::ensure()` reads first, so a later IP change needs only that value updated. The rest of the box: 8889 is the presentation page, 21/23 (FTP/telnet) answer `execve failed!`, 139 and 50019 are silent.
@@ -58,7 +60,7 @@ The renderer's `presentationURL` is the unit's own phone web remote (a Dutch-lan
 
 | GET | Does |
 |---|---|
-| `/CTRL$PLAY_PAUSE`, `/CTRL$STOP`, `/CTRL$NEXT`, `/CTRL$PREV` | transport (`NEXT` answers `{'command':'NOWPLAY'}`; its effect on a radio stream is unverified) |
+| `/CTRL$PLAY_PAUSE`, `/CTRL$STOP`, `/CTRL$NEXT`, `/CTRL$PREV` | transport. **On a live radio stream `PLAY_PAUSE` toggles mute** (`play` stays 1, `mute` flips; it pauses only a UPnP track or a disc). `NEXT` answers `{'command':'NOWPLAY'}`; its effect on a radio stream is unverified |
 | `/VOLUME$VAL$n`, `/VOLUME$MUTE`, `/VOLUME$UNMUTE` | volume 0-64 (same scale as `upnp_volume_max`), mute |
 | `/MODE$SHUFFLE_ON\|OFF`, `/MODE$REPEAT_ALL\|SINGLE\|OFF` | shuffle / repeat (meaningless for radio; the status numbering is unclear) |
 | `/CTRL$ADD2FAV` | add the playing station to favourites |

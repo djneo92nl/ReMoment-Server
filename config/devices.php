@@ -23,6 +23,7 @@ return [
         \Remoment\MozartDriver\MusicPlayerDriver::class => \Remoment\MozartDriver\Services\DeviceListener::class,
         \App\Integrations\Upnp\MusicPlayerDriver::class => \App\Integrations\Upnp\Services\DeviceListener::class,
         \App\Integrations\Philips\VideoPlayerDriver::class => \App\Integrations\Philips\Services\DeviceListener::class,
+        \App\Integrations\Philips\Streamium\MusicPlayerDriver::class => \App\Integrations\Philips\Streamium\Services\DeviceListener::class,
     ],
 
     // device_meta keys holding a platform's multiroom peer ID (see MultiRoomInterface::multiRoomMetaKey()).
@@ -138,6 +139,14 @@ return [
         'Android TV' => [
             'driver_name' => 'Philips',
             'driver' => \App\Integrations\Philips\VideoPlayerDriver::class,
+        ],
+    ],
+    // A Philips Streamium HiFi player (MCi900) enabled with `php artisan streamium:enable`: the UPnP driver plus its phone web
+    // remote (standby, radio presets, the radio playing). Opt-in like the TV, so the brand and model here match no renderer.
+    'Philips Streamium' => [
+        'Wi-Fi Hi-Fi System' => [
+            'driver_name' => 'Streamium',
+            'driver' => \App\Integrations\Philips\Streamium\MusicPlayerDriver::class,
         ],
     ],
 ];

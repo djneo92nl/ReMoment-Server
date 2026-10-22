@@ -1,0 +1,37 @@
+# Philips Streamium HiFi player (MCi900) driver
+
+**Path:** `app/Integrations/Philips/Streamium/`. The generic [UPnP renderer](upnp-renderer.md) (library playback, server queue, volume, seek, polling listener) **plus** what the unit's own phone web remote (port 8889) adds: power, the ten internet-radio presets as sources, and the radio playing as now-playing. `Streamium\MusicPlayerDriver` extends `Upnp\MusicPlayerDriver`; `Streamium\Services\DeviceListener` extends the UPnP listener, the same shape as the [Philips TV](philips-tv.md) driver. The web remote's endpoints, formats and quirks are in the MCi900 section of upnp-renderer.md; this page is what the driver does with them.
+
+## Enabling
+
+Opt-in, like the TV: the config brand is `Philips Streamium` / `Wi-Fi Hi-Fi System`, which matches neither the renderer's manufacturer (`Royal Philips Electronics`) nor its model (`MCi`), so discovery still treats the unit as a generic UPnP renderer (it is also not advertised over SSDP: add it by `http://{ip}:7123/`, see upnp-renderer.md). Then:
+
+```bash
+php artisan streamium:enable {device id} [--url=http://192.168.3.33:8889]
+```
+
+checks that the web remote answers (`/HOMESTATUS`), stores `streamium_remote_url` in the device's meta and sets the driver. Restart the listeners (`device:listen`) afterwards.
+
+## What it adds
+
+| Capability | How |
+|---|---|
+| `power` | `standby()` is the web remote's `POST /CTRL$STANDBY` (a toggle that never answers). The unit has **no readable power state** (every endpoint keeps answering and counting), so the server remembers what it sent (`streamium:{id}:asleep`): `powerOn()` toggles only after the server put the unit to standby, otherwise it answers 422 (a toggle on an awake unit would put it to sleep). A unit put to standby by its own remote is unknown to the server. |
+| `source_control`, `source_activation` | The radio presets, `preset:{id}`, read from `/nav$03$02$001$0` (cached 10 min) and played by the address the page itself uses (`/nav$03$03$00N$1`, a GET that answers after the stream is up, so up to 20 s). Not offered: AUX, disc, FM (selecting them is unverified, see upnp-renderer.md). |
+| now playing | While the UPnP transport holds nothing, the listener asks `/ELAPSE` (the status) and `/nowplay` (the `playItem`) every 3 s and reports the radio: station (`subTitle`) and logo as the radio, the stream's own "Station - Show - Artists" title minus the station as the track. The UPnP side wins while a UPnP stream plays. A unit the server put to standby is not asked (it keeps counting while asleep). |
+| `play`, `pause`, `stop`, `next`, `previous` | While a local source plays (`streamium:{id}:local`, refreshed by the listener, 15 s) they go to the web remote (`GET /CTRL$…`) and never fall through to the server queue; otherwise they are the UPnP driver's. |
+
+**A live radio stream cannot be paused**: the unit's `PLAY_PAUSE` toggles *mute* (`play` stays 1, `mute` flips, the elapsed counter keeps going). The driver therefore pauses by muting and plays by unmuting, and the listener reports a muted radio as `paused`. A mute through the volume control looks the same, so it also shows as paused. Volume itself is shared: the UPnP RenderingControl and the web remote's volume are the same (0-64, scaled to 0-100).
+
+## Pitfalls
+
+- Commands are **GETs**; only standby is a form POST. A POST to `/CTRL$PLAY_PAUSE` is silently ignored.
+- `/ELAPSE` alternates a `NOWPLAY` change signal with the status: `RemoteClient::status()` asks again, and a listener poll that gets only signals leaves what it reported alone (it must not read "no answer" as "nothing playing").
+- The unit's web servers are slow while it connects to a stream; calls during that moment can time out.
+- The stream URL a unit is given comes from the host the API request came in on (`StreamUrl`): call the API by the server's LAN address, not `localhost`, when playing library tracks (see upnp-renderer.md).
+
+## Not built
+
+Source selection for AUX / disc / FM (the disc and FM are behind the DVD unit's UART, see the hardware notes), a readable power state, library browsing of the unit's own USB disk beyond the DLNA scan (`library:scan --server={ip}`; its folder view duplicates tracks under their file names).
+
+Tests: `tests/Feature/StreamiumTest.php` (fixtures of the real pages in `tests/Fixtures/streamium/`).

@@ -36,7 +36,7 @@ class DeviceModelsTest extends TestCase
 
         $this->assertEqualsCanonicalizing(['bang-olufsen', 'remoment', 'spotify', 'sonos', 'upnp'], array_keys($groups));
         $this->assertSame(['ASE', 'Mozart'], array_keys($groups['bang-olufsen']['drivers']));
-        $this->assertSame(['UPnP', 'Philips'], array_keys($groups['upnp']['drivers']));
+        $this->assertSame(['UPnP', 'Philips', 'Streamium'], array_keys($groups['upnp']['drivers']));
         $this->assertTrue($groups['spotify']['virtual']);
         $this->assertFalse($groups['sonos']['virtual']);
     }
