@@ -50,6 +50,36 @@ An old (2008-era firmware, Allegro RomPager 4.64) Streamium HiFi player; plays t
 - **Slow to react.** A `SetAVTransportURI` pointing at an unreachable address leaves the transport on `PLAYING` at 0:00 for roughly 15 s while the box retries it, before it takes a new URI; a stale `STREAM_BASE_URL` (see above) therefore looks like a player that accepts the track and never plays. Check the server log for a `/stream/{id}.mp3` request.
 - The device clock is stuck in 2008 (`Date:` headers); nothing here depends on it. A freshly paired box plays at volume 2 of 64.
 
+### The web remote on port 8889
+
+The renderer's `presentationURL` is the unit's own phone web remote (a Dutch-language page set, `index.htm` / `/index` / `/nowplay` and lists), the successor of the old Streamium app. It sees what the unit's screen shows and drives its **local** sources (internet radio, FM, AUX, disc; HDD only when a disk is fitted), which UPnP cannot: power, the radio presets and what is playing. Findings from the browser's own requests, on a unit with no disk and no FM antenna; send a `Host: {ip}:8889` header.
+
+- **Commands are plain `GET`s**, answered `{'command':'SUCCESS','value':0}` (not JSON: single quotes, read it with a regex). Exception: **`POST /CTRL$STANDBY`** (form field `command`) toggles standby and gets no answer (the request times out although the unit acts). The page's other buttons are GETs; sending them as POSTs does nothing, which looked like a dead interface at first.
+
+| GET | Does |
+|---|---|
+| `/CTRL$PLAY_PAUSE`, `/CTRL$STOP`, `/CTRL$NEXT`, `/CTRL$PREV` | transport (`NEXT` answers `{'command':'NOWPLAY'}`; its effect on a radio stream is unverified) |
+| `/VOLUME$VAL$n`, `/VOLUME$MUTE`, `/VOLUME$UNMUTE` | volume 0-64 (same scale as `upnp_volume_max`), mute |
+| `/MODE$SHUFFLE_ON\|OFF`, `/MODE$REPEAT_ALL\|SINGLE\|OFF` | shuffle / repeat (meaningless for radio; the status numbering is unclear) |
+| `/CTRL$ADD2FAV` | add the playing station to favourites |
+| `/nav$03$01$001$0` | internet radio menu: presets, favourites, recent, search, all stations, my media (the unit's own menu cursor: the lists below the top level mirror its current list, they are not a directory) |
+| `/nav$03$02$001$0` | the 10 radio presets (NPO Radio 1/2, NPO 3FM, 538, Qmusic, Sky Radio 101, Radio Veronica, SLAM!, 100% NL, Arrow Caz on this unit) |
+| **`/nav$03$03$00N$1`** | **plays radio preset N (1-10)**; every list click on the page is just `window.location = target` |
+| `/fmnav$06$01$001$0`, `/fmnav$06$02$001$0`, `/FMCTRL$MANUAL_TUNING`, `/FMCTRL$AUTO_STORE_CONFIRM` | FM menu, its 10 presets (all `(EMPTY)`), tuning, auto-store (found nothing without an antenna) |
+
+- **State is readable:** `GET /ELAPSE` answers either `{'command':'NOWPLAY'}` (a "something changed" signal) or, on the next poll, the status `{'command':'ELAPSE','value':elapsed,'mute','shuffle','repeat','play','volume','rating','favstatus'}` with `play` 1 = playing, 2 = paused. Poll it in a loop until the status form arrives; it lags a command by one poll. `GET /nowplay` is the play screen with `var playItem = {title, subTitle, albumArt, volume, maxvolume, elapsetime, totaltime, playStaus, …}`: for radio the title carries the show and song from the stream (`'NPO 3FM - Barend & Benner - PowNed'`), `albumArt` is the station logo from TuneIn's old RadioTime CDN (`radiotime-logos.s3.amazonaws.com`, fetched by the unit itself), `totaltime` 65535 means no end. `/HOMESTATUS`, `/BUFFERSTATUS`, `/DVDSTATUS` are the screens' own polls. With nothing playing `/nowplay` is the home page. The elapsed counter of a radio stream was stuck at 190 until a new station was selected.
+- **Power has no readable state**: `/CTRL$STANDBY` only toggles. In standby the unit still answers on 7123 and 8889, so it can be woken over the network, but not told from awake by asking; a driver would have to track its own guess.
+- **Not verified:** selecting AUX, disc or FM as the source (`/aux` and `/dvd` return a play-screen template and left the radio playing), Streamium's "My media"/favourites server feature, anything on 21/23/139/50019. The service manual covers hardware only.
+
+### MCi900 hardware (from the service manual's block diagram)
+
+The manual covers hardware only, no software interfaces; the block diagram explains some of what the network side shows.
+
+- **Main board:** an ADI Blackfin BF527 DSP (96 MB SDRAM, 128 Mbit flash), most likely running uClinux. That fits the Allegro RomPager web servers and the FTP/telnet ports that answer `execve failed!` (a cut-down busybox without its binaries): do not expect a way in there. Ethernet is an SMSC LAN8700; Wi-Fi is a USB 802.11b/g/n module on its own USB jack; a 3.5" TFT and an IR receiver are on the same board. The class-D amplifiers (TDA8932T) drive the speakers directly. AUX IN and the headphone jack are on the main board's ADAU1361 codec.
+- **USB storage:** a second USB jack, labelled "Storage Device" (Renesas USB 2.0 dual-function controller), is probably what the web remote's "HDD" source means: a USB disk or stick, served by the built-in MediaServer on port 80 (its ContentDirectory was empty with nothing attached). Untested: plug in a stick with music and browse it again; it would be a Local-style library source on the unit itself.
+- **DVD unit:** a separate board (MediaTek MT1389M, disc loader, FM tuner with RDS decoder, HDMI/YUV/CVBS outputs) linked to the main board by a UART (`DVD TX/RX`), tuner I2C, GPO and an eject key. Disc and FM selection are therefore commands to another module, which is why `/dvd` and `/fmnav$…` on the web remote behave as screen templates and selecting those sources was not confirmed.
+- No serial or debug header is labelled in the diagram.
+
 ## Not built yet / future research
 
 - **Prefer a native queue when the device has one.** The descriptor already lists a device's services, so this is detectable. OpenHome (Linn, Naim, Volumio, BubbleUPnP, others) has `urn:av-openhome-org:service:Playlist:1` (`Insert`, `DeleteId`, `ReadList`, `SeekId`, `Next`, `Previous`, `SetShuffle`, `SetRepeat`): a real queue on the device, gapless, that survives the server going away and shows the same list in the device's own app. A device with it would get its own tier above this driver (`QueueInterface` / `QueueJumpInterface` / shuffle / repeat read from and written to the device, the listener subscribing to the service's events instead of polling), and the server queue stays for plain renderers. Sonos-style `Q:` queues on AVTransport are the same idea for the Sonos driver, which has it already.
