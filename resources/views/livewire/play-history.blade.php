@@ -175,7 +175,8 @@
                                                 <div class="flex-1 min-w-0">
                                                     <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate leading-snug flex items-center gap-1.5">
                                                         @if($trackUrl = \App\Domain\Library\TrackLink::for($play->track))<a href="{{ $trackUrl }}" class="hover:underline">{{ $play->trackTitle() }}</a>@else{{ $play->trackTitle() }}@endif
-                                                        <x-source-icon :source="$play->track?->source ?? $play->source_type" />
+                                                        {{-- How it was played: Spotify only when the device played Spotify; a track with an own file played from it, whatever source first created the record --}}
+                                                        <x-source-icon :source="$play->source_type === 'spotify' ? 'spotify' : ($play->track?->track_files_exists ? 'files' : ($play->track?->source ?? $play->source_type))" />
                                                     </p>
                                                     <p class="text-xs text-gray-400 dark:text-gray-600 truncate mt-0.5 leading-snug">
                                                         @if($play->track?->artist)

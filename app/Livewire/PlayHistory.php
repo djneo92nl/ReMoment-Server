@@ -200,7 +200,7 @@ class PlayHistory extends Component
     public function render()
     {
         $query = Play::query()
-            ->with(['device', 'track.artist', 'track.album', 'radioStation'])
+            ->with(['device', 'track' => fn ($q) => $q->withExists('trackFiles'), 'track.artist', 'track.album', 'radioStation'])
             ->orderByDesc('played_at');
 
         if ($this->deviceId) {
