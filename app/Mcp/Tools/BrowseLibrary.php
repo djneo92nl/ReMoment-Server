@@ -10,13 +10,13 @@ use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
-#[Description('Browse the library. kind: libraries, recent-items, recent, favorites, random-album, artists, albums, genres, playlists (lists; page with `cursor`, order with `sort`, jump with `letter`) or artist, album, genre, playlist (detail; needs `id`, genre takes its slug). Pass `device_id` on album/playlist detail to see which tracks that device can play. Full shapes: docs/api/library.md.')]
+#[Description('Browse the library. kind: libraries, recent-items, recent, favorites, random-album, artists, albums, tracks, genres, playlists (lists; page with `cursor`, order with `sort`, jump with `letter`) or artist, album, genre, playlist (detail; needs `id`, genre takes its slug). Pass `device_id` on album/playlist detail to see which tracks that device can play. Full shapes: docs/api/library.md.')]
 #[IsReadOnly]
 class BrowseLibrary extends Tool
 {
     use CallsApi;
 
-    private const LISTS = ['libraries', 'recent-items', 'recent', 'favorites', 'random-album', 'artists', 'albums', 'genres', 'playlists'];
+    private const LISTS = ['libraries', 'recent-items', 'recent', 'favorites', 'random-album', 'artists', 'albums', 'tracks', 'genres', 'playlists'];
 
     private const DETAILS = ['artist' => 'artists', 'album' => 'albums', 'genre' => 'genres', 'playlist' => 'playlists'];
 
@@ -26,7 +26,7 @@ class BrowseLibrary extends Tool
             'kind' => $schema->string()->enum([...self::LISTS, ...array_keys(self::DETAILS)])->required(),
             'id' => $schema->string()->description('Artist/album/playlist id, or genre slug (detail kinds)'),
             'cursor' => $schema->string()->description('next_cursor of the previous page'),
-            'sort' => $schema->string()->description('artists: name|plays; albums: name|artist|year|added|plays'),
+            'sort' => $schema->string()->description('artists: name|plays; albums: name|artist|year|added|plays; tracks: name|artist|added|plays'),
             'letter' => $schema->string()->description('A-Z or # to start at that letter (artists, albums)'),
             'scope' => $schema->string()->description('local, streaming, all or a library id; default is the leading source'),
             'device_id' => $schema->integer()->description('Mark what this device can play'),

@@ -9,6 +9,7 @@ use App\Domain\Device\PlaybackModes;
 use App\Domain\Device\RepeatMode;
 use App\Domain\Device\SourceSync;
 use App\Domain\Device\SpotifyRouting;
+use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\LibrarySources;
 use App\Domain\Library\ListeningModes;
@@ -419,6 +420,36 @@ class DeviceController extends Controller
         return $this->playFromLibrary(
             fn () => $library->playTracks($device, $tracks),
             ['mode' => $data['mode'], 'queued' => $tracks->count()],
+        );
+    }
+
+    /** Shuffles the whole library: a random sample of the tracks of the scope this device can play. */
+    public function libraryPlayTracks(Request $request, Device $device, LibraryPlayback $library): JsonResponse
+    {
+        $request->validate([
+            'client' => ['nullable', 'string', 'max:100'],
+            'scope' => ['nullable', 'in:'.implode(',', LeadingSource::apiScopes())],
+        ]);
+
+        if ($error = $this->assertReachable($device)) {
+            return $error;
+        }
+
+        if (!LibraryPlayback::availableFor($device)) {
+            return $this->unsupported('library_playback');
+        }
+
+        $client = $request->filled('client') ? Client::byApiToken((string) $request->input('client')) : null;
+        $hidden = LibrarySources::hiddenForRequest($client, $request->input('scope'));
+        $tracks = LibraryPlayback::playableTracks(LibrarySources::tracks(Track::query(), $hidden), $device)
+            ->inRandomOrder()->limit(\App\Http\Controllers\LibraryController::SHUFFLE_TRACKS)->with(['metadata', 'artist'])->get();
+        if ($tracks->isEmpty()) {
+            return response()->json(['error' => 'not_playable', 'message' => 'This device can not play any track of this library.'], 422);
+        }
+
+        return $this->playFromLibrary(
+            fn () => $library->playTracks($device, $tracks, shuffle: true),
+            ['queued' => $tracks->count()],
         );
     }
 

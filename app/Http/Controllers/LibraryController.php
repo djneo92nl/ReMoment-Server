@@ -9,6 +9,8 @@ use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\LibrarySources;
 use App\Domain\Library\ListeningModes;
 use App\Domain\Library\RandomAlbum;
+use App\Domain\Library\SmartPlaylist\SmartPlaylistBuilder;
+use App\Domain\Library\TrackBrowse;
 use App\Http\Controllers\Concerns\FlashesLibraryPlayback;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
@@ -19,6 +21,9 @@ use Illuminate\Http\Request;
 class LibraryController extends Controller
 {
     use FlashesLibraryPlayback;
+
+    /** Tracks queued by "shuffle all": a random sample, since the whole collection goes to the driver. */
+    public const SHUFFLE_TRACKS = 100;
 
     public function index(Request $request)
     {
@@ -41,6 +46,31 @@ class LibraryController extends Controller
         }
 
         return $this->flashPlayback(fn () => $library->playAlbum($device, $album, shuffle: true), $device, $album->name);
+    }
+
+    /** Every track of the scope: the Livewire TrackBrowser holds search, sort and the smart playlist rules. */
+    public function tracks(Request $request)
+    {
+        return view('library.tracks', ['scope' => LeadingSource::forRequest($request)]);
+    }
+
+    /** Shuffle the tracks page's selection (all tracks, or its filters): a random sample of what the pinned player can play. */
+    public function shuffleTracks(Request $request, LibraryPlayback $library)
+    {
+        $device = app(SelectedDevice::class)->device();
+        if ($device === null) {
+            return back()->with('error', 'Pick a player in the bar below first.');
+        }
+
+        $scope = LeadingSource::forRequest($request);
+        $definition = SmartPlaylistBuilder::normalize($request->only(['match', 'rules']));
+        $tracks = LibraryPlayback::playableTracks(TrackBrowse::query($definition, $scope, (string) $request->input('q'), $request->boolean('fav')), $device)
+            ->inRandomOrder()->limit(self::SHUFFLE_TRACKS)->with(['metadata', 'artist'])->get();
+        if ($tracks->isEmpty()) {
+            return back()->with('error', "{$device->device_name} can't play any tracks of this library.");
+        }
+
+        return $this->flashPlayback(fn () => $library->playTracks($device, $tracks, shuffle: true), $device, 'All tracks');
     }
 
     /** A listening mode on the player pinned in this browser. */

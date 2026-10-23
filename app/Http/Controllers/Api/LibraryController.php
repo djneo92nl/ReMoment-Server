@@ -49,6 +49,8 @@ class LibraryController extends Controller
 
     public const ALBUMS_PAGE_SIZE = 60;
 
+    public const TRACKS_PAGE_SIZE = 50;
+
     public const PLAYLISTS_PAGE_SIZE = 50;
 
     /** Artists and albums listed in a genre's detail. */
@@ -69,6 +71,8 @@ class LibraryController extends Controller
 
     /** Album name for sorting: lower case (a leading "The " is not ignored for albums). */
     private const ALBUM_SORT_NAME = 'LOWER(albums.name)';
+
+    private const TRACK_SORT_NAME = 'LOWER(tracks.name)';
 
     /** Artists with albums, paged: `sort` is name (default) or plays (most played first, in the scope). */
     public function artists(Request $request): JsonResponse
@@ -160,6 +164,42 @@ class LibraryController extends Controller
         return response()->json([
             'data' => $albums->take(self::ALBUMS_PAGE_SIZE)->map(fn (Album $album) => $this->albumItem($album))->values(),
             'next_cursor' => $hasMore ? $this->encodeCursor($offset + self::ALBUMS_PAGE_SIZE) : null,
+        ]);
+    }
+
+    /** All tracks of the scope, paged: `sort` is name (default), artist ("The " ignored), added (newest first) or plays. */
+    public function tracks(Request $request): JsonResponse
+    {
+        $request->validate([
+            'cursor' => ['nullable', 'string', 'max:200'],
+            'letter' => ['nullable', 'string', 'regex:/^[A-Za-z#]$/'],
+            'sort' => ['nullable', 'in:name,artist,added,plays'],
+        ]);
+        $hidden = $this->hiddenSources($request);
+        $offset = $this->decodeCursor($request->query('cursor'));
+        $sort = $request->query('sort', 'name');
+
+        $query = LibrarySources::tracks(Track::query(), $hidden)->with(['artist', 'album']);
+
+        match ($sort) {
+            'artist' => $query->leftJoin('artists', 'artists.id', '=', 'tracks.artist_id')
+                ->orderByRaw(self::ARTIST_SORT_NAME)->orderBy('tracks.name')->select('tracks.*'),
+            'added' => $query->orderByDesc('tracks.created_at'),
+            'plays' => $query->withCount('plays')->orderByDesc('plays_count')->orderByDesc('tracks.created_at'),
+            default => $query->orderByRaw(self::TRACK_SORT_NAME),
+        };
+
+        if ($sort === 'name' || $sort === 'artist') {
+            $offset = $this->letterOffset($query, $sort === 'artist' ? self::ARTIST_SORT_NAME : self::TRACK_SORT_NAME, $request, $offset);
+        }
+
+        $tracks = $query->orderBy('tracks.id')->offset($offset)->limit(self::TRACKS_PAGE_SIZE + 1)->get();
+        $page = $tracks->take(self::TRACKS_PAGE_SIZE);
+        $this->preloadArtwork(albums: $page->map->album->filter());
+
+        return response()->json([
+            'data' => $page->map(fn (Track $track) => $this->searchTrack($track))->values(),
+            'next_cursor' => $tracks->count() > self::TRACKS_PAGE_SIZE ? $this->encodeCursor($offset + self::TRACKS_PAGE_SIZE) : null,
         ]);
     }
 

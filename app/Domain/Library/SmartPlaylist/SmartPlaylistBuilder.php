@@ -106,7 +106,7 @@ final class SmartPlaylistBuilder
     {
         $definition = self::normalize($definition);
 
-        return self::sort(self::query($definition), $definition['sort'])->limit($definition['limit']);
+        return self::order(self::query($definition), $definition['sort'])->limit($definition['limit']);
     }
 
     /** Rewrites the playlist's tracks from its rules. Idempotent apart from random order. Returns the track count. */
@@ -134,7 +134,8 @@ final class SmartPlaylistBuilder
         return $ids->count();
     }
 
-    private static function sort(Builder $query, string $sort): Builder
+    /** Orders a track query by one of SORTS (ties by id, so paging is stable except for `random`). */
+    public static function order(Builder $query, string $sort): Builder
     {
         match ($sort) {
             'recently_added' => $query->orderByDesc('tracks.created_at')->orderByDesc('tracks.id'),

@@ -69,4 +69,6 @@ Tracks are limited to what the leading source shows (`LeadingSource::defaultScop
 
 ## Web
 
+`/library/tracks` uses the same rules to filter the whole library and can save the filter set as a new smart playlist (`App\Livewire\TrackBrowser`, `Domain\Library\TrackBrowse`; see `docs/frontend/library.md`).
+
 `/playlists` has a "New smart playlist" button next to "New playlist" (`POST /playlists` with `smart=1`, which creates the playlist with empty rules and fills it). Smart playlists can be deleted; the tracks are not edited by hand.

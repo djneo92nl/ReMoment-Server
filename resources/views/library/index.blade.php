@@ -3,6 +3,7 @@
         $chips = [
             ['Albums', 'compact-disc', route('albums.index'), $counts['albums']],
             ['Artists', 'microphone-lines', route('artists.index'), $counts['artists']],
+            ['Tracks', 'music', route('library.tracks'), $counts['tracks']],
             ['Playlists', 'list-ul', route('playlists.index'), $counts['playlists']],
             ['Genres', 'tags', route('genres.index'), $counts['genres']],
             ['Radio', 'radio', route('radio.index'), $counts['radio']],

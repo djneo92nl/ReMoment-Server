@@ -74,6 +74,8 @@ Route::get('/genres/{slug}', [GenreController::class, 'show'])->name('genres.sho
 Route::get('/library', [LibraryController::class, 'index'])->name('library.index');
 Route::post('/library/shuffle', [LibraryController::class, 'shuffle'])->name('library.shuffle');
 Route::post('/library/listening-modes/{mode}', [LibraryController::class, 'playListeningMode'])->name('library.listening-modes.play');
+Route::get('/library/tracks', [LibraryController::class, 'tracks'])->name('library.tracks');
+Route::post('/library/tracks/shuffle', [LibraryController::class, 'shuffleTracks'])->name('library.tracks.shuffle');
 Route::get('/library/favorites', [LibraryController::class, 'favorites'])->name('library.favorites');
 Route::get('/playlists', [PlaylistController::class, 'index'])->name('playlists.index');
 Route::post('/playlists', [PlaylistController::class, 'store'])->name('playlists.store');

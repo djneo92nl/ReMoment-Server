@@ -88,6 +88,7 @@ Route::delete('/devices/{device}/multiroom/leave', [DeviceController::class, 'mu
 
 Route::post('/devices/{device}/library/play', [DeviceController::class, 'libraryPlay']);
 Route::post('/devices/{device}/library/play-playlist', [DeviceController::class, 'libraryPlayPlaylist']);
+Route::post('/devices/{device}/library/play-tracks', [DeviceController::class, 'libraryPlayTracks']);
 Route::post('/devices/{device}/library/play-listening-mode', [DeviceController::class, 'libraryPlayListeningMode']);
 Route::post('/devices/{device}/library/play-album', [DeviceController::class, 'libraryPlayAlbum']);
 Route::post('/devices/{device}/library/play-artist', [DeviceController::class, 'libraryPlayArtist']);
@@ -97,6 +98,7 @@ Route::get('/library/recent-items', [LibraryController::class, 'recentItems']);
 Route::get('/library/artists', [LibraryController::class, 'artists']);
 Route::get('/library/artists/{artist}', [LibraryController::class, 'artist']);
 Route::put('/library/artists/{artist}/favorite', [LibraryController::class, 'favoriteArtist']);
+Route::get('/library/tracks', [LibraryController::class, 'tracks']);
 Route::get('/library/albums', [LibraryController::class, 'albums']);
 Route::get('/library/random-album', [LibraryController::class, 'randomAlbum']);
 Route::get('/library/albums/{album}', [LibraryController::class, 'album']);

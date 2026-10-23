@@ -151,6 +151,55 @@ class LibraryHomeTest extends TestCase
             ->assertSessionHas('error');
     }
 
+    public function test_tracks_page_lists_searches_and_links_from_the_hub(): void
+    {
+        $this->release('Coldplay', 'Parachutes');
+        $this->release('Muse', 'Absolution');
+
+        $this->get('/library')->assertOk()->assertSee(route('library.tracks'));
+        $this->get('/library/tracks')->assertOk()->assertSee('2 tracks')->assertSee('Parachutes song')->assertSee('Absolution song')->assertSee('Shuffle all');
+        $this->get('/library/tracks?q=muse')->assertOk()->assertSee('Absolution song')->assertDontSee('Parachutes song');
+    }
+
+    public function test_shuffle_tracks_needs_a_pinned_player(): void
+    {
+        $this->release('Coldplay', 'Parachutes');
+
+        $this->post('/library/tracks/shuffle')->assertSessionHas('error');
+        $this->assertCount(0, FakeLibraryPlaybackDriver::$calls);
+    }
+
+    public function test_shuffle_tracks_queues_the_tracks_of_the_library_on_the_pinned_player(): void
+    {
+        $this->release('Coldplay', 'Parachutes');
+        $this->release('Muse', 'Absolution');
+        $speaker = $this->speaker();
+
+        $this->withCookie(SelectedDevice::COOKIE, (string) $speaker->id)
+            ->post('/library/tracks/shuffle')
+            ->assertSessionHas('success');
+
+        $this->assertCount(2, FakeLibraryPlaybackDriver::$calls[0]['tracks']);
+    }
+
+    public function test_api_lists_tracks_in_pages_and_plays_them_shuffled(): void
+    {
+        $this->release('Coldplay', 'Parachutes');
+        $this->release('Muse', 'Absolution');
+
+        $this->getJson('/api/library/tracks')->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.name', 'Absolution song')
+            ->assertJsonPath('next_cursor', null);
+        $this->getJson('/api/library/tracks?sort=artist&letter=M')->assertOk()->assertJsonPath('data.0.artist_name', 'Muse');
+
+        $speaker = $this->speaker();
+        \App\Domain\Device\DeviceCache::updateState($speaker->id, \App\Domain\Device\State::Standby);
+        $this->postJson("/api/devices/{$speaker->id}/library/play-tracks")
+            ->assertOk()->assertJsonPath('queued', 2);
+        $this->assertCount(2, FakeLibraryPlaybackDriver::$calls[0]['tracks']);
+    }
+
     public function test_the_page_does_not_query_per_card(): void
     {
         $count = function (): int {

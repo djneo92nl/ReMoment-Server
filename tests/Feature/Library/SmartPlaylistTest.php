@@ -302,6 +302,45 @@ class SmartPlaylistTest extends TestCase
         $this->assertSame(['Old'], $playlist->tracks()->pluck('tracks.name')->all());
     }
 
+    public function test_the_tracks_page_filters_with_the_rules_and_saves_them_as_a_playlist(): void
+    {
+        $this->track('Old', '1994-01-01');
+        $this->track('New', '2008-01-01');
+
+        Livewire::test(\App\Livewire\TrackBrowser::class, ['scope' => 'all'])
+            ->assertSee('2 tracks')
+            ->call('addRule')
+            ->set('rules.0.field', 'decade')
+            ->set('rules.0.value', '1990')
+            ->assertSee('1 track')
+            ->assertSee('LP Old')
+            ->assertDontSee('LP New')
+            ->set('saveName', 'Nineties')
+            ->set('saveSort', 'name')
+            ->set('saveLimit', 20)
+            ->call('saveAsPlaylist')
+            ->assertHasNoErrors();
+
+        $playlist = Playlist::where('name', 'Nineties')->firstOrFail();
+        $this->assertTrue($playlist->isSmart());
+        $this->assertSame([['field' => 'decade', 'operator' => 'is', 'value' => '1990']], $playlist->rules['rules']);
+        $this->assertSame(20, $playlist->rules['limit']);
+        $this->assertSame(['Old'], $playlist->tracks()->pluck('tracks.name')->all());
+    }
+
+    public function test_shuffling_the_tracks_page_respects_its_filters(): void
+    {
+        $this->track('Old', '1994-01-01');
+        $this->track('New', '2008-01-01');
+        $speaker = Device::factory()->create(['ip_address' => '10.0.0.1', 'device_driver' => \Tests\Support\FakeLibraryPlaybackDriver::class]);
+
+        $this->withCookie(\App\Support\SelectedDevice::COOKIE, (string) $speaker->id)
+            ->post('/library/tracks/shuffle', ['rules' => [['field' => 'decade', 'operator' => 'is', 'value' => '1990']]])
+            ->assertSessionHas('success');
+
+        $this->assertSame(['Old'], \Tests\Support\FakeLibraryPlaybackDriver::$calls[0]['tracks']->pluck('name')->all());
+    }
+
     public function test_a_changed_field_resets_the_row_and_rows_can_be_removed(): void
     {
         $playlist = Playlist::create(['name' => 'Smart', 'source' => 'smart', 'rules' => SmartPlaylistBuilder::defaults()]);

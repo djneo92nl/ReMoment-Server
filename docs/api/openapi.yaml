@@ -809,6 +809,34 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/AlbumItem" }
                   next_cursor: { type: string, nullable: true }
+  /library/tracks:
+    get:
+      tags: [Library]
+      summary: All tracks of the scope, 50 per page
+      operationId: listTracks
+      parameters:
+        - { $ref: "#/components/parameters/cursor" }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [name, artist, added, plays], default: name }
+        - name: letter
+          in: query
+          description: "Start at the first track whose sort key (track name with `name`, artist name with `artist`) is at or after this letter (`#` = the start). Ignored with `added`, `plays` and with a cursor."
+          schema: { type: string, pattern: "^[A-Za-z#]$" }
+        - { $ref: "#/components/parameters/client" }
+        - { $ref: "#/components/parameters/scope" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/SearchTrack" }
+                  next_cursor: { type: string, nullable: true }
   /library/albums/{album}:
     parameters:
       - name: album
@@ -1303,6 +1331,31 @@ paths:
                 source: { type: string, enum: [files, dlna, spotify], description: Play only the tracks of this library. }
       responses:
         "200": { $ref: "#/components/responses/PlayedOk" }
+        "422": { $ref: "#/components/responses/DeviceError" }
+  /devices/{device}/library/play-tracks:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    post:
+      tags: [Library playback]
+      operationId: playTracks
+      description: Shuffles the whole library, a random sample of up to 100 tracks of the scope that the device can play. 422 `not_playable` when it can play none, 422 `unsupported` without library playback.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                scope: { type: string, description: A library id, `local`, `streaming` or `all`. }
+                client: { type: string, description: A client `api_token` whose hidden sources apply. }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  queued: { type: integer }
         "422": { $ref: "#/components/responses/DeviceError" }
   /devices/{device}/library/play-listening-mode:
     parameters: [{ $ref: "#/components/parameters/device" }]

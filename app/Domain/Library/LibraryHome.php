@@ -9,6 +9,7 @@ use App\Domain\Artwork\PlaylistArtwork;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
 use App\Models\Media\Playlist;
+use App\Models\Media\Track;
 use App\Models\RadioStation;
 use Illuminate\Support\Collection;
 
@@ -87,6 +88,7 @@ final class LibraryHome
                 'albums' => $glance['albums'],
                 'artists' => $glance['artists'],
                 'playlists' => $hero['playlists'],
+                'tracks' => LibrarySources::tracks(Track::query(), $hidden)->count(),
                 'genres' => $genres->count(),
                 'radio' => RadioStation::query()->count(),
                 'favorites' => self::favoriteCount($hidden),

@@ -20,6 +20,8 @@ One call returns everything the view needs; every artwork cover is read from the
 ## Routes
 - `GET /library` (`library.index`): scope from `LeadingSource::forRequest`.
 - `POST /library/shuffle` (`library.shuffle`): a random album of the scope (`RandomAlbum::pick`, preferring one the pinned player can play), played shuffled through `LibraryPlayback` on the player pinned in this browser; flashes success or error like the other web play buttons (`FlashesLibraryPlayback`). Without a pinned player the hero button opens the picker instead.
+- `GET /library/tracks` (`library.tracks`): every track of the scope, 100 per page, in the Livewire `TrackBrowser`: search `q`, sort (the smart playlist sorts except random), a Favorites switch, and a Filters panel with the same field / operator / value rules as a smart playlist (`SmartFields`, `match` all/any), all kept in the URL. With rules set, "Save these rules as a smart playlist" (name, sort, limit) creates one through `PlaylistEditor::create` + `setRules`; the search text and Favorites switch are not rules and are not saved. Chip and count on the hub.
+- `POST /library/tracks/shuffle` (`library.tracks.shuffle`): a random sample of up to `LibraryController::SHUFFLE_TRACKS` (100) tracks of the page's selection (all tracks, or the posted `match`/`rules`/`q`/`fav`, via `TrackBrowse::query`) that the pinned player can play (`LibraryPlayback::playableTracks`), queued shuffled through `playTracks`. Same REST path as `POST /api/devices/{id}/library/play-tracks`.
 - `GET /library/favorites` (`library.favorites`): favourite albums and artists of the scope.
 
 ## Not on the page any more
