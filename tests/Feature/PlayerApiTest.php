@@ -115,6 +115,33 @@ class PlayerApiTest extends TestCase
         Event::assertDispatched(NowPlayingUpdated::class, fn ($e) => $e->deviceId === (string) $id);
     }
 
+    public function test_a_paused_report_keeps_the_device_paused_and_resuming_plays_again(): void
+    {
+        $registered = $this->register();
+        $id = $registered['device_id'];
+        $token = $registered['player_token'];
+        $track = $this->ownTrack('One');
+        // A track is already known to the device (the artwork of a fresh one needs files this test does not have).
+        Event::fake([NowPlayingUpdated::class]);
+        DeviceCache::updateNowPlaying($id, new \App\Domain\Media\NowPlaying(state: 'playing', position: 3, type: 'music'));
+
+        $this->putJson("/api/players/{$token}/state", ['state' => 'playing', 'track_id' => $track->id, 'position' => 3])->assertOk();
+        $this->assertSame(State::Playing, DeviceCache::getState($id));
+
+        // The position comes with a pause too; it must not count as progress of a playing track.
+        $this->putJson("/api/players/{$token}/state", ['state' => 'paused', 'track_id' => $track->id, 'position' => 40])->assertOk();
+        $this->assertSame(State::Paused, DeviceCache::getState($id));
+        $this->assertSame(40, (int) DeviceCache::getNowPlaying($id)->position);
+        $this->assertSame('paused', $this->getJson("/api/devices/{$id}")->json('data.state'));
+
+        // A later heartbeat while still paused changes nothing.
+        $this->putJson("/api/players/{$token}/state", ['state' => 'paused', 'track_id' => $track->id, 'position' => 40])->assertOk();
+        $this->assertSame(State::Paused, DeviceCache::getState($id));
+
+        $this->putJson("/api/players/{$token}/state", ['state' => 'playing', 'track_id' => $track->id, 'position' => 41])->assertOk();
+        $this->assertSame(State::Playing, DeviceCache::getState($id));
+    }
+
     public function test_a_player_plays_a_radio_station_as_a_live_stream(): void
     {
         $registered = $this->register();

@@ -143,7 +143,14 @@ class PlayerController extends Controller
         }
 
         if (isset($data['position'])) {
-            event(new ProgressUpdated(deviceId: $id, progress: (int) round($data['position'])));
+            if ($data['state'] === 'playing') {
+                event(new ProgressUpdated(deviceId: $id, progress: (int) round($data['position'])));
+            } elseif ($cached = DeviceCache::getNowPlaying($device->id)) {
+                // A paused player still says where it stands, but a progress event means "playing" to the cache
+                // (UpdateDeviceCache), so it would turn the pause just stored above back into a playing device.
+                $cached->position = (int) round($data['position']);
+                DeviceCache::updateNowPlaying($device->id, $cached);
+            }
         }
 
         return response()->json(['status' => 'ok']);
