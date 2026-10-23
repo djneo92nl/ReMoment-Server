@@ -192,6 +192,41 @@ class LibraryApiTest extends TestCase
         $this->getJson("/api/library/artists/{$artist->id}?source=nope")->assertStatus(422);
     }
 
+    public function test_artist_page_lists_every_album_that_holds_its_tracks_in_the_library(): void
+    {
+        $artist = $this->artist('Foo');
+        $own = $this->album($artist, 'Own album');
+        $this->track($own, 'a', false, 'sp1');
+        // A compilation credited to someone else that holds one of Foo's Spotify tracks.
+        $various = $this->artist('Various Artists');
+        $compilation = $this->album($various, 'Now That is Music');
+        $this->makeLibraryTrack($compilation, 'Hit', false, 'sp2', $artist->id);
+        // Another artist's album with no track of Foo's stays out.
+        $this->track($this->album($various, 'Unrelated'), 'x', false, 'sp3');
+
+        $response = $this->getJson("/api/library/artists/{$artist->id}?source=spotify")->assertOk()
+            ->assertJsonPath('source', 'spotify')
+            ->assertJsonPath('sources.0', ['id' => 'spotify', 'name' => 'Spotify', 'albums' => 2, 'tracks' => 2]);
+
+        // The page and the switch agree: the albums listed are the ones counted.
+        $this->assertEqualsCanonicalizing(['Own album', 'Now That is Music'], collect($response->json('albums'))->pluck('name')->all());
+        $this->assertCount($response->json('sources.0.albums'), $response->json('albums'));
+    }
+
+    public function test_artist_page_is_not_trimmed_by_the_leading_library_scope(): void
+    {
+        // The browse lists follow the leading library (own files here); an artist page that names a streaming library
+        // shows that library's albums all the same.
+        \App\Models\Setting::set(\App\Domain\Library\LeadingSource::SETTING, 'files');
+        $artist = $this->artist('Foo');
+        $this->track($this->album($artist, 'Local album'), 'a');
+        $this->track($this->album($artist, 'Spotify album'), 's', false, 'sp1');
+
+        $this->getJson("/api/library/artists/{$artist->id}?source=spotify")->assertOk()
+            ->assertJsonPath('sources.1', ['id' => 'spotify', 'name' => 'Spotify', 'albums' => 1, 'tracks' => 1])
+            ->assertJsonPath('albums.*.name', ['Spotify album']);
+    }
+
     public function test_artist_default_source_is_used_when_the_request_names_none(): void
     {
         $artist = $this->artist('Foo');

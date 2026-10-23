@@ -183,8 +183,10 @@ class LibraryController extends Controller
 
     public function artist(Request $request, Artist $artist): JsonResponse
     {
-        $request->validate(['source' => ['nullable', 'in:files,dlna,spotify']]);
-        $hidden = $this->hiddenSources($request);
+        $request->validate(['source' => ['nullable', 'in:files,dlna,spotify'], 'scope' => ['nullable', 'in:'.implode(',', LeadingSource::apiScopes())]]);
+        // Only what the client hides applies: the page shows one chosen library, so the leading-library scope that
+        // trims the browse lists must not hide a streaming library's own albums here.
+        $hidden = $this->clientHidden($request);
 
         // One library at a time, like the web page: streaming is never merged with local. The libraries the artist
         // has tracks in, plus Spotify while it is connected (its side is always one request away).
@@ -194,8 +196,7 @@ class LibraryController extends Controller
         }
         $source = AlbumPage::selectSource($sources, $request->query('source') ?? $artist->metaValue('default_source'), LeadingSource::scope($request->query('scope')));
 
-        $albums = LibrarySources::albums($artist->albums()->with(['artist', 'metadata' => fn ($q) => $q->where('key', 'release_type')]), $hidden)
-            ->when($source !== null, fn ($q) => $q->whereHas('tracks', fn ($t) => LibrarySources::availableFrom($t, $source)))
+        $albums = $this->artistAlbums($artist, $source, $hidden)
             ->withCount(['tracks' => fn ($t) => $source !== null ? LibrarySources::availableFrom($t, $source) : $t])
             ->get()
             ->sortBy([
@@ -214,13 +215,34 @@ class LibraryController extends Controller
                 'gallery' => array_values(array_filter(array_map(LibraryItemArtwork::fanart(...), $artist->galleryUrls()))),
             ],
             'source' => $source,
-            'sources' => array_map(function (string $id) use ($artist) {
-                $tracks = LibrarySources::availableFrom($artist->tracks(), $id);
-
-                return ['id' => $id, 'name' => LibrarySources::LIBRARIES[$id]['name'], 'albums' => (clone $tracks)->distinct()->count('tracks.album_id'), 'tracks' => (clone $tracks)->count()];
-            }, $sources),
+            'sources' => array_map(fn (string $id) => [
+                'id' => $id,
+                'name' => LibrarySources::LIBRARIES[$id]['name'],
+                'albums' => $this->artistAlbums($artist, $id, $hidden)->count(),
+                'tracks' => LibrarySources::availableFrom($artist->tracks(), $id)->count(),
+            ], $sources),
             'albums' => $albums->map(fn (Album $album) => $this->albumItem($album) + ['kind' => AlbumKind::of($album, $album->tracks_count)])->values(),
         ]);
+    }
+
+    /**
+     * The albums an artist's page shows for one library: the albums credited to the artist plus any album that holds one
+     * of its tracks there (a compilation, a feature), each with a visible track from that library. This is also what
+     * `sources[].albums` counts, so the switch and the page agree.
+     */
+    private function artistAlbums(Artist $artist, ?string $source, array $hidden): Builder
+    {
+        $albums = Album::query()
+            ->with(['artist', 'metadata' => fn ($q) => $q->where('key', 'release_type')])
+            ->where(function ($q) use ($artist, $source) {
+                $q->where('albums.artist_id', $artist->id);
+                if ($source !== null) {
+                    $q->orWhereIn('albums.id', LibrarySources::availableFrom($artist->tracks(), $source)->select('tracks.album_id'));
+                }
+            });
+
+        return LibrarySources::albums($albums, $hidden)
+            ->when($source !== null, fn ($q) => $q->whereHas('tracks', fn ($t) => LibrarySources::availableFrom($t, $source)));
     }
 
     public function album(Request $request, Album $album): JsonResponse
