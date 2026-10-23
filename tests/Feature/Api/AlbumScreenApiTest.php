@@ -72,7 +72,7 @@ class AlbumScreenApiTest extends TestCase
         $this->getJson('/api/library/editable-playlists')
             ->assertOk()
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0', ['id' => $id, 'name' => 'Rock', 'track_count' => 0]);
+            ->assertJsonPath('data.0', ['id' => $id, 'name' => 'Rock', 'track_count' => 0, 'track_source' => null]);
 
         $this->postJson("/api/library/playlists/{$id}/tracks", ['track_id' => $a->id])->assertOk()->assertJsonPath('added', 1);
         $this->postJson("/api/library/playlists/{$id}/tracks", ['album_id' => $album->id])
@@ -82,6 +82,34 @@ class AlbumScreenApiTest extends TestCase
         $this->postJson("/api/library/playlists/{$id}/tracks", [])->assertStatus(422);
         $this->postJson('/api/library/playlists/'.Playlist::firstWhere('source', 'spotify')->id.'/tracks', ['track_id' => $a->id])
             ->assertStatus(422)->assertJsonPath('error', 'unsupported');
+    }
+
+    public function test_a_playlist_holds_one_library(): void
+    {
+        $album = $this->album();
+        $own = $this->makeLibraryTrack($album, 'Hysteria');
+        $nas = $this->makeLibraryTrack($album, 'Sing for Absolution', streamSource: 'dlna:nas');
+
+        $id = $this->postJson('/api/library/playlists', ['name' => 'Rock'])->json('id');
+
+        // The first add decides the playlist's library, and an album is added one library at a time.
+        $this->postJson("/api/library/playlists/{$id}/tracks", ['album_id' => $album->id])
+            ->assertStatus(422)->assertJsonPath('error', 'source_mismatch');
+        $this->postJson("/api/library/playlists/{$id}/tracks", ['album_id' => $album->id, 'source' => 'files'])
+            ->assertOk()->assertJsonPath('added', 1);
+        $this->getJson('/api/library/editable-playlists')->assertJsonPath('data.0.track_source', 'files');
+
+        // Another library is refused, track or album; the same one is fine.
+        $this->postJson("/api/library/playlists/{$id}/tracks", ['track_id' => $nas->id])
+            ->assertStatus(422)->assertJsonPath('error', 'source_mismatch');
+        $this->postJson("/api/library/playlists/{$id}/tracks", ['album_id' => $album->id, 'source' => 'dlna'])
+            ->assertStatus(422)->assertJsonPath('error', 'source_mismatch');
+        $this->postJson("/api/library/playlists/{$id}/tracks", ['track_id' => $own->id, 'source' => 'dlna'])
+            ->assertStatus(422)->assertJsonPath('error', 'source_mismatch');
+        $this->postJson("/api/library/playlists/{$id}/tracks", ['track_id' => $own->id, 'source' => 'files'])
+            ->assertOk()->assertJsonPath('added', 0);
+
+        $this->assertSame([$own->id], Playlist::find($id)->tracks()->pluck('tracks.id')->all());
     }
 
     public function test_spotify_side_marks_tracks_the_library_holds_and_can_be_filled(): void

@@ -630,15 +630,20 @@ class LibraryController extends Controller
         return response()->json(['favorite' => $this->setFavorite($request, $track)]);
     }
 
-    /** Playlists made on this server (not smart, not synced from Spotify): the ones tracks can be added to. */
-    public function editablePlaylists(): JsonResponse
+    /**
+     * Playlists made on this server (not smart, not synced from Spotify): the ones tracks can be added to.
+     * `track_source` is the one library a playlist's tracks come from (`null` while it is empty): see `PlaylistEditor::sourceOf`.
+     */
+    public function editablePlaylists(PlaylistEditor $editor): JsonResponse
     {
-        $playlists = Playlist::query()->where('source', 'local')->orderBy('name')->withCount('tracks')->get();
+        $playlists = Playlist::query()->where('source', 'local')->orderBy('name')->withCount('tracks')
+            ->with(['tracks.metadata' => fn ($q) => $q->whereIn('key', ['dlna_url', 'external_id'])])->get();
 
         return response()->json(['data' => $playlists->map(fn (Playlist $p) => [
             'id' => $p->id,
             'name' => $p->name,
             'track_count' => $p->tracks_count,
+            'track_source' => $editor->commonSources($p->tracks)[0] ?? null,
         ])->values()]);
     }
 
@@ -666,15 +671,33 @@ class LibraryController extends Controller
             return response()->json(['error' => 'unsupported', 'message' => 'Tracks can only be added to playlists made here.'], 422);
         }
 
+        $with = ['metadata' => fn ($q) => $q->whereIn('key', ['dlna_url', 'external_id'])];
         if (!empty($data['track_id'])) {
-            $ids = [(int) $data['track_id']];
+            $tracks = Track::with($with)->whereKey((int) $data['track_id'])->get();
         } else {
             $tracks = LibraryPlayback::albumTracks(Album::findOrFail($data['album_id']), $this->hiddenSources($request));
-            if (!empty($data['source'])) {
-                $tracks = $tracks->filter(fn (Track $t) => in_array($data['source'], $t->sources(), true));
-            }
-            $ids = $tracks->pluck('id')->map(fn ($id) => (int) $id)->all();
         }
+        if (!empty($data['source'])) {
+            $before = $tracks->count();
+            $tracks = $tracks->filter(fn (Track $t) => in_array($data['source'], $t->sources(), true));
+            if (!empty($data['track_id']) && $before > 0 && $tracks->isEmpty()) {
+                return response()->json(['error' => 'source_mismatch', 'message' => "This track is not in the {$data['source']} library."], 422);
+            }
+        }
+
+        // A playlist holds one library: its tracks must share a source with each other and with what is in it.
+        if ($tracks->isNotEmpty()) {
+            $incoming = $editor->commonSources($tracks);
+            $current = $editor->sourceOf($playlist);
+            if ($incoming === []) {
+                return response()->json(['error' => 'source_mismatch', 'message' => 'These tracks come from different libraries. Add one library at a time.'], 422);
+            }
+            if ($current !== null && !in_array($current, $incoming, true)) {
+                return response()->json(['error' => 'source_mismatch', 'message' => "This playlist holds {$current} tracks; a playlist cannot mix libraries."], 422);
+            }
+        }
+
+        $ids = $tracks->pluck('id')->map(fn ($id) => (int) $id)->all();
 
         return response()->json(['added' => $editor->addTracks($playlist, $ids), 'track_count' => $playlist->tracks()->count()]);
     }

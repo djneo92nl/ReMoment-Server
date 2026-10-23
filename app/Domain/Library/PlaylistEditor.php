@@ -4,6 +4,7 @@ namespace App\Domain\Library;
 
 use App\Domain\Library\SmartPlaylist\SmartPlaylistBuilder;
 use App\Models\Media\Playlist;
+use App\Models\Media\Track;
 use Illuminate\Support\Facades\DB;
 
 /** Creating, renaming, deleting and editing the tracks of playlists made on this server; shared by the web UI and the MCP server. */
@@ -61,6 +62,34 @@ class PlaylistEditor
     public function addTrack(Playlist $playlist, int $trackId): void
     {
         $playlist->tracks()->syncWithoutDetaching([$trackId => ['position' => $this->nextPosition($playlist)]]);
+    }
+
+    /**
+     * The one library a playlist's tracks come from (`files`, `dlna` or `spotify`), null while it is empty or
+     * holds a mix from before playlists were limited to one source. A playlist never merges libraries: that would
+     * need the queue to play a mix, which only works through the Spotify-as-local-stream route.
+     */
+    public function sourceOf(Playlist $playlist): ?string
+    {
+        return $this->commonSources($playlist->tracks()->with(['metadata' => fn ($q) => $q->whereIn('key', ['dlna_url', 'external_id'])])->get())[0] ?? null;
+    }
+
+    /**
+     * The sources every one of the tracks is available from, in `files`, `dlna`, `spotify` order. Empty for no
+     * tracks, and for tracks that share no source.
+     *
+     * @param  iterable<Track>  $tracks
+     * @return list<string>
+     */
+    public function commonSources(iterable $tracks): array
+    {
+        $common = null;
+        foreach ($tracks as $track) {
+            $own = $track->sources();
+            $common = $common === null ? $own : array_values(array_intersect($common, $own));
+        }
+
+        return $common ?? [];
     }
 
     /**

@@ -232,12 +232,14 @@ Favorites are listed most recently favorited first; favoriting an item again kee
 ## Playlists made here
 
 ```
-GET  /api/library/editable-playlists          → { "data": [ { "id": 3, "name": "Rock", "track_count": 12 } ] }   by name; local playlists only (no smart, no Spotify)
+GET  /api/library/editable-playlists          → { "data": [ { "id": 3, "name": "Rock", "track_count": 12, "track_source": "files" } ] }   by name; local playlists only (no smart, no Spotify)
 POST /api/library/playlists                   body: { "name": "Rock" }            → 201 { "id", "name", "track_count": 0 }
 POST /api/library/playlists/{id}/tracks       body: { "track_id": 34 }  or  { "album_id": 12, "source": "dlna" }   → { "added": 3, "track_count": 15 }
 ```
 
-An album is added in album order, limited to `source` (`files`, `dlna`, `spotify`) when given; tracks already in the playlist are skipped (`added` counts the new ones). A smart or Spotify playlist answers `422 unsupported`. Same editor as the web UI and MCP `manage_playlist` (`App\Domain\Library\PlaylistEditor`).
+An album is added in album order, limited to `source` (`files`, `dlna`, `spotify`) when given; tracks already in the playlist are skipped (`added` counts the new ones). A smart or Spotify playlist answers `422 unsupported`.
+
+**A playlist holds one library.** Libraries are never merged in a playlist (the queue would have to play a mix, which only works through the Spotify-as-local-stream route). `track_source` is the library the playlist's tracks come from (`files`, `dlna` or `spotify`), `null` while it is empty (or holds a mix from before this rule): the first add decides it. An add whose tracks come from another library, or from several, is `422 source_mismatch`; clients send `source` with an album and only offer playlists that are empty or have the same `track_source`. Local in a client is `files`; DLNA is its own library. Same editor as the web UI and MCP `manage_playlist` (`App\Domain\Library\PlaylistEditor`).
 
 ## An album on Spotify
 
