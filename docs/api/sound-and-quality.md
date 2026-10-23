@@ -62,7 +62,7 @@ Smart playlists are edited on the web. Clients read `rules_summary` and `rules` 
 | Client | Uses |
 |--------|------|
 | Web app | everything above: *Sound* and *Signal* rows on the album page's track info, the Listening modes row on the Library page (Local scope), all new smart-playlist fields in the rule editor, and the Library Health page in Settings (counts and findings) |
-| iOS | `camelot` beside the key (album track info and the track row). Not yet: the quality fields, listening modes |
+| iOS | `camelot` beside the key (album track info and the track row), the Listening modes row on the Local library screen. Not yet: the quality fields |
 | ESP32 | nothing. The mode list and the play call are small enough for a touch remote |
 
 Update this table when a client adopts more.
