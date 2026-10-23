@@ -61,7 +61,7 @@
         const image = track && track.images && track.images[0];
         setArt(image);
         // The cover may still be processing when the track starts: ask the device for it a few times.
-        if (track && !image) fetchArt(track.id, 5);
+        if (track && !image && !track.live) fetchArt(track.id, 5);
         document.title = track ? track.name + ' · ReMoment Player' : 'ReMoment Player';
 
         if ('mediaSession' in navigator) {
@@ -106,7 +106,11 @@
                 show(current);
                 play();
                 break;
-            case 'resume': play(); break;
+            case 'resume':
+                // A paused live stream would play its stale buffer: reconnect to the live edge.
+                if (current && current.live) audio.src = current.url;
+                play();
+                break;
             case 'pause': audio.pause(); break;
             case 'stop':
                 audio.pause();
@@ -160,12 +164,13 @@
 
     function report(extra) {
         if (!token) return;
+        const live = current && current.live;
         const state = !current ? 'stopped' : (audio.paused || pendingPlay ? 'paused' : 'playing');
         const body = Object.assign({
             state,
-            track_id: current ? current.id : null,
-            position: Math.floor(audio.currentTime || 0),
-            duration: Number.isFinite(audio.duration) ? Math.floor(audio.duration) : null,
+            track_id: current && !live ? current.id : null,
+            position: live ? 0 : Math.floor(audio.currentTime || 0),
+            duration: !live && Number.isFinite(audio.duration) ? Math.floor(audio.duration) : null,
             volume: Math.round(audio.volume * 100),
             muted: audio.muted,
         }, extra);
@@ -183,7 +188,7 @@
         navigator.mediaSession.setActionHandler('pause', () => { audio.pause(); report(); });
         navigator.mediaSession.setActionHandler('nexttrack', act('next'));
         navigator.mediaSession.setActionHandler('previoustrack', act('previous'));
-        navigator.mediaSession.setActionHandler('seekto', e => { audio.currentTime = e.seekTime; report(); });
+        navigator.mediaSession.setActionHandler('seekto', e => { if (!(current && current.live)) { audio.currentTime = e.seekTime; report(); } });
     }
 
     function connectMqtt(info) {
@@ -249,6 +254,11 @@
             if (!current || Date.now() < ignoreEventsUntil || audio.src.startsWith('data:')) return;
             ended = true;
             report({ ended: true });
+        });
+        audio.addEventListener('error', () => {
+            if (!current || Date.now() < ignoreEventsUntil || audio.src.startsWith('data:')) return;
+            status('Could not play ' + current.name + (location.protocol === 'https:' && /^http:/.test(current.url) ? ' (an http stream is blocked on an https page)' : ''));
+            if (current.live) { ended = true; report({ ended: true }); }
         });
         audio.addEventListener('play', () => { if (Date.now() >= ignoreEventsUntil) report(); });
         audio.addEventListener('pause', () => { if (!ended && Date.now() >= ignoreEventsUntil) report(); });

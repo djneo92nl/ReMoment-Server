@@ -32,6 +32,8 @@ MQTT topic `remoment/playercmd/{device_id}` (QoS 1, not retained), or poll `GET 
 | `volume` | `volume` (0–100) |
 | `mute` | `muted` (bool) |
 
+A live stream (a radio station, or the Spotify/Icecast stream) arrives as a `play` too, with `track.live: true`, `id: null`, `url` the absolute stream URL, `duration: null`. The player plays it endlessly: no seek, no position, and it reports `track_id: null`; `resume` after a pause reconnects to the live edge. A stream that ends or errors is reported as `ended: true`; the server then stops (it never advances the queue). The capabilities `radio_control` and `stream_url` are optional like `seek`: a player lists them at registration to get `GET/POST /api/devices/{id}/radio…` and the Spotify stream. For a station the server publishes the now playing (station + ICY title, `StreamTitles`) when the player reports state; the Spotify stream reports its own. A browser blocks an `http://` stream on an `https://` page (mixed content), so serve the server over http or use https stream URLs.
+
 `next`, `previous`, queue jumps, shuffle and repeat are resolved by the server into `play`/`stop`.
 
 ## State (player → server)

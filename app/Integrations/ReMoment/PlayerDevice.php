@@ -13,7 +13,7 @@ class PlayerDevice
     public const KINDS = ['web', 'ios', 'esp32', 'retro'];
 
     /** Capabilities every kind of player has; the rest is reported by the player at registration. */
-    public const OPTIONAL = ['seek', 'queue', 'queue_jump', 'shuffle', 'repeat', 'volume_control'];
+    public const OPTIONAL = ['seek', 'queue', 'queue_jump', 'shuffle', 'repeat', 'volume_control', 'radio_control', 'stream_url'];
 
     /** Browser-decodable by default; a player reports its own list. */
     public const DEFAULT_FORMATS = ['audio/mpeg', 'audio/mp4', 'audio/aac', 'audio/flac', 'audio/ogg', 'audio/wav', 'audio/x-wav'];

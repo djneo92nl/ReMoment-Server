@@ -13,6 +13,7 @@ use App\Models\Media\Album;
 use App\Models\Media\Artist;
 use App\Models\Media\Metadata;
 use App\Models\Media\Track;
+use App\Models\RadioStation;
 use App\Services\MqttService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
@@ -112,6 +113,34 @@ class PlayerApiTest extends TestCase
         $this->assertTrue(DeviceCache::isListenerRunning($id));
         $this->assertSame(State::Playing, DeviceCache::getState($id));
         Event::assertDispatched(NowPlayingUpdated::class, fn ($e) => $e->deviceId === (string) $id);
+    }
+
+    public function test_a_player_plays_a_radio_station_as_a_live_stream(): void
+    {
+        $registered = $this->register();
+        $id = $registered['device_id'];
+        $station = RadioStation::create(['name' => 'Radio Test']);
+        $station->setMeta('url', 'http://stream.test/radio.mp3');
+        \Illuminate\Support\Facades\Queue::fake();
+        DeviceCache::updateState($id, State::Standby);
+
+        $this->assertContains('radio_control', $this->getJson("/api/devices/{$id}")->json('data.capabilities'));
+        $this->postJson("/api/devices/{$id}/radio/{$station->id}")->assertOk();
+
+        $command = json_decode(collect(app(MqttService::class)->published)->firstWhere('topic', "remoment/playercmd/{$id}")['message'], true);
+        $this->assertSame('play', $command['op']);
+        $this->assertTrue($command['track']['live']);
+        $this->assertSame('http://stream.test/radio.mp3', $command['track']['url']);
+
+        Event::fake([NowPlayingUpdated::class, \App\Events\Device\ProgressUpdated::class]);
+        $this->putJson("/api/players/{$registered['player_token']}/state", ['state' => 'playing', 'track_id' => null, 'position' => 0])->assertOk();
+        Event::assertDispatched(NowPlayingUpdated::class, fn ($e) => $e->nowPlaying->radio?->name === 'Radio Test');
+        Event::assertNotDispatched(\App\Events\Device\ProgressUpdated::class);
+
+        // A dropped stream stops instead of moving a queue on.
+        $this->putJson("/api/players/{$registered['player_token']}/state", ['state' => 'playing', 'ended' => true])->assertOk();
+        $this->assertNull(\App\Integrations\ReMoment\PlayerDriver::stream($id));
+        $this->assertSame(State::Standby, DeviceCache::getState($id));
     }
 
     public function test_unknown_token_is_404(): void

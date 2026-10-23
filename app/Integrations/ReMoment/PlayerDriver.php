@@ -6,6 +6,7 @@ use App\Domain\Artwork\LibraryItemArtwork;
 use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\QueueItem;
 use App\Domain\Device\RepeatMode;
+use App\Domain\Radio\StreamTitles;
 use App\Domain\Storage\Proxies;
 use App\Domain\Storage\StreamUrl;
 use App\Events\Device\PlaybackModesUpdated;
@@ -14,6 +15,7 @@ use App\Integrations\Common\EditsDeviceQueue;
 use App\Integrations\Contracts\LibraryPlaybackInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
+use App\Integrations\Contracts\PlayStreamUrlInterface;
 use App\Integrations\Contracts\QueueAddInterface;
 use App\Integrations\Contracts\QueueClearInterface;
 use App\Integrations\Contracts\QueueInterface;
@@ -21,6 +23,7 @@ use App\Integrations\Contracts\QueueJumpInterface;
 use App\Integrations\Contracts\QueueMoveInterface;
 use App\Integrations\Contracts\QueuePlayNextInterface;
 use App\Integrations\Contracts\QueueRemoveInterface;
+use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\RepeatInterface;
 use App\Integrations\Contracts\SeekInterface;
 use App\Integrations\Contracts\ShuffleInterface;
@@ -28,14 +31,16 @@ use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
 use App\Models\Media\Playlist;
 use App\Models\Media\Track;
+use App\Models\RadioStation;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
  * A ReMoment player (browser tab, app, ESP32) that plays the server's own files. The player does the
  * playing; this driver keeps the queue and turns every control into a command for it (PlayerCommands).
  */
-class PlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, MusicPlayerDriverInterface, QueueAddInterface, QueueClearInterface, QueueInterface, QueueJumpInterface, QueueMoveInterface, QueuePlayNextInterface, QueueRemoveInterface, RepeatInterface, SeekInterface, ShuffleInterface, VolumeControlInterface
+class PlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, MusicPlayerDriverInterface, PlayStreamUrlInterface, QueueAddInterface, QueueClearInterface, QueueInterface, QueueJumpInterface, QueueMoveInterface, QueuePlayNextInterface, QueueRemoveInterface, RadioControlInterface, RepeatInterface, SeekInterface, ShuffleInterface, VolumeControlInterface
 {
     use EditsDeviceQueue;
 
@@ -63,7 +68,68 @@ class PlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, 
 
     public function stop(): void
     {
+        self::forgetStream($this->device->id);
         $this->send('stop');
+    }
+
+    public function radioPlatform(): string
+    {
+        return 'url';
+    }
+
+    public function canPlayRadioStation(RadioStation $station): bool
+    {
+        return $station->streamUrl() !== null;
+    }
+
+    /** The browser plays the stream itself; the station and, from the ICY title, the song are the now playing (see PlayerController). */
+    public function playRadioStation(RadioStation $station): void
+    {
+        $url = $station->streamUrl() ?? throw new \App\Integrations\Common\UnsupportedOperationException('This station has no stream URL.');
+        $cover = LibraryItemArtwork::proxy($station->image_url, 320);
+
+        $this->startStream($url, $station->name, $cover, $station->id);
+        StreamTitles::touch($station);
+    }
+
+    public function playStreamUrl(string $url, string $title, ?string $art = null): void
+    {
+        $this->startStream($url, $title, $art, null);
+    }
+
+    /** @return array{url: string, name: string, station_id: int|null}|null what this player plays as a live stream, while it does */
+    public static function stream(int $deviceId): ?array
+    {
+        return Cache::get(self::streamKey($deviceId));
+    }
+
+    public static function forgetStream(int $deviceId): void
+    {
+        Cache::forget(self::streamKey($deviceId));
+    }
+
+    private static function streamKey(int $deviceId): string
+    {
+        return "player:{$deviceId}:stream";
+    }
+
+    private function startStream(string $url, string $name, ?string $art, ?int $stationId): void
+    {
+        Cache::put(self::streamKey($this->device->id), ['url' => $url, 'name' => $name, 'art' => $art, 'station_id' => $stationId], now()->addDay());
+
+        $this->send('play', ['track' => [
+            'id' => null,
+            'live' => true,
+            'url' => $url,
+            'profile' => null,
+            'mime' => 'audio/mpeg',
+            'name' => $name,
+            'artist' => null,
+            'album' => null,
+            'duration' => null,
+            'images' => $art ? [$art] : [],
+            'lite' => null,
+        ]]);
     }
 
     public function next(): void
@@ -264,6 +330,7 @@ class PlayerDriver implements LibraryPlaybackInterface, MediaControlsInterface, 
             return;
         }
 
+        self::forgetStream($this->device->id);
         $artwork = LibraryItemArtwork::forUrl(PlayerDevice::cover($track));
 
         $this->send('play', ['track' => [

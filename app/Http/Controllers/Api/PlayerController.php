@@ -8,7 +8,10 @@ use App\Domain\Device\State;
 use App\Domain\Media\AlbumData;
 use App\Domain\Media\ArtistData;
 use App\Domain\Media\NowPlaying;
+use App\Domain\Media\Radio;
 use App\Domain\Media\TrackData;
+use App\Domain\Radio\IcyReader;
+use App\Domain\Radio\StreamTitles;
 use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
 use App\Events\Device\ProgressUpdated;
@@ -19,6 +22,7 @@ use App\Integrations\ReMoment\PlayerDevice;
 use App\Integrations\ReMoment\PlayerDriver;
 use App\Models\Device;
 use App\Models\Media\Track;
+use App\Models\RadioStation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -96,6 +100,19 @@ class PlayerController extends Controller
             }
         }
 
+        $stream = PlayerDriver::stream($device->id);
+
+        // A live stream that "ends" has dropped: there is no next track, so the player just stops.
+        if ($stream && (($data['ended'] ?? false) || $data['state'] === 'stopped')) {
+            PlayerDriver::forgetStream($device->id);
+            DeviceCache::updateState($device->id, State::Standby);
+            if (DeviceCache::getNowPlaying($device->id)) {
+                event(new NowPlayingEnded($id));
+            }
+
+            return response()->json(['status' => 'ok']);
+        }
+
         if ($data['ended'] ?? false) {
             $device->driver->trackEnded();
 
@@ -112,6 +129,12 @@ class PlayerController extends Controller
         }
 
         DeviceCache::updateState($device->id, $data['state'] === 'playing' ? State::Playing : State::Paused);
+
+        if ($stream) {
+            $this->reportStation($id, $stream);
+
+            return response()->json(['status' => 'ok']);
+        }
 
         $track = isset($data['track_id']) ? Track::with(['artist', 'album'])->find($data['track_id']) : null;
 
@@ -165,5 +188,39 @@ class PlayerController extends Controller
             type: 'music',
             platform: 'media',
         );
+    }
+
+    /**
+     * A station's now playing: the station is the radio, the stream's ICY title the song (kept fresh by StreamTitles).
+     * Published when it changes. Other live streams (the Spotify stream) report their own now playing.
+     *
+     * @param  array{station_id: int|null}  $stream
+     */
+    private function reportStation(string $id, array $stream): void
+    {
+        $station = $stream['station_id'] ? RadioStation::with('meta')->find($stream['station_id']) : null;
+
+        if (!$station) {
+            return;
+        }
+
+        StreamTitles::touch($station);
+
+        $images = array_values(array_filter([$stream['art'] ?? $station->image_url]));
+        $title = StreamTitles::get($station->id);
+        [$artistName, $song] = $title !== null ? IcyReader::split($title) : [null, $station->name];
+
+        $cached = DeviceCache::getNowPlaying((int) $id);
+        if ($cached?->radio?->name === $station->name && $cached->track?->name === $song && $cached->track?->artist?->name === $artistName) {
+            return;
+        }
+
+        event(new NowPlayingUpdated(deviceId: $id, nowPlaying: new NowPlaying(
+            track: new TrackData(name: $song, artist: $artistName !== null ? new ArtistData(name: $artistName) : null, images: $images),
+            position: 0,
+            type: 'music',
+            platform: 'radio',
+            radio: new Radio(name: $station->name, genre: $station->genre, images: $images, id: $station->streamUrl()),
+        ), sourceType: 'radio'));
     }
 }
