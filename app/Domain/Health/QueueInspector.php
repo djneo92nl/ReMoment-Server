@@ -3,6 +3,7 @@
 namespace App\Domain\Health;
 
 use App\Domain\Library\Enrichment;
+use App\Jobs\RunStorageTask;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +20,7 @@ class QueueInspector
     public const SCAN_LIMIT = 5000;
 
     /** The queues the supervised workers listen on; others found in the driver are added. */
-    private const KNOWN_QUEUES = ['default', 'health'];
+    private const KNOWN_QUEUES = ['default', 'health', RunStorageTask::QUEUE];
 
     /**
      * Pending jobs grouped by class: waiting (ready), running (reserved by a worker) and delayed (a retry

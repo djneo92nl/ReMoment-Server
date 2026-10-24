@@ -8,12 +8,19 @@ use App\Models\Media\Track;
 use App\Services\MetadataHttp;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Queue\Middleware\RateLimited;
 
 class EnrichTrackLyrics implements ShouldBeUnique, ShouldQueue
 {
     use EnrichesFromSource;
 
     public function __construct(public readonly Track $track) {}
+
+    /** See the `lrclib` limiter. */
+    public function middleware(): array
+    {
+        return [new RateLimited('lrclib')];
+    }
 
     public function uniqueId(): string
     {

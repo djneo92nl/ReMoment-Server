@@ -20,9 +20,18 @@ trait EnrichesFromSource
     /** Releases by a rate limiter don't count as attempts; only thrown exceptions do. */
     public int $tries = 0;
 
-    public int $maxExceptions = 3;
+    public int $maxExceptions = 6;
 
-    public int $backoff = 60;
+    /**
+     * Growing waits: a short outage of the service (a 503 for a few minutes) must not use up every retry,
+     * the 12 hours of retryUntil() are there to ride it out.
+     *
+     * @return list<int>
+     */
+    public function backoff(): array
+    {
+        return [60, 300, 900, 1800, 3600];
+    }
 
     /** Seconds the uniqueness lock is held at most, should a job die without releasing it. */
     public int $uniqueFor = 86400;

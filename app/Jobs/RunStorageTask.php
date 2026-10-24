@@ -24,11 +24,19 @@ class RunStorageTask implements ShouldBeUnique, ShouldQueue
 
     public int $tries = 1;
 
+    /**
+     * Its own queue and worker: a scan or import takes minutes to hours, and on the default workers it kept
+     * both busy, so the health heartbeat went stale and QueueWatchdog killed them mid-task.
+     */
+    public const QUEUE = 'storage';
+
     public function __construct(
         public readonly string $task,
         public readonly ?int $locationId = null,
         public readonly bool $keepSource = false,
-    ) {}
+    ) {
+        $this->onQueue(self::QUEUE);
+    }
 
     public function uniqueId(): string
     {

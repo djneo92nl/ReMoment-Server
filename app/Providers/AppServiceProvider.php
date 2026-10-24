@@ -54,6 +54,8 @@ class AppServiceProvider extends ServiceProvider
         // TheAudioDB's free key allows about 30 requests a minute, Discogs 60 with a token.
         RateLimiter::for('audiodb', fn () => Limit::perMinute(25));
         RateLimiter::for('discogs', fn () => Limit::perMinute(50));
+        // LRCLIB has no published limit but answers 503 when hammered; one request a second, shared by every worker.
+        RateLimiter::for('lrclib', fn () => Limit::perSecond(1));
 
         Event::listen(NowPlayingUpdated::class, [UpdateDeviceCache::class, 'handle']);
         Event::listen(NowPlayingUpdated::class, [StorePlaybackHistory::class, 'handle']);
