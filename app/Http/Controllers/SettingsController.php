@@ -95,6 +95,7 @@ class SettingsController extends Controller
 
         Setting::set(LeadingSource::SETTING, $validated['leading_source']);
         Setting::set(LibrarySettings::ADD_PLAYED_TRACKS, $request->boolean('add_played_tracks') ? '1' : '0');
+        Setting::set(\App\Domain\Radio\RadioSettings::NTS_ENABLED, $request->boolean('nts_enabled') ? '1' : '0');
 
         return redirect()->route('settings.storage', ['tab' => 'library'])->with('success', 'Library settings saved.');
     }

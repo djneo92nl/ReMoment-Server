@@ -2,6 +2,7 @@
 
 namespace App\Integrations\Radio\Nts;
 
+use App\Domain\Radio\RadioSettings;
 use App\Services\MetadataHttp;
 use Illuminate\Support\Facades\Cache;
 
@@ -115,6 +116,10 @@ class NtsClient
 
     private function get(string $path, string $key, int $ttl): array
     {
+        if (!RadioSettings::ntsEnabled()) {
+            return [];
+        }
+
         return Cache::remember($key, $ttl, function () use ($path) {
             try {
                 $response = MetadataHttp::get(self::BASE.'/'.$path);

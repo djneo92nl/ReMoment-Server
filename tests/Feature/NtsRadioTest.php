@@ -3,10 +3,12 @@
 namespace Tests\Feature;
 
 use App\Domain\Radio\NowPlayingProviders;
+use App\Domain\Radio\RadioSettings;
 use App\Domain\Radio\StreamTitles;
 use App\Integrations\Radio\Nts\NtsClient;
 use App\Jobs\PollRadioTitle;
 use App\Models\RadioStation;
+use App\Models\Setting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -21,6 +23,7 @@ class NtsRadioTest extends TestCase
     private function fakeNts(): void
     {
         Cache::flush();
+        Setting::set(RadioSettings::NTS_ENABLED, '1');
         Http::fake([
             '*/api/v2/live' => Http::response(['results' => [
                 ['channel_name' => '1', 'now' => ['broadcast_title' => 'AURAL w/ ANGEL D&#039;LITE', 'start_timestamp' => '2026-10-24T19:00:00+01:00', 'end_timestamp' => '2026-10-24T20:00:00+01:00', 'embeds' => ['details' => ['genres' => [['id' => 'x', 'value' => 'Techno']], 'media' => ['picture_medium' => 'https://img.test/a.jpg']]]]],
@@ -82,5 +85,23 @@ class NtsRadioTest extends TestCase
         $this->assertSame("AURAL w/ ANGEL D'LITE", StreamTitles::get($live->id));
         $this->assertSame('nts', StreamTitles::source($live->id));
         $this->assertSame('nts', $live->fresh()->apiItem()['now']['source']);
+    }
+
+    public function test_nts_does_nothing_until_it_is_switched_on(): void
+    {
+        Cache::flush();
+        Http::fake();
+
+        $this->assertNull(app(NtsClient::class)->now('1'));
+        $this->assertSame([], app(NtsClient::class)->mixtapes());
+        $this->artisan('radio:import-nts')->assertFailed();
+        $this->post(route('radio.import-nts'))->assertNotFound();
+        $this->get(route('radio.nts'))->assertNotFound();
+        Http::assertNothingSent();
+        $this->assertSame(0, RadioStation::count());
+
+        $station = RadioStation::create(['name' => 'NTS 1']);
+        $station->setMeta('nts_channel', '1');
+        $this->assertFalse(app(\App\Integrations\Radio\Nts\NtsProvider::class)->supports($station->load('meta')));
     }
 }

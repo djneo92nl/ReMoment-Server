@@ -72,6 +72,7 @@ class RadioSuggestionsTest extends TestCase
     public function test_nts_episodes_and_tracklists_are_browsable(): void
     {
         Cache::flush();
+        \App\Models\Setting::set(\App\Domain\Radio\RadioSettings::NTS_ENABLED, '1');
         Http::fake([
             '*/api/v2/shows/100-elements/episodes/ep1/tracklist' => Http::response(['results' => [
                 ['artist' => 'Unknown Artist', 'title' => 'Dey Know', 'offset' => 8],

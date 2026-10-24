@@ -6,6 +6,8 @@
 `App\Domain\Radio\NowPlayingProviders` asks `NowPlayingProvider`s in order (`NtsProvider`, `IcyProvider`); the first that supports the station and has a title wins, a failing provider is skipped. Add a source by implementing the interface and listing it in `PROVIDERS`. `StationNowPlaying::for($station)` reads the cache only (API `now`, web card).
 
 ## NTS (`app/Integrations/Radio/Nts/`)
+**Opt-in, off by default** (setting `radio_nts_enabled`, `RadioSettings::ntsEnabled()`, checkbox with a disclaimer under Settings › Files & Import › Library). NTS has no public API and its terms (only a Supporter page) say nothing on third-party use, so we do not assume permission. Off: `NtsClient` returns no data and makes no request, `NtsProvider` is skipped, `radio:import-nts`, the import button and `/radio/nts` refuse (404), the health probe is gone, and NTS stations that were imported stay in the database but are hidden from `/radio`. Plain stream playback through the API is unchanged.
+
 - `NtsClient`: the unofficial `https://www.nts.live/api/v2/live` (cached 60 s) and `/mixtapes` (1 h). Titles carry HTML entities, decoded. Any failure is "no data".
 - Live channel streams are not in the API: `https://stream-relay-geo.ntslive.net/stream` (1) and `/stream2` (2), which redirect to the current CDN. Mixtape streams are `audio_stream_endpoint`.
 - `NtsImporter` (`php artisan radio:import-nts`, or the button on `/radio`): stations found by meta `nts_id` (`live-1`, `mixtape-poolside`), so re-running refreshes the stream URLs. Live channels also get `nts_channel`, which makes `NtsProvider` return the show on air (a show title, not a track). Mixtapes have no live title; ICY is tried.

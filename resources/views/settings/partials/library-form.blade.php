@@ -2,6 +2,7 @@
     $mode = \App\Domain\Library\LeadingSource::mode();
     $leading = \App\Domain\Library\LeadingSource::leading();
     $addPlayed = \App\Domain\Library\LibrarySettings::addPlayedTracks();
+    $ntsOn = \App\Domain\Radio\RadioSettings::ntsEnabled();
 @endphp
 <div class="space-y-6">
         @if(session('success'))
@@ -31,6 +32,15 @@
                 <span>
                     <span class="block text-sm font-medium text-gray-900 dark:text-gray-100">Add played tracks to the library</span>
                     <span class="block text-xs text-gray-500">Off (default): plays are still logged in the history, with their cover, but tracks that aren't in the library stay out of it.</span>
+                </span>
+            </label>
+
+            <label class="flex items-start gap-3 cursor-pointer pt-5 border-t border-gray-100 dark:border-stone-800">
+                <input type="checkbox" name="nts_enabled" value="1" @checked($ntsOn) class="mt-1 rounded text-gray-900 dark:text-stone-500 focus:ring-gray-400">
+                <span>
+                    <span class="block text-sm font-medium text-gray-900 dark:text-gray-100">NTS Radio</span>
+                    <span class="block text-xs text-gray-500">Adds NTS' two live channels and mixtapes to Radio, with the show on air, the show archive and tracklists.</span>
+                    <span class="mt-1 block text-xs text-gray-500">Disclaimer: this reads NTS' unofficial, undocumented website data and plays its public streams. ReMoment is not affiliated with NTS, and NTS has not published terms that allow this. It can change or stop working at any time, and you are responsible for using it in line with NTS' terms. Off by default.</span>
                 </span>
             </label>
 

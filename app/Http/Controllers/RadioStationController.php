@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Artwork\LibraryItemArtwork;
 use App\Domain\Radio\RadioPlayLog;
+use App\Domain\Radio\RadioSettings;
 use App\Domain\Radio\RadioSuggestions;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Radio\Nts\NtsImporter;
@@ -23,10 +24,16 @@ class RadioStationController extends Controller
             ->orderBy('name')
             ->get();
 
+        // NTS is opt-in: while it is off its imported stations stay out of the page (they are not deleted).
+        if (!RadioSettings::ntsEnabled()) {
+            $stations = $stations->reject(fn (RadioStation $s) => $s->getMeta('nts_id') !== null)->values();
+        }
+
         LibraryItemArtwork::preload($stations->pluck('image_url'));
         $art = $stations->mapWithKeys(fn (RadioStation $s) => [$s->id => LibraryItemArtwork::forUrl($s->image_url)]);
 
-        $isNts = fn (RadioStation $s) => $s->getMeta('nts_id') !== null;
+        $ntsOn = RadioSettings::ntsEnabled();
+        $isNts = fn (RadioStation $s) => $ntsOn && $s->getMeta('nts_id') !== null;
         $nts = $stations->filter($isNts)
             ->sortBy(fn (RadioStation $s) => [$s->getMeta('nts_channel') === null, $s->name])->values();
         $rest = $stations->reject($isNts);
@@ -38,12 +45,15 @@ class RadioStationController extends Controller
             'art' => $art,
             'heard' => app(RadioSuggestions::class)->yourArtistsOnTheRadio(6),
             'total' => $stations->count(),
+            'ntsOn' => $ntsOn,
         ]);
     }
 
     /** Add NTS' live channels and mixtapes (or refresh their streams). */
     public function importNts(NtsImporter $importer)
     {
+        abort_unless(RadioSettings::ntsEnabled(), 404);
+
         $result = $importer->import();
 
         return redirect()->route('radio.index')->with('success', "NTS: {$result['created']} added, {$result['updated']} refreshed.");

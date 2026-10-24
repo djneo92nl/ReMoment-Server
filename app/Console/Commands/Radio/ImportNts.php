@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands\Radio;
 
+use App\Domain\Radio\RadioSettings;
 use App\Integrations\Radio\Nts\NtsImporter;
 use Illuminate\Console\Command;
 
@@ -13,6 +14,12 @@ class ImportNts extends Command
 
     public function handle(NtsImporter $importer): int
     {
+        if (!RadioSettings::ntsEnabled()) {
+            $this->warn('NTS is off: enable it under Settings › Files & Import › Library (read the note there first).');
+
+            return self::FAILURE;
+        }
+
         $result = $importer->import();
         $this->info("NTS: {$result['created']} added, {$result['updated']} refreshed.");
 

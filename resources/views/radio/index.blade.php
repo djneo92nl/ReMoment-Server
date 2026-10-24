@@ -38,7 +38,7 @@
         {{-- NTS: its own block, live channels and the infinite mixtapes behind a switch --}}
         @if($nts->isNotEmpty())
             <x-nts-panel :live="$nts->filter(fn ($s) => $s->getMeta('nts_channel') !== null)->values()" :mixtapes="$nts->filter(fn ($s) => $s->getMeta('nts_channel') === null)->values()" :art="$art" />
-        @elseif($total > 0)
+        @elseif($ntsOn && $total > 0)
             <x-card compact class="flex flex-wrap items-center justify-between gap-3 p-4">
                 <p class="text-sm text-gray-500 dark:text-gray-400">NTS Radio: two live channels, 16 mixtapes and the show archive.</p>
                 <form method="POST" action="{{ route('radio.import-nts') }}">
