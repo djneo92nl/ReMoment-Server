@@ -10,6 +10,7 @@ use App\Domain\Library\AlbumKind;
 use App\Domain\Library\AlbumPage;
 use App\Domain\Library\GenreColors;
 use App\Domain\Library\LeadingSource;
+use App\Domain\Library\LibraryCache;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\LibrarySources;
 use App\Domain\Library\ListeningModes;
@@ -353,23 +354,36 @@ class LibraryController extends Controller
     public function genres(Request $request): JsonResponse
     {
         $hidden = $this->hiddenSources($request);
-        $genres = Genre::query()->withCount([
-            'artists' => fn ($q) => LibrarySources::artists($q, $hidden),
-            'albums' => fn ($q) => LibrarySources::albums($q, $hidden),
-        ])->get()
-            ->filter(fn (Genre $genre) => $genre->artists_count > 0 || $genre->albums_count > 0)
-            ->sortBy([['artists_count', 'desc'], ['albums_count', 'desc'], ['name', 'asc']])
-            ->values();
 
-        $colors = GenreColors::forGenres($genres->pluck('id')->all(), $hidden);
+        // The artist and album count of every genre is seconds of queries: kept until the library changes
+        // (LibraryCache). The colors have their own cache (GenreColors).
+        $genres = LibraryCache::remember('library:api-genres:'.md5(implode(',', $hidden)), function () use ($hidden) {
+            return Genre::query()->withCount([
+                'artists' => fn ($q) => LibrarySources::artists($q, $hidden),
+                'albums' => fn ($q) => LibrarySources::albums($q, $hidden),
+            ])->get()
+                ->filter(fn (Genre $genre) => $genre->artists_count > 0 || $genre->albums_count > 0)
+                ->sortBy([['artists_count', 'desc'], ['albums_count', 'desc'], ['name', 'asc']])
+                ->map(fn (Genre $genre) => [
+                    'id' => $genre->id,
+                    'slug' => $genre->slug,
+                    'name' => $genre->name,
+                    'artist_count' => $genre->artists_count,
+                    'album_count' => $genre->albums_count,
+                ])
+                ->values()
+                ->all();
+        });
 
-        return response()->json(['data' => $genres->map(fn (Genre $genre) => [
-            'slug' => $genre->slug,
-            'name' => $genre->name,
-            'artist_count' => $genre->artists_count,
-            'album_count' => $genre->albums_count,
-            'colors' => $colors[$genre->id] ?? [],
-        ])]);
+        $colors = GenreColors::forGenres(array_column($genres, 'id'), $hidden);
+
+        return response()->json(['data' => array_map(fn (array $genre) => [
+            'slug' => $genre['slug'],
+            'name' => $genre['name'],
+            'artist_count' => $genre['artist_count'],
+            'album_count' => $genre['album_count'],
+            'colors' => $colors[$genre['id']] ?? [],
+        ], $genres)]);
     }
 
     /** A genre's artists (alphabetical, "The " ignored) and albums (newest first), up to GENRE_ITEMS of each. */
@@ -410,6 +424,16 @@ class LibraryController extends Controller
         $localScope = in_array(LeadingSource::scope($request->query('scope')), ['local', PlaylistMode::LOCAL_LIBRARY], true);
         $clientHidden = $this->clientHidden($request);
 
+        // The recency ordering scans every play (about a second on a real library) and plays change all day, so a
+        // page is only kept for a minute, besides until the library changes; stale is served while it refreshes.
+        $payload = LibraryCache::remember('library:api-playlists:'.md5(json_encode([$hidden, $clientHidden, $localScope, $offset])), fn () => $this->playlistsPage($offset, $hidden, $clientHidden, $localScope), maxAge: 60);
+
+        return response()->json($payload);
+    }
+
+    /** @return array{data: mixed, next_cursor: ?string} */
+    private function playlistsPage(int $offset, array $hidden, array $clientHidden, bool $localScope): array
+    {
         $query = Playlist::query();
         if (!$localScope) {
             LibrarySources::playlists($query, $hidden);
@@ -439,10 +463,10 @@ class LibraryController extends Controller
         // Local copies of the whole page in one aggregate query.
         $coverage = PlaylistCoverage::counts($playlists->filter(fn (Playlist $p) => PlaylistCoverage::applies($p))->pluck('id'));
 
-        return response()->json([
-            'data' => $playlists->map(fn (Playlist $playlist) => $this->playlistListItem($playlist, $artwork, $coverage[$playlist->id] ?? null, $localScope))->values(),
+        return [
+            'data' => $playlists->map(fn (Playlist $playlist) => $this->playlistListItem($playlist, $artwork, $coverage[$playlist->id] ?? null, $localScope))->values()->all(),
             'next_cursor' => $hasMore ? $this->encodeCursor($offset + self::PLAYLISTS_PAGE_SIZE) : null,
-        ]);
+        ];
     }
 
     /**
@@ -568,28 +592,43 @@ class LibraryController extends Controller
             }
             $hidden = [...$clientHidden, ...LibrarySources::allBut($id)];
 
-            $albumCount = LibrarySources::albums(Album::query(), $hidden)->count();
-            $playlistCount = LibrarySources::playlists(Playlist::query()->whereHas('tracks'), $hidden)->count();
-            if ($albumCount === 0 && $playlistCount === 0) {
+            // The counts and the cover scan every album, play and playlist (seconds on a real library): kept until
+            // the library changes (LibraryCache), a stale copy is served while a refresh runs after the response.
+            $stats = LibraryCache::remember('library:api-stats:'.$id.':'.md5(implode(',', $hidden)), function () use ($hidden) {
+                $albumCount = LibrarySources::albums(Album::query(), $hidden)->count();
+                $playlistCount = LibrarySources::playlists(Playlist::query()->whereHas('tracks'), $hidden)->count();
+                if ($albumCount === 0 && $playlistCount === 0) {
+                    return ['empty' => true];
+                }
+
+                $cover = LibrarySources::albums(Album::query()->whereNotNull('albums.images'), $hidden)
+                    ->leftJoinSub(LibraryArtwork::lastPlayedPerAlbum(), 'recent', 'recent.album_id', '=', 'albums.id')
+                    ->select('albums.*')
+                    ->orderByRaw('CASE WHEN recent.last_played_at IS NULL THEN 1 ELSE 0 END')
+                    ->orderByDesc('recent.last_played_at')
+                    ->orderByDesc('albums.id')
+                    ->first();
+
+                return [
+                    'albums' => $albumCount,
+                    'artists' => LibrarySources::artists(Artist::query()->whereHas('albums'), $hidden)->count(),
+                    'playlists' => $playlistCount,
+                    'images' => $cover?->images,
+                ];
+            });
+
+            if ($stats['empty'] ?? false) {
                 continue;
             }
 
-            $cover = LibrarySources::albums(Album::query()->whereNotNull('albums.images'), $hidden)
-                ->leftJoinSub(LibraryArtwork::lastPlayedPerAlbum(), 'recent', 'recent.album_id', '=', 'albums.id')
-                ->select('albums.*')
-                ->orderByRaw('CASE WHEN recent.last_played_at IS NULL THEN 1 ELSE 0 END')
-                ->orderByDesc('recent.last_played_at')
-                ->orderByDesc('albums.id')
-                ->first();
-
-            $covers[$id] = $cover;
+            $covers[$id] = (new Album)->forceFill(['images' => $stats['images']]);
             $data[] = [
                 'id' => $id,
                 'name' => $library['name'],
                 'kind' => $library['kind'],
-                'album_count' => $albumCount,
-                'artist_count' => LibrarySources::artists(Artist::query()->whereHas('albums'), $hidden)->count(),
-                'playlist_count' => $playlistCount,
+                'album_count' => $stats['albums'],
+                'artist_count' => $stats['artists'],
+                'playlist_count' => $stats['playlists'],
                 'artwork' => null,
                 ...($device ? ['playable' => LibrarySources::playableOn($id, $device)] : []),
             ];

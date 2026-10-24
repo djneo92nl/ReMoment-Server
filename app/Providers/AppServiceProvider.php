@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Domain\Library\LibraryCache;
 use App\Events\Device\BatteryUpdated;
 use App\Events\Device\DeviceStateChanged;
 use App\Events\Device\MultiRoomUpdated;
@@ -28,6 +29,7 @@ use App\Listeners\Device\SyncNowPlayingDataWithState;
 use App\Listeners\Device\UpdateDeviceCache;
 use App\Services\MqttService;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -56,6 +58,9 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('discogs', fn () => Limit::perMinute(50));
         // LRCLIB has no published limit but answers 503 when hammered; one request a second, shared by every worker.
         RateLimiter::for('lrclib', fn () => Limit::perSecond(1));
+
+        // Writes to the library tables mark the cached library overviews stale (LibraryCache).
+        Event::listen(QueryExecuted::class, fn (QueryExecuted $query) => LibraryCache::observe($query->sql));
 
         Event::listen(NowPlayingUpdated::class, [UpdateDeviceCache::class, 'handle']);
         Event::listen(NowPlayingUpdated::class, [StorePlaybackHistory::class, 'handle']);

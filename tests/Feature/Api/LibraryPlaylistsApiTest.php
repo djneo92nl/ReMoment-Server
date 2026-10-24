@@ -5,6 +5,7 @@ namespace Tests\Feature\Api;
 use App\Domain\Artwork\PlaylistArtwork;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
+use App\Domain\Library\LibraryCache;
 use App\Integrations\Spotify\MusicPlayerDriver as SpotifyDriver;
 use App\Jobs\ProcessArtwork;
 use App\Models\Device;
@@ -14,6 +15,7 @@ use App\Models\Media\Metadata;
 use App\Models\Media\Playlist;
 use App\Models\Media\Track;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Mockery;
@@ -122,6 +124,8 @@ class LibraryPlaylistsApiTest extends TestCase
         Queue::assertPushed(ProcessArtwork::class, fn (ProcessArtwork $job) => $job->originalUrl === $composite && $job->sources === $covers);
 
         $this->processed($composite);
+        // A processed cover is no library change: the page shows it once its minute of cache is over.
+        Cache::forget('library:api-playlists:'.md5(json_encode([[], [], false, 0])));
         $this->getJson('/api/library/playlists')
             ->assertJsonPath('data.0.artwork', ['hash' => md5($composite), 'proxy_120' => '/storage/a/120.jpg', 'proxy_320' => '/storage/a/320.jpg', 'colors' => ['#111111'], 'safe_colors' => ['#999999']]);
     }

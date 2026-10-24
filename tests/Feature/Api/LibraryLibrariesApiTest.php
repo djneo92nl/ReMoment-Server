@@ -16,6 +16,7 @@ use App\Models\Play;
 use App\Models\RadioStation;
 use App\Models\Setting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Tests\Support\CachesArtwork;
 use Tests\Support\FakeBareDriver;
 use Tests\Support\FakeLibraryPlaybackDriver;
@@ -67,6 +68,8 @@ class LibraryLibrariesApiTest extends TestCase
     {
         $this->getJson('/api/library/libraries')->assertOk()->assertExactJson(['data' => []]);
 
+        // The counts are cached for a few minutes, so a change shows up after the cache has expired.
+        Cache::flush();
         $this->release('Dlna Band', 'dlna');
         $this->getJson('/api/library/libraries')
             ->assertJsonCount(1, 'data')
@@ -76,6 +79,7 @@ class LibraryLibrariesApiTest extends TestCase
         $playlist = Playlist::create(['name' => 'Mix', 'source' => 'spotify']);
         $playlist->tracks()->sync([$spot->id => ['position' => 0]]);
 
+        Cache::flush();
         $this->getJson('/api/library/libraries')
             ->assertJsonCount(2, 'data')
             ->assertJsonPath('data.1.id', 'spotify')
