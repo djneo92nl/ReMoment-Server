@@ -20,7 +20,10 @@ use Illuminate\Support\Facades\DB;
  */
 final class LibraryOverview
 {
+    /** Seconds a cached block is fresh, and how long after that it is still served while a refresh runs after the response. */
     private const TTL = 600;
+
+    private const STALE = 86400;
 
     /** Tempo buckets (BPM, lower bound inclusive, upper exclusive) for browsing by tempo. */
     public const TEMPOS = ['slow' => [0, 90], 'steady' => [90, 125], 'fast' => [125, 1000]];
@@ -38,7 +41,7 @@ final class LibraryOverview
      */
     public static function topGenres(array $hidden, int $limit = 14): Collection
     {
-        return Cache::remember('library:genres:'.self::key($hidden).":{$limit}", self::TTL, function () use ($hidden, $limit) {
+        return Cache::flexible('library:genres:'.self::key($hidden).":{$limit}", [self::TTL, self::STALE], function () use ($hidden, $limit) {
             $artistIds = LibrarySources::artists(Artist::query(), $hidden)->select('artists.id');
 
             $genres = Genre::query()
@@ -66,7 +69,7 @@ final class LibraryOverview
      */
     public static function genreAlbumCounts(array $hidden, Collection $genres): array
     {
-        return Cache::remember('library:genre-albums:'.self::key($hidden).':'.md5($genres->pluck('id')->join(',')), self::TTL, function () use ($hidden, $genres) {
+        return Cache::flexible('library:genre-albums:'.self::key($hidden).':'.md5($genres->pluck('id')->join(',')), [self::TTL, self::STALE], function () use ($hidden, $genres) {
             return $genres->mapWithKeys(fn ($genre) => [
                 $genre->id => self::whereGenre(self::albums($hidden), $genre->slug)->count(),
             ])->all();
@@ -80,7 +83,7 @@ final class LibraryOverview
      */
     public static function glance(array $hidden): array
     {
-        return Cache::remember('library:glance:'.self::key($hidden), self::TTL, function () use ($hidden) {
+        return Cache::flexible('library:glance:'.self::key($hidden), [self::TTL, self::STALE], function () use ($hidden) {
             $albums = self::albums($hidden);
             $tracks = LibrarySources::tracks(Track::query(), $hidden);
             $artists = LibrarySources::artists(Artist::query(), $hidden);
@@ -147,7 +150,7 @@ final class LibraryOverview
      */
     public static function soundBuckets(array $hidden): array
     {
-        return Cache::remember('library:sound:'.self::key($hidden), self::TTL, function () use ($hidden) {
+        return Cache::flexible('library:sound:'.self::key($hidden), [self::TTL, self::STALE], function () use ($hidden) {
             $rows = LibrarySources::tracks(Track::query(), $hidden)
                 ->join('track_files', fn ($join) => $join->on('track_files.track_id', '=', 'tracks.id')->where('track_files.is_primary', true))
                 ->join('file_analyses', 'file_analyses.file_id', '=', 'track_files.file_id')
