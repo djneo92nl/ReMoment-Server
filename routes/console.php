@@ -23,6 +23,9 @@ Schedule::command('artwork:backfill')->daily();
 Schedule::command('artwork:prerender')->daily();
 Schedule::command('library:enrich')->daily();
 Schedule::command('playlists:refresh-smart')->daily();
+Schedule::command('radio:refresh')->weekly();
+Schedule::command('radio:fix-artwork')->weekly();
+Schedule::call(fn () => \App\Domain\Radio\RadioPlayLog::prune())->daily()->name('radio-plays-prune');
 
 // Audio analysis (loudness, fingerprints, BPM/key/mood) of the own files; a bounded batch on its own queue, off by default (ANALYSIS_ENABLED).
 Schedule::command('library:analyze')->dailyAt('02:00');

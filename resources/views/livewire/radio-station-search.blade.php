@@ -10,9 +10,27 @@
         </x-secondary-button>
     </form>
 
-    @if($searched !== null)
+    <div class="space-y-2">
+        <div class="flex flex-wrap items-center gap-2">
+            <span class="text-xs text-gray-400 dark:text-gray-600">Discover</span>
+            <x-secondary-button type="button" wire:click="suggest" title="Like your favourite stations"><i class="fa-solid fa-wand-magic-sparkles"></i> For you</x-secondary-button>
+            @foreach(['trending' => 'Trending', 'votes' => 'Most voted', 'popular' => 'Most played'] as $key => $label)
+                <x-secondary-button type="button" wire:click="discover('{{ $key }}', @js($tag))" :class="$discovered && $mode === $key ? 'ring-1 ring-gray-400' : ''">{{ $label }}</x-secondary-button>
+            @endforeach
+        </div>
+        @if($tags)
+            <div class="flex flex-wrap gap-2">
+                @foreach($tags as $t)
+                    <button type="button" wire:click="discover('{{ $mode }}', @js($t))" wire:key="tag-{{ $t }}"
+                            class="px-2.5 py-1 rounded-full text-xs {{ $discovered && $tag === $t ? 'bg-gray-800 text-white dark:bg-gray-200 dark:text-stone-900' : 'bg-gray-100 dark:bg-stone-800 text-gray-600 dark:text-gray-400' }}">{{ $t }}</button>
+                @endforeach
+            </div>
+        @endif
+    </div>
+
+    @if($searched !== null || $discovered)
         @if(empty($results))
-            <p class="text-sm text-gray-400 dark:text-gray-600">No playable stations found for “{{ $searched }}”.</p>
+            <p class="text-sm text-gray-400 dark:text-gray-600">No playable stations found{{ $searched ? ' for “'.$searched.'”' : '' }}.</p>
         @else
             <ul class="divide-y divide-gray-100 dark:divide-stone-800 rounded-xl border border-gray-100 dark:border-stone-800">
                 @foreach($results as $i => $result)

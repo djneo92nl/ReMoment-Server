@@ -198,7 +198,7 @@ class ProcessArtwork implements ShouldQueue
 
         return $logo !== null
             ? LogoRenderer::render($logo)
-            : Http::timeout(30)->get($this->originalUrl)->throw()->body();
+            : Http::timeout(30)->withUserAgent(config('metadata.user_agent'))->get($this->originalUrl)->throw()->body();
     }
 
     private function encodeJpeg(ImageInterface $image, int $quality = self::JPEG_QUALITY): string

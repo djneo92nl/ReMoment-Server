@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Artwork\LibraryItemArtwork;
-use App\Domain\Artwork\RadioStationArtwork;
+use App\Domain\Radio\RadioPlayLog;
+use App\Domain\Radio\RadioSuggestions;
 use App\Integrations\Contracts\RadioControlInterface;
+use App\Integrations\Radio\Nts\NtsImporter;
 use App\Models\Device;
+use App\Models\RadioPlay;
 use App\Models\RadioStation;
 use Illuminate\Http\Request;
 
@@ -15,19 +18,45 @@ class RadioStationController extends Controller
     {
         $stations = RadioStation::query()
             ->with('meta')
-            ->withCount('plays')
             ->orderByRaw('favorited_at IS NULL')
             ->orderByDesc('favorited_at')
             ->orderBy('name')
             ->get();
 
-        $artwork = $stations->mapWithKeys(fn (RadioStation $station) => [
-            $station->id => LibraryItemArtwork::webUrl(RadioStationArtwork::resolve($station)['proxy_120'] ?? null),
+        LibraryItemArtwork::preload($stations->pluck('image_url'));
+        $art = $stations->mapWithKeys(fn (RadioStation $s) => [$s->id => LibraryItemArtwork::forUrl($s->image_url)]);
+
+        $isNts = fn (RadioStation $s) => $s->getMeta('nts_id') !== null;
+        $nts = $stations->filter($isNts)
+            ->sortBy(fn (RadioStation $s) => [$s->getMeta('nts_channel') === null, $s->name])->values();
+        $rest = $stations->reject($isNts);
+
+        return view('radio.index', [
+            'favourites' => $rest->filter(fn (RadioStation $s) => $s->favorited_at !== null)->values(),
+            'others' => $rest->filter(fn (RadioStation $s) => $s->favorited_at === null)->values(),
+            'nts' => $nts,
+            'art' => $art,
+            'heard' => app(RadioSuggestions::class)->yourArtistsOnTheRadio(6),
+            'total' => $stations->count(),
         ]);
+    }
 
-        $devices = $this->radioCapableDevices();
+    /** Add NTS' live channels and mixtapes (or refresh their streams). */
+    public function importNts(NtsImporter $importer)
+    {
+        $result = $importer->import();
 
-        return view('radio.index', compact('stations', 'devices', 'artwork'));
+        return redirect()->route('radio.index')->with('success', "NTS: {$result['created']} added, {$result['updated']} refreshed.");
+    }
+
+    /** A station: what it plays now and the songs it played recently, each linked to the library when it has the track. */
+    public function show(RadioStation $radio)
+    {
+        $radio->load('meta');
+        $plays = $radio->radioPlays()->latest('started_at')->latest('id')->limit(50)->get();
+        $tracks = $plays->mapWithKeys(fn (RadioPlay $play) => [$play->id => RadioPlayLog::libraryTrack($play)]);
+
+        return view('radio.show', ['station' => $radio, 'plays' => $plays, 'tracks' => $tracks]);
     }
 
     public function create()

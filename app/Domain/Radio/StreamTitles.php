@@ -20,9 +20,23 @@ final class StreamTitles
         return Cache::get("radio:title:{$stationId}");
     }
 
-    public static function put(int $stationId, ?string $title): void
+    /** Which provider (`icy`, `nts`, …) the cached title came from. */
+    public static function source(int $stationId): ?string
     {
-        $title === null ? Cache::forget("radio:title:{$stationId}") : Cache::put("radio:title:{$stationId}", $title, now()->addMinutes(10));
+        return Cache::get("radio:source:{$stationId}");
+    }
+
+    public static function put(int $stationId, ?string $title, string $source = 'icy'): void
+    {
+        if ($title === null) {
+            Cache::forget("radio:title:{$stationId}");
+            Cache::forget("radio:source:{$stationId}");
+
+            return;
+        }
+
+        Cache::put("radio:title:{$stationId}", $title, now()->addMinutes(10));
+        Cache::put("radio:source:{$stationId}", $source, now()->addMinutes(10));
     }
 
     /** A device plays the station: keep its title fresh, starting the poll chain when none runs. */
@@ -43,7 +57,7 @@ final class StreamTitles
     public static function chainEnded(int $stationId): void
     {
         Cache::forget("radio:polling:{$stationId}");
-        Cache::forget("radio:title:{$stationId}");
+        self::put($stationId, null);
     }
 
     /** The chain is alive: its lock must outlive the delay to the next poll. */

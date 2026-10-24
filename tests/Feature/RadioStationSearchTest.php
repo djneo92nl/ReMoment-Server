@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Domain\Radio\IcyReader;
+use App\Domain\Radio\NowPlayingProviders;
 use App\Domain\Radio\RadioBrowser;
 use App\Domain\Radio\StreamTitles;
 use App\Jobs\PollRadioTitle;
@@ -71,12 +72,12 @@ class RadioStationSearchTest extends TestCase
         StreamTitles::touch($station); // a second listener of the same station does not start a second chain
         Queue::assertPushed(PollRadioTitle::class, 1);
 
-        (new PollRadioTitle($station->id))->handle(app(IcyReader::class));
+        (new PollRadioTitle($station->id))->handle(app(NowPlayingProviders::class));
         $this->assertSame('Artist - Song', StreamTitles::get($station->id));
         Queue::assertPushed(PollRadioTitle::class, 2);
 
         Cache::forget("radio:active:{$station->id}");
-        (new PollRadioTitle($station->id))->handle(app(IcyReader::class));
+        (new PollRadioTitle($station->id))->handle(app(NowPlayingProviders::class));
         $this->assertNull(StreamTitles::get($station->id));
         Queue::assertPushed(PollRadioTitle::class, 2);
     }
@@ -92,7 +93,7 @@ class RadioStationSearchTest extends TestCase
         $results = app(RadioBrowser::class)->search('fip');
 
         $this->assertCount(1, $results);
-        $this->assertSame(['name' => 'Radio Fip', 'url' => 'https://stream.test/fip.mp3', 'image_url' => 'https://img.test/fip.png', 'genre' => 'Eclectic', 'codec' => 'MP3', 'bitrate' => 128, 'country' => 'FR'], $results[0]);
+        $this->assertSame(['name' => 'Radio Fip', 'url' => 'https://stream.test/fip.mp3', 'image_url' => 'https://img.test/fip.png', 'genre' => 'Eclectic', 'codec' => 'MP3', 'bitrate' => 128, 'country' => 'FR', 'uuid' => null, 'homepage' => null], $results[0]);
         $this->assertSame([], app(RadioBrowser::class)->search('f'));
     }
 
@@ -169,5 +170,46 @@ class RadioStationSearchTest extends TestCase
             ->call('pick', 0)
             ->assertDispatched('radio-url-picked', url: 'https://stream.test/energy.mp3', image_url: 'https://img.test/e.png', genre: 'Dance')
             ->assertSee('Filled in');
+    }
+
+    public function test_the_now_endpoint_touches_the_station_and_reports_the_cached_title(): void
+    {
+        Queue::fake();
+        $station = RadioStation::create(['name' => 'Fip']);
+        $station->setMeta('url', 'https://stream.test/fip.mp3');
+
+        $this->getJson("/api/radio/{$station->id}/now")->assertOk()->assertJson(['now' => null]);
+        Queue::assertPushed(PollRadioTitle::class, 1);
+
+        StreamTitles::put($station->id, 'Artist - Song');
+        $this->getJson("/api/radio/{$station->id}/now")->assertJson(['now' => ['artist' => 'Artist', 'title' => 'Song', 'source' => 'icy']]);
+        $this->assertSame('Artist', $station->fresh()->apiItem()['now']['artist']);
+    }
+
+    public function test_discovery_browses_by_mode_and_genre_and_keeps_the_directory_uuid_for_clicks(): void
+    {
+        Queue::fake();
+        Http::fake([
+            '*/json/tags*' => Http::response([['name' => 'jazz'], ['name' => 'x'], ['name' => 'electronic']]),
+            '*/json/stations/search*' => Http::response([['stationuuid' => 'uuid-1', 'name' => 'Jazz FM', 'url' => 'https://s.test/jazz', 'tags' => 'jazz', 'hls' => 0]]),
+            '*/json/url/*' => Http::response(['ok' => true]),
+        ]);
+
+        $component = Livewire::test(RadioStationSearch::class)
+            ->assertSet('tags', ['jazz', 'electronic'])
+            ->call('discover', 'votes', 'jazz')
+            ->assertSet('discovered', true)
+            ->call('add', 0);
+
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'order=votes') && str_contains($r->url(), 'tag=jazz'));
+
+        $station = RadioStation::with('meta')->first();
+        $this->assertSame('uuid-1', $station->getMeta('radio_browser_uuid'));
+
+        $station->markPlayed();
+        Queue::assertPushed(\App\Jobs\ReportRadioClick::class, fn ($job) => $job->stationUuid === 'uuid-1');
+
+        (new \App\Jobs\ReportRadioClick('uuid-1'))->handle(app(RadioBrowser::class));
+        Http::assertSent(fn ($r) => str_contains($r->url(), '/json/url/uuid-1'));
     }
 }

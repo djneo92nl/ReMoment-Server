@@ -6,6 +6,7 @@
     'size' => 'w-12 h-12',
     'rounded' => 'rounded-xl',
     'proxy' => 320,
+    'label' => null,
 ])
 
 @php
@@ -26,7 +27,11 @@
         <img src="{{ $src }}" alt="" loading="lazy" decoding="async" class="w-full h-full object-cover">
     @else
         <div class="w-full h-full flex items-center justify-center">
-            <i class="{{ $icon }} text-white/60"></i>
+            @if($label)
+                <span class="font-semibold tracking-tight text-white/80 {{ $attributes->get('data-label-class', 'text-2xl') }}">{{ $label }}</span>
+            @else
+                <i class="{{ $icon }} text-white/60"></i>
+            @endif
         </div>
     @endif
 </div>

@@ -79,6 +79,7 @@ Route::post('/devices/{device}/spotify-stream', [SpotifyStreamController::class,
 Route::post('/librespot/event', [SpotifyStreamController::class, 'event']);
 
 Route::get('/devices/{device}/radio', [DeviceController::class, 'radioStations']);
+Route::get('/radio/{station}/now', [DeviceController::class, 'radioNow']);
 Route::put('/radio/{station}/favorite', [DeviceController::class, 'favoriteRadio']);
 Route::post('/devices/{device}/radio/{station}', [DeviceController::class, 'playRadio']);
 

@@ -77,6 +77,8 @@ class ExternalServices
             'discogs' => ['Discogs', 'Metadata', fn () => $this->discogs()],
             'wikipedia' => ['Wikipedia', 'Metadata', fn () => $this->reachable('https://en.wikipedia.org/api/rest_v1/page/summary/Radiohead')],
             'coverart' => ['Cover Art Archive', 'Metadata', fn () => $this->reachable('https://coverartarchive.org/release-group/'.self::PROBE_MBID)],
+            'radiobrowser' => ['radio-browser.info', 'Metadata', fn () => $this->reachable('https://de1.api.radio-browser.info/json/stats')],
+            'nts' => ['NTS Radio', 'Metadata', fn () => $this->reachable('https://www.nts.live/api/v2/live')],
             'lrclib' => ['LRCLIB (lyrics)', 'Metadata', fn () => $this->reachable('https://lrclib.net/api/get', ['artist_name' => 'Radiohead', 'track_name' => 'Creep'])],
         ];
 

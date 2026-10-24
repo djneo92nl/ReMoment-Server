@@ -42,6 +42,7 @@ docs/
     metadata-enrichment.md  Per-source enrichment jobs (MusicBrainz track/artist/album, Wikipedia, Cover Art Archive, lyrics, Spotify, Last.fm, TheAudioDB, Discogs), DLNA tags, canonical genres: markers, retries, rate limits, library:enrich
     artist-settings.md      Admin page per artist: photo/backdrop choice, MusicBrainz/Spotify/Last.fm mappings, details overrides, files, default source; the `manual` metadata source
     file-storage.md          Own music files: storage locations (local/S3), files + track_files tables, indexer, organizer, management, /stream, admin API
+    radio.md                Radio: station-level now playing (providers: ICY, NTS), poll chain lifecycle, NTS import
     lastfm.md                Scrobbling, now-playing, auth flow, artist enrichment, backfill
     library-identity.md      One record per artist/album/track across sources: name keys, find-or-create, library:merge-duplicates
     live-updates.md          MQTT-over-WebSocket push to Livewire + /receiver, topics, fallback polling

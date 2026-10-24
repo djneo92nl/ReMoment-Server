@@ -2080,6 +2080,14 @@ components:
         artwork:
           allOf: [{ $ref: "#/components/schemas/Artwork" }]
           nullable: true
+        now:
+          type: object
+          nullable: true
+          description: Cached title of the station's stream; null while unknown. Read from cache only; GET /radio/{id}/now keeps it fresh.
+          properties:
+            artist: { type: string, nullable: true }
+            title: { type: string }
+            source: { type: string, description: "icy | nts" }
     MultiroomPeer:
       type: object
       properties:

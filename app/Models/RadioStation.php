@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Domain\Artwork\RadioStationArtwork;
+use App\Domain\Radio\StationNowPlaying;
+use App\Jobs\ReportRadioClick;
 use App\Models\Concerns\Favoritable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -28,6 +30,10 @@ class RadioStation extends Model
     public function markPlayed(): void
     {
         $this->forceFill(['last_played_at' => now()])->save();
+
+        if ($uuid = $this->getMeta('radio_browser_uuid')) {
+            ReportRadioClick::dispatch($uuid);
+        }
     }
 
     /** The RadioStation shape of the API (docs/api/radio.md). */
@@ -39,12 +45,27 @@ class RadioStation extends Model
             'genre' => $this->genre,
             'favorite' => $this->favorited_at !== null,
             'artwork' => RadioStationArtwork::resolve($this),
+            'now' => StationNowPlaying::for($this)?->toArray(),
         ];
+    }
+
+    /** Up to two capital letters for the tile of a station without a logo ("NPO Radio 2" → "NR"; the "NTS" prefix is dropped). */
+    public function initials(): string
+    {
+        $words = collect(preg_split('/\s+/u', trim(preg_replace('/^NTS\s+/i', '', $this->name))))
+            ->filter(fn ($w) => preg_match('/[\p{L}\d]/u', $w))->take(2);
+
+        return mb_strtoupper($words->map(fn ($w) => mb_substr(preg_replace('/[^\p{L}\d]/u', '', $w), 0, 1))->implode(''));
     }
 
     public function plays(): HasMany
     {
         return $this->hasMany(Play::class);
+    }
+
+    public function radioPlays(): HasMany
+    {
+        return $this->hasMany(RadioPlay::class);
     }
 
     public function meta(): HasMany

@@ -18,6 +18,8 @@ use App\Domain\Library\PlaybackFailedException;
 use App\Domain\Library\PlaybackResult;
 use App\Domain\Library\PlaylistMode;
 use App\Domain\Library\SpotifyUri;
+use App\Domain\Radio\StationNowPlaying;
+use App\Domain\Radio\StreamTitles;
 use App\Events\Device\PlaybackModesUpdated;
 use App\Http\Controllers\Api\Concerns\GuardsDeviceAccess;
 use App\Http\Controllers\Controller;
@@ -188,6 +190,14 @@ class DeviceController extends Controller
         $request->validate(['favorite' => ['required', 'boolean']]);
 
         return response()->json(['favorite' => $station->setFavorite($request->boolean('favorite'))]);
+    }
+
+    /** What the station plays now, with or without a device on it. Asking keeps the title fresh for a minute and a half. */
+    public function radioNow(RadioStation $station): JsonResponse
+    {
+        StreamTitles::touch($station->loadMissing('meta'));
+
+        return response()->json(['now' => StationNowPlaying::for($station)?->toArray()]);
     }
 
     /** The stations playRadio() accepts for this device, in /radio's order (by name). */

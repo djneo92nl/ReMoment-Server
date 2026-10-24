@@ -54,6 +54,8 @@ Route::get('/multiroom', fn () => view('multiroom.index'))->name('multiroom.inde
 Route::get('/receiver', fn () => view('receiver'))->name('receiver');
 Route::get('/player', fn () => view('player'))->name('player');
 Route::get('/artists', [ArtistController::class, 'index'])->name('artists.index');
+Route::get('/radio/nts', fn () => view('radio.nts'))->name('radio.nts');
+Route::post('/radio/import-nts', [RadioStationController::class, 'importNts'])->name('radio.import-nts');
 Route::resource('radio', RadioStationController::class);
 Route::post('/radio/{radio}/favorite', [RadioStationController::class, 'favorite'])->name('radio.favorite');
 Route::post('/radio/{radio}/play/{device}', [RadioStationController::class, 'play'])->name('radio.play');
