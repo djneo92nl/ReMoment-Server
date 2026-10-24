@@ -40,23 +40,27 @@ final class LibraryHome
     {
         $cardMeta = ['artist', 'genreRelation', 'metadata' => fn ($q) => $q->whereIn('key', Album::CARD_METADATA)];
 
-        $recentAdded = LibrarySources::albums(Album::query(), $hidden)
+        $scopeKey = md5(implode(',', $hidden));
+
+        // The shelves below are seconds of queries on a real library: kept until the library changes (LibraryCache).
+        $recentAdded = LibraryCache::remember("library:home:recent-added:{$scopeKey}", fn () => LibrarySources::albums(Album::query(), $hidden)
             ->whereHas('tracks')
             ->with($cardMeta)
             ->withSourceFlags()
             ->latest()
             ->limit(self::SHELF)
-            ->get();
+            ->get());
 
         ['items' => $recentPlayed, 'artwork' => $playedArtwork] = RecentItems::get($hidden, 12);
 
         $topArtists = self::artists($hidden)->whereHas('plays')->orderByDesc('plays_count')->limit(12)->get();
 
-        $playlists = LibrarySources::playlists(Playlist::query()->whereHas('tracks'), $hidden)
+        // Ordered by last played, so it follows plays: a minute at most.
+        $playlists = LibraryCache::remember("library:home:playlists:{$scopeKey}", fn () => LibrarySources::playlists(Playlist::query()->whereHas('tracks'), $hidden)
             ->withCount(['tracks' => fn ($q) => LibrarySources::tracks($q, $hidden)])
             ->orderByRaw('last_played_at IS NULL')->orderByDesc('last_played_at')->orderBy('name')
             ->limit(12)
-            ->get();
+            ->get(), maxAge: 60);
         $playlistArtwork = PlaylistArtwork::choose($playlists);
 
         $favoriteAlbums = LibrarySources::albums(Album::query()->whereNotNull('favorited_at'), $hidden)
@@ -68,7 +72,8 @@ final class LibraryHome
         $glance = LibraryOverview::glance($hidden);
         $similarArtists = LibraryOverview::similarArtists($hidden, $topArtists);
         $sound = LibraryOverview::soundBuckets($hidden);
-        $topRated = LibraryOverview::topRated($hidden)->with($cardMeta)->withSourceFlags()->limit(6)->get();
+        // Ratings are metadata, not a library table: an hour at most.
+        $topRated = LibraryCache::remember("library:home:top-rated:{$scopeKey}", fn () => LibraryOverview::topRated($hidden)->with($cardMeta)->withSourceFlags()->limit(6)->get(), maxAge: 3600);
         AlbumSound::attach($recentAdded);
         AlbumSound::attach($topRated);
 
@@ -137,7 +142,7 @@ final class LibraryHome
             'icon' => self::ICONS[$scope] ?? 'layer-group',
             'albums' => $glance['albums'],
             'artists' => $glance['artists'],
-            'playlists' => LibrarySources::playlists(Playlist::query()->whereHas('tracks'), $hidden)->count(),
+            'playlists' => LibraryCache::remember('library:home:playlist-count:'.md5(implode(',', $hidden)), fn () => LibrarySources::playlists(Playlist::query()->whereHas('tracks'), $hidden)->count()),
             'covers' => $recentAdded->map(fn (Album $album) => LibraryItemArtwork::proxy(LibraryArtwork::coverUrl($album->images)))
                 ->filter()->take(self::COLLAGE)->values()->all(),
             'tint' => ArtworkTint::style($recentAdded->first(fn (Album $album) => !empty($album->colors))?->colors),

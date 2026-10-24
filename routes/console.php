@@ -36,6 +36,9 @@ Schedule::command('library:scan-files --queue')->dailyAt('03:30');
 // Folds duplicate artists/albums/tracks together (ids of merged records disappear), so weekly and off-hours.
 Schedule::command('library:merge-duplicates --force')->weeklyOn(0, '04:00')->withoutOverlapping();
 
+// Fills and refreshes the cached library overviews (LibraryCache), so a visit never pays for a cold or stale one.
+Schedule::command('library:warm')->everyFiveMinutes()->withoutOverlapping()->runInBackground();
+
 // Health heartbeats — see App\Domain\Health\Heartbeat and /settings/health.
 Schedule::call(function () {
     Heartbeat::beat(Heartbeat::SCHEDULER);

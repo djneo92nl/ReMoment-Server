@@ -5,7 +5,6 @@ namespace Tests\Feature\Api;
 use App\Domain\Artwork\PlaylistArtwork;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
-use App\Domain\Library\LibraryCache;
 use App\Integrations\Spotify\MusicPlayerDriver as SpotifyDriver;
 use App\Jobs\ProcessArtwork;
 use App\Models\Device;
