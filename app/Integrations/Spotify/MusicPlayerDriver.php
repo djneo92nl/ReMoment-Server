@@ -5,6 +5,7 @@ namespace App\Integrations\Spotify;
 use App\Domain\Device\QueueItem;
 use App\Domain\Device\RepeatMode;
 use App\Domain\Library\LibraryPlayback;
+use App\Domain\Spotify\SpotifyLibraryApi;
 use App\Integrations\Contracts\LikeInterface;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
@@ -114,7 +115,7 @@ class MusicPlayerDriver implements LikeInterface, MediaControlsInterface, MusicP
             throw new \RuntimeException('Nothing is playing on Spotify.');
         }
 
-        $liked ? $api->addMyTracks(['ids' => [$trackId]]) : $api->deleteMyTracks([$trackId]);
+        app(SpotifyLibraryApi::class)->setTrackSaved($trackId, $liked);
 
         // So the listener reports the new value instead of its cached lookup.
         Cache::put(self::likedCacheKey($trackId), $liked, 3600);

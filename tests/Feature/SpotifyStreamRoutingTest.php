@@ -65,7 +65,7 @@ class SpotifyStreamRoutingTest extends TestCase
             'device' => ['name' => $connectName],
             'item' => ['id' => 'abc', 'name' => 'Song', 'duration_ms' => 200_000, 'artists' => [['name' => 'Artist']], 'album' => ['name' => 'Album', 'images' => []]],
         ]);
-        $api->shouldReceive('myTracksContains')->andReturn([true]);
+        \Illuminate\Support\Facades\Http::fake(['*/me/library/contains*' => \Illuminate\Support\Facades\Http::response([true])]);
 
         return $api;
     }

@@ -11,6 +11,7 @@ use App\Domain\Media\AlbumData;
 use App\Domain\Media\ArtistData;
 use App\Domain\Media\NowPlaying;
 use App\Domain\Media\TrackData;
+use App\Domain\Spotify\SpotifyLibraryApi;
 use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
 use App\Events\Device\PlaybackModesUpdated;
@@ -271,7 +272,7 @@ class DeviceListener implements DeviceListenerInterface
         }
 
         try {
-            $liked = (bool) ($api->myTracksContains([$trackId])[0] ?? false);
+            $liked = app(SpotifyLibraryApi::class)->isTrackSaved($trackId);
         } catch (\Throwable) {
             return null;
         }

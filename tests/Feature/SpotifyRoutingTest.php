@@ -44,7 +44,7 @@ class SpotifyRoutingTest extends TestCase
 
         // Playback history enrichment would otherwise reach out to the network.
         Http::preventStrayRequests();
-        Http::fake();
+        Http::fake(['*/me/library/contains*' => Http::response([true]), '*' => Http::response()]);
         FakeSpotifyDriver::reset();
         FakePlayerDriver::reset();
         FakePowerDriver::reset();
@@ -100,7 +100,6 @@ class SpotifyRoutingTest extends TestCase
     {
         $api = Mockery::mock(SpotifyWebAPI::class);
         $api->shouldReceive('getMyCurrentPlaybackInfo')->andReturnValues($responses);
-        $api->shouldReceive('myTracksContains')->andReturn([true]);
 
         return $api;
     }

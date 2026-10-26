@@ -12,6 +12,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use SpotifyWebAPI\SpotifyWebAPIException;
 
 /**
  * Stores Spotify's photo of each artist as `spotify_image` metadata (source spotify). Artists
@@ -61,12 +62,43 @@ class FetchSpotifyArtistImages implements ShouldQueue
         }
 
         foreach (array_chunk(array_keys($bySpotifyId), self::BATCH) as $ids) {
-            foreach ($api->getArtists($ids)['artists'] ?? [] as $spotifyArtist) {
+            foreach ($this->fetchArtists($api, $ids) as $spotifyArtist) {
                 foreach ($bySpotifyId[$spotifyArtist['id'] ?? ''] ?? [] as $artist) {
                     $this->save($artist, SpotifyImages::pick($spotifyArtist['images'] ?? [], self::MIN_WIDTH));
                 }
             }
         }
+    }
+
+    /**
+     * The batch endpoint (GET /artists?ids=) is removed for new Development Mode apps (February 2026):
+     * then ask for each artist alone, skipping one that fails. Other failures still fail the job.
+     *
+     * @param  list<string>  $ids
+     * @return list<array>
+     */
+    private function fetchArtists($api, array $ids): array
+    {
+        try {
+            return $api->getArtists($ids)['artists'] ?? [];
+        } catch (SpotifyWebAPIException $e) {
+            if (!in_array($e->getCode(), [400, 403, 404, 410], true)) {
+                throw $e;
+            }
+        }
+
+        $artists = [];
+        foreach ($ids as $id) {
+            try {
+                $artists[] = $api->getArtist($id);
+            } catch (SpotifyWebAPIException $e) {
+                if (!in_array($e->getCode(), [403, 404, 410], true)) {
+                    throw $e;
+                }
+            }
+        }
+
+        return $artists;
     }
 
     /** Spotify's id for an artist whose name matches exactly (as the library compares names). */

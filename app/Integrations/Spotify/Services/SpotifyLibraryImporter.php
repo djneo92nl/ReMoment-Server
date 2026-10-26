@@ -7,6 +7,7 @@ use App\Domain\Library\Enrichment;
 use App\Domain\Library\LibraryIdentity;
 use App\Domain\Library\Normalizer;
 use App\Domain\Library\SpotifyUri;
+use App\Domain\Spotify\SpotifyLibraryApi;
 use App\Jobs\ProcessArtwork;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
@@ -14,6 +15,8 @@ use App\Models\Media\Metadata;
 use App\Models\Media\Playlist;
 use App\Models\Media\Track;
 use App\Services\SpotifyTokenService;
+use Illuminate\Support\Facades\Log;
+use SpotifyWebAPI\SpotifyWebAPIException;
 
 class SpotifyLibraryImporter
 {
@@ -45,7 +48,14 @@ class SpotifyLibraryImporter
         $count = 0;
 
         foreach ($this->paginate(fn ($offset, $limit) => $api->getMyPlaylists(['limit' => $limit, 'offset' => $offset])) as $item) {
-            $this->importPlaylistItem($item, $api);
+            try {
+                $this->importPlaylistItem($item, $api);
+            } catch (SpotifyWebAPIException $e) {
+                Log::warning('Spotify playlist import skipped', ['playlist' => $item['id'] ?? null, 'error' => $e->getMessage()]);
+
+                continue;
+            }
+
             $count++;
         }
 
@@ -143,7 +153,10 @@ class SpotifyLibraryImporter
         $trackIds = [];
         $position = 0;
 
-        foreach ($this->paginate(fn ($offset, $limit) => $api->getPlaylistTracks($spotifyPlaylist['id'], ['limit' => $limit, 'offset' => $offset])) as $entry) {
+        // Spotify only lists the entries of playlists the user owns or collaborates on; others are kept without tracks.
+        $entries = app(SpotifyLibraryApi::class);
+
+        foreach ($this->paginate(fn ($offset, $limit) => $entries->playlistEntries($spotifyPlaylist['id'], $offset, $limit) ?? []) as $entry) {
             if (empty($entry['track']['id'])) {
                 continue;
             }

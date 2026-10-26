@@ -9,6 +9,7 @@ use App\Models\Media\Track;
 use App\Services\SpotifyTokenService;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use SpotifyWebAPI\SpotifyWebAPIException;
 
 class EnrichTrackSpotify implements ShouldBeUnique, ShouldQueue
 {
@@ -32,14 +33,21 @@ class EnrichTrackSpotify implements ShouldBeUnique, ShouldQueue
 
         $api = $tokenService->makeApiClient();
 
-        $spotifyTrackId = SpotifyUri::trackId($track->external_id);
-        if ($spotifyTrackId === null) {
-            $results = $api->search(trim($track->name).' '.trim($track->artist->name), 'track', ['limit' => 1]);
-            $spotifyTrackId = $results['tracks']['items'][0]['id'] ?? null;
-        }
+        try {
+            $spotifyTrackId = SpotifyUri::trackId($track->external_id);
+            if ($spotifyTrackId === null) {
+                $results = $api->search(trim($track->name).' '.trim($track->artist->name), 'track', ['limit' => 1]);
+                $spotifyTrackId = $results['tracks']['items'][0]['id'] ?? null;
+            }
 
-        if ($spotifyTrackId) {
-            $this->store($track, $api, $spotifyTrackId);
+            if ($spotifyTrackId) {
+                $this->store($track, $api, $spotifyTrackId);
+            }
+        } catch (SpotifyWebAPIException $e) {
+            // An endpoint Spotify removed or restricts for this app (403/404/410): no data, not a failed job. Other errors retry.
+            if (!in_array($e->getCode(), [403, 404, 410], true)) {
+                throw $e;
+            }
         }
 
         Enrichment::markDone($track, Enrichment::SPOTIFY);
