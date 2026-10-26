@@ -54,6 +54,8 @@ docs/
     smart-playlists.md       Rule-based playlists (source smart): rules JSON, SmartFields registry, builder, editor, daily refresh
     sd-card-export.md        Admin zip of recent covers/backgrounds + logos in the touch client's SD layout
     refactor-hardware-check.md  Checklist for real devices after the duplicate-code cleanup: listeners, discovery, DLNA playback, volume, multiroom, API errors, artwork, MQTT
+    v1-roadmap.md            v1.0 scope: stability, TV, availability layer, discovery, Deezer/Tidal, physical library, CD import, extras, Home Assistant; order, dependencies, done-criteria, open questions (plan)
+    streaming-services.md    Deezer and Tidal as per-device capabilities (ASE/Mozart play-by-id, Tidal Connect read-only): library entry, id mapping, contract, what to verify on hardware first (plan, not built)
     plugin-architecture.md  Design doc: extracting drivers into composable packages
     setup-wizard.md          First-time setup wizard: steps, Setting flags, auto-redirect middleware
   frontend/
