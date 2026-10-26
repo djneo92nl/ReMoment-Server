@@ -29,6 +29,18 @@
                     class="underline hover:text-gray-600 dark:hover:text-gray-400 transition-colors">Manage</button>
             to choose which ones appear.
         </p>
+    @elseif($tv && ($groups = \App\Domain\Device\TvSources::group($sources)) && ($groups['inputs'] || $groups['apps']))
+        <div class="space-y-5">
+            @if($groups['inputs'])
+                @include('livewire.partials.tv-source-grid', ['title' => 'Input', 'items' => $groups['inputs'], 'supportsActivation' => $supportsActivation])
+            @endif
+            @if($groups['apps'])
+                @include('livewire.partials.tv-source-grid', ['title' => 'Apps', 'items' => $groups['apps'], 'supportsActivation' => $supportsActivation])
+            @endif
+        </div>
+        @if($hiddenCount > 0)
+            <p class="mt-3 text-xs text-gray-400 dark:text-gray-600">{{ $hiddenCount }} hidden</p>
+        @endif
     @else
         @php $shown = $showAll ? $visible : $visible->take(6); @endphp
         <div class="space-y-2">

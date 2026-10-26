@@ -32,6 +32,7 @@ docs/
     device-drivers.md       Driver contracts, existing drivers, guide for adding a new brand
     philips-tv.md           Philips Android TV on top of the UPnP driver (Jointspace v6): pairing command, standby, apps as sources, active app as now playing; what is unverified
     tv-devices.md           How a TV is modelled: sources/inputs, playback, power, RemoteControlInterface (remote keys); what the TV phase still has to do (Philips, BeoVision)
+    beovision-tv.md         BeoVision / Beoplay V1 TV controls design: V1 API findings, one-way remote commands, TV screens (list, detail, remote), probe plan, phases; mostly unbuilt
     upnp-renderer.md        Generic UPnP MediaRenderer fallback driver: server-managed queue, polling listener, discovery precedence, future research (native queues, radio, OpenHome)
     device-discovery.md     Discovery commands, listener startup, device_meta keys
     ase-api-map.md          What the B&O ASE REST API offers beyond the driver (Bluetooth, network, WiSA, sound), per model; the ase:map command
@@ -404,7 +405,7 @@ POST /api/devices/{id}/sources/activate  body: { "source_id": "MUSIC" }   → { 
 }
 ```
 
-`in_use` is not "selected" (ASE reports it true for nearly every source). `active` is the selected source and is absent when the device cannot tell; clients then match `now_playing.source`. `input` is the physical connection (TV devices), absent for digital sources.
+`in_use` is not "selected" (ASE reports it true for nearly every source). `active` is the selected source and is absent when the device cannot tell; clients then match `now_playing.source`. `input` is the physical connection (TV devices: "HDMI 2"), absent for digital sources; `signal` is the device's signal flag for the source (B&O TVs). A TV (driver with `VideoDeviceInterface`) gets Input/Apps grids and a Power on button that wakes it by activating a source; see `docs/architecture/beovision-tv.md`.
 
 ### Radio
 
@@ -414,6 +415,7 @@ POST /api/devices/{id}/radio/{station_id}   → { "status": "ok", "station": "Ra
 ```
 
 `station_id` is the `RadioStation` model ID. The device must have `radio_control` capability and a compatible radio platform. `GET` lists exactly the stations with an identifier for the device's platform (`beoradio` for ASE/Mozart, `tunein` for Sonos, `url` for generic UPnP). **Native identifiers win:** a station with a `beoradio` / `tunein` id plays through the speaker's own radio even when it also has a stream `url`; the plain stream URL (`PlayStreamUrlInterface`, see `docs/architecture/spotify-stream.md`) is only the fallback on ASE and Sonos and the only way on UPnP. Stations are added by hand or from the radio-browser.info search on `/radio/create` (`Domain\Radio\RadioBrowser`, `Livewire\RadioStationSearch`); a UPnP renderer's now playing for such a station is the station plus the song from the stream's ICY title (`Domain\Radio\IcyReader`, polled by `Jobs\PollRadioTitle` through `StreamTitles`, one chain per station while a device plays it; Sonos and ASE report their own titles), ordered by name like `/radio`; `422` without `radio_control`, `503` while unreachable (building the driver may contact the device).
+  "signal": true,
 
 **RadioStationItem shape:** `{ "id": 3, "name": "Radio 1", "genre": null, "favorite": false, "artwork": { "kind": "radio", "proxy_512": "…", … } | null }`. `genre` is the station's genre when it was added from the radio-browser.info search, else `null`. `favorite` is household-wide (`radio_stations.favorited_at`); `PUT /api/radio/{station_id}/favorite` with `{ "favorite": true }` → `{ "favorite": true }` sets it. The `/radio` web page lists favorites first; the API list stays by name. `artwork` is the same object as `now_playing.artwork`: the station's `image_url`, else the generated radio logo. An `image_url` that isn't processed yet gives `null` and is queued (at most once an hour per image), so the request never waits for a download.
 

@@ -2064,7 +2064,7 @@ components:
         provider_name: { type: string, nullable: true }
         input:
           type: string
-          description: Physical connection such as "HDMI 5" or "DVB". Absent for purely digital sources. Show it as a badge, never invent it from the name.
+          description: Physical connection such as "HDMI 5" or "AV". Absent for purely digital sources. Show it as a badge, never invent it from the name.
         active:
           type: boolean
           description: This is the selected source. Absent when the device cannot tell.
@@ -2278,6 +2278,9 @@ components:
         playable: { type: boolean }
         tracks:
           type: array
+        signal:
+          type: boolean
+          description: The source has a signal (an HDMI box that is on). Show it as a status dot. Absent when the device cannot tell (B&O TVs report it).
           description: First 200 tracks in playlist order
           items:
             type: object

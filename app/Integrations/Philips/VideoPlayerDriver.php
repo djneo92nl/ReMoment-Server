@@ -7,6 +7,7 @@ use App\Integrations\Common\UnsupportedOperationException;
 use App\Integrations\Contracts\PowerInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\SourcesInterface;
+use App\Integrations\Contracts\VideoDeviceInterface;
 use App\Integrations\Upnp\MusicPlayerDriver as UpnpDriver;
 use Illuminate\Support\Facades\Cache;
 
@@ -16,7 +17,7 @@ use Illuminate\Support\Facades\Cache;
  * the TV's own media player). The TV cannot be woken over the network and has no API to switch HDMI inputs
  * on current firmware, so those are not offered. See docs/architecture/philips-tv.md.
  */
-class VideoPlayerDriver extends UpnpDriver implements PowerInterface, SourceActivationInterface, SourcesInterface
+class VideoPlayerDriver extends UpnpDriver implements PowerInterface, SourceActivationInterface, SourcesInterface, VideoDeviceInterface
 {
     /** The app list barely changes: asked once in a while, not on every page. */
     private const APPS_TTL_SECONDS = 600;

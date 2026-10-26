@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Domain\Device\SourceSync;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\SourcesInterface;
+use App\Integrations\Contracts\VideoDeviceInterface;
 use App\Models\Device;
 use App\Models\DeviceSource;
 use Livewire\Component;
@@ -19,6 +20,9 @@ class DeviceSourceManager extends Component
 
     public bool $supportsActivation = false;
 
+    /** A TV: the inline card shows inputs and apps as grids instead of one list. */
+    public bool $tv = false;
+
     /** Live data per source id (`active`, `input`); empty when the device is unreachable. */
     public array $live = [];
 
@@ -29,8 +33,10 @@ class DeviceSourceManager extends Component
         $this->device = $device;
         try {
             $this->supportsActivation = $device->driver instanceof SourceActivationInterface;
+            $this->tv = $device->driver instanceof VideoDeviceInterface;
         } catch (\Throwable) {
             $this->supportsActivation = false;
+            $this->tv = false;
         }
         $this->syncWhenEmpty();
         $this->loadLive();
@@ -86,7 +92,7 @@ class DeviceSourceManager extends Component
                 return;
             }
             foreach ($driver->getSources() as $s) {
-                $this->live[$s->sourceId] = ['active' => $s->active, 'input' => $s->input];
+                $this->live[$s->sourceId] = ['active' => $s->active, 'input' => $s->input, 'signal' => $s->signal];
             }
         } catch (\Throwable) {
             // Unreachable device: the list still renders from the stored rows, with no active row.
@@ -153,6 +159,7 @@ class DeviceSourceManager extends Component
                 'source_id' => $s->source_id,
                 'active' => (bool) ($this->live[$s->source_id]['active'] ?? false),
                 'input' => $this->live[$s->source_id]['input'] ?? null,
+                'signal' => $this->live[$s->source_id]['signal'] ?? null,
                 'name' => $s->friendly_name,
                 'type' => $s->source_type,
                 'category' => $s->category,

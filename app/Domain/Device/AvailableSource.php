@@ -17,6 +17,8 @@ class AvailableSource
         public ?string $input = null,
         /** Currently selected source; null when the device cannot tell. */
         public ?bool $active = null,
+        /** The source has a signal (an HDMI box that is on); null when the device cannot tell. */
+        public ?bool $signal = null,
     ) {}
 
     public function toArray(): array
@@ -32,6 +34,7 @@ class AvailableSource
             'provider_name' => $this->providerName,
             'input' => $this->input,
             'active' => $this->active,
+            'signal' => $this->signal,
         ], fn ($v) => $v !== null);
     }
 }

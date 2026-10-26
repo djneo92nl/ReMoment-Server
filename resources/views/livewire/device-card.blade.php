@@ -143,8 +143,8 @@
                                 {{-- External source (line-in, HDMI, etc.) --}}
                                 <h2 class="text-2xl lg:text-3xl font-medium tracking-tight dark:text-emerald-50 truncate">{{ $nowPlaying->source->name }}</h2>
                                 <p class="mt-1.5 text-base text-gray-500 dark:text-gray-400 truncate">
-                                    {{ $nowPlaying->source->sourceType }}
-                                    @if($nowPlaying->source->connector)
+                                    {{ $nowPlaying->source->input() ?? $nowPlaying->source->sourceType }}
+                                    @if(!$nowPlaying->source->input() && $nowPlaying->source->connector)
                                         · {{ $nowPlaying->source->connector }}
                                     @endif
                                 </p>
@@ -305,6 +305,13 @@
                             class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
                         <i class="fa-solid fa-layer-group"></i>
                         <span>Multiroom</span>
+                    </button>
+                @endif
+                @if($supportsPower && $state === \App\Domain\Device\State::Standby)
+                    <button wire:click="powerOn"
+                            class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors">
+                        <i class="fa-solid fa-power-off"></i>
+                        <span>Power on</span>
                     </button>
                 @endif
                 @if($state !== \App\Domain\Device\State::Unreachable)

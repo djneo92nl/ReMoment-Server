@@ -3,6 +3,7 @@
 namespace App\Integrations\BangOlufsen\Ase\Connectors;
 
 use App\Domain\Device\AvailableSource;
+use App\Domain\Device\SourceInput;
 
 trait SourceControls
 {
@@ -24,7 +25,9 @@ trait SourceControls
                 borrowed: (bool) ($pair[1]['borrowed'] ?? false),
                 providerJid: $pair[1]['product']['jid'] ?? null,
                 providerName: $pair[1]['product']['friendlyName'] ?? null,
+                input: SourceInput::label($pair[1]['sourceType']['type'] ?? null, $pair[1]['sourceType']['connector'] ?? null),
                 active: $activeId === null ? null : $activeId === ($pair[1]['id'] ?? $pair[0]),
+                signal: isset($pair[1]['signalSensed']) ? (bool) $pair[1]['signalSensed'] : null,
             ))
             ->values()
             ->all();

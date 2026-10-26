@@ -14,6 +14,12 @@ class Source
         public ?bool $playsLocally = null,
     ) {}
 
+    /** The physical connection of a TV input ("HDMI 2", "DVB", "AV"), null for a digital source. */
+    public function input(): ?string
+    {
+        return \App\Domain\Device\SourceInput::label($this->sourceType, $this->connector);
+    }
+
     public function toArray(): array
     {
         return array_filter([
@@ -21,6 +27,7 @@ class Source
             'category' => $this->category,
             'sourceType' => $this->sourceType,
             'connector' => $this->connector,
+            'input' => $this->input(),
             'jid' => $this->jid,
             'playsLocally' => $this->playsLocally,
         ], fn ($value) => $value !== null);

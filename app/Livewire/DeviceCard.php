@@ -7,6 +7,7 @@ use App\Domain\Device\DeviceCache;
 use App\Domain\Device\SpotifyRouting;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
+use App\Integrations\Contracts\PowerInterface;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Contracts\SeekInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
@@ -39,6 +40,8 @@ class DeviceCard extends Component
 
     public bool $supportsRadio = false;
 
+    public bool $supportsPower = false;
+
     public bool $supportsSeek = false;
 
     public bool $muted = false;
@@ -56,6 +59,7 @@ class DeviceCard extends Component
             $this->supportsMultiRoom = $driver instanceof MultiRoomInterface;
             $this->supportsSourceActivation = $driver instanceof SourceActivationInterface;
             $this->supportsRadio = $driver instanceof RadioControlInterface;
+            $this->supportsPower = $driver instanceof PowerInterface;
             $this->supportsSeek = SpotifyRouting::driverFor($device, SeekInterface::class) instanceof SeekInterface;
             // Asking the device costs a network round trip, so only the
             // single-device page reads it; grid cards start unmuted.
@@ -117,6 +121,12 @@ class DeviceCard extends Component
     public function standby(): void
     {
         $this->control(MediaControlsInterface::class, fn ($d) => $d->standby(), plain: true);
+    }
+
+    /** Wakes the device; a TV is woken by being sent a source (see the ASE `VideoPlayerDriver`). */
+    public function powerOn(): void
+    {
+        $this->control(PowerInterface::class, fn ($d) => $d->powerOn(), plain: true);
     }
 
     public function playLastRadioStation(): void
