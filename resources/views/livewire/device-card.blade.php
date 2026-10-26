@@ -35,7 +35,11 @@
     }
 @endphp
 
-@once
+<div x-data="liveDevice({{ $device->id }})"
+     class="{{ $gradientStyle ? '' : 'bg-white dark:bg-stone-900' }} {{ $dark ? 'np-dark' : '' }} rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 overflow-hidden hover:shadow-xl transition-all {{ (!$standalone && $isActive) ? 'md:col-span-2' : '' }}"
+     style="{{ $gradientStyle }}">
+
+    {{-- Inside the root on purpose: a Livewire component has one root element, a <style> before it became the root. --}}
     <style>
         /* Quiet greys of the light card become translucent whites on the artwork colors. */
         .np-dark .np-inner [class*="text-gray-"], .np-dark .np-inner [class*="text-stone-"] { color: rgba(255,255,255,.7) !important; }
@@ -45,11 +49,6 @@
         .np-dark .np-inner [class*="border-gray-"], .np-dark .np-inner [class*="border-stone-"] { border-color: rgba(255,255,255,.18) !important; }
         .np-dark .np-inner [class*="text-blue-"], .np-dark .np-inner [class*="text-red-"] { color: #fff !important; }
     </style>
-@endonce
-
-<div x-data="liveDevice({{ $device->id }})"
-     class="{{ $gradientStyle ? '' : 'bg-white dark:bg-stone-900' }} {{ $dark ? 'np-dark' : '' }} rounded-3xl shadow-lg border border-gray-200/70 dark:border-stone-800/80 overflow-hidden hover:shadow-xl transition-all {{ (!$standalone && $isActive) ? 'md:col-span-2' : '' }}"
-     style="{{ $gradientStyle }}">
 
     {{-- Inner wrapper handles click-to-navigate; buttons capture their own clicks first --}}
     <div class="np-inner p-8 cursor-pointer"
