@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\Setting;
+use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Support\Facades\Crypt;
 use SpotifyWebAPI\Session;
 use SpotifyWebAPI\SpotifyWebAPI;
 
@@ -31,10 +33,52 @@ class SpotifyTokenService
     public function __construct()
     {
         $this->session = new Session(
-            clientId: (string) config('spotify.auth.client_id'),
-            clientSecret: (string) config('spotify.auth.client_secret'),
+            clientId: self::clientId(),
+            clientSecret: self::clientSecret(),
             redirectUri: route('spotify.callback'),
         );
+    }
+
+    /** The admin's own Spotify app (Settings › Spotify), else SPOTIFY_CLIENT_ID from .env. */
+    public static function clientId(): string
+    {
+        return (string) (Setting::get('spotify_client_id') ?: config('spotify.auth.client_id'));
+    }
+
+    public static function clientSecret(): string
+    {
+        $stored = Setting::get('spotify_client_secret');
+
+        if ($stored) {
+            try {
+                return Crypt::decryptString($stored);
+            } catch (DecryptException) {
+                // Unreadable (APP_KEY changed): fall back to .env.
+            }
+        }
+
+        return (string) config('spotify.auth.client_secret');
+    }
+
+    public static function hasCredentials(): bool
+    {
+        return self::clientId() !== '' && self::clientSecret() !== '';
+    }
+
+    /** Stores the credentials of the admin's Spotify app; a different Client ID invalidates the old connection. */
+    public static function saveCredentials(string $clientId, ?string $clientSecret): void
+    {
+        $changed = $clientId !== self::clientId();
+
+        Setting::set('spotify_client_id', $clientId);
+        if ($clientSecret !== null && $clientSecret !== '') {
+            Setting::set('spotify_client_secret', Crypt::encryptString($clientSecret));
+            $changed = true;
+        }
+
+        if ($changed) {
+            app(self::class)->disconnect();
+        }
     }
 
     public function getAuthorizationUrl(): string

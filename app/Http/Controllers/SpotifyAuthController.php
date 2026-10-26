@@ -12,7 +12,24 @@ class SpotifyAuthController extends Controller
 
     public function authorize(): RedirectResponse
     {
+        if (!SpotifyTokenService::hasCredentials()) {
+            return redirect()->route('settings.spotify')
+                ->with('error', 'Enter the Client ID and secret of your Spotify app first.');
+        }
+
         return redirect($this->spotify->getAuthorizationUrl());
+    }
+
+    public function saveCredentials(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'client_id' => ['required', 'string', 'regex:/^[A-Za-z0-9]{16,64}$/'],
+            'client_secret' => [SpotifyTokenService::clientSecret() === '' ? 'required' : 'nullable', 'string', 'regex:/^[A-Za-z0-9]{16,64}$/'],
+        ]);
+
+        SpotifyTokenService::saveCredentials($data['client_id'], $data['client_secret'] ?? null);
+
+        return redirect()->route('settings.spotify')->with('success', 'Spotify app saved. Connect your account next.');
     }
 
     public function callback(Request $request): RedirectResponse

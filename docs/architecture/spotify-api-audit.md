@@ -44,7 +44,7 @@ SDK: `jwilsson/spotify-web-api-php` through `SpotifyTokenService::makeApiClient(
 
 Development Mode allows 5 authorized users per Client ID (and Premium on the owner), so a public ReMoment cannot ship one shared Client ID; **every install creates its own Spotify app** (https://developer.spotify.com/dashboard, redirect URI `{APP_URL}/settings/spotify/callback` as built by `route('spotify.callback')`), and the one admin connects their own account.
 
-Today the credentials are only `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` in `.env` (`config/spotify.php`; the Ansible `env.j2` takes them from `vault_spotify_client_id` / `vault_spotify_client_secret`). **Not covered yet:** there is no field for them in the settings UI or the setup wizard, and no doc says to create an app, which redirect URI and which scopes to use (`SpotifyTokenService::SCOPES` plus optional `user-library-modify`), nor that Spotify needs the app owner on Premium. A follow-up for 1.0: a `docs/` setup page and a settings form (stored like the other `Setting`s, with the secret not echoed back), plus a hint on `/settings/spotify` when the Client ID is empty.
+Covered since the follow-up: **Settings › Spotify** has a form for the app's Client ID and secret (with the redirect URI to register and the Premium/5-user note), and the setup steps are in [spotify-app-setup.md](spotify-app-setup.md). `.env` credentials still work as a fallback.
 
 ## Tests
 

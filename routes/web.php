@@ -138,6 +138,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/settings/spotify/library/sync-tracks', [SettingsController::class, 'spotifyLibrarySyncTracks'])->name('settings.spotify-library.sync-tracks');
     Route::post('/settings/spotify/library/sync-playlists', [SettingsController::class, 'spotifyLibrarySyncPlaylists'])->name('settings.spotify-library.sync-playlists');
 
+    Route::post('/settings/spotify/credentials', [SpotifyAuthController::class, 'saveCredentials'])->name('spotify.credentials');
     Route::get('/settings/spotify/authorize', [SpotifyAuthController::class, 'authorize'])->name('spotify.authorize');
     Route::get('/settings/spotify/callback', [SpotifyAuthController::class, 'callback'])->name('spotify.callback');
     Route::post('/settings/spotify/disconnect', [SpotifyAuthController::class, 'disconnect'])->name('spotify.disconnect');

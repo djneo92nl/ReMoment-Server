@@ -175,11 +175,11 @@ class ExternalServices
 
     private function spotifyApp(): ServiceCheck
     {
-        $id = config('spotify.auth.client_id');
-        $secret = config('spotify.auth.client_secret');
+        $id = SpotifyTokenService::clientId();
+        $secret = SpotifyTokenService::clientSecret();
 
         if (!$id || !$secret) {
-            return ServiceCheck::disabled('SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET not set');
+            return ServiceCheck::disabled('No Spotify app configured: enter its Client ID and secret in Settings › Spotify');
         }
 
         $response = Http::timeout(self::TIMEOUT)->asForm()->withBasicAuth($id, $secret)
@@ -198,7 +198,7 @@ class ExternalServices
     {
         $spotify = app(SpotifyTokenService::class);
 
-        if (!config('spotify.auth.client_id')) {
+        if (!SpotifyTokenService::hasCredentials()) {
             return ServiceCheck::disabled('Spotify is not configured');
         }
         if (!$spotify->isConnected()) {
