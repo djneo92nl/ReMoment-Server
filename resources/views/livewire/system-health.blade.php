@@ -15,6 +15,11 @@
         <x-alert :type="['critical' => 'error', 'warning' => 'warning', 'info' => 'info'][$alert->severity] ?? 'info'">
             <span class="font-medium">{{ $alert->title }}.</span> {{ $alert->message }}
             <span class="text-xs opacity-75">Since {{ $alert->raised_at->diffForHumans() }}{{ $alert->acknowledged_at ? ', acknowledged' : '' }}</span>
+            @if(!$alert->acknowledged_at && auth()->check())
+                <x-slot:action>
+                    <button type="button" wire:click="acknowledge({{ $alert->id }})" class="text-xs font-medium underline hover:no-underline">Acknowledge</button>
+                </x-slot:action>
+            @endif
         </x-alert>
     @endforeach
 

@@ -38,7 +38,7 @@ Reserved for later: `container.crashed` and `disk.low` (the Manager, workstream 
 - **MQTT** `remoment/alerts/{kind}`, not retained, on raise, on a changed severity/message and on resolve: `{ id, kind, key, severity, title, message, device_id, raised_at, state: "raised"|"resolved" }`.
 - **MQTT** `remoment/alerts/active`, retained, only when it changes (dedupe key `mqtt_published_alerts_active`): `{ counts: { info, warning, critical }, kinds: [...], total }`.
 - **REST** `GET /api/alerts?since=&state=active|resolved|all&limit=` (open, newest first, `since` = id cursor, default `all`, limit 1–200 default 100) → `{ data: [Alert], summary }`. An alert keeps its id when it resolves, so a client polling with `since` sees new alerts only; re-read `state=active` to learn which ended. `POST /api/admin/alerts/{id}/ack` (admin token) → `{ data: Alert }`. Contract in `docs/api/openapi.yaml`.
-- **Web** the active alerts at the top of `/settings/health` (the backup one keeps its own notice).
+- **Web** the active alerts at the top of `/settings/health` (the backup one keeps its own notice); a signed-in admin gets an Acknowledge button on each.
 - **MCP** the `alerts` tool: `list` (open) and `ack` (admin).
 - `GET /api/info` has no `features` list yet, so no `alerts` feature key was added; add it when that list exists.
 

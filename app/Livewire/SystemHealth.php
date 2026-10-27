@@ -36,6 +36,16 @@ class SystemHealth extends Component
         ]);
     }
 
+    /** Admin only, like the API's POST /admin/alerts/{id}/ack. */
+    public function acknowledge(int $alertId): void
+    {
+        abort_unless(auth()->check(), 403);
+
+        if ($alert = \App\Models\Alert::find($alertId)) {
+            \App\Domain\Alerts\Alerts::acknowledge($alert);
+        }
+    }
+
     private function broker(): array
     {
         $host = config('mqtt.host');

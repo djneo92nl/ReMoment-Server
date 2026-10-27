@@ -302,4 +302,16 @@ class AlertsTest extends TestCase
 
         \Livewire\Livewire::test(\App\Livewire\SystemHealth::class)->assertSee('Queue heavy is stuck')->assertSee('Its worker is down.');
     }
+
+    public function test_the_health_page_acknowledge_button_is_admin_only(): void
+    {
+        $alert = Alerts::raise('queue.stuck', 'heavy', 'critical', 'Queue heavy is stuck', 'M');
+
+        \Livewire\Livewire::test(\App\Livewire\SystemHealth::class)->assertDontSee('Acknowledge')->call('acknowledge', $alert->id)->assertForbidden();
+        $this->assertNull($alert->fresh()->acknowledged_at);
+
+        $this->actingAs(\App\Models\User::factory()->create());
+        \Livewire\Livewire::test(\App\Livewire\SystemHealth::class)->assertSee('Acknowledge')->call('acknowledge', $alert->id);
+        $this->assertNotNull($alert->fresh()->acknowledged_at);
+    }
 }
