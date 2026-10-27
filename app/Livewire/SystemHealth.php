@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Domain\Backup\BackupStatus;
 use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Health\Heartbeat;
@@ -23,6 +24,7 @@ class SystemHealth extends Component
             'scheduler' => $this->heartbeat(Heartbeat::SCHEDULER),
             'queueWorker' => $this->heartbeat(Heartbeat::QUEUE),
             'queue' => $this->queue(),
+            'backup' => BackupStatus::health(),
             'devices' => $this->devices(),
         ]);
     }

@@ -30,6 +30,7 @@ docs/
     device-settings.md      Sound adjustment (bass/treble/loudness), Bluetooth pairing, device name: endpoints, shapes, per-platform support
   architecture/
     client-devices.md       DB schema, model, controller, admin UI internals
+    backup-restore.md       backup:run / backup:restore: archive contents, secrets excluded by default, fresh-install restore, SQLite and SD-card note, upgrade flow
     database.md             MariaDB (SQLite for tests only): why, .env settings, db:import-sqlite, recovering a corrupt file, driver-specific SQL
     device-drivers.md       Driver contracts, existing drivers, guide for adding a new brand
     philips-tv.md           Philips Android TV on top of the UPnP driver (Jointspace v6): pairing command, standby, apps as sources, active app as now playing; what is unverified
@@ -93,6 +94,10 @@ php artisan test tests/Path/To/TestFile.php
 
 # Code style
 ./vendor/bin/pint
+
+# Backup (database + safe settings + manifest, no secrets unless --with-secrets; scheduled nightly, keeps BACKUP_KEEP) and restore on a fresh `migrate`; see docs/architecture/backup-restore.md
+php artisan backup:run [--path=] [--keep=N] [--no-db] [--with-secrets]
+php artisan backup:restore {archive} [--force]
 
 # Copy the data of a SQLite file into the configured MariaDB (after `php artisan migrate`); see docs/architecture/database.md
 php artisan db:import-sqlite path/to/database.sqlite [--force]

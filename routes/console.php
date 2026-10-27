@@ -39,6 +39,9 @@ Schedule::command('library:merge-duplicates --force')->weeklyOn(0, '04:00')->wit
 // Fills and refreshes the cached library overviews (LibraryCache), so a visit never pays for a cold or stale one.
 Schedule::command('library:warm')->everyFiveMinutes()->withoutOverlapping()->runInBackground();
 
+// Nightly backup of the database and settings, keeping the last BACKUP_KEEP archives (docs/architecture/backup-restore.md); /settings/health warns when it stops.
+Schedule::command('backup:run')->dailyAt('01:30')->withoutOverlapping();
+
 // Health heartbeats — see App\Domain\Health\Heartbeat and /settings/health.
 Schedule::call(function () {
     Heartbeat::beat(Heartbeat::SCHEDULER);

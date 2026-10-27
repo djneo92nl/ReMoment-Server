@@ -10,7 +10,7 @@ use Throwable;
 class ImportSqlite extends Command
 {
     /** Throwaway or derived data: it is rebuilt by the app, so it is not worth carrying over. */
-    private const SKIP = ['migrations', 'sessions', 'cache', 'cache_locks', 'jobs', 'job_batches', 'lost_and_found'];
+    public const SKIP = ['migrations', 'sessions', 'cache', 'cache_locks', 'jobs', 'job_batches', 'lost_and_found'];
 
     protected $signature = 'db:import-sqlite
         {path : The SQLite database file to copy from}

@@ -11,6 +11,13 @@
 <div wire:poll.5s class="space-y-6">
 
 
+    @unless($backup['ok'])
+        <x-alert type="warning">
+            {{ $backup['last'] ? 'The last backup is from '.$backup['last']->diffForHumans().'.' : 'No backup exists yet.' }}
+            The nightly <span class="font-mono">backup:run</span> keeps the database and settings safe; run it by hand or check the scheduler.
+        </x-alert>
+    @endunless
+
     {{-- Background processes --}}
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <x-card class="p-6">
