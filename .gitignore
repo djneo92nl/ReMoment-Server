@@ -22,3 +22,8 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+/ripper/node_modules
+/ripper/dist
+/ripper/src-tauri/target
+/ripper/src-tauri/gen

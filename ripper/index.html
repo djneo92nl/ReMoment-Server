@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ReMoment Ripper</title>
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body>
+    <main>
+      <h1>ReMoment Ripper</h1>
+
+      <section id="connect" hidden>
+        <p class="muted">Sign in to your ReMoment server with the admin password.</p>
+        <form id="connect-form">
+          <label>Server address
+            <input id="url" placeholder="http://remoment.local" autocomplete="off" required />
+          </label>
+          <label>Admin password
+            <input id="password" type="password" required />
+          </label>
+          <button type="submit">Connect</button>
+        </form>
+      </section>
+
+      <section id="home" hidden>
+        <p>Connected to <strong id="server"></strong>. <button id="sign-out" class="link">Sign out</button></p>
+
+        <section id="disc">
+          <h2>Rip a disc</h2>
+          <form id="lookup-form">
+            <label>Disc ID
+              <input id="disc-id" placeholder="28 characters, e.g. Wn8eRBtfLDfM0qjYPdxrz.Zjs_U-" autocomplete="off" spellcheck="false" />
+            </label>
+            <button type="submit">Look up</button>
+            <button type="button" id="manual" class="secondary">Enter by hand</button>
+          </form>
+          <div id="choices"></div>
+          <div id="review" hidden></div>
+        </section>
+
+        <details>
+          <summary>Test upload</summary>
+          <p class="muted">Pick an audio file to send to the library, to check the connection works.</p>
+          <button id="pick">Choose file…</button>
+          <p id="result"></p>
+        </details>
+      </section>
+
+      <p id="status" role="status"></p>
+    </main>
+  </body>
+</html>
