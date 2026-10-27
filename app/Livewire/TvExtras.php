@@ -28,7 +28,10 @@ class TvExtras extends Component
     public function mount(Device $device): void
     {
         $this->device = $device;
-        $this->capabilities = array_values(array_intersect(['digits', 'sleep_timer'], DeviceCapabilities::for($device)));
+        $all = DeviceCapabilities::for($device);
+        // A device with a remote card has its number keys there.
+        $wanted = in_array('remote_control', $all, true) ? ['sleep_timer'] : ['digits', 'sleep_timer'];
+        $this->capabilities = array_values(array_intersect($wanted, $all));
         $this->readSleepTimer();
     }
 

@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Domain\Device\DeviceCapabilities;
 use App\Domain\Device\RemoteKey;
+use App\Integrations\Contracts\DigitsInterface;
 use App\Integrations\Contracts\RemoteControlInterface;
 use App\Models\Device;
 use Livewire\Component;
@@ -11,7 +12,7 @@ use Livewire\Component;
 /**
  * The remote card of a TV's page: a D-pad with OK / Back / Home, volume and channel keys, transport and colour
  * keys. Only the keys the driver lists in `supportedKeys()` are drawn, and the card exists only with the
- * `remote_control` capability. Guest-accessible like the playback controls. Number keys stay in `TvExtras`.
+ * `remote_control` capability. Guest-accessible like the playback controls. Number keys are part of it (`digits` capability); `TvExtras` then drops its own copy.
  */
 class RemoteCard extends Component
 {
@@ -19,6 +20,8 @@ class RemoteCard extends Component
 
     /** @var string[] */
     public array $keys = [];
+
+    public bool $digits = false;
 
     public ?string $error = null;
 
@@ -30,6 +33,20 @@ class RemoteCard extends Component
         $this->keys = $driver instanceof RemoteControlInterface
             ? array_map(fn (RemoteKey $key) => $key->value, $driver->supportedKeys())
             : [];
+        $this->digits = $driver instanceof DigitsInterface && in_array('digits', DeviceCapabilities::for($device), true);
+    }
+
+    public function pressDigit(int|string $digit): void
+    {
+        try {
+            $driver = $this->device->driver;
+            if ($this->digits && $driver instanceof DigitsInterface && $digit >= 0 && $digit <= 9) {
+                $driver->sendDigit((int) $digit);
+            }
+            $this->error = null;
+        } catch (\Throwable $e) {
+            $this->error = $e->getMessage();
+        }
     }
 
     public function press(string $key): void

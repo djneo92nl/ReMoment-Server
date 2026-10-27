@@ -17,7 +17,7 @@
     ];
 @endphp
 <div>
-@if($keys)
+@if($keys || $digits)
     <x-card class="p-8" title="Remote">
         @if($error)
             <p class="mb-4 text-xs text-red-500">{{ $error }}</p>
@@ -38,6 +38,19 @@
                     </div>
                 @endif
             @endforeach
+
+            @if($digits)
+                <div class="grid grid-cols-3 gap-2">
+                    @foreach([1, 2, 3, 4, 5, 6, 7, 8, 9, null, 0, null] as $digit)
+                        @if($digit !== null)
+                            <button type="button" wire:click="pressDigit({{ $digit }})" wire:loading.attr="disabled" wire:target="pressDigit"
+                                    class="{{ $btn }} text-lg">{{ $digit }}</button>
+                        @else
+                            <div></div>
+                        @endif
+                    @endforeach
+                </div>
+            @endif
         </div>
     </x-card>
 @endif
