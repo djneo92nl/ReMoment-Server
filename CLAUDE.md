@@ -31,6 +31,7 @@ docs/
   architecture/
     client-devices.md       DB schema, model, controller, admin UI internals
     backup-restore.md       backup:run / backup:restore: archive contents, secrets excluded by default, fresh-install restore, SQLite and SD-card note, upgrade flow
+    alerts.md               Alert model (workstream 14.1): one place raises/resolves alerts, kinds and thresholds, dedupe, MQTT remoment/alerts/*, GET /api/alerts, ack, how to add a kind
     database.md             MariaDB (SQLite for tests only): why, .env settings, db:import-sqlite, recovering a corrupt file, driver-specific SQL
     device-drivers.md       Driver contracts, existing drivers, guide for adding a new brand
     philips-tv.md           Philips Android TV on top of the UPnP driver (Jointspace v6): pairing command, standby, apps as sources, active app as now playing; what is unverified
@@ -154,6 +155,17 @@ Base URL: `/api` — no authentication required.
 ### Server Info
 
 **`GET /api/info`** — bootstrap info for client devices: `{ name, version, api_version, base_url, api_base_url, artwork_base_url, mqtt: { host, port, ws_port, ws_url, topic_prefix }, placeholder }`. `placeholder` is a full artwork object (`kind: "source"`, the music-note logo, rendered on the spot if missing) for clients to show whenever there is no artwork, e.g. while a cover is first processed. Addresses are as the client reached the server; `mqtt.host` is `MQTT_PUBLIC_HOST` or the request host (never the Docker-internal `MQTT_HOST`); `mqtt.ws_port`/`ws_url` are the WebSocket listener (`MQTT_PUBLIC_WS_PORT`, default 9001; `MQTT_WS_URL` overrides the URL). See `docs/api/server-info.md`.
+
+### Alerts
+
+`App\Domain\Alerts\Alerts::raise($kind, $key, $severity, $title, $message, $deviceId, $data)` / `resolve($kind, $key)` is the one place conditions become alerts (stuck queue, silent scheduler, stale backup, unreachable storage, offline device, down listener; `php artisan alerts:check` every minute). One active alert per `(kind, key)`; MQTT `remoment/alerts/{kind}` (not retained) and retained `remoment/alerts/active`; shown on `/settings/health`; MCP tool `alerts`. See `docs/architecture/alerts.md`.
+
+```
+GET  /api/alerts?since=&state=active|resolved|all&limit=   → { data: [Alert], summary }   newest first, `since` = id cursor
+POST /api/admin/alerts/{id}/ack                            → { data: Alert }                  admin token; admin-wide, no per-user state
+```
+
+Alert `{ id, kind, key, severity: info|warning|critical, title, message, device_id, data, raised_at, resolved_at, acknowledged_at, state: raised|resolved }`.
 
 ### Device List & Detail
 

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AdminAuthController;
+use App\Http\Controllers\Api\AlertController;
 use App\Http\Controllers\Api\ClientController;
 use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\DeviceSettingsController;
@@ -17,6 +18,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\SyncGroupController;
 
 Route::get('/info', InfoController::class);
+Route::get('/alerts', [AlertController::class, 'index']);
 
 // Tiny GIF/BMP/PGM covers for old clients: /api/artwork/{hash}/64.gif?colors=16, the hash is the artwork `hash` of a track or `lite` of a play command.
 Route::get('/artwork/{hash}/{size}.{format}', [LiteArtworkController::class, 'show'])
@@ -147,6 +149,7 @@ Route::post('/admin/login', [AdminAuthController::class, 'login']);
 Route::middleware('admin.token')->group(function () {
     Route::get('/admin/me', [AdminAuthController::class, 'me']);
     Route::delete('/admin/token', [AdminAuthController::class, 'logout']);
+    Route::post('/admin/alerts/{alert}/ack', [AlertController::class, 'acknowledge']);
 
     // Storage locations and the library's files (docs/architecture/file-storage.md)
     Route::get('/admin/storage/locations', [StorageController::class, 'locations']);

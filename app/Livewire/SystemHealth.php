@@ -18,6 +18,12 @@ class SystemHealth extends Component
 
     public function render()
     {
+        // A dead scheduler can't run alerts:check; the open health page can notice it (a cache read).
+        try {
+            app(\App\Domain\Alerts\AlertChecks::class)->scheduler();
+        } catch (\Throwable) {
+        }
+
         return view('livewire.system-health', [
             'broker' => $this->broker(),
             'supervisor' => $this->supervisor(),
@@ -26,6 +32,7 @@ class SystemHealth extends Component
             'queue' => $this->queue(),
             'backup' => BackupStatus::health(),
             'devices' => $this->devices(),
+            'alerts' => \App\Domain\Alerts\Alerts::active(),
         ]);
     }
 

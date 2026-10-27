@@ -10,6 +10,13 @@
 
 <div wire:poll.5s class="space-y-6">
 
+    {{-- Active alerts (App\Domain\Alerts\Alerts); the backup one has its own notice below. --}}
+    @foreach($alerts->where('kind', '!=', 'backup.stale') as $alert)
+        <x-alert :type="['critical' => 'error', 'warning' => 'warning', 'info' => 'info'][$alert->severity] ?? 'info'">
+            <span class="font-medium">{{ $alert->title }}.</span> {{ $alert->message }}
+            <span class="text-xs opacity-75">Since {{ $alert->raised_at->diffForHumans() }}{{ $alert->acknowledged_at ? ', acknowledged' : '' }}</span>
+        </x-alert>
+    @endforeach
 
     @unless($backup['ok'])
         <x-alert type="warning">

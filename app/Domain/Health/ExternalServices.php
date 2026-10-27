@@ -301,6 +301,16 @@ class ExternalServices
             : ServiceCheck::error('Token rejected: check DISCOGS_TOKEN');
     }
 
+    /** One storage location's probe with its failure turned into an error check (used by the alert checks). */
+    public function probeStorage(StorageLocation $location): ServiceCheck
+    {
+        try {
+            return $this->storage($location);
+        } catch (\Throwable $e) {
+            return ServiceCheck::error($this->short($e->getMessage()));
+        }
+    }
+
     private function storage(StorageLocation $location): ServiceCheck
     {
         if ($location->isLocal()) {

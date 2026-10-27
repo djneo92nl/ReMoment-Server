@@ -1611,6 +1611,61 @@ paths:
                   skipped: { type: integer, description: Local mode only; playlist tracks without a local copy }
         "422": { $ref: "#/components/responses/DeviceError" }
 
+  /alerts:
+    get:
+      tags: [Alerts]
+      summary: Alerts of the server, newest first
+      description: >-
+        Conditions the server detects (stuck queue, silent scheduler, stale backup, unreachable storage,
+        offline device, down listener), raised and later resolved; the same alerts are pushed on MQTT
+        `remoment/alerts/{kind}` and summarised on the retained `remoment/alerts/active`. `since` is an id:
+        only newer alerts are returned, so a client that opens later passes the highest id it has seen. An
+        alert keeps its id when it resolves; re-read with `state=active` to learn which ones ended. The server
+        keeps all active alerts and the last 100 resolved.
+      parameters:
+        - { name: since, in: query, schema: { type: integer, minimum: 0 } }
+        - { name: state, in: query, schema: { type: string, enum: [active, resolved, all], default: all } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 100 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Alert" }
+                  summary:
+                    type: object
+                    properties:
+                      counts:
+                        type: object
+                        properties:
+                          info: { type: integer }
+                          warning: { type: integer }
+                          critical: { type: integer }
+                      kinds: { type: array, items: { type: string } }
+                      total: { type: integer }
+  /admin/alerts/{alert}/ack:
+    post:
+      tags: [Alerts]
+      summary: Acknowledge an alert (admin-wide, not per user)
+      security: [{ adminToken: [] }]
+      parameters:
+        - { name: alert, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: The alert with `acknowledged_at` set
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Alert" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /admin/login:
     post:
       tags: [Admin]
@@ -2033,6 +2088,21 @@ components:
               playlist: { type: string }
 
   schemas:
+    Alert:
+      type: object
+      properties:
+        id: { type: integer, description: Monotonic }
+        kind: { type: string, example: queue.stuck, description: "queue.stuck, scheduler.silent, backup.stale, storage.unreachable, device.offline, listener.down (more later: container.crashed, disk.low)" }
+        key: { type: string, description: "Dedupe key within the kind: a queue name, a device or location id, '' for a single condition" }
+        severity: { type: string, enum: [info, warning, critical] }
+        title: { type: string }
+        message: { type: string }
+        device_id: { type: integer, nullable: true }
+        data: { type: object, nullable: true }
+        raised_at: { type: string, format: date-time }
+        resolved_at: { type: string, format: date-time, nullable: true }
+        acknowledged_at: { type: string, format: date-time, nullable: true }
+        state: { type: string, enum: [raised, resolved] }
     Error:
       type: object
       properties:

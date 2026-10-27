@@ -57,3 +57,7 @@ Schedule::call(function () {
 
 // Kills a hung default-queue worker so supervisor starts a new one (a stale queue beat while the scheduler beats).
 Schedule::call(fn () => (new QueueWatchdog)->run())->everyMinute()->name('queue-watchdog');
+
+// Raises and resolves alerts for the conditions above and the devices (docs/architecture/alerts.md); never slows the heartbeat.
+Schedule::command('alerts:check')->everyMinute()->withoutOverlapping(5)->name('alerts-check');
+Schedule::call(fn () => \App\Domain\Alerts\Alerts::prune())->dailyAt('04:45')->name('alerts-prune');
