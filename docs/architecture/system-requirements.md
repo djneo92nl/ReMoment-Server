@@ -4,7 +4,7 @@ What it takes to run the full server, with all library scanning and analysis too
 
 ## What runs
 
-One Docker/supervisor stack: the PHP 8.4 app (nginx + php-fpm in production), Redis, Mosquitto (MQTT), the queue workers (`default`, and `analysis` when enabled), `device:listen` (one booted process that forks a child per device), `ffmpeg` and `fpcalc` (in the app image) and, optionally, the Essentia sidecar (compose profile `analysis`). Meilisearch is in the dev compose file only and is not needed in production.
+One Docker/supervisor stack: the PHP 8.4 app (today served by `php artisan serve --no-reload`, PHP's built-in server; replacing it with a production web server is planned, see [v1-roadmap.md](v1-roadmap.md) 9a), Redis, Mosquitto (MQTT), the queue workers (`default`, and `analysis` when enabled), `device:listen` (one booted process that forks a child per device), `ffmpeg` and `fpcalc` (in the app image) and, optionally, the Essentia sidecar (compose profile `analysis`). Meilisearch is in the dev compose file only and is not needed in production.
 
 ## Tiers
 
