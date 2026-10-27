@@ -336,6 +336,7 @@ final class ServiceCredentials
                 purpose: 'What the Jellyfin app on a TV is playing (title, poster, position), shown on the TV\'s card.',
                 fields: [
                     new CredentialField('api_key', 'API key', 'jellyfin_api_key', 'services.jellyfin.api_key', type: 'password', secret: true, required: true),
+                    new CredentialField('user_id', 'User ID', 'jellyfin_user_id', null, hint: 'Optional: whose "Continue watching" and "Next up" to show. Without one the first user of the server is used.'),
                 ],
                 baseUrl: 'http://jellyfin.local:8096',
                 probes: ['jellyfin'],
