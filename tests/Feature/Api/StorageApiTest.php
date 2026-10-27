@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api;
 
+use App\Jobs\EnrichTrackMusicBrainz;
 use App\Models\File;
 use App\Models\Media\Track;
 use App\Models\StorageLocation;
@@ -9,6 +10,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File as Fs;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\RateLimiter;
 use Tests\TestCase;
 
@@ -40,11 +42,16 @@ class StorageApiTest extends TestCase
         parent::tearDown();
     }
 
-    private function wavUpload(string $name = 'Song.wav'): UploadedFile
+    private function wavUpload(string $name = 'Song.wav', ?string $artist = null): UploadedFile
     {
         $data = str_repeat("\x80", 8000);
         $path = $this->base.'/'.$name;
-        file_put_contents($path, 'RIFF'.pack('V', 36 + strlen($data)).'WAVEfmt '.pack('VvvVVvv', 16, 1, 1, 8000, 8000, 1, 8).'data'.pack('V', strlen($data)).$data);
+        $info = '';
+        if ($artist !== null) {
+            $info = 'INFO'.collect(['IART' => $artist, 'INAM' => 'Song'])->map(fn ($v, $k) => $k.pack('V', strlen($v) + 1).$v."\0".(strlen($v) % 2 ? '' : "\0"))->implode('');
+            $info = 'LIST'.pack('V', strlen($info)).$info;
+        }
+        file_put_contents($path, 'RIFF'.pack('V', 36 + strlen($data) + strlen($info)).'WAVEfmt '.pack('VvvVVvv', 16, 1, 1, 8000, 8000, 1, 8).$info.'data'.pack('V', strlen($data)).$data);
 
         return new UploadedFile($path, $name, 'audio/wav', null, true);
     }
@@ -92,6 +99,34 @@ class StorageApiTest extends TestCase
         $this->assertSame(0, File::count());
         $this->assertSame(0, Track::count());
         $this->assertFileDoesNotExist($this->base.'/library/renamed/Song.wav');
+    }
+
+    public function test_an_uploaded_track_gets_its_enrichment_queued(): void
+    {
+        Queue::fake();
+        StorageLocation::create(['name' => 'library', 'driver' => 'local', 'role' => 'library', 'config' => ['root' => $this->base.'/library']]);
+
+        $this->post('/api/admin/files', ['file' => $this->wavUpload('Song.wav', 'Some Artist')], $this->auth + ['Accept' => 'application/json'])->assertCreated();
+
+        Queue::assertPushed(EnrichTrackMusicBrainz::class);
+    }
+
+    public function test_uploading_the_same_file_twice(): void
+    {
+        Queue::fake();
+        StorageLocation::create(['name' => 'library', 'driver' => 'local', 'role' => 'library', 'config' => ['root' => $this->base.'/library']]);
+        $headers = $this->auth + ['Accept' => 'application/json'];
+
+        $this->post('/api/admin/files', ['file' => $this->wavUpload('Song.wav', 'Some Artist')], $headers)->assertCreated();
+        $this->post('/api/admin/files', ['file' => $this->wavUpload('Song.wav', 'Some Artist')], $headers)->assertCreated();
+
+        $this->assertSame(1, Track::count());
+        $this->assertSame(1, File::count());
+        $this->assertSame('Some Artist/Unknown Album/Song.wav', File::firstOrFail()->path);
+        $this->assertFileExists($this->base.'/library/Some Artist/Unknown Album/Song.wav');
+        $this->assertFileDoesNotExist($this->base.'/library/Some Artist/Unknown Album/Song (2).wav');
+        $this->assertSame([], glob($this->base.'/library/_uploads/*') ?: []); // no staging folder left behind
+        $this->assertSame(1, Track::firstOrFail()->trackFiles()->count());
     }
 
     public function test_a_location_with_files_cannot_be_removed(): void

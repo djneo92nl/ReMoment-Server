@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Analysis\AudioAnalysis;
+use App\Domain\Library\Enrichment;
 use App\Domain\Storage\FileStore;
 use App\Domain\Storage\LibraryFiles;
 use App\Domain\Storage\StorageTasks;
 use App\Http\Controllers\Controller;
+use App\Jobs\AnalyzeAudioFile;
 use App\Models\File;
 use App\Models\Media\Track;
 use App\Models\StorageLocation;
@@ -116,7 +119,16 @@ class StorageController extends Controller
                 fclose($stream);
             }
 
-            return ['file' => $this->file($file), 'track_id' => $file->tracks()->value('tracks.id')];
+            // Like the browser upload (ProcessLibraryUpload): a new track gets its metadata and analysis queued.
+            $track = $file->tracks()->first();
+            if ($track) {
+                Enrichment::queue($track);
+            }
+            if (AudioAnalysis::enabled()) {
+                AnalyzeAudioFile::dispatch($file);
+            }
+
+            return ['file' => $this->file($file), 'track_id' => $track?->id];
         }, 201);
     }
 

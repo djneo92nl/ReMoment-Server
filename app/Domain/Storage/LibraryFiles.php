@@ -69,6 +69,17 @@ class LibraryFiles
             throw new \InvalidArgumentException('The file could not be read as audio.');
         }
 
+        // The same bytes are already in the library (a disc ripped again, a retried upload): keep that file, drop the staged copy.
+        $existing = File::where('storage_location_id', $location->id)->where('status', File::PRESENT)
+            ->where('hash', $file->hash)->where('id', '!=', $file->id)->get()
+            ->first(fn (File $f) => !str_starts_with($f->path, '_uploads/'));
+        if ($existing) {
+            $this->deleteFile($file);
+            $store->deleteDirectory(dirname($path));
+
+            return $existing;
+        }
+
         return $file;
     }
 

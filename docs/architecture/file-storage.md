@@ -57,7 +57,7 @@ Files dropped on `/settings/storage` go through `App\Http\Controllers\LibraryUpl
 
 The job runs the steps of `LibraryFiles::upload()` one by one and records each: **parsing** (`indexStaged`: tags, track, cover; an unreadable file is removed again), **copying** (`placeInLibrary`: organized layout, copy, hash check, source removed), **enriching** (`Enrichment::queue()` for the track, plus audio analysis for the file when enabled). The table calls a file *done* when every source the job queued is fetched (`Enrichment::pendingSources()`), or after 15 minutes, naming the sources that did not answer (rate limited or nothing found). A failure keeps the step it failed in; a file that failed after parsing stays in `_uploads/` in the library (a scan indexes it from there). Rows are progress, not data: they expire after a day and a row without progress for two hours shows as failed.
 
-The size limit is PHP's `upload_max_filesize` / `post_max_size` (100M in `docker/*/php.ini`) and any proxy in front; a larger file fails at the upload step.
+The size limit is PHP's `upload_max_filesize` / `post_max_size` (300M in `docker/*/php.ini`, so a 24-bit FLAC fits) and any proxy in front; a larger file fails at the upload step.
 
 All locations are also scanned nightly at 03:30 (`library:scan-files --queue`).
 
@@ -87,7 +87,7 @@ POST            /api/admin/storage/locations/{id}/test    can it be listed (502 
 POST            /api/admin/storage/locations/{id}/scan    → { changed, counts }; with ?queue=1 → 202 { status: queued } (409 while one is queued or running)
 POST            /api/admin/storage/import                 inbox → library (keep=true: copy and verify, originals stay in the inbox)
 POST            /api/admin/storage/reorganize             { dry_run? } → { moves: [{file_id, from, to}] }
-POST            /api/admin/files                          multipart `file` → { file, track_id }
+POST            /api/admin/files                          multipart `file` → { file, track_id }; queues the track's enrichment (and audio analysis when enabled), like the browser upload; a file whose bytes (hash) are already in the library is not stored again: the staged copy is dropped and the existing file returned (a disc ripped twice, a retried upload)
 GET|DELETE      /api/admin/tracks/{id}/files              files of a track / delete the track and its files
 DELETE          /api/admin/files/{id}                     delete a file (and its track if it was the last)
 POST            /api/admin/files/{id}/move                { path, storage_location_id? }

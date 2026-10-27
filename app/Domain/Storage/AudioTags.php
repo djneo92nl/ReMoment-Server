@@ -34,12 +34,12 @@ class AudioTags
 
         return [
             'artist' => $tag('artist'),
-            'album_artist' => $tag('band'),
+            'album_artist' => $tag('band') ?? $tag('albumartist'), // ID3 TPE2 (getID3's `band`) or the Vorbis ALBUMARTIST of a FLAC/Ogg
             'album' => $tag('album'),
             'title' => $tag('title'),
             'year' => $tag('year') ?? $tag('date'),
             'track_number' => ((int) $tag('track_number')) ?: null,
-            'disc_number' => ((int) $tag('part_of_a_set')) ?: null,
+            'disc_number' => ((int) ($tag('part_of_a_set') ?? $tag('discnumber'))) ?: null, // ID3 TPOS or Vorbis DISCNUMBER ("1" or "1/2")
             'genres' => array_values(array_filter($info['comments']['genre'] ?? [])),
             'mbid' => $info['tags']['id3v2']['text']['MusicBrainz Release Track Id'][0] ?? $tag('musicbrainz_trackid'),
             'duration' => $int($info['playtime_seconds'] ?? null),
