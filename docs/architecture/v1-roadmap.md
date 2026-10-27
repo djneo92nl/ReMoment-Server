@@ -27,6 +27,7 @@ Effort: S = days, M = 1–2 weeks, L = several weeks. Feasibility notes come fro
 | 10 | Manager: host service that controls the running instance (containers, processes, upgrade with rollback, host stats) and SMB shares (serve and mount) for the library and the drop directory; on every install target | L | 1b, 9a, backup | **decided, design draft** | Must |
 | 11 | WiiM (LinkPlay) driver: a dedicated driver on the public HTTP API, on top of the generic UPnP fallback | M | | to do | Should |
 | 13 | Export from the library: download a playlist, album or artist as a zip, transcoded to a chosen maximum quality, for an MP3 player or a car radio | M | 1b | to do | Should |
+| 14 | Foundations, decided early (phase 2): one alert and event model, stable IDs for clients, a schema review before the migration squash, a shared credentials layer, and an action-layer design spike | M | | to do | Must (14.1, 14.3), Should (14.2, 14.4, 14.5 spike) |
 | 12 | Library and audio intelligence, what is left: mixes-well, loudness-normalised playback, tag and cover suggestions, concerts, related works, lyrics extras, listening insights, Essentia on arm64 | S–M each | 4 (similar tracks), 8.4 (tag editor) | plan below; the enrichment, analysis and health base is built | Mixed (per item); platform docs Must |
 
 ## Progress (as of 2026-10-27)
@@ -481,6 +482,56 @@ Lossy to lossy loses quality, so the dialog says which files will be transcoded 
 
 Done when: from an album, playlist or artist page an admin picks "MP3, max 320 kbit/s", sees how many tracks are copied and how many transcoded, and downloads a zip whose files play on a FAT32 stick in a plain MP3 player, with the right tags, a cover and an `.m3u8`; a second export of the same album reuses the cached transcodes; streaming-only tracks are reported as skipped; the whole run stays within the Pi memory budget.
 
+## 14. Foundations (decided early)
+
+Status: **plan**, added 2026-10-27. Five items that are cheap to decide now and expensive to change once other workstreams build on them. They sit in phase 2 ("Shape") next to the availability layer.
+
+### 14.1 One alert and event model *[Must for the model; the consumers keep their own priority]*
+
+**Problem.** Health alerts (1), the queue watchdog and per-queue health (1b), a stale backup (1), the alerts feed for the app (8b.5), browser notifications (8.6), Home Assistant triggers (8a) and the Manager (10) each plan their own way to say "something is wrong". One shape avoids five.
+
+**Design.**
+- An **alert** is a condition with a state: it is *raised* and later *resolved*, with a dedupe key so a condition that persists does not repeat every minute. Fields: `id` (monotonic), `kind` (dotted: `queue.stuck`, `backup.stale`, `device.offline`, `listener.down`, `storage.unreachable`, `container.crashed`, `disk.low`), `severity` (`info`, `warning`, `critical`), `device_id` or null, `title`, `message`, `data` (JSON), `raised_at`, `resolved_at`. Playback events (a track started) stay on the existing `remoment/player/{id}/*` topics; they are events, not alerts.
+- **One API in the app**, `Alerts::raise($kind, …)` and `Alerts::resolve($kind, $key)`, backed by a small `alerts` table (kept: the last 100 resolved plus all active; pruned nightly; works on SQLite and MariaDB).
+- **Outputs** from the one place: MQTT `remoment/alerts/{kind}` (not retained) and a retained `remoment/alerts/active` summary; `GET /api/alerts?since=&state=active|all`; the banner on `/settings/health`; an admin acknowledge (`POST /api/admin/alerts/{id}/ack`); `features` key `alerts`.
+- **Consumers**: 8.6 (browser notifications subscribe to the MQTT topic), 8a (HA event entities), 8b.5 (the feed), 1/1b (the failure cases `/settings/health` already detects raise alerts), 10 (the Manager raises container and host alerts through the same API).
+
+Done when: the health checks that exist today (queue stuck, scheduler silent, backup stale, storage unreachable, device offline, listener down) raise and resolve alerts through `Alerts`, one test per kind, and `GET /api/alerts` and the MQTT topic show them.
+
+### 14.2 Stable IDs for clients *[Should]*
+
+**Problem.** `library:merge-duplicates` deletes the merged records, so a client that cached an album or artist id gets `404` (or `422` in a play body) until it re-reads the list (`CLAUDE.md`, Library). For a public API with firmware and apps in the wild that is a breaking behaviour.
+
+**Design.** An `id_aliases` table (`entity` artist|album|track|playlist, `old_id`, `new_id`, `merged_at`) written by `LibraryMerger`. Detail endpoints and play bodies **resolve an alias to the surviving record** and answer normally, adding `canonical_id` to the response so a client can update its cache; list endpoints never contain a retired id; web routes redirect (`301`). Rows are kept (they are tiny); chains are collapsed when a survivor is itself merged. A really unknown id stays `404`.
+
+Done when: after a merge the old id still plays and opens through the API and the web, the response names the canonical id, `docs/api/library.md` and `openapi.yaml` say so, and a test covers a merge chain.
+
+### 14.3 Schema review before the migration squash *[Must; part of 9a]*
+
+**Problem.** The squash (9a) turns 52 migrations into one per table. Several workstreams add tables and columns afterwards, and each would otherwise bring a new "add field" migration right after the squash.
+
+**Design.** Inventory every table and column the roadmap adds or changes and design them **together** in `docs/architecture/schema-plan.md`: `catalogue_albums` and the wishlist (3), `device_links` (2a), `physical_items` and `physical_locations` (6), `exports` (13), `alerts` (14.1), `id_aliases` (14.2), credentials rows (14.4), scenes (8.1), podcasts, episodes and `playback_positions` (8.2, 8.3), `push_subscriptions` (1.1), indexes on `plays` and retention (8.8), `device.verified` and the profile setting (1a, 9b), plus the manager's needs (10). For each: names, keys and `ON DELETE` behaviour, column types and lengths (the 255-character artist case in `database.md`), JSON columns, indexes, and what differs between **MariaDB and SQLite** (the Control profile). Workstreams that are not built by the squash write their tables **straight into the consolidated set** from the plan; ones already built are consolidated as they are.
+
+Done when: the plan is reviewed, every planned feature's tables are in it, and the squash needs no follow-up migration for a planned 1.0 feature.
+
+### 14.4 Credentials layer *[Should]*
+
+**Problem.** Spotify has its own settings card now (`SpotifyTokenService`: the secret encrypted with `Crypt` in the `settings` table, falling back to `.env`). Last.fm, Discogs, AcoustID and TheAudioDB are `.env` only, and Deezer, ListenBrainz and later Tidal need the same. Building each separately gives five forms, five storage rules and no place for the relay of 9b item 8.
+
+**Design.** One registry of external services (`ServiceCredentials`): for each service its **fields** (client id, secret, API key, token), which are **secret** (encrypted at rest, masked in the UI, never echoed, never in logs, the diagnostics bundle or a backup unless `--with-secrets`; the backup rule already matches `token`, `secret`, `session_key`, `password`: key it on the registry's flag instead), the **base URL** (a setting, never a constant, so a relay can replace it), the **source** (`own` key now, `relay` later), the **health probe** (the existing `ExternalServices` probes attach to it), and **setup help** (the link and the steps, which also feed `docs/user/` and the setup wizard). One Livewire settings page renders every service from its declaration; the `.env` value stays as the fallback so existing installs keep working. Spotify moves onto it.
+
+Done when: Spotify, Last.fm, Discogs, AcoustID and TheAudioDB are configured from the same page with the same masking, the backup excludes them by the registry's flag, a missing key shows the setup help, and an `.env`-only install still works.
+
+### 14.5 Action layer: a design spike *[Should as a spike; the refactor itself is not planned for 1.0]*
+
+**Problem.** An action such as "move playback" exists as a REST route and controller, an MCP tool (which already calls the REST API in-process through `ApiBridge`, so that part is not duplicated), a hand-written OpenAPI entry, a web (Livewire) path, and soon a Home Assistant `rest_command` entry, a scene step and a schedule. Each new action touches all of them.
+
+**Spike (at most one to two weeks, no migration of the API):** can an action be **defined once** (typed input with validation rules, a handler, a result, metadata for name and description) and the REST route, the MCP tool, the scene step, the HA command package and the OpenAPI entry **derived** from that definition? Evaluate a small in-house registry against generating OpenAPI from validation rules with a package, and what it would cost to migrate a route at a time. Build a **prototype with two actions** (move playback, activate a source), measure the lines and files saved, and write the recommendation in `docs/architecture/action-layer.md`.
+
+**Why now:** scenes (8.1) need a scene step to *be* an action reference, and the HA package (8a) lists actions; deciding after both are built means building them twice.
+
+Done when: the recommendation exists with the prototype and the numbers, and scenes (8.1) and the HA package (8a) are built on the chosen shape (a registry, or the existing REST API as the one definition).
+
 ## Not in 1.0
 
 - 1.1 or later, wanted: an SMB share and a USB target for finished exports (workstream 13); more export formats (AAC, Opus).
@@ -539,6 +590,8 @@ Done when: from an album, playlist or artist page an admin picks "MP3, max 320 k
 
 - Library export (2026-10-27): workstream 13, Should: download a playlist, album or artist as a zip at a chosen maximum quality (copy what fits, transcode what does not), for MP3 players and car radios; built on the proxy machinery. **Admin only** (the export is a heavy operation, not a secret), **MP3 320 default**, **zip download only** (no share or USB in 1.0), size and retention limits with the defaults in section 13.
 
+- Foundations (2026-10-27): workstream 14 added to phase 2: one alert and event model (14.1), stable IDs through an alias table (14.2), a schema review before the migration squash (14.3), a shared credentials layer (14.4), and a design spike for a single action layer, not a refactor (14.5). The API freeze policy is a short doc, not a workstream.
+
 ## Open questions
 
 Workstream 2a: how a sub device reachable only through its host is shown (listed under 2a). New questions go here.
@@ -556,3 +609,5 @@ Web server (9a): (a) does the FrankenPHP armv7 image build and run on a real Pi 
 Workstream 11: (a) is there a source for WiiM multiroom control (another LinkPlay document, UPnP, OpenHome); (b) does newer firmware still answer on HTTPS with a self-signed certificate only; (c) which models report a battery and which sources they have (the document gives no per-model list); (d) does a WiiM's UPnP description let the discoverer tell it from a generic renderer, so the dedicated driver wins.
 
 Workstream 13: (a) is loudness normalisation off by default, and does it wait for 12.3; (b) the default numbers of the three limits once measured on the Pi; (c) which further profiles (AAC, Opus) follow from the proxies built for the players.
+
+Workstream 14: (a) acknowledge alerts from the apps or the admin web only; (b) should `id_aliases` also redirect web routes for guests, or only the API; (c) which providers `ServiceCredentials` must cover in 1.0 beyond the five; (d) how much of the action-layer spike can be built on the REST API as the single definition (the cheapest outcome).
