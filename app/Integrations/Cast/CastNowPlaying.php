@@ -20,8 +20,13 @@ class CastNowPlaying
 
     public function __construct(private readonly CastConnection $connection) {}
 
-    /** One connection: receiver status, then the media status of the running app. Null when nothing runs. */
-    public function read(): ?NowPlaying
+    /**
+     * One connection: receiver status, then the media status of the running app.
+     *
+     * @return array{now: ?NowPlaying, standby: bool, external: bool} `external`: the TV shows another input (HDMI),
+     *                                                                not the Cast receiver (`isActiveInput` false)
+     */
+    public function read(): array
     {
         $this->connection->connect();
 
@@ -33,7 +38,11 @@ class CastNowPlaying
             $this->connection->close();
         }
 
-        return self::fromStatus($receiver, $media);
+        return [
+            'now' => self::fromStatus($receiver, $media),
+            'standby' => (bool) ($receiver['isStandBy'] ?? false),
+            'external' => ($receiver['isActiveInput'] ?? true) === false,
+        ];
     }
 
     /**

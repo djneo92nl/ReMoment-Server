@@ -8,6 +8,7 @@ use App\Domain\Media\NowPlaying;
 use App\Domain\Media\Source;
 use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
+use App\Events\Device\ProgressUpdated;
 use App\Integrations\Cast\CastConnection;
 use App\Integrations\Cast\CastNowPlaying;
 use App\Integrations\Philips\VideoPlayerDriver;
@@ -31,19 +32,40 @@ class DeviceListener extends UpnpListener
 
     private const CAST_RETRY_AFTER_FAILURE_SECONDS = 300;
 
+    /** A TV that does not answer as a UPnP renderer is asked again only this often. */
+    private const UPNP_RETRY_SECONDS = 60;
+
     private ?string $activePackage = null;
+
+    private bool $upnpDown = false;
+
+    private int $nextUpnpCheck = 0;
 
     private ?string $reported = null;
 
     private int $nextCastCheck = 0;
 
-    private ?NowPlaying $lastCast = null;
+    /** @var array{now: ?NowPlaying, standby: bool, external: bool}|null */
+    private ?array $lastCast = null;
+
+    private ?int $lastProgress = null;
 
     private int $nextActivityCheck = 0;
 
     public function poll(string $deviceId): void
     {
-        parent::poll($deviceId);
+        // Some TVs have no UPnP renderer at all (the lab TV does not answer a search): Jointspace and Cast then
+        // carry the listener, and the TV is unreachable only when Jointspace does not answer either.
+        if (now()->timestamp >= $this->nextUpnpCheck) {
+            try {
+                parent::poll($deviceId);
+                $this->upnpDown = false;
+            } catch (\Throwable) {
+                $this->upnpDown = true;
+                $this->transportIdle = true;
+                $this->nextUpnpCheck = now()->timestamp + self::UPNP_RETRY_SECONDS;
+            }
+        }
 
         if (!$this->transportIdle) {
             $this->activePackage = null;
@@ -72,7 +94,11 @@ class DeviceListener extends UpnpListener
 
         try {
             $package = $driver->client()->currentPackage();
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            if ($this->upnpDown) {
+                throw $e; // Neither side answers: the TV is off or unreachable.
+            }
+
             return; // The UPnP side already tells reachable from not.
         }
 
@@ -80,13 +106,17 @@ class DeviceListener extends UpnpListener
             $package = null;
         }
 
-        if ($package === null) {
-            $this->lastCast = null;
-            $this->nextCastCheck = 0;
+        $reading = $this->castReading();
+        $cast = $reading['now'] ?? null;
+
+        if ($reading['standby'] ?? false) {
+            $package = null;
         }
 
-        $cast = $package === null ? null : $this->castNowPlaying();
-        $signature = $package === null ? null : $package.'|'.($cast?->track?->name ?? '').'|'.($cast?->state ?? '');
+        $external = $reading['external'] ?? false;
+        $signature = $package === null ? null : $package.'|'.($cast?->track?->name ?? '').'|'.($cast?->state ?? '').'|'.(int) $external;
+
+        $this->reportProgress($deviceId, $cast);
 
         if ($package === $this->activePackage && $signature === $this->reported) {
             return;
@@ -102,7 +132,7 @@ class DeviceListener extends UpnpListener
             return;
         }
 
-        $label = collect($driver->apps())->firstWhere('id', $package)['label'] ?? $package;
+        $label = $this->label($driver, $package, $external);
 
         event(new NowPlayingUpdated(
             deviceId: $deviceId,
@@ -118,6 +148,29 @@ class DeviceListener extends UpnpListener
         DeviceCache::updateState((int) $deviceId, State::Playing);
     }
 
+    /** `org.droidtv.xtv` is the TV's own layer: the tuner, or (Cast says so) another input such as HDMI. */
+    private function label(VideoPlayerDriver $driver, string $package, bool $external): string
+    {
+        if ($package === 'org.droidtv.xtv') {
+            return $external ? 'HDMI input' : 'TV';
+        }
+
+        return collect($driver->apps())->firstWhere('id', $package)['label'] ?? $package;
+    }
+
+    /** The progress of casted media, in percent, when it moved. */
+    private function reportProgress(string $deviceId, ?NowPlaying $cast): void
+    {
+        $duration = $cast?->track?->duration;
+        $percent = $duration ? min(100, (int) round($cast->position / $duration * 100)) : null;
+
+        if ($percent !== null && $cast->state === 'playing' && $percent !== $this->lastProgress) {
+            event(new ProgressUpdated(deviceId: $deviceId, progress: $percent));
+        }
+
+        $this->lastProgress = $percent;
+    }
+
     /** The casted title, shown under the app's own name (Jointspace knows the label, Cast only the receiver's). */
     private function withApp(NowPlaying $cast, string $label, string $package): NowPlaying
     {
@@ -127,7 +180,7 @@ class DeviceListener extends UpnpListener
     }
 
     /** What Cast reports, at most every few seconds; null when there is no media session, or the TV has no Cast. */
-    private function castNowPlaying(): ?NowPlaying
+    private function castReading(): ?array
     {
         if (now()->timestamp < $this->nextCastCheck) {
             return $this->lastCast;
