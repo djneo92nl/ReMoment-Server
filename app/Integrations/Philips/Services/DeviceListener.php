@@ -25,8 +25,8 @@ class DeviceListener extends UpnpListener
 {
     private const ACTIVITY_EVERY_SECONDS = 3;
 
-    /** Packages that are the TV's menu, not something playing. */
-    private const IDLE_PACKAGES = ['com.google.android.tvlauncher', 'com.google.android.apps.tv.launcherx', 'org.droidtv.nettvbrowser'];
+    /** Packages that are the TV's menu or launcher: the TV is on, at its home screen. */
+    private const IDLE_PACKAGES = ['com.google.android.tvlauncher', 'com.google.android.apps.tv.launcherx', 'org.droidtv.nettvbrowser', 'me.efesser.flauncher'];
 
     private const CAST_EVERY_SECONDS = 5;
 
@@ -130,8 +130,13 @@ class DeviceListener extends UpnpListener
             return; // The UPnP side already tells reachable from not.
         }
 
-        if ($package !== null && in_array($package, self::IDLE_PACKAGES, true)) {
-            $package = null;
+        // The TV's own power state says standby; its menu or launcher in front is the TV on, at its home screen.
+        try {
+            if ($driver->client()->powerState() === 'Standby') {
+                $package = null;
+            }
+        } catch (\Throwable) {
+            // Not every firmware has powerstate.
         }
 
         $reading = $this->castReading();
@@ -179,6 +184,10 @@ class DeviceListener extends UpnpListener
     /** `org.droidtv.xtv` is the TV's own layer: the tuner, or (Cast says so) another input such as HDMI. */
     private function label(VideoPlayerDriver $driver, string $package, bool $external): string
     {
+        if (in_array($package, self::IDLE_PACKAGES, true)) {
+            return 'Home screen';
+        }
+
         if ($package === 'org.droidtv.xtv') {
             return $external ? 'HDMI input' : 'TV';
         }

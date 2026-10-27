@@ -162,12 +162,13 @@ class PhilipsTvTest extends TestCase
         $this->assertSame(State::Playing, DeviceCache::getState($device->id));
         Event::assertDispatchedTimes(\App\Events\Device\DeviceStateChanged::class, $changes);
 
-        // Back in the TV's launcher: nothing plays any more.
+        // Back in the TV's launcher: the TV is on at its home screen, not in standby.
         $package = 'com.google.android.tvlauncher';
         $this->travel(5)->seconds();
         $listener->poll((string) $device->id);
 
-        Event::assertDispatched(NowPlayingEnded::class);
+        Event::assertDispatched(NowPlayingUpdated::class, fn ($e) => $e->nowPlaying->source?->name === 'Home screen');
+        $this->assertSame(State::Playing, DeviceCache::getState($device->id));
     }
 
     public function test_an_unpaired_philips_tv_is_still_found_by_generic_discovery(): void
