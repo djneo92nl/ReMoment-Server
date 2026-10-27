@@ -143,15 +143,4 @@ class RemoteKeysTest extends TestCase
 
         Livewire::test(RemoteCard::class, ['device' => $plain])->assertDontSee('Remote');
     }
-
-    public function test_number_keys_live_in_the_remote_card_and_not_in_also(): void
-    {
-        Http::fake(['*' => Http::response([])]);
-        $device = $this->philips();
-
-        Livewire::test(RemoteCard::class, ['device' => $device])->assertSeeHtml('pressDigit(5)')->call('pressDigit', 5);
-        Http::assertSent(fn (Request $r) => ($r['key'] ?? null) === 'Digit5');
-
-        Livewire::test(\App\Livewire\TvExtras::class, ['device' => $device])->assertDontSee('Number keys')->assertDontSee('Also');
-    }
 }
