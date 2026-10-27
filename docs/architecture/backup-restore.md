@@ -51,6 +51,8 @@ No `mariadb-dump`: the production image installs `mysql-client` (Sail's default)
 
 Refusals: the archive's latest migration is newer than the app's (a downgrade; update the app first), a different driver family (use `db:import-sqlite` for SQLite to MariaDB), a `--no-db` archive, and any table that already has rows unless `--force` (which empties those tables first). Foreign keys are switched off for the load (`SET FOREIGN_KEY_CHECKS` / `PRAGMA foreign_keys`) and back on after. Tables missing in the target are skipped with a warning; columns the target lacks are dropped.
 
+**`APP_KEY` and `--with-secrets`.** Service secrets are stored encrypted with the install's `APP_KEY` (see [credentials.md](credentials.md)). An archive made with `--with-secrets` holds those encrypted values, so restoring it on an install with a different `APP_KEY` probably leaves them unreadable (the registry then treats them as not set and you enter the keys again). *Not verified.* Keep the `APP_KEY` with your backups if you use `--with-secrets`.
+
 ## Not in the backup: your music files
 
 Own audio files (`MUSIC_DIR`, `LIBRARY_DIR`, S3 locations) are yours and large. Back them up with what you use for the rest of your files (rsync, restic, Proxmox backup of the mount, S3 versioning). After restoring on a new machine, mount them at the same paths and run `php artisan library:scan-files`; the database already knows the files (tracks, playlists, plays) and matches them.
