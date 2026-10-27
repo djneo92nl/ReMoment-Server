@@ -33,6 +33,8 @@ services:
                 condition: service_healthy
             meilisearch:
                 condition: service_healthy
+        # Supervisor waits up to 3660 s for the storage worker to finish its job (stopwaitsecs in supervisord.prod.conf); Docker's 10 s default would SIGKILL it first.
+        stop_grace_period: 3700s
         restart: unless-stopped
 
     # The app runs on the host network, so MariaDB is published on loopback only.

@@ -24,6 +24,9 @@ class RunStorageTask implements ShouldBeUnique, ShouldQueue
 
     public int $tries = 1;
 
+    /** Not forever: a worker killed mid-task must not block the next scan. Matches StorageTasks' 120 minutes after which a task counts as lost. */
+    public int $uniqueFor = 7200;
+
     /**
      * Its own queue and worker: a scan or import takes minutes to hours, and on the default workers it kept
      * both busy, so the health heartbeat went stale and QueueWatchdog killed them mid-task.

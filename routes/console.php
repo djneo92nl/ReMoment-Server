@@ -15,7 +15,7 @@ Schedule::command('device:sync-sources')->weekly();
 
 // Finds new devices for the list at /settings/devices; never adds one (DEVICE_AUTO_DISCOVER=false turns it off).
 if (config('devices.auto_discover')) {
-    Schedule::command('device:discover')->hourly()->withoutOverlapping()->runInBackground();
+    Schedule::command('device:discover')->hourly()->withoutOverlapping(120)->runInBackground();
 }
 
 Schedule::command('spotify:sync-library')->daily();
@@ -37,10 +37,14 @@ Schedule::command('library:scan-files --queue')->dailyAt('03:30');
 Schedule::command('library:merge-duplicates --force')->weeklyOn(0, '04:00')->withoutOverlapping();
 
 // Fills and refreshes the cached library overviews (LibraryCache), so a visit never pays for a cold or stale one.
-Schedule::command('library:warm')->everyFiveMinutes()->withoutOverlapping()->runInBackground();
+// The overlap lock expires after 10 minutes: the default is 24 h, and a run killed by a restart never clears it (Redis survives), so the warm-up would stay off for a day.
+Schedule::command('library:warm')->everyFiveMinutes()->withoutOverlapping(10)->runInBackground();
 
 // Nightly backup of the database and settings, keeping the last BACKUP_KEEP archives (docs/architecture/backup-restore.md); /settings/health warns when it stops.
 Schedule::command('backup:run')->dailyAt('01:30')->withoutOverlapping();
+
+// failed_jobs only grows otherwise; a month is enough to look at a failure.
+Schedule::command('queue:prune-failed --hours=720')->dailyAt('04:30');
 
 // Health heartbeats — see App\Domain\Health\Heartbeat and /settings/health.
 Schedule::call(function () {
