@@ -28,6 +28,7 @@ Device and library tools do not re-implement anything: `ApiBridge` dispatches an
 | `queue` | `action`: `list` (default) Up Next, `jump`, `add` / `next` (track, album, artist or playlist at the end / after the current track), `remove`, `move`, `clear` (`confirm=true`); see `docs/api/queue.md` |
 | `sources` | list/activate sources; list/run source controls (CD, FM presets) |
 | `radio` | list stations, play one, favorite one |
+| `beolink_stream` | the BeoLink stream (a B&O source's audio through the server): address, which B&O device it listens to, who plays it; with `device_id` play it there (`stream_url`, optional `host_device_id` = the B&O device to carry), `stop` stops it |
 | `spotify_stream` | the Spotify stream's address and receiver name; with `device_id` start it on that device (`stream_url`) |
 | `multiroom` | get, join, leave |
 | `device_settings` | sound-adjustment, bluetooth, info (rename), sleep-timer (`docs/api/device-settings.md`) |

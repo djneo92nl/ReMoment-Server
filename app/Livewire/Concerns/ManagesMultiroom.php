@@ -2,10 +2,15 @@
 
 namespace App\Livewire\Concerns;
 
+use App\Domain\Artwork\NowPlayingArtwork;
+use App\Domain\Beolink\BeolinkStream;
 use App\Domain\Device\DeviceVolume;
 use App\Domain\Device\MultiRoomPeers;
 use App\Domain\Device\State;
+use App\Domain\Storage\StreamUrl;
+use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
+use App\Integrations\Contracts\PlayStreamUrlInterface;
 use App\Models\Device;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
@@ -24,6 +29,12 @@ trait ManagesMultiroom
     public array $currentListeners = [];
 
     public array $invitableDevices = [];
+
+    /** Devices outside the brand's own multiroom that can play the BeoLink stream of this device (pseudo multiroom). */
+    public array $streamTargets = [];
+
+    /** Ids of the stream targets that play the stream of this device now. */
+    public array $streamPlaying = [];
 
     public ?string $multiroomError = null;
 
@@ -59,7 +70,72 @@ trait ManagesMultiroom
             }
         }
 
+        $this->loadStreamTargets();
         $this->multiRoomDataLoaded = true;
+    }
+
+    /**
+     * The "stream to" rows: devices that are not on this device's native multiroom but play a stream URL, offered
+     * while this device plays and the BeoLink receiver can join it (docs/architecture/beolink-stream.md).
+     */
+    private function loadStreamTargets(): void
+    {
+        $this->streamTargets = $this->streamPlaying = [];
+        $device = $this->multiroomDevice();
+
+        if (!BeolinkStream::enabled() || $device->state !== State::Playing || BeolinkStream::jidOf($device) === null) {
+            return;
+        }
+
+        $this->streamTargets = Device::where('id', '!=', $device->id)
+            ->where('device_brand_name', '!=', $device->device_brand_name)
+            ->get()
+            ->filter(function ($d) {
+                try {
+                    return $d->state !== State::Unreachable && $d->driver instanceof PlayStreamUrlInterface;
+                } catch (\Throwable) {
+                    return false;
+                }
+            })
+            ->map(fn ($d) => ['id' => $d->id, 'device_name' => $d->device_name])
+            ->values()
+            ->all();
+
+        $status = BeolinkStream::status();
+        $this->streamPlaying = $status['host_device_id'] === $device->id ? $status['target_device_ids'] : [];
+    }
+
+    /** Plays this device's audio on a device outside the native multiroom, through the BeoLink stream. */
+    public function streamTo(int $targetDeviceId): void
+    {
+        $this->multiroomAction('Stream failed', function () use ($targetDeviceId) {
+            $target = Device::findOrFail($targetDeviceId);
+            $driver = $target->driver;
+
+            if (!($driver instanceof PlayStreamUrlInterface)) {
+                throw new \RuntimeException('This device cannot play a stream.');
+            }
+
+            BeolinkStream::listenTo($this->multiroomDevice());
+            $logo = ($proxy = NowPlayingArtwork::logo('music')['proxy_320'] ?? null) ? StreamUrl::storage($proxy) : null;
+            $driver->playStreamUrl(BeolinkStream::url(), BeolinkStream::title(), $logo);
+            BeolinkStream::addTarget($target->id);
+            $this->loadStreamTargets();
+        });
+    }
+
+    public function stopStreamTo(int $targetDeviceId): void
+    {
+        $this->multiroomAction('Stop failed', function () use ($targetDeviceId) {
+            $driver = Device::findOrFail($targetDeviceId)->driver;
+
+            if ($driver instanceof MediaControlsInterface) {
+                $driver->stop();
+            }
+
+            BeolinkStream::removeTarget($targetDeviceId);
+            $this->loadStreamTargets();
+        });
     }
 
     public function joinSession(int $hostDeviceId): void
@@ -110,7 +186,7 @@ trait ManagesMultiroom
     #[Computed]
     public function multiroomRooms(): Collection
     {
-        $ids = array_merge(array_column($this->currentListeners, 'id'), array_column($this->invitableDevices, 'id'), array_column($this->joinableSessions, 'id'));
+        $ids = array_merge(array_column($this->currentListeners, 'id'), array_column($this->invitableDevices, 'id'), array_column($this->joinableSessions, 'id'), array_column($this->streamTargets, 'id'));
 
         return Device::whereIn('id', $ids)->get()->keyBy('id');
     }

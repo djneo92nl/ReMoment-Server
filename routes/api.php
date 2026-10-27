@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\LiteArtworkController;
 use App\Http\Controllers\Api\PlayerController;
 use App\Http\Controllers\Api\QueueController;
 use App\Http\Controllers\Api\SourceControlsController;
+use App\Http\Controllers\Api\BeolinkStreamController;
 use App\Http\Controllers\Api\SpotifyStreamController;
 use App\Http\Controllers\Api\StorageController;
 use Illuminate\Support\Facades\Route;
@@ -78,6 +79,10 @@ Route::post('/devices/{device}/controls/{control}', [SourceControlsController::c
 Route::get('/spotify-stream', [SpotifyStreamController::class, 'show']);
 Route::post('/devices/{device}/spotify-stream', [SpotifyStreamController::class, 'play']);
 Route::post('/librespot/event', [SpotifyStreamController::class, 'event']);
+
+Route::get('/beolink-stream', [BeolinkStreamController::class, 'show']);
+Route::post('/devices/{device}/beolink-stream', [BeolinkStreamController::class, 'play']);
+Route::delete('/devices/{device}/beolink-stream', [BeolinkStreamController::class, 'stop']);
 
 Route::get('/devices/{device}/radio', [DeviceController::class, 'radioStations']);
 Route::get('/radio/{station}/now', [DeviceController::class, 'radioNow']);

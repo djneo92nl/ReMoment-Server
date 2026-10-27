@@ -30,6 +30,7 @@ class ReMomentServer extends Server
         Tools\Sources::class,
         Tools\Radio::class,
         Tools\SpotifyStream::class,
+        Tools\BeolinkStream::class,
         Tools\Multiroom::class,
         Tools\DeviceSettings::class,
         Tools\MovePlayback::class,

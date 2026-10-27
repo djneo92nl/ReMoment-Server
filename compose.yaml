@@ -118,7 +118,7 @@ services:
     # ICECAST_INTERNAL_URL=http://icecast:8000 (docs/architecture/spotify-stream.md). Docker Desktop does not pass mDNS,
     # so Spotify finds librespot only when the app runs on a Linux host (use docker-compose.prod.yml there).
     icecast:
-        profiles: [spotify-stream]
+        profiles: [spotify-stream, beolink-stream]
         build:
             context: './docker/icecast'
         environment:
@@ -150,6 +150,28 @@ services:
             - '${LIBRESPOT_TRACK_PORT:-8010}:8010'
         volumes:
             - 'sail-librespot-cache:/cache'
+        depends_on:
+            - icecast
+        networks:
+            - sail
+
+    # Opt-in BeoLink stream: docker compose --profile beolink-stream up -d, then BEOLINK_ENABLED=true and BEOLINK_API_URL=http://beolink:8081
+    # (docs/architecture/beolink-stream.md). The receiver is a B&O listener found by mDNS, which Docker Desktop does not pass:
+    # it joins a B&O source only when the stack runs on a Linux host (use docker-compose.prod.yml there).
+    beolink:
+        profiles: [beolink-stream]
+        build:
+            context: './docker'
+            dockerfile: 'beolink/Dockerfile'
+        environment:
+            BEOLINK_NAME: '${BEOLINK_NAME:-ReMoment Stream}'
+            BEOLINK_API_PORT: '8081'
+            # Add this receiver to the network's shared configuration (a change every B&O product holds); off unless asked.
+            BEO_ENROL: '${BEOLINK_ENROL:-false}'
+            STREAM_BITRATE: '${BEOLINK_STREAM_BITRATE:-192}'
+            ICECAST_SOURCE_PASSWORD: '${ICECAST_SOURCE_PASSWORD:-remoment}'
+            ICECAST_HOST: 'icecast'
+            ICECAST_BEOLINK_MOUNT: '${ICECAST_BEOLINK_MOUNT:-beolink.mp3}'
         depends_on:
             - icecast
         networks:

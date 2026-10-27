@@ -123,7 +123,7 @@ services:
     # (docs/architecture/spotify-stream.md). Icecast is published on ICECAST_PORT for the speakers; librespot
     # runs on the host network so Spotify's zeroconf discovery reaches the LAN, and reaches Icecast and the app on 127.0.0.1.
     icecast:
-        profiles: [spotify-stream]
+        profiles: [spotify-stream, beolink-stream]
         build:
             context: './docker/icecast'
         image: 'remoment/icecast:latest'
@@ -158,6 +158,29 @@ services:
             REMOMENT_URL: 'http://127.0.0.1:${APP_PORT:-80}'
         volumes:
             - 'remoment-librespot-cache:/cache'
+        depends_on:
+            - icecast
+        restart: unless-stopped
+
+    # Opt-in BeoLink stream (docs/architecture/beolink-stream.md): a B&O NetworkLink listener whose audio is served on a
+    # second Icecast mount. Host network: B&O products find it by mDNS and open sessions to it (5222) and stream to it
+    # (UDP/TCP 1234); its Mozart API listens on BEOLINK_API_PORT (the server joins and leaves a source through it).
+    beolink:
+        profiles: [beolink-stream]
+        network_mode: host
+        build:
+            context: './docker'
+            dockerfile: 'beolink/Dockerfile'
+        image: 'remoment/beolink:latest'
+        environment:
+            BEOLINK_NAME: '${BEOLINK_NAME:-ReMoment Stream}'
+            BEOLINK_API_PORT: '${BEOLINK_API_PORT:-8081}'
+            BEO_ENROL: '${BEOLINK_ENROL:-false}'
+            STREAM_BITRATE: '${BEOLINK_STREAM_BITRATE:-192}'
+            ICECAST_SOURCE_PASSWORD: '${ICECAST_SOURCE_PASSWORD:-remoment}'
+            ICECAST_HOST: '127.0.0.1'
+            ICECAST_PORT: '${ICECAST_PORT:-8000}'
+            ICECAST_BEOLINK_MOUNT: '${ICECAST_BEOLINK_MOUNT:-beolink.mp3}'
         depends_on:
             - icecast
         restart: unless-stopped

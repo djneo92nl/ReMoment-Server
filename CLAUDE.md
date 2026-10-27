@@ -53,6 +53,7 @@ docs/
     library-health.md        Reports on the own files: suspected transcodes, damaged, clipping, duplicates, lossy, incomplete albums, orphans
     listening-modes.md       Focus / Party / Sleep / Workout: preset smart-playlist definitions over the audio analysis, API and Library page row
     similar-tracks.md        Plan (not built) for similar tracks / radio from the EffNet embeddings; the sqlite-vec spike's measurements and what the build must do
+    beolink-stream.md        B&O multiroom on any speaker (pseudo multiroom): beo listener → ffmpeg → Icecast, joins a B&O source, `stream_url` targets in the multiroom picker, opt-in compose profile
     spotify-stream.md        Spotify on any speaker: librespot → ffmpeg → Icecast MP3 stream, `stream_url` capability, --onevent hook as now playing, opt-in compose profile
     smart-playlists.md       Rule-based playlists (source smart): rules JSON, SmartFields registry, builder, editor, daily refresh
     sd-card-export.md        Admin zip of recent covers/backgrounds + logos in the touch client's SD layout
@@ -350,6 +351,8 @@ GET      /api/devices/{id}/wired-speakers   PUT …/wired-speakers/{pl_1|pl_2} {
 
 GET  /api/spotify-stream                  → { enabled, name, url }
 POST /api/devices/{id}/spotify-stream     → { status, url, receiver }   (needs LIBRESPOT_ENABLED and `stream_url`; the user then picks the receiver in Spotify)
+GET  /api/beolink-stream                  → { enabled, name, url, host_device_id, target_device_ids }   the B&O source's audio through the server (`docs/architecture/beolink-stream.md`)
+POST /api/devices/{id}/beolink-stream     body { host_device_id? } → { status, url, … }   play it on a `stream_url` device; the receiver joins the host B&O device first. DELETE stops it
 POST /api/librespot/event                 the container's --onevent hook, header X-Librespot-Secret; becomes the speaker's now playing
 ```
 

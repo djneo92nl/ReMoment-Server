@@ -725,6 +725,53 @@ paths:
                   receiver: { type: string }
         "422":
           description: Stream not enabled, or the device cannot play a stream
+  /beolink-stream:
+    get:
+      tags: [Radio]
+      summary: The BeoLink stream (a B&O source's audio through the server) - whether it is on, the MP3 stream URL, the B&O device it listens to and the devices playing it
+      operationId: getBeolinkStream
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled: { type: boolean }
+                  name: { type: string }
+                  url: { type: string, nullable: true }
+                  host_device_id: { type: integer, nullable: true }
+                  target_device_ids: { type: array, items: { type: integer } }
+  /devices/{device}/beolink-stream:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    post:
+      tags: [Radio]
+      summary: Play the BeoLink stream on this device (capability stream_url); with host_device_id the receiver first joins that B&O device's experience
+      operationId: playBeolinkStream
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                host_device_id: { type: integer, description: "A B&O device that is playing (its multiroom id must be known)" }
+      responses:
+        "200":
+          description: OK (the body is GET /beolink-stream plus status and url)
+        "422":
+          description: Stream not enabled, or the device cannot play a stream
+        "502":
+          description: The receiver did not accept the join, or the host's multiroom id is unknown (beolink_unavailable), or the device failed
+    delete:
+      tags: [Radio]
+      summary: Stop the BeoLink stream on this device; the receiver leaves the B&O source when no device plays it any more
+      operationId: stopBeolinkStream
+      responses:
+        "200":
+          description: OK
+        "422":
+          description: The device has no media controls
   /radio/{station}/favorite:
     parameters:
       - name: station

@@ -47,6 +47,17 @@
                         <x-mini-player :glass="$inPanel" :device="$rooms[$guest['id']]" :in-session="false"
                                        :toggle="'inviteDevice('.$guest['id'].')'" wire:key="mr-out-{{ $guest['id'] }}" />
                     @endforeach
+
+                    @if(count($streamTargets) > 0)
+                        <p class="{{ $inPanel ? '' : 'text-gray-400 dark:text-gray-600' }}" style="{{ $inPanel ? 'opacity:.6;' : '' }}font-size:.7rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-top:.4rem"
+                           title="Played as a stream: about 5-10 seconds behind, not in sync with the B&O speakers">Stream to</p>
+                        @foreach($streamTargets as $target)
+                            @continue(!$rooms->has($target['id']))
+                            @php $streaming = in_array($target['id'], $streamPlaying, true); @endphp
+                            <x-mini-player :glass="$inPanel" :device="$rooms[$target['id']]" :in-session="$streaming"
+                                           :toggle="($streaming ? 'stopStreamTo(' : 'streamTo(').$target['id'].')'" wire:key="mr-stream-{{ $target['id'] }}" />
+                        @endforeach
+                    @endif
                 @else
                     {{-- not playing: join a room that is --}}
                     @foreach($joinableSessions as $session)
@@ -57,7 +68,7 @@
                 @endif
             </div>
 
-            @if(($isHosting && count($currentListeners) === 0 && count($invitableDevices) === 0) || (!$isHosting && count($joinableSessions) === 0))
+            @if(($isHosting && count($currentListeners) === 0 && count($invitableDevices) === 0 && count($streamTargets) === 0) || (!$isHosting && count($joinableSessions) === 0))
                 <p class="{{ $inPanel ? '' : 'text-gray-400 dark:text-gray-600' }}" style="{{ $inPanel ? 'opacity:.6;' : '' }}font-size:.85rem;text-align:center;padding:1rem 0 0">
                     {{ $isHosting ? "No other {$device->device_brand_name} devices available." : 'Nothing is playing that this device can join.' }}
                 </p>
