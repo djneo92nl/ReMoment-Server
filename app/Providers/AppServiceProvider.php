@@ -25,6 +25,7 @@ use App\Listeners\Device\PublishStateToMqtt;
 use App\Listeners\Device\PublishVolumeToMqtt;
 use App\Listeners\Device\StorePlaybackHistory;
 use App\Listeners\Device\SwitchToDefaultSource;
+use App\Listeners\Device\SyncGroupMirror;
 use App\Listeners\Device\SyncNowPlayingDataWithState;
 use App\Listeners\Device\UpdateDeviceCache;
 use App\Services\MqttService;
@@ -66,9 +67,12 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(NowPlayingUpdated::class, [StorePlaybackHistory::class, 'handle']);
         Event::listen(NowPlayingUpdated::class, PublishNowPlayingToMqtt::class);
         Event::listen(NowPlayingUpdated::class, DispatchArtworkProcessing::class);
+        // After UpdateDeviceCache: it reads the cache those events just wrote.
+        Event::listen(NowPlayingUpdated::class, SyncGroupMirror::class);
 
         Event::listen(ProgressUpdated::class, UpdateDeviceCache::class);
         Event::listen(ProgressUpdated::class, PublishProgressToMqtt::class);
+        Event::listen(ProgressUpdated::class, SyncGroupMirror::class);
         Event::listen(NowPlayingEnded::class, UpdateDeviceCache::class);
         Event::listen(NowPlayingEnded::class, [ClosePlaybackHistory::class, 'handle']);
         Event::listen(VolumeUpdated::class, UpdateDeviceCache::class);
@@ -87,5 +91,6 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(DeviceStateChanged::class, PublishStateToMqtt::class);
         Event::listen(DeviceStateChanged::class, SyncNowPlayingDataWithState::class);
         Event::listen(DeviceStateChanged::class, SwitchToDefaultSource::class);
+        Event::listen(DeviceStateChanged::class, SyncGroupMirror::class);
     }
 }

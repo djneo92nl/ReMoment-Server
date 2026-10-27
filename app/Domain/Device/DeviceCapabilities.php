@@ -5,6 +5,8 @@ namespace App\Domain\Device;
 use App\Domain\Control\SourceControls;
 use App\Domain\Device\Cache\Battery;
 use App\Domain\Library\LibraryPlayback;
+use App\Domain\Playback\PlaybackCapture;
+use App\Domain\Playback\SyncGroups;
 use App\Integrations\ReMoment\PlayerDevice;
 use App\Integrations\ReMoment\PlayerDriver;
 use App\Models\Device;
@@ -15,7 +17,9 @@ use App\Models\Device;
  * Spotify is routed to it (SpotifyRouting), plus `library_playback` when the
  * library can be played on it by DLNA or Spotify (LibraryPlayback), minus
  * capabilities its model has no hardware for (HardwareFeatures).
- * `source_controls` is reported while the active source has controls a
+ * `sync_group` is reported for a device that can follow a leader (SyncGroups::canFollow).
+ * `move_playback` is reported while something plays that can be moved to another device
+ * (PlaybackCapture::movable). `source_controls` is reported while the active source has controls a
  * transport can deliver (SourceControls). `battery` is reported only once the
  * device's listener has seen a battery: a driver also covers mains-powered
  * models.
@@ -41,6 +45,14 @@ final class DeviceCapabilities
 
         if (SourceControls::available($device) !== null) {
             $capabilities[] = 'source_controls';
+        }
+
+        if (app(PlaybackCapture::class)->movable($device)) {
+            $capabilities[] = 'move_playback';
+        }
+
+        if (SyncGroups::canFollow($device)) {
+            $capabilities[] = 'sync_group';
         }
 
         if (Battery::get($device->id) === null) {

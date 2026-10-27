@@ -18,6 +18,8 @@ use App\Domain\Library\PlaybackFailedException;
 use App\Domain\Library\PlaybackResult;
 use App\Domain\Library\PlaylistMode;
 use App\Domain\Library\SpotifyUri;
+use App\Domain\Playback\NotMovableException;
+use App\Domain\Playback\PlaybackMover;
 use App\Domain\Radio\StationNowPlaying;
 use App\Domain\Radio\StreamTitles;
 use App\Events\Device\PlaybackModesUpdated;
@@ -347,6 +349,36 @@ class DeviceController extends Controller
 
             return ['status' => 'ok'];
         }, reachable: false);
+    }
+
+    /**
+     * Moves what $device plays to another device ("Move playback to…"); see docs/api/playback-move.md.
+     * The device that plays is stopped afterwards unless `stop_source` is false.
+     */
+    public function move(Request $request, Device $device, PlaybackMover $mover): JsonResponse
+    {
+        $data = $request->validate([
+            'to_device_id' => ['required', 'integer', 'exists:devices,id', Rule::notIn([$device->id])],
+            'stop_source' => ['nullable', 'boolean'],
+        ]);
+
+        $target = Device::findOrFail($data['to_device_id']);
+
+        if ($error = $this->assertReachable($device) ?? $this->assertReachable($target)) {
+            return $error;
+        }
+
+        try {
+            $result = $mover->move($device, $target, $request->boolean('stop_source', true));
+        } catch (NotMovableException $e) {
+            return response()->json(['error' => 'not_movable', 'message' => $e->getMessage()], 422);
+        } catch (NotPlayableException $e) {
+            return response()->json(['error' => 'not_playable', 'message' => $e->getMessage()], 422);
+        } catch (PlaybackFailedException $e) {
+            return response()->json(['error' => 'driver_error', 'message' => $e->getMessage()], 502);
+        }
+
+        return response()->json(['status' => 'ok', 'to' => $target->device_name] + $result);
     }
 
     public function libraryPlay(Request $request, Device $device, LibraryPlayback $library): JsonResponse

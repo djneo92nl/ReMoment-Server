@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\SourceControlsController;
 use App\Http\Controllers\Api\SpotifyStreamController;
 use App\Http\Controllers\Api\StorageController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\SyncGroupController;
 
 Route::get('/info', InfoController::class);
 
@@ -92,6 +93,15 @@ Route::post('/devices/{device}/library/play-playlist', [DeviceController::class,
 Route::post('/devices/{device}/library/play-tracks', [DeviceController::class, 'libraryPlayTracks']);
 Route::post('/devices/{device}/library/play-listening-mode', [DeviceController::class, 'libraryPlayListeningMode']);
 Route::post('/devices/{device}/library/play-album', [DeviceController::class, 'libraryPlayAlbum']);
+Route::post('/devices/{device}/move', [DeviceController::class, 'move']);
+
+Route::get('/sync-groups', [SyncGroupController::class, 'index']);
+Route::post('/sync-groups', [SyncGroupController::class, 'store']);
+Route::delete('/sync-groups/{group}', [SyncGroupController::class, 'destroy']);
+Route::post('/sync-groups/{group}/members', [SyncGroupController::class, 'addMember']);
+Route::put('/sync-groups/{group}/members/{device}', [SyncGroupController::class, 'setOffset']);
+Route::delete('/sync-groups/{group}/members/{device}', [SyncGroupController::class, 'removeMember']);
+
 Route::post('/devices/{device}/library/play-artist', [DeviceController::class, 'libraryPlayArtist']);
 
 Route::get('/library/libraries', [LibraryController::class, 'libraries']);

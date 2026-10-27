@@ -80,7 +80,7 @@ class DeviceApiTest extends TestCase
     {
         $device = $this->makeDevice(\Tests\Support\FakeLibraryPlaybackDriver::class);
 
-        $this->getJson("/api/devices/{$device->id}")->assertJsonPath('data.capabilities', ['library_playback']);
+        $this->getJson("/api/devices/{$device->id}")->assertJsonPath('data.capabilities', ['library_playback', 'sync_group']);
     }
 
     public function test_show_has_null_now_playing_when_nothing_is_cached(): void

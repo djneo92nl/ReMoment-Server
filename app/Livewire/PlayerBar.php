@@ -23,6 +23,7 @@ use App\Integrations\Contracts\VolumeControlInterface;
 use App\Livewire\Concerns\ControlsPlayback;
 use App\Livewire\Concerns\EditsQueue;
 use App\Livewire\Concerns\ManagesMultiroom;
+use App\Livewire\Concerns\MovesPlayback;
 use App\Models\Device;
 use App\Support\SelectedDevice;
 use Illuminate\Support\Facades\Cache;
@@ -34,8 +35,9 @@ class PlayerBar extends Component
     use ControlsPlayback;
     use EditsQueue;
     use ManagesMultiroom;
+    use MovesPlayback;
 
-    /** The panel floating above the bar: 'queue', 'players' or 'multiroom'; null while closed. */
+    /** The panel floating above the bar: 'queue', 'players', 'multiroom' or 'move'; null while closed. */
     public ?string $panel = null;
 
     public function togglePanel(string $panel): void
@@ -45,7 +47,7 @@ class PlayerBar extends Component
 
     public function openPanel(string $panel): void
     {
-        if (!in_array($panel, ['queue', 'players', 'multiroom'], true)) {
+        if (!in_array($panel, ['queue', 'players', 'multiroom', 'move'], true)) {
             return;
         }
         // Queue and multiroom are about the pinned device: with none pinned only the picker exists.
@@ -53,6 +55,9 @@ class PlayerBar extends Component
             return;
         }
         $this->panel = $panel;
+        if ($panel === 'move') {
+            $this->moved = $this->moveError = null;
+        }
         if ($panel === 'multiroom') {
             $this->loadMultiRoomData();
         }
@@ -148,6 +153,11 @@ class PlayerBar extends Component
         return $this->device() ?? throw new \LogicException('No player is pinned.');
     }
 
+    protected function moveSourceDevice(): Device
+    {
+        return $this->device() ?? throw new \LogicException('No player is pinned.');
+    }
+
     protected function queueDevice(): ?Device
     {
         return $this->playbackDevice();
@@ -188,6 +198,8 @@ class PlayerBar extends Component
             'group' => $this->multiroomGroup($device),
             'players' => $this->panel === 'players' ? $this->players() : null,
             'queue' => $this->panel === 'queue' ? $this->queue($device, $state) : null,
+            'moveTargets' => $this->panel === 'move' ? $this->moveTargets() : collect(),
+            'canMove' => in_array('move_playback', $capabilities, true) || $this->panel === 'move',
             'supportsMultiRoom' => in_array('multi_room', $capabilities, true) && $state !== State::Unreachable,
         ]);
     }

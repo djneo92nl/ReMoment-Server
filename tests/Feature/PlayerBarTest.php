@@ -142,6 +142,46 @@ class PlayerBarTest extends TestCase
             ->assertSet('panel', 'multiroom');
     }
 
+    public function test_the_move_panel_moves_playback_to_the_picked_device(): void
+    {
+        \Tests\Support\FakePlayerDriver::reset();
+        config(['playback.move_wait_seconds' => 0]);
+        $from = $this->makeDevice('Kitchen');
+        $to = Device::factory()->driver(\Tests\Support\FakeMovableDriver::class)->create(['device_name' => 'Bedroom']);
+        DeviceCache::updateState($to->id, State::Playing);
+        cache()->put("listener_running_{$to->id}", true, 60);
+        cache()->put("listener_running_{$from->id}", true, 60);
+        DeviceCache::updateNowPlaying($from->id, new \App\Domain\Media\NowPlaying(state: 'playing', platform: 'radio', radio: new \App\Domain\Media\Radio(name: 'Radio 1')));
+        \App\Models\RadioStation::create(['name' => 'Radio 1']);
+
+        Livewire::withCookie(SelectedDevice::COOKIE, (string) $from->id)
+            ->test(PlayerBar::class)
+            ->call('openPanel', 'move')
+            ->assertSee('Move playback to')
+            ->assertSee('Bedroom')
+            ->call('movePlayback', $to->id)
+            ->assertSet('moveError', null)
+            ->assertSet('moved.name', 'Bedroom');
+
+        $this->assertNotEmpty(array_filter(\Tests\Support\FakePlayerDriver::$calls, fn ($c) => $c[0] === 'playRadioStation'));
+    }
+
+    public function test_the_move_panel_shows_why_a_move_is_refused(): void
+    {
+        $from = $this->makeDevice('Kitchen');
+        $to = $this->makeDevice('Bedroom');
+        cache()->put("listener_running_{$to->id}", true, 60);
+        cache()->put("listener_running_{$from->id}", true, 60);
+        DeviceCache::updateNowPlaying($from->id, new \App\Domain\Media\NowPlaying(state: 'playing', source: new \App\Domain\Media\Source(name: 'Line-in', sourceType: 'LINEIN')));
+
+        Livewire::withCookie(SelectedDevice::COOKIE, (string) $from->id)
+            ->test(PlayerBar::class)
+            ->call('openPanel', 'move')
+            ->call('movePlayback', $to->id)
+            ->assertSet('moved', null)
+            ->assertSee("can't be moved");
+    }
+
     public function test_the_queue_panel_edits_the_queue_with_the_row_it_was_shown_for(): void
     {
         \Tests\Support\FakePlayerDriver::reset();

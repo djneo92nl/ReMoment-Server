@@ -86,6 +86,8 @@
                         @include('livewire.partials.player-queue')
                     @elseif($panel === 'players')
                         @include('livewire.partials.player-picker')
+                    @elseif($panel === 'move')
+                        @include('livewire.partials.player-move')
                     @elseif($panel === 'multiroom' && $supportsMultiRoom)
                         @include('livewire.partials.multiroom-content', ['inPanel' => true])
                     @endif
@@ -217,6 +219,12 @@
                     <button type="button" wire:click="togglePanel('queue')" title="Up next" class="player-extra"
                             style="{{ $icon }};{{ $panel === 'queue' ? $on : '' }}">
                         <i class="fa-solid fa-list-ul" style="font-size:.85rem"></i>
+                    </button>
+                @endif
+                @if($canMove)
+                    <button type="button" wire:click="togglePanel('move')" title="Move playback to…" class="player-extra"
+                            style="{{ $icon }};{{ $panel === 'move' ? $on : '' }}">
+                        <i class="fa-solid fa-arrow-right-arrow-left" style="font-size:.85rem"></i>
                     </button>
                 @endif
                 @if($supportsMultiRoom)

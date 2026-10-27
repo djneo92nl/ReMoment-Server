@@ -20,6 +20,8 @@ docs/
     client-devices.md       Client device registration flow, all endpoints, firmware guide
     library.md              Library browse (artists, albums, playlists), favorites, play album/artist/playlist on a device (DLNA or Spotify), playlist artwork
     source-controls.md      Per-source controls (change disc, FM presets) from control profiles: GET/POST /api/devices/{id}/controls, resolution, transports
+    sync-groups.md          Sync groups (fake multiroom) REST API: leader + members, offsets, errors
+    playback-move.md        Move playback to another device: POST /api/devices/{id}/move, what moves (library queue, radio, Spotify transfer), what is refused (local inputs)
     queue.md                Editing the queue: add, play next, remove, move, clear (queue_add/next/remove/move/clear), positions, `expect`, per-platform support
     server-info.md          GET /api/info bootstrap endpoint (API/MQTT/artwork addresses for clients)
     mcp.md                  MCP server at /mcp for AI agents: tools, admin-token gating, how tools reuse the REST API
@@ -36,6 +38,7 @@ docs/
     upnp-renderer.md        Generic UPnP MediaRenderer fallback driver: server-managed queue, polling listener, discovery precedence, future research (native queues, radio, OpenHome)
     device-discovery.md     Discovery commands, listener startup, device_meta keys
     ase-api-map.md          What the B&O ASE REST API offers beyond the driver (Bluetooth, network, WiSA, sound), per model; the ase:map command
+    sync-groups.md          Fake multiroom: a leader and members kept together by the server (state, track changes, drift seeks), what can be shared, precision (about ±2 s), where it runs
     proxmox-deployment.md   Ansible: LXC container on an existing Proxmox host, MiniDLNA server
     discovery-for-clients.md mDNS advertisement (_remoment._tcp via host Avahi) so clients find the server
     system-requirements.md  Hardware tiers for the full server (Pi minimum up to Essentia + ML), what runs, disk and network needs
@@ -174,7 +177,7 @@ Response: `{ "data": DeviceDetailResource }`
 
 `state` values: `playing` | `standby` | `paused` | `unreachable`
 
-`capabilities` values: `media_controls` | `volume_control` | `radio_control` | `source_control` | `source_activation` | `multi_room` | `library_playback` | `seek` | `queue` | `queue_jump` | `queue_add` | `queue_next` | `queue_remove` | `queue_move` | `queue_clear` | `shuffle` | `repeat` | `like` | `power` | `sound_adjustment` | `bluetooth` | `device_info` | `battery` | `network_settings` | `wireless_speakers` | `wired_speakers` | `sleep_timer` | `digits` | `remote_control` | `stream_url` | `source_controls`
+`capabilities` values: `media_controls` | `volume_control` | `radio_control` | `source_control` | `source_activation` | `multi_room` | `library_playback` | `seek` | `queue` | `queue_jump` | `queue_add` | `queue_next` | `queue_remove` | `queue_move` | `queue_clear` | `shuffle` | `repeat` | `like` | `power` | `sound_adjustment` | `bluetooth` | `device_info` | `battery` | `network_settings` | `wireless_speakers` | `wired_speakers` | `sleep_timer` | `digits` | `remote_control` | `stream_url` | `source_controls` | `move_playback` | `sync_group`
 
 `multiroom` is `{ role, host, listeners }` (role `standalone` | `host` | `listener`, `host` and `listeners` as `{ id, name }`) or `null` while unknown — ASE devices only for now, read by their listener (`MultiRoomStatusInterface`, `MultiRoomUpdated` → cache + MQTT `/multiroom`, checked every 5 s); the device card shows a badge.
 
@@ -337,6 +340,14 @@ GET      /api/devices/{id}/wired-speakers   PUT …/wired-speakers/{pl_1|pl_2} {
 `stream_url` (UPnP, Sonos, ASE unverified) plays a live MP3 stream; the opt-in librespot + Icecast containers turn Spotify Connect into one (`docs/architecture/spotify-stream.md`).
 
 ```
+### Move playback
+
+`POST /api/devices/{id}/move` `{ to_device_id, stop_source? }` continues what plays on `{id}` on another device (capability `move_playback`, cache-only check). Library tracks keep queue and position (play, wait for `playing`, seek), radio restarts the station, Spotify uses Spotify's own transfer to a Connect-mapped speaker; line-in/TV/CD/Bluetooth/AirPlay inputs are `422 not_movable`. Code `App\Domain\Playback`; see `docs/api/playback-move.md`.
+
+### Sync groups (fake multiroom)
+
+`/api/sync-groups` makes a leader + members group for devices without native multiroom (capability `sync_group`): members start on the leader's queue (the move machinery) and `SyncGroupMirror` keeps them in step from the leader's events: state, track changes, a seek of a member that drifted more than `sync.drift_threshold` (2 s). Library tracks and radio, not Spotify; precision about ±2 s. UI: "Sync groups" on `/multiroom`. See `docs/architecture/sync-groups.md` and `docs/api/sync-groups.md`.
+
 GET  /api/spotify-stream                  → { enabled, name, url }
 POST /api/devices/{id}/spotify-stream     → { status, url, receiver }   (needs LIBRESPOT_ENABLED and `stream_url`; the user then picks the receiver in Spotify)
 POST /api/librespot/event                 the container's --onevent hook, header X-Librespot-Secret; becomes the speaker's now playing

@@ -79,8 +79,8 @@ final class Capabilities
         return self::MAP[$capability] ?? null;
     }
 
-    /** Not a driver contract: reported while the active source has controls (see SourceControls). */
-    private const DYNAMIC = ['source_controls'];
+    /** Not a driver contract: `source_controls` while the active source has controls (see SourceControls), `move_playback` while something movable plays (see PlaybackCapture), `sync_group` for a device that can follow a leader (see SyncGroups). */
+    private const DYNAMIC = ['source_controls', 'move_playback', 'sync_group'];
 
     /**
      * @param  string[]  $contracts

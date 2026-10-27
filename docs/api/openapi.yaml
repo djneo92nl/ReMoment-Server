@@ -182,6 +182,151 @@ paths:
                   status: { type: string }
                   position: { type: integer }
         "422": { $ref: "#/components/responses/DeviceError" }
+  /devices/{device}/move:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    post:
+      tags: [Playback]
+      summary: Move what plays on this device to another device (capability move_playback)
+      description: |
+        Library tracks continue on the target at the same position with the same queue (tracks the target
+        cannot play are left out, `skipped`); radio restarts the station; Spotify is handed over with
+        Spotify's own transfer, only to a speaker mapped to a Spotify Connect name. Inputs of the device
+        itself (line-in, TV, CD, Bluetooth, AirPlay/Cast) answer `not_movable`. The playing device is stopped
+        afterwards unless `stop_source` is false. See docs/api/playback-move.md.
+      operationId: movePlayback
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to_device_id]
+              properties:
+                to_device_id: { type: integer }
+                stop_source: { type: boolean, default: true }
+      responses:
+        "200":
+          description: Moved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  to: { type: string, description: Name of the target device }
+                  kind: { type: string, enum: [library, radio, spotify] }
+                  queued: { type: integer }
+                  skipped: { type: integer }
+                  position: { type: integer, description: Seconds the target was asked to continue from }
+        "422": { $ref: "#/components/responses/DeviceError" }
+        "503": { $ref: "#/components/responses/DeviceError" }
+  /sync-groups:
+    get:
+      tags: [Multiroom]
+      summary: Sync groups ("fake multiroom")
+      operationId: listSyncGroups
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/SyncGroup" } }
+    post:
+      tags: [Multiroom]
+      summary: Make a sync group (members need capability sync_group)
+      description: |
+        A leader plays, the members follow it: same queue, state and progress (within about two seconds).
+        Library tracks and radio only. See docs/api/sync-groups.md.
+      operationId: createSyncGroup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [leader_device_id, member_device_ids]
+              properties:
+                leader_device_id: { type: integer }
+                member_device_ids: { type: array, items: { type: integer }, minItems: 1 }
+                name: { type: string, nullable: true }
+      responses:
+        "201":
+          description: Made; `failed` lists members that could not start
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/SyncGroup" }
+                  failed:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        device_id: { type: integer }
+                        message: { type: string }
+        "422": { $ref: "#/components/responses/DeviceError" }
+  /sync-groups/{group}:
+    parameters: [{ name: group, in: path, required: true, schema: { type: integer } }]
+    delete:
+      tags: [Multiroom]
+      summary: End a sync group
+      operationId: deleteSyncGroup
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                stop_members: { type: boolean, default: true }
+      responses:
+        "200": { description: OK }
+  /sync-groups/{group}/members:
+    parameters: [{ name: group, in: path, required: true, schema: { type: integer } }]
+    post:
+      tags: [Multiroom]
+      summary: Add a member to a sync group
+      operationId: addSyncGroupMember
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_id]
+              properties:
+                device_id: { type: integer }
+      responses:
+        "201": { description: Added }
+        "422": { $ref: "#/components/responses/DeviceError" }
+  /sync-groups/{group}/members/{device}:
+    parameters:
+      - { name: group, in: path, required: true, schema: { type: integer } }
+      - { $ref: "#/components/parameters/device" }
+    put:
+      tags: [Multiroom]
+      summary: Trim a member (positive plays ahead of the leader)
+      operationId: setSyncGroupOffset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [offset_ms]
+              properties:
+                offset_ms: { type: integer, minimum: -30000, maximum: 30000 }
+      responses:
+        "200": { description: OK }
+    delete:
+      tags: [Multiroom]
+      summary: Remove a member (the last one ends the group)
+      operationId: removeSyncGroupMember
+      responses:
+        "200": { description: OK }
   /devices/{device}/queue:
     parameters: [{ $ref: "#/components/parameters/device" }]
     get:
@@ -1877,7 +2022,7 @@ components:
       enum: [off, all, one]
     Capability:
       type: string
-      enum: [media_controls, volume_control, radio_control, source_control, source_activation, multi_room, library_playback, seek, queue, queue_jump, queue_add, queue_next, queue_remove, queue_move, queue_clear, shuffle, repeat, like, power, sound_adjustment, bluetooth, device_info, battery, network_settings, wireless_speakers, wired_speakers, sleep_timer, digits, remote_control, stream_url, source_controls]
+      enum: [media_controls, volume_control, radio_control, source_control, source_activation, multi_room, library_playback, seek, queue, queue_jump, queue_add, queue_next, queue_remove, queue_move, queue_clear, shuffle, repeat, like, power, sound_adjustment, bluetooth, device_info, battery, network_settings, wireless_speakers, wired_speakers, sleep_timer, digits, remote_control, stream_url, source_controls, move_playback, sync_group]
     Battery:
       type: object
       nullable: true
@@ -1888,6 +2033,24 @@ components:
       type: object
       nullable: true
       description: Multiroom role as the device's listener last saw it; null while unknown (ASE only for now)
+    SyncGroup:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string, nullable: true }
+        leader:
+          type: object
+          properties:
+            id: { type: integer }
+            name: { type: string }
+        members:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              name: { type: string }
+              offset_ms: { type: integer }
       properties:
         role: { type: string, enum: [standalone, host, listener] }
         host:

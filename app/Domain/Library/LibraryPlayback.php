@@ -448,6 +448,26 @@ class LibraryPlayback
         }
     }
 
+    /**
+     * Moves what Spotify plays to $device with Spotify's own transfer: the queue and position come along and
+     * playback continues there. $device is the Spotify device itself or a speaker mapped to a Connect name.
+     */
+    public function transferSpotify(Device $device, bool $play = true): void
+    {
+        if (!self::canPlaySpotify($device) || SpotifyRouting::isSpotify($device)) {
+            throw new NotPlayableException("Spotify can't be moved to {$device->device_name}: map it to a Spotify Connect name first.");
+        }
+
+        try {
+            $api = $this->tokens->makeApiClient();
+            $api->changeMyDevice(['device_ids' => [$this->connectDeviceId($api, $device)], 'play' => $play]);
+        } catch (PlaybackFailedException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            throw new PlaybackFailedException('Spotify did not move playback: '.$e->getMessage(), previous: $e);
+        }
+    }
+
     /** The Spotify Connect device id of the speaker mapped to $device, from Spotify's device list. */
     protected function connectDeviceId(SpotifyWebAPI $api, Device $device): string
     {

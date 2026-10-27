@@ -3,5 +3,8 @@
         <x-page-header title="Multiroom" subtitle="Save room groups and activate them with one tap" />
     </x-slot>
 
-    <livewire:multiroom-presets />
+    <div class="space-y-10">
+        <livewire:multiroom-presets />
+        <livewire:sync-group-manager />
+    </div>
 </x-app-layout>
