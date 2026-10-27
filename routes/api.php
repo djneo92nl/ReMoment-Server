@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\DeviceSettingsController;
 use App\Http\Controllers\Api\InfoController;
 use App\Http\Controllers\Api\LibraryController;
+use App\Http\Controllers\Api\JellyfinController;
 use App\Http\Controllers\Api\LiteArtworkController;
 use App\Http\Controllers\Api\PlayerController;
 use App\Http\Controllers\Api\QueueController;
@@ -74,6 +75,8 @@ Route::put('/devices/{device}/sleep-timer', [DeviceSettingsController::class, 's
 Route::post('/devices/{device}/digits', [DeviceSettingsController::class, 'sendDigits']);
 Route::get('/devices/{device}/keys', [RemoteKeysController::class, 'index']);
 Route::post('/devices/{device}/keys', [RemoteKeysController::class, 'press']);
+Route::get('/devices/{device}/jellyfin', [JellyfinController::class, 'index']);
+Route::post('/devices/{device}/jellyfin/play', [JellyfinController::class, 'play']);
 
 Route::get('/devices/{device}/sources', [DeviceController::class, 'sources']);
 Route::post('/devices/{device}/sources/activate', [DeviceController::class, 'activateSource']);

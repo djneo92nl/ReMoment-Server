@@ -9,11 +9,11 @@
             <div class="h-24 bg-gray-100 dark:bg-stone-800 rounded-xl animate-pulse"></div>
         @elseif($lists === null)
             <p class="text-sm text-gray-500">Jellyfin did not answer: check the server address and key in Settings › Services.</p>
-        @elseif(empty($lists['resume']) && empty($lists['next']))
+        @elseif(empty($lists['continue_watching']) && empty($lists['next_up']))
             <p class="text-sm text-gray-500">Nothing to continue or watch next.</p>
         @else
             <div class="space-y-6">
-                @foreach(['resume' => 'Continue watching', 'next' => 'Next up'] as $key => $heading)
+                @foreach(['continue_watching' => 'Continue watching', 'next_up' => 'Next up'] as $key => $heading)
                     @if(!empty($lists[$key]))
                         <div>
                             <p class="text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-3">{{ $heading }}</p>

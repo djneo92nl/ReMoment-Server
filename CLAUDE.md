@@ -18,6 +18,7 @@ Detailed documentation lives in `docs/`. CLAUDE.md holds enough context to under
 docs/
   api/
     client-devices.md       Client device registration flow, all endpoints, firmware guide
+    jellyfin.md             Jellyfin on a Philips TV: continue watching / next up and play in the Jellyfin app (GET /api/devices/{id}/jellyfin, POST .../jellyfin/play)
     library.md              Library browse (artists, albums, playlists), favorites, play album/artist/playlist on a device (DLNA or Spotify), playlist artwork
     source-controls.md      Per-source controls (change disc, FM presets) from control profiles: GET/POST /api/devices/{id}/controls, resolution, transports
     sync-groups.md          Sync groups (fake multiroom) REST API: leader + members, offsets, errors
@@ -354,6 +355,7 @@ PUT      /api/devices/{id}/network/interface | /network/wired | /network/wifi   
 GET      /api/devices/{id}/wireless-speakers   POST …/wireless-speakers/scan { action: start|stop }   (capability `wireless_speakers`; WiSA: **only the BeoSound Moment**, via `wisa => true` in config/devices.php / `HardwareFeatures`)
 GET      /api/devices/{id}/wired-speakers   PUT …/wired-speakers/{pl_1|pl_2} { type?, sound? }   (capability `wired_speakers`; which speaker type is on each wired output: **only models with external speakers**, Essence and Moment, via `speaker => 'external'` in config/devices.php / `HardwareFeatures`)
 ```
+GET  /api/devices/{id}/jellyfin   → { active, continue_watching: [Tile], next_up: [Tile] }   Jellyfin on a Philips TV with a Jellyfin key (Settings › Services): what to continue or watch next; `POST …/jellyfin/play { item_id, position_ticks? }` starts it in the Jellyfin app on the TV; MCP `jellyfin`; see `docs/api/jellyfin.md`; web: the Jellyfin card on the TV's page
 
 ### Spotify stream
 

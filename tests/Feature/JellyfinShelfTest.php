@@ -77,4 +77,46 @@ class JellyfinShelfTest extends TestCase
             && str_contains($r->url(), 'itemIds=m1')
             && str_contains($r->url(), 'startPositionTicks=250'));
     }
+
+    public function test_the_api_lists_and_plays(): void
+    {
+        $this->fakeServer();
+        $device = $this->tv();
+
+        $this->getJson("/api/devices/{$device->id}/jellyfin")->assertOk()
+            ->assertJsonPath('active', true)
+            ->assertJsonPath('continue_watching.0.title', 'A Film')
+            ->assertJsonPath('continue_watching.0.progress', 25)
+            ->assertJsonPath('next_up.0.subtitle', 'S2E3 · Pilot');
+
+        $this->postJson("/api/devices/{$device->id}/jellyfin/play", ['item_id' => 'm1', 'position_ticks' => 250])->assertOk()->assertJson(['status' => 'ok']);
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), '/Sessions/sess1/Playing') && str_contains($r->url(), 'startPositionTicks=250'));
+    }
+
+    public function test_the_api_errors(): void
+    {
+        $this->fakeServer();
+        $device = $this->tv();
+
+        $this->postJson("/api/devices/{$device->id}/jellyfin/play", [])->assertStatus(422)->assertJsonValidationErrors('item_id');
+
+        $plain = Device::factory()->create();
+        $this->getJson("/api/devices/{$plain->id}/jellyfin")->assertStatus(422)->assertJsonPath('error', 'unsupported');
+    }
+
+    public function test_a_tv_whose_app_has_no_session_is_a_502(): void
+    {
+        Http::fake(['jf:8096/Sessions' => Http::response([])]);
+        $device = $this->tv();
+
+        $this->postJson("/api/devices/{$device->id}/jellyfin/play", ['item_id' => 'm1'])->assertStatus(502)->assertJsonPath('error', 'driver_error');
+    }
+
+    public function test_the_mcp_tool_lists(): void
+    {
+        $this->fakeServer();
+        $device = $this->tv();
+
+        \App\Mcp\Servers\ReMomentServer::tool(\App\Mcp\Tools\Jellyfin::class, ['device_id' => $device->id])->assertOk()->assertSee('A Film');
+    }
 }

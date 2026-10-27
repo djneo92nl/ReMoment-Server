@@ -644,6 +644,55 @@ paths:
         "502": { $ref: "#/components/responses/DeviceError" }
         "503": { $ref: "#/components/responses/DeviceError" }
 
+  /devices/{device}/jellyfin:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    get:
+      tags: [Playback]
+      summary: Jellyfin on a TV - continue watching and next up (Philips TV with a Jellyfin key; see docs/api/jellyfin.md)
+      operationId: jellyfinLists
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  active: { type: boolean, description: "The TV shows its Jellyfin app with nothing playing" }
+                  continue_watching: { type: array, items: { $ref: "#/components/schemas/JellyfinTile" } }
+                  next_up: { type: array, items: { $ref: "#/components/schemas/JellyfinTile" } }
+        "422": { $ref: "#/components/responses/DeviceError" }
+        "502": { $ref: "#/components/responses/DeviceError" }
+
+  /devices/{device}/jellyfin/play:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    post:
+      tags: [Playback]
+      summary: Start a Jellyfin item in the Jellyfin app on the TV
+      operationId: jellyfinPlay
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [item_id]
+              properties:
+                item_id: { type: string }
+                position_ticks: { type: integer, minimum: 0, description: "10 000 000 per second; the tile's ticks to resume" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  item_id: { type: string }
+        "422": { $ref: "#/components/responses/DeviceError" }
+        "502": { $ref: "#/components/responses/DeviceError" }
+
   /devices/{device}/sources:
     parameters: [{ $ref: "#/components/parameters/device" }]
     get:
@@ -2278,6 +2327,16 @@ components:
               type: array
               description: Only with the remote_control capability
               items: { $ref: "#/components/schemas/RemoteKey" }
+
+    JellyfinTile:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        subtitle: { type: string, nullable: true }
+        image: { type: string, nullable: true }
+        progress: { type: integer, minimum: 0, maximum: 100 }
+        ticks: { type: integer }
 
     RemoteKey:
       type: string

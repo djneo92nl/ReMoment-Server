@@ -29,6 +29,7 @@ class ReMomentServer extends Server
         Tools\Queue::class,
         Tools\Sources::class,
         Tools\RemoteKeys::class,
+        Tools\Jellyfin::class,
         Tools\Radio::class,
         Tools\SpotifyStream::class,
         Tools\BeolinkStream::class,
