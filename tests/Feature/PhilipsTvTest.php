@@ -221,4 +221,28 @@ class PhilipsTvTest extends TestCase
         $this->assertSame('68:07:0A:4B:03:1D', $device->driver->rememberMac());
         $this->assertSame('68:07:0A:4B:03:1D', $device->meta()->where('key', 'mac_address')->value('value'));
     }
+
+    public function test_a_tv_in_standby_keep_is_standby_not_the_home_screen(): void
+    {
+        Event::fake([NowPlayingUpdated::class, NowPlayingEnded::class, \App\Events\Device\DeviceStateChanged::class]);
+        Http::fake(function (Request $r) {
+            if (str_ends_with($r->url(), 'powerstate')) {
+                return Http::response(['powerstate' => 'StandbyKeep']);
+            }
+            if (str_ends_with($r->url(), 'activities/current')) {
+                return Http::response(['component' => ['packageName' => 'com.google.android.tvlauncher']]);
+            }
+            $action = trim(explode('#', $r->header('SOAPAction')[0] ?? '#')[1] ?? '', '"');
+
+            return Http::response('<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><u:'.$action.'Response xmlns:u="x">'
+                .($action === 'GetTransportInfo' ? '<CurrentTransportState>NO_MEDIA_PRESENT</CurrentTransportState>' : '<TrackURI></TrackURI><TrackMetaData></TrackMetaData><TrackDuration>0:00:00</TrackDuration><RelTime>NOT_IMPLEMENTED</RelTime>')
+                .'</u:'.$action.'Response></s:Body></s:Envelope>');
+        });
+        $device = $this->tv();
+
+        DeviceListener::forDevice($device)->poll((string) $device->id);
+
+        $this->assertSame(State::Standby, DeviceCache::getState($device->id));
+        Event::assertNotDispatched(NowPlayingUpdated::class);
+    }
 }

@@ -149,7 +149,7 @@ class DeviceListener extends UpnpListener
 
         // The TV's own power state says standby; its menu or launcher in front is the TV on, at its home screen.
         try {
-            if ($driver->client()->powerState() === 'Standby') {
+            if (str_starts_with((string) $driver->client()->powerState(), 'Standby')) { // Standby, StandbyKeep
                 $package = null;
             }
         } catch (\Throwable) {
