@@ -15,6 +15,7 @@ use App\Integrations\Contracts\VideoDeviceInterface;
 use App\Integrations\Upnp\MusicPlayerDriver as UpnpDriver;
 use App\Models\DeviceMeta;
 use App\Services\Network\WakeOnLan;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -113,7 +114,7 @@ class VideoPlayerDriver extends UpnpDriver implements DigitsInterface, PowerInte
         Volume::updateMuted($this->device->id, $muted);
     }
 
-    /** A TV is woken with Wake-on-LAN once its MAC is known (read from the TV while it is on). */
+    /** A TV is woken over the network: through its own API while it still answers, else with Wake-on-LAN once its MAC is known. */
     public function canWakeOnLan(): bool
     {
         return $this->wakeMac() !== null;
@@ -121,10 +122,18 @@ class VideoPlayerDriver extends UpnpDriver implements DigitsInterface, PowerInte
 
     public function powerOn(): void
     {
+        try {
+            $this->client()->wake(); // Standby with the network kept alive ("StandbyKeep") answers its API.
+
+            return;
+        } catch (UnsupportedOperationException|ConnectionException) {
+            // Fully asleep: the packet below.
+        }
+
         $mac = $this->wakeMac();
 
         if ($mac === null) {
-            throw new UnsupportedOperationException('The MAC address of this TV is not known yet: it is read while the TV is on, so switch it on once.');
+            throw new UnsupportedOperationException('The TV is asleep and its MAC address is not known yet: it is read while the TV is on, so switch it on once.');
         }
 
         WakeOnLan::send($mac, $this->device->ip_address);

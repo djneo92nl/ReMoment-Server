@@ -7,7 +7,6 @@ use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
 use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
-use App\Integrations\Common\UnsupportedOperationException;
 use App\Integrations\Philips\JointspaceClient;
 use App\Integrations\Philips\Pairing;
 use App\Integrations\Philips\Services\DeviceListener;
@@ -89,7 +88,7 @@ class PhilipsTvTest extends TestCase
         }
     }
 
-    public function test_standby_presses_the_standby_key_and_the_tv_cannot_be_woken(): void
+    public function test_standby_presses_the_standby_key_and_power_on_posts_the_power_state(): void
     {
         Http::fake(['*' => Http::response([])]);
         $driver = $this->tv()->driver;
@@ -97,8 +96,9 @@ class PhilipsTvTest extends TestCase
         $driver->standby();
 
         Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/6/input/key') && $r['key'] === 'Standby');
-        $this->expectException(UnsupportedOperationException::class);
+
         $driver->powerOn();
+        Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/6/powerstate') && $r['powerstate'] === 'On');
     }
 
     public function test_the_apps_are_the_sources_and_one_is_launched_by_its_package(): void
@@ -195,6 +195,7 @@ class PhilipsTvTest extends TestCase
         \App\Services\Network\WakeOnLan::$fake = function (string $packet, array $targets) use (&$sent) {
             $sent = [$packet, $targets];
         };
+        Http::fake(fn () => throw new \Illuminate\Http\Client\ConnectionException('timed out'));
         $device = $this->tv();
 
         try {

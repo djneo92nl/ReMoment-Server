@@ -105,6 +105,12 @@ class JointspaceClient
         $this->post('audio/volume', ['current' => $current, 'muted' => $muted]);
     }
 
+    /** `POST /6/powerstate`: wakes a TV in StandbyKeep (verified on the lab TV: standby with the network alive). */
+    public function wake(): void
+    {
+        $this->post('powerstate', ['powerstate' => 'On']);
+    }
+
     public function key(string $key): void
     {
         $this->post('input/key', ['key' => $key]);
