@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\DeviceCapabilities;
 use App\Domain\Device\DeviceModels;
@@ -10,7 +11,6 @@ use App\Domain\Device\SpotifyRouting;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\SpotifyUri;
 use App\Http\Controllers\Concerns\FlashesLibraryPlayback;
-use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
 use App\Models\Media\Track;
 use App\Models\Play;
@@ -72,12 +72,11 @@ class DeviceController extends Controller
         $device->load('meta');
 
         $capabilities = DeviceCapabilities::for($device);
-        $volume = null;
+        // The page never waits for a device: the volume is what its listener last cached.
+        $cachedVolume = Volume::getVolume($device->id);
+        $volume = $cachedVolume === false ? null : $cachedVolume;
         try {
             $driver = $device->driver;
-            if ($driver instanceof VolumeControlInterface) {
-                $volume = $driver->getVolume();
-            }
             if (method_exists($driver, 'standby')) {
                 $capabilities[] = 'standby';
             }

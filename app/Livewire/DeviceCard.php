@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\SpotifyRouting;
+use App\Domain\Device\State;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
 use App\Integrations\Contracts\PowerInterface;
@@ -63,8 +64,9 @@ class DeviceCard extends Component
             $this->supportsSeek = SpotifyRouting::driverFor($device, SeekInterface::class) instanceof SeekInterface;
             // Asking the device costs a network round trip, so only the
             // single-device page reads it; grid cards start unmuted.
+            // The page never waits for a device: mute is what its listener last cached.
             if ($this->standalone && $driver instanceof VolumeControlInterface) {
-                $this->muted = $driver->isMuted();
+                $this->muted = (bool) Volume::getMuted($device->id);
             }
         } catch (\Throwable) {
             $this->supportsMultiRoom = false;
