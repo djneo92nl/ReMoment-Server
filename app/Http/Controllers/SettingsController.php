@@ -39,6 +39,11 @@ class SettingsController extends Controller
             'Scheduler' => !self::beating(Heartbeat::SCHEDULER),
             'Queue worker' => !self::beating(Heartbeat::QUEUE),
         ]));
+        foreach ((new \App\Domain\Health\QueueInspector)->queues() ?? [] as $queue) {
+            if ($queue['state'] === 'stuck') {
+                $healthProblems[] = "Queue {$queue['queue']}";
+            }
+        }
         $libraryIssueCount = array_sum(LibraryReports::counts());
 
         return view('settings.index', compact('healthProblems', 'libraryIssueCount',

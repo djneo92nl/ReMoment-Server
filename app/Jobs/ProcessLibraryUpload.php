@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Domain\Analysis\AudioAnalysis;
+use App\Domain\Health\Queues;
 use App\Domain\Library\Enrichment;
 use App\Domain\Storage\LibraryFiles;
 use App\Domain\Storage\LibraryUploads;
@@ -29,7 +30,9 @@ class ProcessLibraryUpload implements ShouldQueue
         public readonly string $uploadId,
         public readonly int $locationId,
         public readonly string $path,
-    ) {}
+    ) {
+        $this->onQueue(Queues::HEAVY);
+    }
 
     public function handle(LibraryFiles $files): void
     {

@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Health\Heartbeat;
 use App\Domain\Health\QueueInspector;
+use App\Domain\Health\Queues;
 use App\Domain\Radio\NowPlayingProviders;
 use App\Jobs\EnrichAlbumLastfm;
 use App\Jobs\EnrichTrackSpotify;
@@ -10,6 +12,7 @@ use App\Jobs\FetchSpotifyArtistImages;
 use App\Jobs\ImportSpotifyAlbumById;
 use App\Jobs\PollRadioTitle;
 use App\Jobs\ProcessArtwork;
+use App\Jobs\QueueHeartbeat;
 use App\Jobs\ScrobbleToLastfm;
 use App\Models\RadioStation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -75,5 +78,42 @@ class QueueRunnerJobsTest extends TestCase
         config(['queue.default' => 'database']);
 
         $this->assertNull((new QueueInspector)->queues());
+    }
+
+    public function test_long_jobs_go_to_the_heavy_queue(): void
+    {
+        $this->assertSame('heavy', (new \App\Jobs\BuildSdCardExport)->queue);
+        $this->assertSame('heavy', (new \App\Jobs\ProcessLibraryUpload('u', 1, 'p'))->queue);
+        $this->assertSame('heavy', config('proxies.queue'));
+    }
+
+    public function test_every_heartbeat_queue_has_a_worker_and_the_beats_are_unique_per_queue(): void
+    {
+        $conf = file_get_contents(base_path('docker/8.4/supervisord.prod.conf'));
+
+        foreach (Queues::heartbeat() as $queue) {
+            $this->assertMatchesRegularExpression("/queue:work[^\n]*--queue={$queue}(,|\\s)/", $conf, $queue);
+        }
+
+        $this->assertSame('storage', (new QueueHeartbeat('storage'))->uniqueId());
+        $this->assertSame('storage', (new QueueHeartbeat('storage'))->queue);
+        $this->assertNotSame('health:queue', Queues::heartbeatKey('storage'));
+        $this->assertSame('health:queue', Queues::heartbeatKey('health'));
+    }
+
+    public function test_a_heartbeat_marks_its_own_queue_and_the_runner_state_follows_it(): void
+    {
+        Cache::flush();
+        Heartbeat::beat(Heartbeat::SCHEDULER);
+        $inspector = new QueueInspector;
+
+        $this->assertSame('stuck', $inspector->runnerState('storage', null, 0));
+
+        (new QueueHeartbeat('storage'))->handle();
+        $this->assertSame('ok', $inspector->runnerState('storage', Heartbeat::last('health:queue:storage'), 0));
+        $this->assertSame('unknown', $inspector->runnerState('default', null, 0));   // no heartbeat of its own
+
+        Cache::put(Heartbeat::SCHEDULER, now()->subHour()->toIso8601String(), 3600);
+        $this->assertSame('unknown', $inspector->runnerState('storage', null, 0));   // nothing dispatches beats without the scheduler
     }
 }

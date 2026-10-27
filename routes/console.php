@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Health\Heartbeat;
+use App\Domain\Health\Queues;
 use App\Domain\Health\QueueWatchdog;
 use App\Jobs\QueueHeartbeat;
 use Illuminate\Foundation\Inspiring;
@@ -49,7 +50,9 @@ Schedule::command('queue:prune-failed --hours=720')->dailyAt('04:30');
 // Health heartbeats — see App\Domain\Health\Heartbeat and /settings/health.
 Schedule::call(function () {
     Heartbeat::beat(Heartbeat::SCHEDULER);
-    QueueHeartbeat::dispatch();
+    foreach (Queues::heartbeat() as $queue) {
+        QueueHeartbeat::dispatch($queue);
+    }
 })->everyMinute()->name('health-heartbeat');
 
 // Kills a hung default-queue worker so supervisor starts a new one (a stale queue beat while the scheduler beats).

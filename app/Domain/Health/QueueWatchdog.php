@@ -5,7 +5,6 @@ namespace App\Domain\Health;
 use Closure;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Queue;
 
 /**
  * Restarts a hung default-queue worker. The scheduler dispatches QueueHeartbeat every minute and the
@@ -31,7 +30,7 @@ final class QueueWatchdog
      */
     public function __construct(private ?Closure $findPids = null, private ?Closure $kill = null, private ?Closure $runningSeconds = null)
     {
-        $this->runningSeconds ??= fn () => self::longestRunningSeconds();
+        $this->runningSeconds ??= fn () => Queues::longestRunningSeconds(Queues::DEFAULT);
         $this->findPids ??= fn () => self::workerPids();
         $this->kill ??= fn (int $pid) => posix_kill($pid, 9);
     }
@@ -70,23 +69,6 @@ final class QueueWatchdog
         Log::warning('Queue worker did not run its heartbeat; killed it so supervisor restarts it.', ['pids' => $pids]);
 
         return 'restarted';
-    }
-
-    /** Redis only: a reserved job's score is its reservation time plus `retry_after`. */
-    private static function longestRunningSeconds(): ?int
-    {
-        try {
-            if (config('queue.connections.'.config('queue.default').'.driver') !== 'redis') {
-                return null;
-            }
-
-            $oldest = Queue::connection()->getConnection()->zrange('queues:default:reserved', 0, 0, ['withscores' => true]);
-            $expires = $oldest ? (int) reset($oldest) : null;
-
-            return $expires === null ? null : max(0, now()->timestamp - ($expires - (int) config('queue.connections.redis.retry_after')));
-        } catch (\Throwable) {
-            return null;
-        }
     }
 
     /** @return list<int> */

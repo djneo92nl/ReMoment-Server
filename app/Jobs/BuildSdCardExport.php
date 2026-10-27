@@ -7,6 +7,7 @@ use App\Domain\Artwork\LibraryArtwork;
 use App\Domain\Artwork\NowPlayingArtwork;
 use App\Domain\Artwork\SdCardExport;
 use App\Domain\Artwork\SourceLogo;
+use App\Domain\Health\Queues;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -33,7 +34,9 @@ class BuildSdCardExport implements ShouldBeUnique, ShouldQueue
     public function __construct(
         public readonly ?int $limit = null,
         public readonly string $size = ArtworkBackgrounds::DEFAULT,
-    ) {}
+    ) {
+        $this->onQueue(Queues::HEAVY);
+    }
 
     /** One build per size at a time; different sizes may build side by side. */
     public function uniqueId(): string

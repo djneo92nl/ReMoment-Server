@@ -3,7 +3,6 @@
 namespace App\Domain\Health;
 
 use App\Domain\Library\Enrichment;
-use App\Jobs\RunStorageTask;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -20,8 +19,6 @@ class QueueInspector
     public const SCAN_LIMIT = 5000;
 
     /** The queues the supervised workers listen on; others found in the driver are added. */
-    private const KNOWN_QUEUES = ['default', 'health', RunStorageTask::QUEUE];
-
     /**
      * Pending jobs grouped by class: waiting (ready), running (reserved by a worker) and delayed (a retry
      * after a rate limit or failure, or a release by a limiter). Null when the driver can't be listed.
@@ -70,7 +67,7 @@ class QueueInspector
      * (`oldest_waiting`, null when nothing waits). A runner that is stuck shows as an age that keeps growing.
      * Redis only; null for other drivers.
      *
-     * @return list<array{queue: string, waiting: int, delayed: int, running: int, oldest_waiting: ?Carbon}>|null
+     * @return list<array{queue: string, beat: ?Carbon, state: string, waiting: int, delayed: int, running: int, oldest_waiting: ?Carbon}>|null
      */
     public function queues(): ?array
     {
@@ -85,11 +82,16 @@ class QueueInspector
                 $head = $redis->lindex("queues:{$name}", 0);
                 $pushed = $head ? (json_decode($head, true)['pushedAt'] ?? null) : null;
 
+                $beat = in_array($name, Queues::heartbeat(), true) ? Heartbeat::last(Queues::heartbeatKey($name)) : null;
+                $running = (int) $redis->zcard("queues:{$name}:reserved");
+
                 return [
                     'queue' => $name,
+                    'beat' => $beat,
+                    'state' => $this->runnerState($name, $beat, $running),
                     'waiting' => (int) $redis->llen("queues:{$name}"),
                     'delayed' => (int) $redis->zcard("queues:{$name}:delayed"),
-                    'running' => (int) $redis->zcard("queues:{$name}:reserved"),
+                    'running' => $running,
                     'oldest_waiting' => $pushed ? Carbon::createFromTimestamp((int) $pushed) : null,
                 ];
             }, $this->queueNames());
@@ -98,10 +100,35 @@ class QueueInspector
         }
     }
 
+    /**
+     * `ok` (a heartbeat ran in the last 3 minutes), `busy` (none, but a job runs that is younger than the queue's
+     * longest timeout), `stuck` (neither: the runner is down or hung), `unknown` (no heartbeat is dispatched for this
+     * queue, or the scheduler is down).
+     */
+    public function runnerState(string $queue, ?Carbon $beat, int $running): string
+    {
+        if (!in_array($queue, Queues::heartbeat(), true) || !self::fresh(Heartbeat::last(Heartbeat::SCHEDULER))) {
+            return 'unknown';
+        }
+
+        if (self::fresh($beat)) {
+            return 'ok';
+        }
+
+        $age = $running > 0 ? Queues::longestRunningSeconds($queue) : null;
+
+        return $age !== null && $age < Queues::maxRuntime($queue) ? 'busy' : 'stuck';
+    }
+
+    private static function fresh(?Carbon $beat): bool
+    {
+        return $beat !== null && $beat->diffInSeconds(now()) < 180;
+    }
+
     /** @return list<string> */
     private function queueNames(): array
     {
-        return array_values(array_unique([...self::KNOWN_QUEUES, config('analysis.queue'), config('proxies.queue'), config('queue.connections.redis.queue', 'default')]));
+        return Queues::all();
     }
 
     /** @return array{0: int, 1: list<array{0: string, 1: string, 2: ?Carbon}>} */

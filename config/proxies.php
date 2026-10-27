@@ -18,7 +18,7 @@ return [
 
     'enabled' => (bool) env('PROXIES_ENABLED', true),
 
-    'queue' => env('PROXIES_QUEUE', 'default'),
+    'queue' => env('PROXIES_QUEUE', 'heavy'),
 
     /** Seconds one transcode may take. */
     'timeout' => (int) env('PROXIES_TIMEOUT', 600),

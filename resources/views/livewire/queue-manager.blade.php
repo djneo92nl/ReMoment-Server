@@ -23,6 +23,7 @@
             @foreach($queues as $queue)
                 <div class="px-8 py-3 flex items-center gap-4 border-b border-gray-100 dark:border-stone-800 last:border-b-0" data-test="queue-{{ $queue['queue'] }}">
                     <div class="flex-1 text-sm text-gray-900 dark:text-gray-100">{{ $queue['queue'] }}</div>
+                    <div class="w-20 text-xs {{ $queue['state'] === 'stuck' ? 'text-red-600 font-medium' : 'text-gray-500' }}" data-test="queue-state-{{ $queue['queue'] }}" title="{{ $queue['beat'] ? 'Last heartbeat '.$queue['beat']->diffForHumans() : 'No heartbeat yet' }}">{{ $queue['state'] }}</div>
                     <div class="text-xs text-gray-500">{{ $queue['waiting'] }} waiting · {{ $queue['running'] }} running · {{ $queue['delayed'] }} delayed</div>
                     <div class="w-36 text-xs text-gray-500 text-right">oldest waiting {{ $queue['oldest_waiting']?->diffForHumans(short: true) ?? '—' }}</div>
                 </div>
