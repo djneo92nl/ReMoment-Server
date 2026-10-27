@@ -10,6 +10,7 @@ Effort: S = days, M = 1–2 weeks, L = several weeks. Feasibility notes come fro
 |---|---|---|---|---|---|
 | 1 | Stability: cards disappearing, hardware checklist, Spotify API audit, backup/restore | M | | **mostly built** (cards fix, Spotify audit, backup); hardware checklist and alerts to do | Must |
 | 1a | Profiles: Control / Standard / Full, chosen in the setup wizard | M | 1 | design below | Must |
+| 1b | Queue stability and management: are the runners stable, per-queue health, pause/cancel/prioritise jobs | M | 1 | partly built; review below | Must (stability), Should (management) |
 | 2 | TV control | M | | **phase 1 built** (Beoplay V1 page, wake); keys and Philips to do | Must |
 | 2a | Sub devices (devices connected to other devices: converter, Chromecast on a TV, changers) | M | 2 (first case) | design below | Should |
 | 3 | Availability layer (external libraries add to the collection) | L | | design decision first | Must |
@@ -17,12 +18,13 @@ Effort: S = days, M = 1–2 weeks, L = several weeks. Feasibility notes come fro
 | 5 | Deezer and Tidal | L | 3, hardware probes | design in [streaming-services.md](streaming-services.md) | Should |
 | 6 | Physical library (CDs, tapes, vinyl) | M | 3 | to do | Should |
 | 7 | CD import (ripping) | M | 6 (links to items) | **started**: desktop ripper app (sign-in, upload) and the upload API exist; ripping itself to do | Can slip |
-| 8 | Additional features: scenes/automations, podcasts, audiobook resume, tag editor, lyrics on /receiver, PWA + alerts, playback history | M–L | varies | to do | Mixed (per item) |
+| 8 | Additional features: scenes/automations, podcasts, audiobook resume, tag editor, PWA + alerts, playback history | M–L | varies | to do | Mixed (per item) |
 | 8a | Home Assistant: MQTT discovery and automations built in HA | M | 8 (scenes, alerts), 2a (TV events) | plan in [home-assistant.md](home-assistant.md) | Should |
 | 8b | Mobile app support: admin API for apps, one-library playlists everywhere, contract gaps, player housekeeping, alerts feed | M–L | 8.6, 8.7 | plan below; the app side is in `~/Code/ReMomentiOS/docs/roadmap.md` | Must (contract items), Should (rest) |
 | 9 | Release: docs, OpenAPI, MCP, upgrade path, versioning | S | all | to do | Must |
 | 9a | Distribution and upgrades: registry images, compose, Ansible, Pi image, `app:upgrade`, migration squash | L | 1a | design below | Must |
 | 9b | Release readiness: CI, end-user docs, network guardrails, performance budget, diagnostics bundle | M | 1a | design below | Must (diagnostics: Should) |
+| 10 | Manager: host service that controls the running instance (containers, processes, upgrade with rollback, host stats) and SMB shares (serve and mount) for the library and the drop directory; on every install target | L | 1b, 9a, backup | **decided, design draft** | Must |
 
 ## Progress (as of 2026-10-27)
 
@@ -43,7 +45,7 @@ Still open on workstream 1: the hardware checklist (needs the device lab), healt
 
 **Priority.** *Must* = 1.0 does not ship without it. *Should* = in 1.0 unless time runs out, cut in the order listed under "Cut order". *Can slip* = moves to 1.1 without hurting 1.0. Per-item tags for workstream 8 are on the items below.
 
-**Cut order** (first to go): 8.2 podcasts, 8.4 tag editor, 8.5 lyrics on /receiver, 8.3 resume position, the HA command path (8a), 7 CD import, 6 physical library, 5 Tidal (Deezer stays if verified), 4 similar tracks. 8b's admin endpoints can ship area by area; its contract items (2, 3, 6) are Must because the app and the `features` list depend on them.
+**Cut order** (first to go): 8.2 podcasts, 8.4 tag editor, 8.3 resume position, the HA command path (8a), 7 CD import, 6 physical library, 5 Tidal (Deezer stays if verified), 4 similar tracks. 8b's admin endpoints can ship area by area; its contract items (2, 3, 6) are Must because the app and the `features` list depend on them.
 
 Suggested order: 1 and 2 in parallel, with 1a (profiles) right behind 1 because the stack, the scheduler and the budget of 9b depend on it (independent; 2a follows the first TV work), then 3, then 4, 5 and 6 in parallel, then 7, 8 (with 8a after its scenes and alerts), 8b alongside 8 (its contract items first: they block the app and cost little), and 9, 9a and 9b last (the migration squash is the very last step before the release tag). Workstream 3 is the one that shapes the rest, so it is decided first.
 
@@ -77,6 +79,26 @@ Suggested order: 1 and 2 in parallel, with 1a (profiles) right behind 1 because 
 - **Pi 2 is 32-bit armv7.** Every image in the Control stack (app, Redis, Mosquitto) needs an armv7 build; *unverified*. If one is missing, the Control floor is the Pi 3 (arm64).
 
 Done when: the wizard offers the three profiles, each starts only what it should, a Pi 2 and a Pi 3 meet the budget of 9b for their profile, and moving Control to Standard keeps the data.
+
+## 1b. Queue stability and management
+
+**Goal.** The queue runners keep running without attention, and the admin can see and steer what is in them.
+
+**What exists today** (read from the repo, not from a running install):
+- Supervisor (`docker/8.4/supervisord.prod.conf`) runs `queue` (`QUEUE_WORKERS` workers on `health,default`, `--tries=3 --max-time=3600`), `storage-queue` (scans and imports, `--timeout=3600`), `analysis-queue` (`nice -n 15`, `--timeout=900`), the `scheduler` and the `listeners` (`device:listen`), all with `autorestart` and retries without limit so a Redis that is not up yet does not leave a program stuck in FATAL.
+- Redis is the queue driver in production; `retry_after` is 3700 s, above the longest job timeout (a comment records the earlier `MaxAttemptsExceededException` this fixed).
+- `/settings/health` has a Queue tab (`QueueManager`, `Domain/Health/QueueInspector`): pending jobs by class (waiting, running, delayed), failed jobs with retry, forget and clear, a worker restart (`queue:restart`) and re-queueing missing enrichment.
+
+**Review (a session can do this from the configuration; the soak part needs a real run):**
+1. Worker settings against the Pi budget: no `--memory` limit set (the default of 128 MB applies), `QUEUE_WORKERS` default on a 1 GB board, `--max-time` and `--max-jobs` so a leaking job class cannot grow a worker for an hour.
+2. Timeouts and `retry_after` for every queue, including any job class with its own `$timeout` longer than its queue's `--timeout`.
+3. Failure behaviour: which job classes retry forever, which are idempotent, what a failed job leaves behind (a half-imported file, a stuck "running" marker), and `failed_jobs` growth.
+4. Heartbeats: `health:queue` is one timestamp; per-queue worker heartbeats and the age of the oldest waiting job per queue are what actually show a stuck `analysis` or `storage` runner.
+5. A **soak test**: a 24-hour run with real listeners and a busy library scan (the same run as the SQLite stress test of 1a), counting failed jobs, restarts, memory per worker and the oldest-waiting age.
+
+**Management additions:** pause and resume one queue, cancel a pending job, move a job class to another queue or change its priority, per-queue concurrency (`storage` and `analysis` stay at one), a live view of what each worker runs now and for how long, and the failed-job list with the exception and the payload's entity (the track or file) instead of the class name alone. Alerts (workstream 8.6) for "queue X has not progressed for N minutes". All of it behind the admin login and, for apps, the admin API of 8b.
+
+Done when: the review's findings are fixed or written down, a 24-hour soak shows no stuck queue and no unexplained failed job, per-queue health shows on `/settings/health` and in `/api/info` `features`/alerts, and an admin can pause a queue and cancel a job without a shell.
 
 ## 2. TV control
 
@@ -217,7 +239,7 @@ Each is independent and small enough to cut if time runs out; ordered by value.
 2. **Podcasts.** *[Can slip]* RSS subscriptions, episodes as a library kind with resume position, played as a stream URL through the same paths as radio (`PlayStreamUrlInterface`, DLNA URL), new-episode checks on the scheduler. Needs a small `podcasts`/`episodes` schema and a page next to `/radio`.
 3. **Resume position (audiobooks and podcasts).** *[Can slip]* A bookmark per album/episode, kept server-side, restored on play (`playback_positions`); scoped to files and podcasts only.
 4. **Tag editor for own files.** *[Can slip (becomes Should if CD import ships)]* Edit artist, album, track, year, genre and cover of files (write tags, rename through the organizer), needed for manual rips and fixing imports; re-runs identity and analysis for the changed files.
-5. **Lyrics on `/receiver`.** *[Can slip]* LRCLIB lyrics exist; show synced lyrics with the progress the receiver already has.
+5. **Lyrics on `/receiver`** *[Built, nothing to do]*. Already in `receiver.blade.php`: a lyrics button, a three-line view with synced (LRC) or estimated plain lyrics, and ambient mode switching to it; see `docs/frontend/receiver.md`. Kept in the list so the numbering holds.
 6. **PWA and notifications (decided: MQTT first, browser notifications second).** *[Should (phases 1 and 2); phase 3 is 1.1]*
    - *Phase 1, MQTT:* health and other alerts are published on a `remoment/alerts/{kind}` topic (not retained, small JSON: kind, device, message, time). Anything can subscribe (Home-style dashboards, phones with an MQTT app).
    - *Phase 2, local browser notification:* the page already holds an MQTT-over-WebSocket connection (`remoment-live.js`). A subscriber on `remoment/alerts/#` raises a `Notification` (after the user allows it once) while a tab or the installed PWA is open. No push service, no accounts, works everywhere the Notification API does.
@@ -286,7 +308,7 @@ Public release means installs the author does not control. Decided 2026-10-26.
 
 - **Registry images.** Versioned images (`1.0.0`, `1`, and `latest` for stable releases only) published to **GHCR** (the repository is public), built for `linux/amd64` and `linux/arm64` with buildx in CI. Today `docker-compose.prod.yml` builds `remoment/app:latest` on the host; that does not work for strangers. armv7 only if the Control stack on a Pi 2 is verified (see 1a).
 - **Supported install methods.** Compose file and registry images (the base; everything else wraps it), the **Ansible playbook** (`ansible/`, Proxmox LXC), and a **Raspberry Pi image** (Should for 1.0: flash, first boot, setup wizard, mDNS name so clients find the server). A **Proxmox template** is 1.1. A premade image is rebuilt and tested every release, so it needs its own first-boot and upgrade path.
-- **Upgrades are command line only** (and Ansible); no button in `/settings` and no auto-updater for 1.0. `app:upgrade`: check the version, run the backup of workstream 1, migrate, clear and warm caches, restart workers, report. The version is recorded in the database so a downgrade is refused. Migrations are forward-only; the backup is the rollback. Each release has a changelog with a "needs attention" section. An updater service next to the app ("hypervisor") is a later idea; it needs the Docker socket, which is root on the host.
+- **Upgrades** have a CLI (`app:upgrade`, Ansible) **and**, decided 2026-10-27, a web path through the Manager of workstream 10 (backup first, health check, rollback); no unattended auto-update. `app:upgrade`: check the version, run the backup of workstream 1, migrate, clear and warm caches, restart workers, report. The version is recorded in the database so a downgrade is refused. Migrations are forward-only; the backup is the rollback. Each release has a changelog with a "needs attention" section. An updater service next to the app ("hypervisor") is a later idea; it needs the Docker socket, which is root on the host.
 - **Migration squash.** The 52 migration files include 28 that alter or fix (add a field, drop it, add it again, data repairs). Right before the public release, consolidate to **one migration per table**, drop the data-fix migrations after checking none seeds data a fresh install needs, and mark the two existing databases (production and dev) as already migrated: Laravel ignores `migrations` rows for deleted files, and the new files must not run on them. Proof: build a fresh MariaDB from the consolidated set, dump its schema, diff it against production's. After 1.0 never edit an old migration. Laravel's `schema:dump` gives one baseline file, not one per table; per-table files are a manual rewrite.
 - **Tested upgrade.** Restore a production backup into a scratch database, run `app:upgrade` from the last 0.x tag, check the app.
 
@@ -305,6 +327,40 @@ Done when: `docker compose pull && up` from a registry tag works on amd64 and ar
 8. **Hosted-service hooks** *[Should]* (the service itself is after 1.0): every external API client takes its **base URL and credentials from settings**, never constants, so a relay can later be swapped in; credentials never appear in logs, health output or the diagnostics bundle; a credential "source" (own key now, relay later) is one abstraction, not one `if` per service.
 
 Done when: CI is green on SQLite and MariaDB with the warnings above, `docs/user/` covers every install method, the supported-hardware table is generated, the setup wizard warns on a non-private address, the budget numbers are written down per profile, and a bundle from a test install contains no secret, and the keyboard and TV checks for `/receiver` pass.
+
+## 10. Manager (control of the running instance) and SMB shares
+
+Status: **decided into 1.0 (hard requirement), design draft.** Decided 2026-10-27. Extends 9a: the "updater service" that was left for later is now part of 1.0, and the upgrade command stays as its CLI.
+
+**What it is.** A small, separate service, the **ReMoment Manager**, that runs on the **host** next to the app, survives the app being broken, and can see and control the running install: its processes and containers, upgrades with a backup first, host health, and the SMB shares for the library and the drop directory. Design reference: **DevDash** (`~/Code/devdash`, the owner's own tool): a dependency-free service that drives `docker compose` through `execFile` with argument arrays, a job map with streamed output, state on disk, a thin CLI that is only a client of the same HTTP API, mutating endpoints that need a header and a Host allow-list, bound to localhost. Reuse its shape and lessons (logic lives in the server so the UI and CLI are identical; never build shell strings from request input; hide nothing that is merely unhealthy but show crashed and restarting containers).
+
+**Runs everywhere (decided).** The manager is installed on every supported target: the **Raspberry Pi image** (preinstalled), the **Ansible playbook / Proxmox LXC** (a role installs it), and **plain compose** installs (an install script that adds the service). It runs on the host (a systemd unit; launchd on a Mac dev machine like DevDash), not in a container, because it must manage the host's Samba, mounts and Docker, and must stay up when the app container is down.
+
+**Language (to decide).** DevDash is Node. For a Pi 2 (armv7) and for a public image, a **static Go binary** (amd64, arm64, armv7, no runtime) is the better fit and cheaper on 1 GB; reusing DevDash code argues for Node. Suggest: prototype the API and UI against DevDash's shape, ship Go if the Pi measurements in 9b say Node is too heavy.
+
+**What it controls (an allow-list, not a shell):**
+- **Status and control:** the ReMoment compose project's containers (app, Redis, MariaDB or SQLite volume, Mosquitto, Icecast, the analysis sidecar, the BeoLink stream container): state, crashed or restarting, memory and CPU, start, stop and restart one or all, tail logs. Inside the app container, the supervised processes (`queue`, `storage-queue`, `analysis-queue`, `scheduler`, `listeners`): status, restart, logs (through supervisor; scope A of the earlier draft is included).
+- **Upgrade:** pull the new image tag, run `backup:run`, restart, migrate, check `/settings/health`, and **roll back** (previous tag plus `backup:restore`) when the check fails. This is the web version of `app:upgrade` (9a), which stays as the CLI.
+- **Host:** disk, memory, temperature and throttling (Pi), uptime; run a backup now; download the diagnostics bundle (9b); Pi image only: hostname and Wi-Fi.
+- **SMB** (below).
+- **Not included:** a generic shell, arbitrary `docker` commands, or editing the app's code.
+
+**Where the admin uses it.** (1) Inside the ReMoment web UI: a Manager section under Settings, **reached with the admin login** (the app calls the manager over localhost or a unix socket with a shared secret the installer generates; the Laravel app already runs with host networking in production, see [database.md](database.md)). No second account. (2) **When the app is down** the web UI is down too, so the manager also has its own minimal page and CLI on the LAN, protected by a **manager token** created at install time (shown once on the Pi console or by the Ansible run, and stored root-readable). Open: whether that token may be the admin password (it cannot verify it while the app is down) or must stay separate.
+
+**Security.** The manager is root-equivalent (Docker socket, Samba, mounts). It binds to localhost or a unix socket by default; the LAN page is opt-in and shows the same "LAN only" warning as the rest (9b). Every mutating call needs the token and an `x-` header and a Host allow-list (as DevDash); `execFile` with argument arrays only; project and service names validated against the compose file; every action logged to an audit file; no secrets in responses or in the diagnostics bundle.
+
+**SMB shares for the library and the drop directory: both (decided).** Samba runs on the **host** (decided), configured by the manager.
+- **Serve:** the music library as a share (**read-only by default**) and the drop directory (`inbox`) read-write, so a PC copies albums into the drop share and `library:import` picks them up. Settings in the web UI: share names, which paths, guest or password access, a Samba user (separate from the admin login) with a stored password, and a warning that guest access is unauthenticated. The manager writes `smb.conf`, creates the Samba user, reloads `smbd`, and reports the state. The app never writes system configuration.
+- **Mount:** a share on a NAS used as a storage location: host, share, user, password, mount point, options. The manager writes a root-only credentials file and the mount unit (so it is mounted before Docker starts the app), and the compose volume points at the mount. Credentials are stored on the host only (not in the app database, not in backups by default, never echoed). *Unverified:* the file indexer and analysis over SMB are slower and have no change notifications (scans only); a Pi on Wi-Fi over SMB may not keep up; an unavailable mount must make the storage location report unreachable, not hang the app.
+- Both appear in the app as another storage-location kind next to local and S3 ([file-storage.md](file-storage.md)); the manager does the host side.
+
+**Build order.** (1) The manager skeleton: API, token, status of containers and processes, logs, restart, the CLI, on one target (compose on a dev host). (2) The web UI section and the app-to-manager link. (3) Upgrade and rollback, with `backup:run` and health check. (4) Host stats. (5) Installers: Ansible role, Pi image, install script. (6) SMB serve. (7) SMB mount. (8) The manager's own LAN page and token.
+
+**Decisions still needed:** (a) Go or Node (above); (b) may the manager token be the admin password; (c) is the manager updated by itself, by `app:upgrade`, or only by the OS package on the image; (d) which init system and paths on each target (systemd on the Pi and LXC; plain-compose hosts may not have systemd).
+
+Done when: on the Pi image, the Proxmox/Ansible install and a plain compose install, the admin can see and restart each container and process from the web UI, upgrade with an automatic backup and a rollback, and see disk and temperature; with the app stopped, the manager's own page and CLI still work; with SMB serve on, a file copied into the drop share from another machine appears in the library after the import; with SMB mount configured, a NAS share is used as a storage location and an unavailable share degrades cleanly.
+
+**Feasibility:** high for status, logs and restart (DevDash already does it); medium for upgrade and rollback (the rollback path must be tested); medium for SMB (Samba and cifs are routine, the host differences per target are the work); the main cost is the installers on three targets and the security review.
 
 ## Not in 1.0
 
@@ -350,6 +406,8 @@ Done when: CI is green on SQLite and MariaDB with the warnings above, `docs/user
 - Progress (2026-10-27): the card fix, Spotify audit and credentials card, and backup/restore are built (see Progress). Backup secrets: excluded by default, `--with-secrets` opts in; archives sit on the app's disk by default and must be copied off the machine (workstream 1).
 - CD ripper (2026-10-27): built as a Tauri desktop app that uses the admin token and the upload API; supersedes "standalone script" and "registers like a client device" (workstream 7).
 
+- Manager and shares (2026-10-27): a **hard requirement for 1.0** (workstream 10). A separate host service in the spirit of DevDash (`~/Code/devdash`) that controls containers and processes, upgrades with backup and rollback, and reports host health; installed on every target (Pi image, Proxmox/Ansible, plain compose). SMB: both serve (library read-only, drop directory read-write) and mount (a NAS share as a storage location), with Samba on the host, configured by the manager. Queue management and stability is 1b. This reverses "upgrades by command line only / updater later" (9a): the CLI stays, the manager adds the web path.
+
 ## Open questions
 
 Workstream 2a: how a sub device reachable only through its host is shown (listed under 2a). New questions go here.
@@ -359,3 +417,5 @@ Workstream 8b: none open (decisions are in the decisions log). New questions go 
 Stability: (a) does the card fix hold over an hour with several devices; (b) restore a backup on a scratch MariaDB 11.4 and record the result; (c) where do nightly archives go off the machine (NAS, USB, cloud).
 
 CD import: (d) a headless ripper for a Pi, or desktop only; (e) does CD import move up from Can slip now that the app exists.
+
+Workstream 10: (a) Go or Node for the manager; (b) may the manager token be the admin password, or must it stay separate (the manager has to work when the app is down); (c) how does the manager itself get updated; (d) init system and paths on each target (plain-compose hosts may have no systemd); (e) the Pi image console and Wi-Fi setup: in the manager or the image.
