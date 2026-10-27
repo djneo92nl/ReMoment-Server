@@ -39,6 +39,8 @@ class DeviceListener extends UpnpListener
 
     private bool $upnpDown = false;
 
+    private bool $macKnown = false;
+
     private int $nextUpnpCheck = 0;
 
     private ?string $reported = null;
@@ -79,6 +81,7 @@ class DeviceListener extends UpnpListener
 
         $this->nextActivityCheck = now()->timestamp + self::ACTIVITY_EVERY_SECONDS;
         $this->reportJointspaceVolume($deviceId);
+        $this->rememberMac();
         $this->reportActivity($deviceId);
     }
 
@@ -112,6 +115,20 @@ class DeviceListener extends UpnpListener
             event(new \App\Events\Device\VolumeUpdated(deviceId: $deviceId, volume: $reading['percent'], muted: $reading['muted']));
             $this->lastVolume = $reading['percent'];
             $this->lastMuted = $reading['muted'];
+        }
+    }
+
+    /** Once, while the TV answers: its MAC, so it can be woken from standby. */
+    private function rememberMac(): void
+    {
+        if ($this->macKnown) {
+            return;
+        }
+
+        try {
+            $this->macKnown = $this->device->driver->rememberMac() !== null;
+        } catch (\Throwable) {
+            // Tried again at the next check.
         }
     }
 

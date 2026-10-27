@@ -188,4 +188,37 @@ class PhilipsTvTest extends TestCase
         $driver->setVolume(10);
         Http::assertSent(fn (Request $r) => $r->method() === 'POST' && $r['current'] === 6 && $r['muted'] === false);
     }
+
+    public function test_the_tv_is_woken_with_a_magic_packet_once_its_mac_is_known(): void
+    {
+        $sent = [];
+        \App\Services\Network\WakeOnLan::$fake = function (string $packet, array $targets) use (&$sent) {
+            $sent = [$packet, $targets];
+        };
+        $device = $this->tv();
+
+        try {
+            $this->putJson("/api/devices/{$device->id}/power", ['on' => true])->assertStatus(503);
+
+            DeviceMeta::create(['device_id' => $device->id, 'key' => 'mac_address', 'value' => '68:07:0A:4B:03:1D']);
+            $this->putJson("/api/devices/{$device->id}/power", ['on' => true])->assertOk()->assertJson(['on' => true]);
+
+            $this->assertSame(str_repeat("\xFF", 6).str_repeat(hex2bin('68070A4B031D'), 16), $sent[0]);
+            $this->assertSame(['255.255.255.255', '10.0.0.255', '10.0.0.70'], $sent[1]);
+        } finally {
+            \App\Services\Network\WakeOnLan::$fake = null;
+        }
+    }
+
+    public function test_the_mac_is_read_from_the_interface_that_has_wake_on_lan(): void
+    {
+        Http::fake(['*/6/network/devices' => Http::response([
+            ['id' => 'wifi0', 'mac' => '1C:30:08:75:70:8B', 'type' => 'Wifi', 'wake-on-lan' => 'Disabled'],
+            ['id' => 'eth0', 'mac' => '68:07:0A:4B:03:1D', 'type' => 'Ethernet', 'wake-on-lan' => 'Enabled'],
+        ])]);
+        $device = $this->tv();
+
+        $this->assertSame('68:07:0A:4B:03:1D', $device->driver->rememberMac());
+        $this->assertSame('68:07:0A:4B:03:1D', $device->meta()->where('key', 'mac_address')->value('value'));
+    }
 }

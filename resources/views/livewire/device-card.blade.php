@@ -312,7 +312,7 @@
                         <span>Multiroom</span>
                     </button>
                 @endif
-                @if($supportsPower && $state === \App\Domain\Device\State::Standby)
+                @if($supportsPower && ($state === \App\Domain\Device\State::Standby || ($supportsWake && $state === \App\Domain\Device\State::Unreachable)))
                     <button wire:click="powerOn"
                             class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors">
                         <i class="fa-solid fa-power-off"></i>

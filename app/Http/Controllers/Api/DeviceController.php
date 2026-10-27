@@ -162,11 +162,14 @@ class DeviceController extends Controller
         $request->validate(['on' => ['required', 'boolean']]);
         $on = $request->boolean('on');
 
+        // A device that can be woken over the network (Wake-on-LAN) is unreachable exactly while it sleeps.
+        $wakeable = $on && rescue(fn () => method_exists($device->driver, 'canWakeOnLan') && $device->driver->canWakeOnLan(), false, false);
+
         return $this->withDriver($device, PowerInterface::class, 'power', function (PowerInterface $driver) use ($on) {
             $on ? $driver->powerOn() : $driver->standby();
 
             return ['on' => $on];
-        });
+        }, reachable: !$wakeable);
     }
 
     /**

@@ -72,6 +72,21 @@ class JointspaceClient
         }
     }
 
+    /** @return array<int, array{id: string, mac: string, type: string, 'wake-on-lan'?: string}> the TV's network interfaces */
+    public function networkDevices(): array
+    {
+        return $this->get('network/devices');
+    }
+
+    /** The MAC of the interface that can wake the TV (Wake-on-LAN enabled), else the first one. */
+    public function wakeMac(): ?string
+    {
+        $devices = $this->networkDevices();
+        $enabled = collect($devices)->first(fn ($d) => strcasecmp((string) ($d['wake-on-lan'] ?? ''), 'Enabled') === 0);
+
+        return ($enabled ?? $devices[0] ?? null)['mac'] ?? null;
+    }
+
     /** @return array{current: int, min: int, max: int, muted: bool} the TV's own volume scale (0-60 on the lab TV) */
     public function volume(): array
     {

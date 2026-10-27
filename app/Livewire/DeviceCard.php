@@ -43,6 +43,8 @@ class DeviceCard extends Component
 
     public bool $supportsPower = false;
 
+    public bool $supportsWake = false;
+
     public bool $supportsSeek = false;
 
     public bool $muted = false;
@@ -61,6 +63,7 @@ class DeviceCard extends Component
             $this->supportsSourceActivation = $driver instanceof SourceActivationInterface;
             $this->supportsRadio = $driver instanceof RadioControlInterface;
             $this->supportsPower = $driver instanceof PowerInterface;
+            $this->supportsWake = $this->supportsPower && method_exists($driver, 'canWakeOnLan') && $driver->canWakeOnLan();
             $this->supportsSeek = SpotifyRouting::driverFor($device, SeekInterface::class) instanceof SeekInterface;
             // Asking the device costs a network round trip, so only the
             // single-device page reads it; grid cards start unmuted.

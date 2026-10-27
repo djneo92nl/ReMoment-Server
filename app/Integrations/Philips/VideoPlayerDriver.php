@@ -13,6 +13,8 @@ use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\SourcesInterface;
 use App\Integrations\Contracts\VideoDeviceInterface;
 use App\Integrations\Upnp\MusicPlayerDriver as UpnpDriver;
+use App\Models\DeviceMeta;
+use App\Services\Network\WakeOnLan;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -111,9 +113,42 @@ class VideoPlayerDriver extends UpnpDriver implements DigitsInterface, PowerInte
         Volume::updateMuted($this->device->id, $muted);
     }
 
+    /** A TV is woken with Wake-on-LAN once its MAC is known (read from the TV while it is on). */
+    public function canWakeOnLan(): bool
+    {
+        return $this->wakeMac() !== null;
+    }
+
     public function powerOn(): void
     {
-        throw new UnsupportedOperationException('This TV cannot be switched on remotely.');
+        $mac = $this->wakeMac();
+
+        if ($mac === null) {
+            throw new UnsupportedOperationException('The MAC address of this TV is not known yet: it is read while the TV is on, so switch it on once.');
+        }
+
+        WakeOnLan::send($mac, $this->device->ip_address);
+    }
+
+    /** Reads the MAC from the TV and keeps it, once; the TV has to be on. */
+    public function rememberMac(): ?string
+    {
+        if (($mac = $this->wakeMac()) !== null) {
+            return $mac;
+        }
+
+        $mac = $this->client()->wakeMac();
+
+        if ($mac !== null) {
+            DeviceMeta::updateOrCreate(['device_id' => $this->device->id, 'key' => 'mac_address'], ['value' => $mac]);
+        }
+
+        return $mac;
+    }
+
+    private function wakeMac(): ?string
+    {
+        return $this->device->meta()->where('key', 'mac_address')->value('value');
     }
 
     public function standby(): void
