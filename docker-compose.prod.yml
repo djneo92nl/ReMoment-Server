@@ -4,8 +4,8 @@ services:
         # cross a Docker bridge. Sibling services are therefore reached on 127.0.0.1.
         network_mode: host
         build:
-            context: './docker/8.4'
-            dockerfile: Dockerfile
+            context: './docker'
+            dockerfile: frankenphp/Dockerfile
             args:
                 WWWGROUP: '${WWWGROUP:-1000}'
         image: 'remoment/app:latest'
@@ -16,9 +16,8 @@ services:
             SUPERVISOR_PHP_USER: 'sail'
             APP_PORT: '${APP_PORT:-80}'
             QUEUE_WORKERS: '${QUEUE_WORKERS:-1}'
-            # artisan serve is PHP's built-in server: one request at a time unless this is set, so a request
-            # stuck on disk blocks every other page load.
-            PHP_CLI_SERVER_WORKERS: '${PHP_CLI_SERVER_WORKERS:-4}'
+            # FrankenPHP PHP threads serving requests concurrently (docker/frankenphp/Caddyfile).
+            FRANKENPHP_THREADS: '${FRANKENPHP_THREADS:-4}'
             XDEBUG_MODE: 'off'
         volumes:
             - '.:/var/www/html'
