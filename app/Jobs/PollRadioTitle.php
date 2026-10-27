@@ -11,6 +11,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 
 /** Reads a station's current title through its {@see NowPlayingProviders} and schedules itself again while a device still plays the station. */
 class PollRadioTitle implements ShouldQueue
@@ -32,6 +33,11 @@ class PollRadioTitle implements ShouldQueue
         if ($station === null || !$providers->supports($station) || !StreamTitles::active($station->id)) {
             StreamTitles::chainEnded($this->stationId);
 
+            return;
+        }
+
+        // A second chain (the first one's lock lapsed behind a backlog) ends here instead of polling twice.
+        if (!Cache::add("radio:polled:{$station->id}", true, self::INTERVAL_SECONDS - 5)) {
             return;
         }
 

@@ -34,14 +34,14 @@ Schedule::command('library:analyze')->dailyAt('02:00');
 Schedule::command('library:scan-files --queue')->dailyAt('03:30');
 
 // Folds duplicate artists/albums/tracks together (ids of merged records disappear), so weekly and off-hours.
-Schedule::command('library:merge-duplicates --force')->weeklyOn(0, '04:00')->withoutOverlapping();
+Schedule::command('library:merge-duplicates --force')->weeklyOn(0, '04:00')->withoutOverlapping(240);
 
 // Fills and refreshes the cached library overviews (LibraryCache), so a visit never pays for a cold or stale one.
 // The overlap lock expires after 10 minutes: the default is 24 h, and a run killed by a restart never clears it (Redis survives), so the warm-up would stay off for a day.
 Schedule::command('library:warm')->everyFiveMinutes()->withoutOverlapping(10)->runInBackground();
 
 // Nightly backup of the database and settings, keeping the last BACKUP_KEEP archives (docs/architecture/backup-restore.md); /settings/health warns when it stops.
-Schedule::command('backup:run')->dailyAt('01:30')->withoutOverlapping();
+Schedule::command('backup:run')->dailyAt('01:30')->withoutOverlapping(120);
 
 // failed_jobs only grows otherwise; a month is enough to look at a failure.
 Schedule::command('queue:prune-failed --hours=720')->dailyAt('04:30');

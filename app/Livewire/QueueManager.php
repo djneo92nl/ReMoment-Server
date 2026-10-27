@@ -58,6 +58,7 @@ class QueueManager extends Component
         }
 
         return view('livewire.queue-manager', [
+            'queues' => $inspector->queues(),
             'pendingJobs' => $inspector->pending(),
             'failedJobs' => $inspector->failed(),
             'failedCount' => $failedCount,

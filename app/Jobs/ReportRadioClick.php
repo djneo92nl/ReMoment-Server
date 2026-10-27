@@ -14,6 +14,8 @@ class ReportRadioClick implements ShouldQueue
 
     public int $tries = 1;
 
+    public int $timeout = 20;
+
     public function __construct(public string $stationUuid) {}
 
     public function handle(RadioBrowser $browser): void

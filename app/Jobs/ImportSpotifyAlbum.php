@@ -10,6 +10,7 @@ use App\Models\Media\Album;
 use App\Services\SpotifyTokenService;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Queue\Middleware\RateLimited;
 
 /**
  * A track played from Spotify creates its album with that one track; this adds the rest of the album.
@@ -24,6 +25,12 @@ class ImportSpotifyAlbum implements ShouldBeUnique, ShouldQueue
     public function uniqueId(): string
     {
         return (string) $this->album->id;
+    }
+
+    /** Released, not failed, while over the limit (the `spotify` limiter). */
+    public function middleware(): array
+    {
+        return [new RateLimited('spotify')];
     }
 
     public function handle(SpotifyTokenService $tokenService, SpotifyLibraryImporter $importer): void

@@ -60,6 +60,10 @@ class AppServiceProvider extends ServiceProvider
         // LRCLIB has no published limit but answers 503 when hammered; one request a second, shared by every worker.
         RateLimiter::for('lrclib', fn () => Limit::perSecond(1));
 
+        // Spotify answers 429 for a few seconds' worth of bursts; Last.fm allows about 5 requests a second per key.
+        RateLimiter::for('spotify', fn () => Limit::perSecond(3));
+        RateLimiter::for('lastfm', fn () => Limit::perSecond(4));
+
         // Writes to the library tables mark the cached library overviews stale (LibraryCache).
         Event::listen(QueryExecuted::class, fn (QueryExecuted $query) => LibraryCache::observe($query->sql));
 

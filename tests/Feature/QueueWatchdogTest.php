@@ -20,11 +20,11 @@ class QueueWatchdogTest extends TestCase
         $this->killed = [];
     }
 
-    private function watchdog(array $pids = [4242]): QueueWatchdog
+    private function watchdog(array $pids = [4242], ?int $running = null): QueueWatchdog
     {
         return new QueueWatchdog(fn () => $pids, function (int $pid) {
             $this->killed[] = $pid;
-        });
+        }, fn () => $running);
     }
 
     private function beat(string $key, int $minutesAgo): void
@@ -85,5 +85,18 @@ class QueueWatchdogTest extends TestCase
         $this->beat(Heartbeat::QUEUE, 10);
 
         $this->assertSame('no-worker', $this->watchdog([])->run());
+    }
+
+    public function test_workers_busy_with_a_recent_long_job_are_left_alone_until_it_outlasts_every_timeout(): void
+    {
+        Log::spy();
+        $this->beat(Heartbeat::SCHEDULER, 0);
+        $this->beat(Heartbeat::QUEUE, 10);
+
+        $this->assertSame('busy', $this->watchdog(running: 600)->run());
+        $this->assertSame([], $this->killed);
+
+        $this->assertSame('restarted', $this->watchdog(running: QueueWatchdog::BUSY_GRACE_SECONDS + 1)->run());
+        $this->assertSame([4242], $this->killed);
     }
 }

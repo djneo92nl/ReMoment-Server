@@ -65,6 +65,45 @@ class QueueInspector
         return ['total' => $total, 'scanned' => count($rows), 'groups' => $groups];
     }
 
+    /**
+     * Per queue: jobs waiting, delayed and running, and how long the head of the waiting list has waited
+     * (`oldest_waiting`, null when nothing waits). A runner that is stuck shows as an age that keeps growing.
+     * Redis only; null for other drivers.
+     *
+     * @return list<array{queue: string, waiting: int, delayed: int, running: int, oldest_waiting: ?Carbon}>|null
+     */
+    public function queues(): ?array
+    {
+        if (config('queue.connections.'.config('queue.default').'.driver') !== 'redis') {
+            return null;
+        }
+
+        try {
+            $redis = Queue::connection()->getConnection();
+
+            return array_map(function (string $name) use ($redis) {
+                $head = $redis->lindex("queues:{$name}", 0);
+                $pushed = $head ? (json_decode($head, true)['pushedAt'] ?? null) : null;
+
+                return [
+                    'queue' => $name,
+                    'waiting' => (int) $redis->llen("queues:{$name}"),
+                    'delayed' => (int) $redis->zcard("queues:{$name}:delayed"),
+                    'running' => (int) $redis->zcard("queues:{$name}:reserved"),
+                    'oldest_waiting' => $pushed ? Carbon::createFromTimestamp((int) $pushed) : null,
+                ];
+            }, $this->queueNames());
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /** @return list<string> */
+    private function queueNames(): array
+    {
+        return array_values(array_unique([...self::KNOWN_QUEUES, config('analysis.queue'), config('proxies.queue'), config('queue.connections.redis.queue', 'default')]));
+    }
+
     /** @return array{0: int, 1: list<array{0: string, 1: string, 2: ?Carbon}>} */
     private function databaseRows(): array
     {
@@ -86,7 +125,7 @@ class QueueInspector
     private function redisRows(): array
     {
         $redis = Queue::connection()->getConnection();
-        $names = array_unique([...self::KNOWN_QUEUES, config('analysis.queue'), config('queue.connections.redis.queue', 'default')]);
+        $names = $this->queueNames();
         $total = 0;
         $rows = [];
 

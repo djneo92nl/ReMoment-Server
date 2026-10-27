@@ -8,6 +8,7 @@ use App\Models\Media\Artist;
 use App\Services\Lastfm\LastfmInfoClient;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Queue\Middleware\RateLimited;
 
 class EnrichArtistLastfm implements ShouldBeUnique, ShouldQueue
 {
@@ -18,6 +19,12 @@ class EnrichArtistLastfm implements ShouldBeUnique, ShouldQueue
     public function uniqueId(): string
     {
         return (string) $this->artist->id;
+    }
+
+    /** Released, not failed, while over the limit (the `lastfm` limiter). */
+    public function middleware(): array
+    {
+        return [new RateLimited('lastfm')];
     }
 
     public function handle(LastfmInfoClient $lastfm): void

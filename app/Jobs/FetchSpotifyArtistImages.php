@@ -11,6 +11,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Middleware\RateLimited;
 use Illuminate\Queue\SerializesModels;
 use SpotifyWebAPI\SpotifyWebAPIException;
 
@@ -30,9 +31,26 @@ class FetchSpotifyArtistImages implements ShouldQueue
     /** Smallest width a stored photo should have; covers are shown at 320px at most. */
     private const MIN_WIDTH = 320;
 
-    public int $tries = 3;
+    /** Releases by the limiter don't count as attempts; only thrown exceptions do (as in EnrichesFromSource). */
+    public int $tries = 0;
 
-    public int $backoff = 60;
+    public int $maxExceptions = 4;
+
+    /** @return list<int> */
+    public function backoff(): array
+    {
+        return [60, 300, 900, 1800];
+    }
+
+    public function retryUntil(): \DateTimeInterface
+    {
+        return now()->addHours(6);
+    }
+
+    public function middleware(): array
+    {
+        return [new RateLimited('spotify')];
+    }
 
     public bool $deleteWhenMissingModels = true;
 

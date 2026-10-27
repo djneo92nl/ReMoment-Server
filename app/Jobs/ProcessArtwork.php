@@ -33,6 +33,9 @@ class ProcessArtwork implements ShouldQueue
 
     public int $tries = 3;
 
+    /** Three backgrounds and a download on a Pi 3 take longer than the worker's 60 s default. */
+    public int $timeout = 120;
+
     public int $backoff = 60;
 
     /** Square proxies, in pixels; each becomes `proxy_{size}` in the cache payload. */

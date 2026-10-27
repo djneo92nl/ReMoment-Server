@@ -18,9 +18,13 @@ class SendNowPlayingToLastfm implements ShouldQueue
     /** A record merged away by library:merge-duplicates no longer exists; drop the job. */
     public bool $deleteWhenMissingModels = true;
 
-    public int $tries = 3;
+    public int $tries = 5;
 
-    public int $backoff = 60;
+    /** A Last.fm outage of a few minutes must not use up every try. @return list<int> */
+    public function backoff(): array
+    {
+        return [60, 300, 900, 3600];
+    }
 
     /** A library track, or a play of a track that isn't in the library (names stored on the play). */
     public function __construct(public readonly Track|Play $track) {}

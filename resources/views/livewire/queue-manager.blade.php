@@ -14,6 +14,22 @@
         <x-secondary-button size="sm" wire:click="restartWorkers" wire:confirm="Restart the queue workers? They finish their current job first." data-test="restart-workers"><i class="fa-solid fa-rotate mr-2"></i>Restart workers</x-secondary-button>
     </div>
 
+    {{-- Per queue: a runner that stopped shows as an oldest-waiting age that keeps growing --}}
+    @if($queues)
+        <x-card flush data-test="queue-overview">
+            <div class="px-8 py-5 border-b border-gray-100 dark:border-stone-800">
+                <h2 class="text-base font-medium text-gray-900 dark:text-gray-100">Queues</h2>
+            </div>
+            @foreach($queues as $queue)
+                <div class="px-8 py-3 flex items-center gap-4 border-b border-gray-100 dark:border-stone-800 last:border-b-0" data-test="queue-{{ $queue['queue'] }}">
+                    <div class="flex-1 text-sm text-gray-900 dark:text-gray-100">{{ $queue['queue'] }}</div>
+                    <div class="text-xs text-gray-500">{{ $queue['waiting'] }} waiting · {{ $queue['running'] }} running · {{ $queue['delayed'] }} delayed</div>
+                    <div class="w-36 text-xs text-gray-500 text-right">oldest waiting {{ $queue['oldest_waiting']?->diffForHumans(short: true) ?? '—' }}</div>
+                </div>
+            @endforeach
+        </x-card>
+    @endif
+
     {{-- Pending jobs --}}
     <x-card flush data-test="pending-jobs">
         <div class="px-8 py-5 border-b border-gray-100 dark:border-stone-800 flex items-center justify-between">

@@ -9,6 +9,7 @@ use App\Models\Media\Track;
 use App\Services\SpotifyTokenService;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Queue\Middleware\RateLimited;
 use SpotifyWebAPI\SpotifyWebAPIException;
 
 class EnrichTrackSpotify implements ShouldBeUnique, ShouldQueue
@@ -20,6 +21,12 @@ class EnrichTrackSpotify implements ShouldBeUnique, ShouldQueue
     public function uniqueId(): string
     {
         return (string) $this->track->id;
+    }
+
+    /** Released, not failed, while over the limit (the `spotify` limiter). */
+    public function middleware(): array
+    {
+        return [new RateLimited('spotify')];
     }
 
     public function handle(SpotifyTokenService $tokenService): void
