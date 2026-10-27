@@ -2197,6 +2197,24 @@ components:
         resolved_at: { type: string, format: date-time, nullable: true }
         acknowledged_at: { type: string, format: date-time, nullable: true }
         state: { type: string, enum: [raised, resolved] }
+    SyncGroup:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string, nullable: true }
+        leader:
+          type: object
+          properties:
+            id: { type: integer }
+            name: { type: string }
+        members:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              name: { type: string }
+              offset_ms: { type: integer }
     Error:
       type: object
       properties:
@@ -2244,24 +2262,6 @@ components:
       type: object
       nullable: true
       description: Multiroom role as the device's listener last saw it; null while unknown (ASE only for now)
-    SyncGroup:
-      type: object
-      properties:
-        id: { type: integer }
-        name: { type: string, nullable: true }
-        leader:
-          type: object
-          properties:
-            id: { type: integer }
-            name: { type: string }
-        members:
-          type: array
-          items:
-            type: object
-            properties:
-              id: { type: integer }
-              name: { type: string }
-              offset_ms: { type: integer }
       properties:
         role: { type: string, enum: [standalone, host, listener] }
         host:
@@ -2460,6 +2460,9 @@ components:
         active:
           type: boolean
           description: This is the selected source. Absent when the device cannot tell.
+        signal:
+          type: boolean
+          description: The source has a signal (an HDMI box that is on). Show it as a status dot. Absent when the device cannot tell (B&O TVs report it).
         hidden: { type: boolean, description: "Household preference; hidden sources stay out of pickers. QPlay and borrowed sources start hidden." }
         sort_order: { type: integer }
     RadioStation:
@@ -2670,9 +2673,6 @@ components:
         playable: { type: boolean }
         tracks:
           type: array
-        signal:
-          type: boolean
-          description: The source has a signal (an HDMI box that is on). Show it as a status dot. Absent when the device cannot tell (B&O TVs report it).
           description: First 200 tracks in playlist order
           items:
             type: object

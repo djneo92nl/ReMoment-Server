@@ -36,13 +36,14 @@ docs/
     credentials.md          Credentials layer (workstream 14.4): ServiceCredentials registry for Spotify/Last.fm/Discogs/AcoustID/TheAudioDB keys, /settings/services, encrypted secrets, backup exclusion, base-URL/relay hook, setup steps, how to add a service
     database.md             MariaDB (SQLite for tests only): why, .env settings, db:import-sqlite, recovering a corrupt file, driver-specific SQL
     device-drivers.md       Driver contracts, existing drivers, guide for adding a new brand
+    beovision-tv.md         BeoVision / Beoplay V1 TV controls design: V1 API findings, one-way remote commands, TV screens (list, detail, remote), probe plan, phases; mostly unbuilt
     philips-tv.md           Philips Android TV on top of the UPnP driver (Jointspace v6): pairing command, standby, apps as sources, active app as now playing; what is unverified
     tv-devices.md           How a TV is modelled: sources/inputs, playback, power, RemoteControlInterface (remote keys); what the TV phase still has to do (Philips, BeoVision)
-    beovision-tv.md         BeoVision / Beoplay V1 TV controls design: V1 API findings, one-way remote commands, TV screens (list, detail, remote), probe plan, phases; mostly unbuilt
     upnp-renderer.md        Generic UPnP MediaRenderer fallback driver: server-managed queue, polling listener, discovery precedence, future research (native queues, radio, OpenHome)
     device-discovery.md     Discovery commands, listener startup, device_meta keys
     ase-api-map.md          What the B&O ASE REST API offers beyond the driver (Bluetooth, network, WiSA, sound), per model; the ase:map command
     sync-groups.md          Fake multiroom: a leader and members kept together by the server (state, track changes, drift seeks), what can be shared, precision (about ±2 s), where it runs
+    masterlink-gateway.md   Master Link Gateway (MLGW/BLGW): IP protocol, bus log, the read-only mlgw:probe command; what is unverified
     proxmox-deployment.md   Ansible: LXC container on an existing Proxmox host, MiniDLNA server
     discovery-for-clients.md mDNS advertisement (_remoment._tcp via host Avahi) so clients find the server
     system-requirements.md  Hardware tiers for the full server (Pi minimum up to Essentia + ML), what runs, disk and network needs
@@ -58,12 +59,13 @@ docs/
     listening-modes.md       Focus / Party / Sleep / Workout: preset smart-playlist definitions over the audio analysis, API and Library page row
     similar-tracks.md        Plan (not built) for similar tracks / radio from the EffNet embeddings; the sqlite-vec spike's measurements and what the build must do
     beolink-stream.md        B&O multiroom on any speaker (pseudo multiroom): beo listener → ffmpeg → Icecast, joins a B&O source, `stream_url` targets in the multiroom picker, opt-in compose profile
+    home-assistant.md       Home Assistant (1.0, plan): MQTT discovery of stats/health/clients/sources, event triggers and a REST command package for automations built in HA; no media_player entities
+    v1-roadmap.md            v1.0 scope: stability, TV, availability layer, discovery, Deezer/Tidal, physical library, CD import, extras, Home Assistant; order, dependencies, done-criteria, open questions (plan)
+    streaming-services.md    Deezer and Tidal as per-device capabilities (ASE/Mozart play-by-id, Tidal Connect read-only): library entry, id mapping, contract, what to verify on hardware first (plan, not built)
     spotify-stream.md        Spotify on any speaker: librespot → ffmpeg → Icecast MP3 stream, `stream_url` capability, --onevent hook as now playing, opt-in compose profile
     smart-playlists.md       Rule-based playlists (source smart): rules JSON, SmartFields registry, builder, editor, daily refresh
     sd-card-export.md        Admin zip of recent covers/backgrounds + logos in the touch client's SD layout
     refactor-hardware-check.md  Checklist for real devices after the duplicate-code cleanup: listeners, discovery, DLNA playback, volume, multiroom, API errors, artwork, MQTT
-    v1-roadmap.md            v1.0 scope: stability, TV, availability layer, discovery, Deezer/Tidal, physical library, CD import, extras, Home Assistant; order, dependencies, done-criteria, open questions (plan)
-    streaming-services.md    Deezer and Tidal as per-device capabilities (ASE/Mozart play-by-id, Tidal Connect read-only): library entry, id mapping, contract, what to verify on hardware first (plan, not built)
     plugin-architecture.md  Design doc: extracting drivers into composable packages
     setup-wizard.md          First-time setup wizard: steps, Setting flags, auto-redirect middleware
   frontend/
@@ -113,6 +115,9 @@ php artisan device:sync-sources
 
 # Map a B&O ASE device's (or NetworkLink/MasterLink converter's) REST API — GET-only crawl; --compare diffs two devices
 php artisan ase:map {device id|ip} [--seed=BeoZone/Zone/Video] [--compare=storage/app/ase-maps/other.json]
+
+# Listen to a Master Link Gateway (IP protocol + bus log), read-only, and record to storage/app/mlgw-probes; see docs/architecture/masterlink-gateway.md
+php artisan mlgw:probe {ip} [--user=admin] [--seconds=120] [--no-http|--no-api|--no-bus]
 
 # Scan DLNA servers' libraries (triggered via UI or manually)
 php artisan library:scan [--server=192.168.1.20] [--root=Muziek]   # --root: start in a folder (title, object id or Muziek/Albums) so a server with films and series isn't crawled first
@@ -350,18 +355,13 @@ The web page `/devices/{id}/settings` (guest-accessible; network and rename need
 GET|PUT  /api/devices/{id}/sleep-timer   → { value, min, max, step, writable }   PUT { minutes } (0 cancels; 0–60)   (capability `sleep_timer`; ASE — the BeoPlay V1 lists it but is `writable: false`)
 POST     /api/devices/{id}/digits   body { digits: "105" } → { status, digits }   number keys for the active TV / set-top box source, sent in order (capability `digits`; ASE VideoPlayerDriver = BeoPlay V1, Philips TV)
 GET|POST /api/devices/{id}/keys   → { supported_keys: ["up", …] } | body { key: "ok" } → { status, key }   remote keys of a TV (capability `remote_control`; Philips Android TV via `POST /6/input/key`, ASE not yet); `RemoteKey` names up/down/left/right/ok/back/home/menu/source/info/guide/exit/play/pause/stop/next/previous/fast_forward/rewind/volume_up/volume_down/mute/channel_up/channel_down/red/green/yellow/blue; 422 `unsupported` for a key outside `supported_keys`, 422 `invalid` for an unknown name; `supported_keys` also in the device detail; MCP `remote_keys`; web: the Remote card on the device page
+GET  /api/devices/{id}/jellyfin   → { active, continue_watching: [Tile], next_up: [Tile] }   Jellyfin on a Philips TV with a Jellyfin key (Settings › Services): what to continue or watch next; `POST …/jellyfin/play { item_id, position_ticks? }` starts it in the Jellyfin app on the TV; MCP `jellyfin`; see `docs/api/jellyfin.md`; web: the Jellyfin card on the TV's page
 GET      /api/devices/{id}/network   → active interface, wired/wireless status and addresses, known Wi-Fi networks (never a passphrase)   (capability `network_settings`; ASE)
 PUT      /api/devices/{id}/network/interface | /network/wired | /network/wifi   → { status: "ok" } — not read back, the device may change address
 GET      /api/devices/{id}/wireless-speakers   POST …/wireless-speakers/scan { action: start|stop }   (capability `wireless_speakers`; WiSA: **only the BeoSound Moment**, via `wisa => true` in config/devices.php / `HardwareFeatures`)
 GET      /api/devices/{id}/wired-speakers   PUT …/wired-speakers/{pl_1|pl_2} { type?, sound? }   (capability `wired_speakers`; which speaker type is on each wired output: **only models with external speakers**, Essence and Moment, via `speaker => 'external'` in config/devices.php / `HardwareFeatures`)
 ```
-GET  /api/devices/{id}/jellyfin   → { active, continue_watching: [Tile], next_up: [Tile] }   Jellyfin on a Philips TV with a Jellyfin key (Settings › Services): what to continue or watch next; `POST …/jellyfin/play { item_id, position_ticks? }` starts it in the Jellyfin app on the TV; MCP `jellyfin`; see `docs/api/jellyfin.md`; web: the Jellyfin card on the TV's page
 
-### Spotify stream
-
-`stream_url` (UPnP, Sonos, ASE unverified) plays a live MP3 stream; the opt-in librespot + Icecast containers turn Spotify Connect into one (`docs/architecture/spotify-stream.md`).
-
-```
 ### Move playback
 
 `POST /api/devices/{id}/move` `{ to_device_id, stop_source? }` continues what plays on `{id}` on another device (capability `move_playback`, cache-only check). Library tracks keep queue and position (play, wait for `playing`, seek), radio restarts the station, Spotify uses Spotify's own transfer to a Connect-mapped speaker; line-in/TV/CD/Bluetooth/AirPlay inputs are `422 not_movable`. Code `App\Domain\Playback`; see `docs/api/playback-move.md`.
@@ -370,10 +370,13 @@ GET  /api/devices/{id}/jellyfin   → { active, continue_watching: [Tile], next_
 
 `/api/sync-groups` makes a leader + members group for devices without native multiroom (capability `sync_group`): members start on the leader's queue (the move machinery) and `SyncGroupMirror` keeps them in step from the leader's events: state, track changes, a seek of a member that drifted more than `sync.drift_threshold` (2 s). Library tracks and radio, not Spotify; precision about ±2 s. UI: "Sync groups" on `/multiroom`. See `docs/architecture/sync-groups.md` and `docs/api/sync-groups.md`.
 
+### Spotify stream
+
+`stream_url` (UPnP, Sonos, ASE unverified) plays a live MP3 stream; the opt-in librespot + Icecast containers turn Spotify Connect into one (`docs/architecture/spotify-stream.md`).
+
+```
 GET  /api/spotify-stream                  → { enabled, name, url }
 POST /api/devices/{id}/spotify-stream     → { status, url, receiver }   (needs LIBRESPOT_ENABLED and `stream_url`; the user then picks the receiver in Spotify)
-GET  /api/beolink-stream                  → { enabled, name, url, host_device_id, target_device_ids }   the B&O source's audio through the server (`docs/architecture/beolink-stream.md`)
-POST /api/devices/{id}/beolink-stream     body { host_device_id? } → { status, url, … }   play it on a `stream_url` device; the receiver joins the host B&O device first. DELETE stops it
 POST /api/librespot/event                 the container's --onevent hook, header X-Librespot-Secret; becomes the speaker's now playing
 ```
 
@@ -436,6 +439,7 @@ POST /api/devices/{id}/sources/activate  body: { "source_id": "MUSIC" }   → { 
   "provider_jid": "provider@jid.example",
   "provider_name": "Spotify",
   "input": "HDMI 5",
+  "signal": true,
   "active": true,
   "hidden": false,
   "sort_order": 0
@@ -452,7 +456,6 @@ POST /api/devices/{id}/radio/{station_id}   → { "status": "ok", "station": "Ra
 ```
 
 `station_id` is the `RadioStation` model ID. The device must have `radio_control` capability and a compatible radio platform. `GET` lists exactly the stations with an identifier for the device's platform (`beoradio` for ASE/Mozart, `tunein` for Sonos, `url` for generic UPnP). **Native identifiers win:** a station with a `beoradio` / `tunein` id plays through the speaker's own radio even when it also has a stream `url`; the plain stream URL (`PlayStreamUrlInterface`, see `docs/architecture/spotify-stream.md`) is only the fallback on ASE and Sonos and the only way on UPnP. Stations are added by hand or from the radio-browser.info search on `/radio/create` (`Domain\Radio\RadioBrowser`, `Livewire\RadioStationSearch`); a UPnP renderer's now playing for such a station is the station plus the song from the stream's ICY title (`Domain\Radio\IcyReader`, polled by `Jobs\PollRadioTitle` through `StreamTitles`, one chain per station while a device plays it; Sonos and ASE report their own titles), ordered by name like `/radio`; `422` without `radio_control`, `503` while unreachable (building the driver may contact the device).
-  "signal": true,
 
 **RadioStationItem shape:** `{ "id": 3, "name": "Radio 1", "genre": null, "favorite": false, "artwork": { "kind": "radio", "proxy_512": "…", … } | null }`. `genre` is the station's genre when it was added from the radio-browser.info search, else `null`. `favorite` is household-wide (`radio_stations.favorited_at`); `PUT /api/radio/{station_id}/favorite` with `{ "favorite": true }` → `{ "favorite": true }` sets it. The `/radio` web page lists favorites first; the API list stays by name. `artwork` is the same object as `now_playing.artwork`: the station's `image_url`, else the generated radio logo. An `image_url` that isn't processed yet gives `null` and is queued (at most once an hour per image), so the request never waits for a download.
 
@@ -498,11 +501,11 @@ GET  /api/library/genres/{slug}            → { slug, name, colors, artists: [A
 GET  /api/library/playlists?cursor=[&scope=] → { data: [PlaylistItem + library, external, local_track_count, local_coverage], next_cursor }   recently played (last_played_at) first, then by name, 50/page, only playlists with tracks; scope dlna/local also lists Spotify playlists with local_coverage >= `PlaylistCoverage::MIN_COVERAGE` (0.4) as `external: true`
 GET  /api/library/playlists/{id}?device_id=&library= → { id, name, owner, last_played_at, artwork, mode, mode_library, sources, track_count, local_track_count, local_coverage, smart, rules, rules_summary, playable, tracks: [{ id, name, artist_name, duration, artwork, playable, missing_locally (local mode only) }] }   playlist order, first 200; track artwork = album cover (one preload, no N+1); rules/rules_summary only for smart playlists (SmartPlaylistDescriber)
 GET  /api/library/recent?limit=30          → { data: [AlbumItem] }   most recently played distinct albums (limit 1–100)
+GET  /api/library/tracks?cursor=&sort=&letter= → { data: [SearchTrack], next_cursor }   all visible tracks, sort name (default) | artist | added | plays, 50/page
 GET  /api/library/favorites                → { albums: [AlbumItem], artists: [ArtistItem] }   most recently favorited first
 PUT  /api/library/albums/{id}/favorite     body: { "favorite": true }   → { "favorite": true }
 PUT  /api/library/artists/{id}/favorite    body: { "favorite": true }   → { "favorite": true }
 ```
-GET  /api/library/tracks?cursor=&sort=&letter= → { data: [SearchTrack], next_cursor }   all visible tracks, sort name (default) | artist | added | plays, 50/page
 
 ArtistItem `{ id, name, album_count, artwork, favorite }`; AlbumItem `{ id, name, artist_name, year, artwork, favorite }`; PlaylistItem `{ id, name, track_count, owner, last_played_at, artwork }` (`owner` = Spotify owner or `null`; `artwork` = the generated playlist cover, see [Artwork](#artwork-caching--processing)). A playlist counts as played when started from the server (API or web), which sets `playlists.last_played_at`. Favorites are household-wide (`favorited_at` on `albums`/`artists`; the web album/artist pages toggle them too). There is one record per artist/album/track across sources (see [Library identity](#library-identity)); ids of records merged by `library:merge-duplicates` disappear, so clients get `404` (or `422` in play bodies) for a stale id and should re-read the list.
 
@@ -512,11 +515,11 @@ ArtistItem `{ id, name, album_count, artwork, favorite }`; AlbumItem `{ id, name
 POST /api/devices/{id}/library/play            body: { "track_id": 42 }                                        → { "status": "ok", "track": "Song Title" }
 POST /api/devices/{id}/library/play-playlist   body: { "playlist_id": 3, "start_track_id": 12, "shuffle": false } → { "status": "ok", "playlist": "…" }
 POST /api/devices/{id}/library/play-album      body: { "album_id": 12, "start_track_id": 34, "shuffle": false } → { "status": "ok", "album": "…" }
+POST /api/devices/{id}/library/play-tracks     body: { "scope"?, "client"? }                                   → { "status": "ok", "queued": 100 }   shuffle the whole library (random sample of 100 playable tracks)
 POST /api/devices/{id}/library/play-artist     body: { "artist_id": 5, "shuffle": true }                        → { "status": "ok", "artist": "…" }
 ```
 
 `App\Domain\Library\LibraryPlayback` (shared with the web play buttons) tries **DLNA** first — the device's `LibraryPlaybackInterface` driver, for tracks with a `dlna_url` — then **Spotify** — when Spotify is connected and the device is the Spotify device or mapped to a Spotify Connect name, for tracks with a Spotify URI (`external_id` `spotify:track:…`): (the track's own `external_id`, or kept as `external_id` metadata with source `spotify` on a merged track): an album plays as its Spotify album context (URI looked up once, stored as album metadata `spotify_album_uri`), an artist as a list of track URIs, a Spotify playlist as its context (offset at `start_track_id`, or random when shuffling); other playlists play their tracks like an album. A playlist that belongs to a library (Spotify: `playlists.source`/`external_id`, `LibraryPlayback::playlistLibrary`) reports `sources` = only that library and is `playable` (playlist and tracks, with `device_id`) only where the device can play that library (`LibrarySources::playableOn`); `play-playlist` on a device that can't answers `422 not_playable` (message names the library) instead of playing merged local copies. Local/smart playlists keep track-derived `sources`/`playable`. **Playlist modes** (`PlaylistMode`, `PlaylistCoverage`; docs/api/library.md "Playlists of another library, played locally"): a playlist plays in exactly one mode, decided by the server from the optional `library` (the library the client browsed in; detail query and play-playlist body): `library` mode (its own library plays it, the default) or `local` mode (a playlist of another library opened from Local, `library=dlna`: only tracks with a Local copy are queued in order, the rest skipped; response `{ queued, skipped, mode }`, `mode` also in library mode). A `library` that makes no sense for the playlist is a 422 validation error; local mode on a device that can't play Local, or with no local track, is `422 not_playable`. `local_coverage` (local tracks / all tracks, 2 decimals) comes from one aggregate query per page; Local-scope lists include other-library playlists at >= 0.4 as `external`. `start_track_id`/`shuffle` are optional on play-album and play-playlist. A device has `library_playback` when either path exists. Errors: `422` `not_playable` (play-album/artist/playlist: neither path works), `422` `no_dlna_url` (`/library/play` on a DLNA device without a stream for the track), `422` `unsupported` (`/library/play`, `/play-playlist` without `library_playback`), `503` unreachable, `502` `driver_error` (device or Spotify failed, or Spotify doesn't list the mapped speaker).
-POST /api/devices/{id}/library/play-tracks     body: { "scope"?, "client"? }                                   → { "status": "ok", "queued": 100 }   shuffle the whole library (random sample of 100 playable tracks)
 
 ### Client Device API
 

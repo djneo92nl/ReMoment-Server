@@ -33,9 +33,9 @@ Device and library tools do not re-implement anything: `ApiBridge` dispatches an
 | `beolink_stream` | the BeoLink stream (a B&O source's audio through the server): address, which B&O device it listens to, who plays it; with `device_id` play it there (`stream_url`, optional `host_device_id` = the B&O device to carry), `stop` stops it |
 | `spotify_stream` | the Spotify stream's address and receiver name; with `device_id` start it on that device (`stream_url`) |
 | `multiroom` | get, join, leave |
-| `device_settings` | sound-adjustment, bluetooth, info (rename), sleep-timer (`docs/api/device-settings.md`) |
 | `move_playback` | move what plays to another device (`POST /devices/{id}/move`): same queue and position for library tracks, station for radio, Spotify transfer; local inputs are refused; see `docs/api/playback-move.md` |
 | `sync_group` | sync groups ("fake multiroom"): list, create, add, remove, offset, dissolve; see `docs/api/sync-groups.md` |
+| `device_settings` | sound-adjustment, bluetooth, info (rename), sleep-timer (`docs/api/device-settings.md`) |
 | `search_library`, `browse_library` | search; lists and details of artists, albums, tracks, genres, playlists, recent, favorites |
 | `set_favorite` | favorite an album, artist or track |
 | `play_from_library` | play a track (or a Spotify track by `spotify_track_id`), an album (optionally limited to a `source`), artist or playlist on a device, or `type: tracks` to shuffle the whole library |

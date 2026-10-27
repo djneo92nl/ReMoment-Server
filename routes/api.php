@@ -2,22 +2,22 @@
 
 use App\Http\Controllers\Api\AdminAuthController;
 use App\Http\Controllers\Api\AlertController;
+use App\Http\Controllers\Api\BeolinkStreamController;
 use App\Http\Controllers\Api\ClientController;
 use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\DeviceSettingsController;
 use App\Http\Controllers\Api\InfoController;
-use App\Http\Controllers\Api\LibraryController;
 use App\Http\Controllers\Api\JellyfinController;
+use App\Http\Controllers\Api\LibraryController;
 use App\Http\Controllers\Api\LiteArtworkController;
 use App\Http\Controllers\Api\PlayerController;
 use App\Http\Controllers\Api\QueueController;
-use App\Http\Controllers\Api\SourceControlsController;
 use App\Http\Controllers\Api\RemoteKeysController;
-use App\Http\Controllers\Api\BeolinkStreamController;
+use App\Http\Controllers\Api\SourceControlsController;
 use App\Http\Controllers\Api\SpotifyStreamController;
 use App\Http\Controllers\Api\StorageController;
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\SyncGroupController;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/info', InfoController::class);
 Route::get('/alerts', [AlertController::class, 'index']);
@@ -101,11 +101,6 @@ Route::get('/devices/{device}/multiroom', [DeviceController::class, 'multiroom']
 Route::post('/devices/{device}/multiroom/join', [DeviceController::class, 'multiroomJoin']);
 Route::delete('/devices/{device}/multiroom/leave', [DeviceController::class, 'multiroomLeave']);
 
-Route::post('/devices/{device}/library/play', [DeviceController::class, 'libraryPlay']);
-Route::post('/devices/{device}/library/play-playlist', [DeviceController::class, 'libraryPlayPlaylist']);
-Route::post('/devices/{device}/library/play-tracks', [DeviceController::class, 'libraryPlayTracks']);
-Route::post('/devices/{device}/library/play-listening-mode', [DeviceController::class, 'libraryPlayListeningMode']);
-Route::post('/devices/{device}/library/play-album', [DeviceController::class, 'libraryPlayAlbum']);
 Route::post('/devices/{device}/move', [DeviceController::class, 'move']);
 
 Route::get('/sync-groups', [SyncGroupController::class, 'index']);
@@ -115,6 +110,11 @@ Route::post('/sync-groups/{group}/members', [SyncGroupController::class, 'addMem
 Route::put('/sync-groups/{group}/members/{device}', [SyncGroupController::class, 'setOffset']);
 Route::delete('/sync-groups/{group}/members/{device}', [SyncGroupController::class, 'removeMember']);
 
+Route::post('/devices/{device}/library/play', [DeviceController::class, 'libraryPlay']);
+Route::post('/devices/{device}/library/play-playlist', [DeviceController::class, 'libraryPlayPlaylist']);
+Route::post('/devices/{device}/library/play-tracks', [DeviceController::class, 'libraryPlayTracks']);
+Route::post('/devices/{device}/library/play-listening-mode', [DeviceController::class, 'libraryPlayListeningMode']);
+Route::post('/devices/{device}/library/play-album', [DeviceController::class, 'libraryPlayAlbum']);
 Route::post('/devices/{device}/library/play-artist', [DeviceController::class, 'libraryPlayArtist']);
 
 Route::get('/library/libraries', [LibraryController::class, 'libraries']);
