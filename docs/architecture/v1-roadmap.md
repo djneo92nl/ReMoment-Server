@@ -8,7 +8,7 @@ Effort: S = days, M = 1–2 weeks, L = several weeks. Feasibility notes come fro
 
 | # | Workstream | Effort | Depends on | State | Priority |
 |---|---|---|---|---|---|
-| 1 | Stability: cards disappearing, hardware checklist, Spotify API audit, backup/restore | M | | **mostly built** (cards fix, Spotify audit, backup); hardware checklist and alerts to do | Must |
+| 1 | Stability: cards disappearing, hardware checklist, Spotify API audit, backup/restore | M | | **mostly built** (cards fix, Spotify audit, backup, alerts); the hardware checklist is left | Must |
 | 1a | Profiles: Control / Standard / Full, chosen in the setup wizard | M | 1 | design below | Must |
 | 1b | Queue stability and management: are the runners stable, per-queue health, pause/cancel/prioritise jobs | M | 1 | partly built; review below | Must (stability), Should (management) |
 | 2 | TV control | M | | **phase 1 built** (Beoplay V1 page, wake); keys and Philips to do | Must |
@@ -27,7 +27,7 @@ Effort: S = days, M = 1–2 weeks, L = several weeks. Feasibility notes come fro
 | 10 | Manager: host service that controls the running instance (containers, processes, upgrade with rollback, host stats) and SMB shares (serve and mount) for the library and the drop directory; on every install target | L | 1b, 9a, backup | **decided, design draft** | Must |
 | 11 | WiiM (LinkPlay) driver: a dedicated driver on the public HTTP API, on top of the generic UPnP fallback | M | | to do | Should |
 | 13 | Export from the library: download a playlist, album or artist as a zip, transcoded to a chosen maximum quality, for an MP3 player or a car radio | M | 1b | to do | Should |
-| 14 | Foundations, decided early (phase 2): one alert and event model, stable IDs for clients, a schema review before the migration squash, a shared credentials layer, and an action-layer design spike | M | | to do | Must (14.1, 14.3), Should (14.2, 14.4, 14.5 spike) |
+| 14 | Foundations, decided early (phase 2): one alert and event model, stable IDs for clients, a schema review before the migration squash, a shared credentials layer, and an action-layer design spike | M | | **14.1 built**; the rest to do | Must (14.1, 14.3), Should (14.2, 14.4, 14.5 spike) |
 | 12 | Library and audio intelligence, what is left: mixes-well, loudness-normalised playback, tag and cover suggestions, concerts, related works, lyrics extras, listening insights, Essentia on arm64 | S–M each | 4 (similar tracks), 8.4 (tag editor) | plan below; the enrichment, analysis and health base is built | Mixed (per item); platform docs Must |
 
 ## Progress (as of 2026-10-27)
@@ -44,9 +44,10 @@ Built and committed since this plan was written (hashes are on `main`):
 | 2a Cast | CASTV2 codec, receiver connection, read-only `cast:probe` | `0ff1c58` |
 | 7 Ripper | `ripper/`: Tauri desktop app, signs in with the admin token, MusicBrainz disc lookup, tags files, uploads through `POST /api/admin/files`; ripping itself still to do | `d0e24af`, `6ca86f3` |
 | 9a Web server | FrankenPHP in classic mode replaces `artisan serve` in production; multi-arch image built natively per host; verified on arm64 only; see [frankenphp.md](frankenphp.md) | `a2ca384` |
+| 14.1 Alerts | One alert and event model: `Alerts::raise`/`resolve`, an `alerts` table, MQTT `remoment/alerts/{kind}`, `GET /api/alerts`, admin acknowledge (API, MCP, a button on `/settings/health`); queue stuck, scheduler silent, backup stale, storage unreachable, device offline and listener down raise through it. Redis and MQTT behaviour **not verified** on a running install; see [alerts.md](alerts.md) | `c158db9`, `1ef4f0d` |
 | Not in the plan | Move playback and sync groups (fake multiroom); BeoLink stream (B&O multiroom as an Icecast stream for any speaker) | `5b12aec`, `d89bc44` |
 
-Still open on workstream 1: the hardware checklist (needs the device lab), health alerts (need the alert model of 14.1), and confirming the card fix over time.
+Still open on workstream 1: the hardware checklist (needs the device lab) and confirming the card fix over time. The health alerts are built through the alert model (14.1).
 
 **Priority.** *Must* = 1.0 does not ship without it. *Should* = in 1.0 unless time runs out, cut in the order listed under "Cut order". *Can slip* = moves to 1.1 without hurting 1.0. Per-item tags for workstream 8 are on the items below.
 
@@ -64,7 +65,7 @@ Suggested order: 1 and 2 in parallel, with 1a (profiles) right behind 1 because 
 - **Hardware checklist** *(not started)*. Work through `refactor-hardware-check.md` on the device lab (GET-only where possible) and record results.
 - **Spotify API audit** *(done, `01932fa`, `c39b118`; see [spotify-api-audit.md](spotify-api-audit.md))*. In February 2026 Spotify moved Development Mode to Premium-only, one Client ID per developer, 5 users per ID and a reduced endpoint set, and reportedly removed several endpoints (new releases, artist top tracks, some album metadata); removal for existing apps was postponed ([migration guide](https://developer.spotify.com/documentation/web-api/tutorials/february-2026-migration-guide)). List every Spotify endpoint the server calls, check each against the guide, and replace or guard those at risk (the library endpoints are now generic and URI-based). Done when: no call depends on a removed endpoint, and a removed one degrades to "no data", never an error page.
 - **Backup and restore** *(built, `a626f9b`; see [backup-restore.md](backup-restore.md); still to do: restore on a scratch MariaDB, copy archives off the machine)*. The database moved to MariaDB and has a corruption history (`storage/db-recovery/`). Add `backup:run` (database dump + settings + the artwork-independent state: playlists, favourites, plays, device and client config, analysis results) to a configurable location, scheduled, with retention; and `backup:restore` that works on a fresh install. Own audio files are not included (they are the user's files; document how to back them up). Done when: a restore on a clean container reproduces devices, library, playlists, favourites, history and settings.
-- **Health** *(not started; blocked on the alert model, 14.1)*. Alerts for the failure cases `/settings/health` already detects (device offline, queue stuck, scheduler silent, storage unreachable) through the notification path in workstream 8.
+- **Health** *(built through the alert model of 14.1, `c158db9`: queue stuck, scheduler silent, backup stale, storage unreachable, device offline, listener down)*. Alerts for the failure cases `/settings/health` already detects (device offline, queue stuck, scheduler silent, storage unreachable) through the notification path in workstream 8.
 
 ## 1a. Profiles (Control / Standard / Full)
 
@@ -488,6 +489,8 @@ Status: **plan**, added 2026-10-27. Five items that are cheap to decide now and 
 
 ### 14.1 One alert and event model *[Must for the model; the consumers keep their own priority]*
 
+**Status: built** (`c158db9`, `1ef4f0d`; see [alerts.md](alerts.md)). Left: a `features.alerts` key once `GET /api/info` has a features list; the Manager's `container.crashed` and `disk.low` kinds (workstream 10); the consumers (8.6, 8a, 8b); and a check on a running install (Redis and MQTT behaviour).
+
 **Problem.** Health alerts (1), the queue watchdog and per-queue health (1b), a stale backup (1), the alerts feed for the app (8b.5), browser notifications (8.6), Home Assistant triggers (8a) and the Manager (10) each plan their own way to say "something is wrong". One shape avoids five.
 
 **Design.**
@@ -591,6 +594,8 @@ Done when: the recommendation exists with the prototype and the numbers, and sce
 - Library export (2026-10-27): workstream 13, Should: download a playlist, album or artist as a zip at a chosen maximum quality (copy what fits, transcode what does not), for MP3 players and car radios; built on the proxy machinery. **Admin only** (the export is a heavy operation, not a secret), **MP3 320 default**, **zip download only** (no share or USB in 1.0), size and retention limits with the defaults in section 13.
 
 - Foundations (2026-10-27): workstream 14 added to phase 2: one alert and event model (14.1), stable IDs through an alias table (14.2), a schema review before the migration squash (14.3), a shared credentials layer (14.4), and a design spike for a single action layer, not a refactor (14.5). The API freeze policy is a short doc, not a workstream.
+
+- Alerts (2026-10-27): the alert model (14.1) is built; 8.6 now only consumes it; health alerts on the stability card are done through it.
 
 ## Open questions
 
