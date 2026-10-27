@@ -52,6 +52,9 @@
             @if(in_array('source_control', $capabilities))
                 <livewire:device-source-manager :device="$device" :key="'srcs-'.$device->id" />
             @endif
+            @if(in_array('remote_control', $capabilities))
+                <livewire:remote-card :device="$device" :key="'remote-'.$device->id" />
+            @endif
             @if(rescue(fn () => $device->driver instanceof \App\Integrations\Contracts\VideoDeviceInterface, false))
                 <livewire:tv-extras :device="$device" :key="'tv-extras-'.$device->id" />
             @endif

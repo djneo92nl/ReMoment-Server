@@ -17,6 +17,7 @@ enum RemoteKey: string
     case Back = 'back';
     case Home = 'home';
     case Menu = 'menu';
+    case Source = 'source';
     case Info = 'info';
     case Guide = 'guide';
     case Exit = 'exit';

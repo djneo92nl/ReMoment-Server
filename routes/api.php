@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\LiteArtworkController;
 use App\Http\Controllers\Api\PlayerController;
 use App\Http\Controllers\Api\QueueController;
 use App\Http\Controllers\Api\SourceControlsController;
+use App\Http\Controllers\Api\RemoteKeysController;
 use App\Http\Controllers\Api\BeolinkStreamController;
 use App\Http\Controllers\Api\SpotifyStreamController;
 use App\Http\Controllers\Api\StorageController;
@@ -71,6 +72,8 @@ Route::put('/devices/{device}/info', [DeviceSettingsController::class, 'setInfo'
 Route::get('/devices/{device}/sleep-timer', [DeviceSettingsController::class, 'getSleepTimer']);
 Route::put('/devices/{device}/sleep-timer', [DeviceSettingsController::class, 'setSleepTimer']);
 Route::post('/devices/{device}/digits', [DeviceSettingsController::class, 'sendDigits']);
+Route::get('/devices/{device}/keys', [RemoteKeysController::class, 'index']);
+Route::post('/devices/{device}/keys', [RemoteKeysController::class, 'press']);
 
 Route::get('/devices/{device}/sources', [DeviceController::class, 'sources']);
 Route::post('/devices/{device}/sources/activate', [DeviceController::class, 'activateSource']);

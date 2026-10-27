@@ -118,7 +118,7 @@ The B&O design and what is built are in [beovision-tv.md](beovision-tv.md); the 
 4. **Inputs in the UI: done for ASE TVs** (names, icons, `input` label, signal dot, default input on wake through `SwitchToDefaultSource`). Philips has apps only until its HDMI switching is solved (item 2).
 5. **Wake: done for B&O TVs**: sending a source turns the TV on, so `powerOn()` activates the default or first visible source (verified by the user on the V1, not yet exercised by an automated hardware run). Wake-on-LAN from a stored MAC, or CEC through another device, is still open for the Philips TV.
 
-Done when: the Philips TV and the Beoplay V1 can be controlled from the web page, the API and MCP, with power, volume, inputs or apps, and remote keys, and what a model cannot do is not offered (capability, not brand). **Left to reach it:** items 1 and 2, and a probe of which one-way commands the V1 accepts.
+Done when: the Philips TV and the Beoplay V1 can be controlled from the web page, the API and MCP, with power, volume, inputs or apps, and remote keys, and what a model cannot do is not offered (capability, not brand). **Left to reach it:** item 1 for the V1 (the probe of which one-way commands it accepts, then `RemoteControlInterface` on the ASE video driver) and Philips HDMI switching (no Jointspace call on the lab firmware, see philips-tv.md). Built: keys API, MCP tool, remote card and the Philips key map (item 2, keys part).
 
 ## 2a. Sub devices
 

@@ -3,8 +3,11 @@
 namespace App\Integrations\Philips;
 
 use App\Domain\Device\AvailableSource;
+use App\Domain\Device\RemoteKey;
 use App\Integrations\Common\UnsupportedOperationException;
+use App\Integrations\Contracts\DigitsInterface;
 use App\Integrations\Contracts\PowerInterface;
+use App\Integrations\Contracts\RemoteControlInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Contracts\SourcesInterface;
 use App\Integrations\Contracts\VideoDeviceInterface;
@@ -13,14 +16,48 @@ use Illuminate\Support\Facades\Cache;
 
 /**
  * A paired Philips Android TV, a video device like the ASE VideoPlayerDriver: everything the UPnP driver does
- * (playback, queue, volume, seek) plus what Jointspace adds: standby, and the apps as sources (Netflix, YouTube,
- * the TV's own media player). The TV cannot be woken over the network and has no API to switch HDMI inputs
+ * (playback, queue, volume, seek) plus what Jointspace adds: standby, remote keys, number keys, and the apps as
+ * sources (Netflix, YouTube, the TV's own media player). The TV cannot be woken over the network and has no API to switch HDMI inputs
  * on current firmware, so those are not offered. See docs/architecture/philips-tv.md.
  */
-class VideoPlayerDriver extends UpnpDriver implements PowerInterface, SourceActivationInterface, SourcesInterface, VideoDeviceInterface
+class VideoPlayerDriver extends UpnpDriver implements DigitsInterface, PowerInterface, RemoteControlInterface, SourceActivationInterface, SourcesInterface, VideoDeviceInterface
 {
     /** The app list barely changes: asked once in a while, not on every page. */
     private const APPS_TTL_SECONDS = 600;
+
+    /**
+     * Jointspace key names (`POST /6/input/key`) per `RemoteKey`. The firmware does not list the keys it accepts
+     * (`GET /6/input/key` answers empty), so this is the static set the API documents. Volume stays with the
+     * UPnP volume calls but the keys are offered too: a TV's remote has them, and they step by the TV's own amount.
+     */
+    private const KEYS = [
+        'up' => 'CursorUp',
+        'down' => 'CursorDown',
+        'left' => 'CursorLeft',
+        'right' => 'CursorRight',
+        'ok' => 'Confirm',
+        'back' => 'Back',
+        'home' => 'Home',
+        'menu' => 'Options',
+        'source' => 'Source',
+        'info' => 'Info',
+        'play' => 'Play',
+        'pause' => 'Pause',
+        'stop' => 'Stop',
+        'next' => 'Next',
+        'previous' => 'Previous',
+        'fast_forward' => 'FastForward',
+        'rewind' => 'Rewind',
+        'volume_up' => 'VolumeUp',
+        'volume_down' => 'VolumeDown',
+        'mute' => 'Mute',
+        'channel_up' => 'ChannelStepUp',
+        'channel_down' => 'ChannelStepDown',
+        'red' => 'RedColour',
+        'green' => 'GreenColour',
+        'yellow' => 'YellowColour',
+        'blue' => 'BlueColour',
+    ];
 
     public function client(): JointspaceClient
     {
@@ -35,6 +72,27 @@ class VideoPlayerDriver extends UpnpDriver implements PowerInterface, SourceActi
     public function standby(): void
     {
         $this->client()->key('Standby');
+    }
+
+    public function supportedKeys(): array
+    {
+        return array_map(fn (string $key) => RemoteKey::from($key), array_keys(self::KEYS));
+    }
+
+    public function sendKey(RemoteKey $key): void
+    {
+        $name = self::KEYS[$key->value] ?? throw new UnsupportedOperationException("This TV has no {$key->value} key.");
+
+        $this->client()->key($name);
+    }
+
+    public function sendDigit(int $digit): void
+    {
+        if ($digit < 0 || $digit > 9) {
+            throw new \InvalidArgumentException('A number key is 0-9.');
+        }
+
+        $this->client()->key("Digit{$digit}");
     }
 
     public function getSources(): array

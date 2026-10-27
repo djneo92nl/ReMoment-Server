@@ -347,7 +347,8 @@ The web page `/devices/{id}/settings` (guest-accessible; network and rename need
 
 ```
 GET|PUT  /api/devices/{id}/sleep-timer   → { value, min, max, step, writable }   PUT { minutes } (0 cancels; 0–60)   (capability `sleep_timer`; ASE — the BeoPlay V1 lists it but is `writable: false`)
-POST     /api/devices/{id}/digits   body { digits: "105" } → { status, digits }   number keys for the active TV / set-top box source, sent in order (capability `digits`; ASE VideoPlayerDriver = BeoPlay V1)
+POST     /api/devices/{id}/digits   body { digits: "105" } → { status, digits }   number keys for the active TV / set-top box source, sent in order (capability `digits`; ASE VideoPlayerDriver = BeoPlay V1, Philips TV)
+GET|POST /api/devices/{id}/keys   → { supported_keys: ["up", …] } | body { key: "ok" } → { status, key }   remote keys of a TV (capability `remote_control`; Philips Android TV via `POST /6/input/key`, ASE not yet); `RemoteKey` names up/down/left/right/ok/back/home/menu/source/info/guide/exit/play/pause/stop/next/previous/fast_forward/rewind/volume_up/volume_down/mute/channel_up/channel_down/red/green/yellow/blue; 422 `unsupported` for a key outside `supported_keys`, 422 `invalid` for an unknown name; `supported_keys` also in the device detail; MCP `remote_keys`; web: the Remote card on the device page
 GET      /api/devices/{id}/network   → active interface, wired/wireless status and addresses, known Wi-Fi networks (never a passphrase)   (capability `network_settings`; ASE)
 PUT      /api/devices/{id}/network/interface | /network/wired | /network/wifi   → { status: "ok" } — not read back, the device may change address
 GET      /api/devices/{id}/wireless-speakers   POST …/wireless-speakers/scan { action: start|stop }   (capability `wireless_speakers`; WiSA: **only the BeoSound Moment**, via `wisa => true` in config/devices.php / `HardwareFeatures`)

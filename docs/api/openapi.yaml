@@ -599,6 +599,51 @@ paths:
                   digits: { type: string }
         "422": { $ref: "#/components/responses/DeviceError" }
 
+  /devices/{device}/keys:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    get:
+      tags: [Playback]
+      summary: Remote keys the device accepts (capability remote_control; Philips Android TV)
+      operationId: listRemoteKeys
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  supported_keys:
+                    type: array
+                    items: { $ref: "#/components/schemas/RemoteKey" }
+        "422": { $ref: "#/components/responses/DeviceError" }
+    post:
+      tags: [Playback]
+      summary: Press one remote key (422 unsupported for a key outside supported_keys, 422 invalid for an unknown name)
+      operationId: pressRemoteKey
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key]
+              properties:
+                key: { $ref: "#/components/schemas/RemoteKey" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  key: { type: string }
+        "422": { $ref: "#/components/responses/DeviceError" }
+        "502": { $ref: "#/components/responses/DeviceError" }
+        "503": { $ref: "#/components/responses/DeviceError" }
+
   /devices/{device}/sources:
     parameters: [{ $ref: "#/components/parameters/device" }]
     get:
@@ -2229,6 +2274,14 @@ components:
             now_playing:
               allOf: [{ $ref: "#/components/schemas/NowPlaying" }]
               nullable: true
+            supported_keys:
+              type: array
+              description: Only with the remote_control capability
+              items: { $ref: "#/components/schemas/RemoteKey" }
+
+    RemoteKey:
+      type: string
+      enum: [up, down, left, right, ok, back, home, menu, source, info, guide, exit, play, pause, stop, next, previous, fast_forward, rewind, volume_up, volume_down, mute, channel_up, channel_down, red, green, yellow, blue]
 
     NowPlaying:
       type: object

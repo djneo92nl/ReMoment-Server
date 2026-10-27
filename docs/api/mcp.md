@@ -27,6 +27,7 @@ Device and library tools do not re-implement anything: `ApiBridge` dispatches an
 | `volume` | read or set volume and mute |
 | `queue` | `action`: `list` (default) Up Next, `jump`, `add` / `next` (track, album, artist or playlist at the end / after the current track), `remove`, `move`, `clear` (`confirm=true`); see `docs/api/queue.md` |
 | `sources` | list/activate sources; list/run source controls (CD, FM presets) |
+| `remote_keys` | a TV's remote keys (`remote_control`): list the supported keys, or press one (`key`, e.g. `ok`, `up`, `volume_up`); `GET/POST /devices/{id}/keys` |
 | `radio` | list stations, play one, favorite one |
 | `beolink_stream` | the BeoLink stream (a B&O source's audio through the server): address, which B&O device it listens to, who plays it; with `device_id` play it there (`stream_url`, optional `host_device_id` = the B&O device to carry), `stop` stops it |
 | `spotify_stream` | the Spotify stream's address and receiver name; with `device_id` start it on that device (`stream_url`) |
