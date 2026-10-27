@@ -70,6 +70,20 @@ class CastConnection
         return $this->request(self::PLATFORM, self::NS_RECEIVER, ['type' => 'GET_STATUS'])['status'] ?? [];
     }
 
+    /**
+     * What a running app plays, from its media namespace: the `status` list of MEDIA_STATUS entries (playerState,
+     * currentTime, media with metadata and duration). Empty when the app has no media session. Read-only: a virtual
+     * connection to the app's transport and GET_STATUS.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function mediaStatus(string $transportId): array
+    {
+        $this->send($transportId, self::NS_CONNECTION, ['type' => 'CONNECT']);
+
+        return $this->request($transportId, self::NS_MEDIA, ['type' => 'GET_STATUS'])['status'] ?? [];
+    }
+
     public function send(string $destination, string $namespace, array $payload): void
     {
         $bytes = CastMessage::json(self::SENDER, $destination, $namespace, $payload)->encode();
