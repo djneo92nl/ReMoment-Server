@@ -14,7 +14,7 @@
                     <span class="absolute top-2.5 right-2.5 w-2 h-2 rounded-full {{ $source['signal'] ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-stone-600' }}"
                           title="{{ $source['signal'] ? 'Signal' : 'No signal' }}"></span>
                 @endif
-                <i class="fa-solid {{ \App\Domain\Device\SourceIcon::for($source['type']) }} text-base text-gray-400 dark:text-gray-500"></i>
+                <i class="{{ \App\Domain\Device\SourceIcon::classes($source['type'], $source['name']) }} text-base text-gray-400 dark:text-gray-500"></i>
                 <span class="block max-w-full truncate">{{ $source['name'] }}</span>
                 @if($source['input'])
                     <span class="px-2 py-0.5 rounded-md bg-gray-200/70 dark:bg-stone-700/60 text-xs font-normal text-gray-500 dark:text-gray-400">{{ $source['input'] }}</span>

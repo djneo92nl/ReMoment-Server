@@ -10,7 +10,7 @@
 @else
     <div class="{{ $rowClass }}">
 @endif
-    <i class="fa-solid {{ \App\Domain\Device\SourceIcon::for($source['type']) }} text-xs w-4 text-center text-gray-400 dark:text-gray-500 flex-shrink-0"></i>
+    <i class="{{ \App\Domain\Device\SourceIcon::classes($source['type'], $source['name']) }} text-xs w-4 text-center text-gray-400 dark:text-gray-500 flex-shrink-0"></i>
     <span class="flex-1 min-w-0">
         <span class="block truncate">{{ $source['name'] }}</span>
         @if($source['borrowed'] && $source['provider_name'])

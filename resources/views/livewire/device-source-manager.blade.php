@@ -1,5 +1,5 @@
 @php
-    $typeIcon = fn ($type) => \App\Domain\Device\SourceIcon::for($type);
+    $typeIcon = fn ($source) => \App\Domain\Device\SourceIcon::classes($source['type'] ?? null, $source['name'] ?? null);
     $allSources     = collect($sources);
     $ownSources     = $allSources->where('borrowed', false)->values();
     $borrowedSources = $allSources->where('borrowed', true)->values();
@@ -107,7 +107,7 @@
                                     <i class="fa-solid fa-chevron-down" style="font-size:.55rem"></i>
                                 </button>
                             </div>
-                            <i class="fa-solid {{ $typeIcon($source['type']) }} text-gray-400 dark:text-gray-500 w-4 text-center flex-shrink-0 text-xs"></i>
+                            <i class="{{ $typeIcon($source) }} text-gray-400 dark:text-gray-500 w-4 text-center flex-shrink-0 text-xs"></i>
                             <span class="flex-1 text-sm text-gray-800 dark:text-gray-200 truncate">{{ $source['name'] }}</span>
                             <span class="text-xs text-gray-400 dark:text-gray-600 flex-shrink-0">{{ $source['type'] }}</span>
                             <button wire:click="toggleHidden({{ $source['id'] }})"
@@ -126,7 +126,7 @@
                         @foreach($borrowedSources as $source)
                             <li class="flex items-center gap-2 px-3 py-2 rounded-xl {{ $source['hidden'] ? 'opacity-40' : '' }}">
                                 <div class="w-5 flex-shrink-0"></div>{{-- spacer aligns with own sources --}}
-                                <i class="fa-solid {{ $typeIcon($source['type']) }} text-gray-400 dark:text-gray-500 w-4 text-center flex-shrink-0 text-xs"></i>
+                                <i class="{{ $typeIcon($source) }} text-gray-400 dark:text-gray-500 w-4 text-center flex-shrink-0 text-xs"></i>
                                 <div class="flex-1 min-w-0">
                                     <span class="text-sm text-gray-800 dark:text-gray-200 truncate block">{{ $source['name'] }}</span>
                                     <span class="text-xs text-gray-400 dark:text-gray-600">↳ {{ $source['provider_name'] }}</span>

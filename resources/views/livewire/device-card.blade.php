@@ -110,7 +110,7 @@
                             @if($nowPlaying->radio)
                                 <i class="fa-solid fa-tower-broadcast text-4xl text-gray-300 dark:text-stone-600"></i>
                             @elseif($nowPlaying->source?->category === 'video')
-                                <i class="fa-solid fa-tv text-4xl text-gray-300 dark:text-stone-600"></i>
+                                <i class="{{ \App\Domain\Device\SourceIcon::classes($nowPlaying->source->sourceType, $nowPlaying->source->name, $nowPlaying->source->connector) }} text-4xl text-gray-300 dark:text-stone-600"></i>
                             @elseif($nowPlaying->source)
                                 <i class="fa-solid fa-plug text-4xl text-gray-300 dark:text-stone-600"></i>
                             @else
@@ -142,7 +142,7 @@
                                 </p>
                                 @if($nowPlaying->source?->sourceType === 'APP')
                                     {{-- A TV app (YouTube, Netflix) playing the title --}}
-                                    <p class="mt-1 text-sm text-gray-400 dark:text-gray-500 truncate"><i class="fa-solid fa-tv text-xs mr-1.5"></i>{{ $nowPlaying->source->name }}</p>
+                                    <p class="mt-1 text-sm text-gray-400 dark:text-gray-500 truncate"><i class="{{ \App\Domain\Device\SourceIcon::classes('APP', $nowPlaying->source->name, $nowPlaying->source->connector) }} text-xs mr-1.5"></i>{{ $nowPlaying->source->name }}</p>
                                 @endif
                             @elseif($nowPlaying->source)
                                 {{-- External source (line-in, HDMI, etc.) --}}
@@ -246,10 +246,10 @@
                                  :style="expanded ? '' : 'max-height: 4rem'"
                                  style="max-height: 4rem">
                                 @foreach($quickSources as $i => $source)
-                                    @php $sourceIcon = \App\Domain\Device\SourceIcon::for($source['type'] ?? null); @endphp
+                                    @php $sourceIcon = \App\Domain\Device\SourceIcon::classes($source['type'] ?? null, $source['name'] ?? null); @endphp
                                     <button wire:click="activateSource('{{ $source['id'] }}')"
                                             class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-stone-800 hover:bg-gray-200 dark:hover:bg-stone-700 transition-colors text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 flex-shrink-0">
-                                        <i class="fa-solid {{ $sourceIcon }} text-xs"></i>
+                                        <i class="{{ $sourceIcon }} text-xs"></i>
                                         <span>{{ $source['name'] }}</span>
                                     </button>
                                 @endforeach
