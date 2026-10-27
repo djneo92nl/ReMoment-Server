@@ -39,7 +39,7 @@ class DeviceListener implements DeviceListenerInterface
 {
     private const POLL_SECONDS = 1;
 
-    private const VOLUME_EVERY_SECONDS = 3;
+    protected const VOLUME_EVERY_SECONDS = 3;
 
     /** A stop this close to the end of the track is the track ending. */
     private const END_MARGIN_SECONDS = 3;
@@ -57,13 +57,13 @@ class DeviceListener implements DeviceListenerInterface
 
     private bool $wasPlaying = false;
 
-    private ?int $lastVolume = null;
+    protected ?int $lastVolume = null;
 
-    private ?bool $lastMuted = null;
+    protected ?bool $lastMuted = null;
 
     private ?PlaybackModes $lastModes = null;
 
-    private int $nextVolumeCheck = 0;
+    protected int $nextVolumeCheck = 0;
 
     /** True while the renderer holds nothing playing (a subclass reports what else the device does then). */
     protected bool $transportIdle = true;
@@ -262,7 +262,7 @@ class DeviceListener implements DeviceListenerInterface
         }
     }
 
-    private function reportVolume(Renderer $renderer, string $deviceId): void
+    protected function reportVolume(Renderer $renderer, string $deviceId): void
     {
         if (time() < $this->nextVolumeCheck || !UpnpCapabilities::has($this->device, 'volume_control')) {
             return;

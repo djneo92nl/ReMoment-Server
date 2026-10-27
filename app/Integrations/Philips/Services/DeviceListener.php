@@ -78,6 +78,7 @@ class DeviceListener extends UpnpListener
         }
 
         $this->nextActivityCheck = now()->timestamp + self::ACTIVITY_EVERY_SECONDS;
+        $this->reportJointspaceVolume($deviceId);
         $this->reportActivity($deviceId);
     }
 
@@ -85,6 +86,33 @@ class DeviceListener extends UpnpListener
     protected function idleState(): State
     {
         return $this->activePackage !== null ? State::Playing : State::Standby;
+    }
+
+    /** Volume and mute from Jointspace, whatever the UPnP side does. */
+    protected function reportVolume(\App\Integrations\Upnp\Renderer $renderer, string $deviceId): void
+    {
+        $this->reportJointspaceVolume($deviceId);
+    }
+
+    private function reportJointspaceVolume(string $deviceId): void
+    {
+        if (time() < $this->nextVolumeCheck) {
+            return;
+        }
+
+        $this->nextVolumeCheck = time() + self::VOLUME_EVERY_SECONDS;
+
+        try {
+            $reading = $this->device->driver->readVolume();
+        } catch (\Throwable) {
+            return;
+        }
+
+        if ($reading['percent'] !== $this->lastVolume || $reading['muted'] !== $this->lastMuted) {
+            event(new \App\Events\Device\VolumeUpdated(deviceId: $deviceId, volume: $reading['percent'], muted: $reading['muted']));
+            $this->lastVolume = $reading['percent'];
+            $this->lastMuted = $reading['muted'];
+        }
     }
 
     private function reportActivity(string $deviceId): void

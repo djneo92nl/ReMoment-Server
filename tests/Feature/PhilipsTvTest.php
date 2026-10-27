@@ -174,4 +174,17 @@ class PhilipsTvTest extends TestCase
     {
         $this->assertFalse(DedicatedDrivers::claims('Philips', 'Philips TV DMR'));
     }
+
+    public function test_volume_is_read_from_and_set_on_the_tvs_own_scale(): void
+    {
+        Http::fake([
+            '*/6/audio/volume' => fn (Request $r) => Http::response(['current' => 30, 'min' => 0, 'max' => 60, 'muted' => false]),
+        ]);
+        $driver = $this->tv()->driver;
+
+        $this->assertSame(50, $driver->getVolume());
+
+        $driver->setVolume(10);
+        Http::assertSent(fn (Request $r) => $r->method() === 'POST' && $r['current'] === 6 && $r['muted'] === false);
+    }
 }

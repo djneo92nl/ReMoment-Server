@@ -72,6 +72,24 @@ class JointspaceClient
         }
     }
 
+    /** @return array{current: int, min: int, max: int, muted: bool} the TV's own volume scale (0-60 on the lab TV) */
+    public function volume(): array
+    {
+        $reply = $this->get('audio/volume');
+
+        return [
+            'current' => (int) ($reply['current'] ?? 0),
+            'min' => (int) ($reply['min'] ?? 0),
+            'max' => max(1, (int) ($reply['max'] ?? 100)),
+            'muted' => (bool) ($reply['muted'] ?? false),
+        ];
+    }
+
+    public function setVolume(int $current, bool $muted): void
+    {
+        $this->post('audio/volume', ['current' => $current, 'muted' => $muted]);
+    }
+
     public function key(string $key): void
     {
         $this->post('input/key', ['key' => $key]);

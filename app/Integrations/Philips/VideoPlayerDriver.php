@@ -3,6 +3,7 @@
 namespace App\Integrations\Philips;
 
 use App\Domain\Device\AvailableSource;
+use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\RemoteKey;
 use App\Integrations\Common\UnsupportedOperationException;
 use App\Integrations\Contracts\DigitsInterface;
@@ -62,6 +63,52 @@ class VideoPlayerDriver extends UpnpDriver implements DigitsInterface, PowerInte
     public function client(): JointspaceClient
     {
         return JointspaceClient::forDevice($this->device);
+    }
+
+    /** The TV's own volume (`/6/audio/volume`, its scale scaled to 0-100): the UPnP renderer is not there on every TV. */
+    public function getVolume(): int
+    {
+        return Volume::remember($this->device->id, fn () => $this->readVolume()['percent']);
+    }
+
+    public function setVolume(int $volume): int
+    {
+        $volume = max(0, min(100, $volume));
+        $scale = $this->client()->volume();
+        $this->client()->setVolume((int) round($volume / 100 * $scale['max']), $scale['muted']);
+        Volume::updateVolume($this->device->id, $volume);
+
+        return $volume;
+    }
+
+    public function mute(): void
+    {
+        $this->setMuted(true);
+    }
+
+    public function unmute(): void
+    {
+        $this->setMuted(false);
+    }
+
+    public function isMuted(): bool
+    {
+        return Volume::getMuted($this->device->id) ?? $this->readVolume()['muted'];
+    }
+
+    /** @return array{percent: int, muted: bool} */
+    public function readVolume(): array
+    {
+        $scale = $this->client()->volume();
+
+        return ['percent' => (int) round($scale['current'] / $scale['max'] * 100), 'muted' => $scale['muted']];
+    }
+
+    private function setMuted(bool $muted): void
+    {
+        $scale = $this->client()->volume();
+        $this->client()->setVolume($scale['current'], $muted);
+        Volume::updateMuted($this->device->id, $muted);
     }
 
     public function powerOn(): void
