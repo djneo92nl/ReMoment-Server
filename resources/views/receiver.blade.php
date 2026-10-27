@@ -1068,7 +1068,7 @@ function updateUI(d) {
 
   document.getElementById('platform').textContent = np.platform || (np.source && np.source.name) || '—';
 
-  const isTrack = np.track && (np.type === 'track' || np.type === 'music');
+  const isTrack = np.track && ['track', 'music', 'video', 'live'].includes(np.type);
   let trackName = '—', artistName = '', albumName = '', artUrl = '', trackId = '';
 
   if (isTrack) {

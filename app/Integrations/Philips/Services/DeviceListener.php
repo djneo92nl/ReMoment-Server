@@ -245,17 +245,16 @@ class DeviceListener extends UpnpListener
         return collect($driver->apps())->firstWhere('id', $package)['label'] ?? $package;
     }
 
-    /** The progress of casted media, in percent, when it moved. */
+    /** The position (seconds, what the cache and the progress ticker use) of casted or Jellyfin media, when it moved. */
     private function reportProgress(string $deviceId, ?NowPlaying $cast): void
     {
-        $duration = $cast?->track?->duration;
-        $percent = $duration ? min(100, (int) round($cast->position / $duration * 100)) : null;
+        $position = $cast?->track?->duration ? $cast->position : null;
 
-        if ($percent !== null && $cast->state === 'playing' && $percent !== $this->lastProgress) {
-            event(new ProgressUpdated(deviceId: $deviceId, progress: $percent));
+        if ($position !== null && $cast->state === 'playing' && $position !== $this->lastProgress) {
+            event(new ProgressUpdated(deviceId: $deviceId, progress: $position));
         }
 
-        $this->lastProgress = $percent;
+        $this->lastProgress = $position;
     }
 
     /** The casted title, shown under the app's own name (Jointspace knows the label, Cast only the receiver's). */
