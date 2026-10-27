@@ -102,6 +102,31 @@ final class BeolinkStream
         self::leave();
     }
 
+    /**
+     * What the receiver says about itself and the B&O products it has heard (its Mozart API), or null while it does not
+     * answer: `{ jid, name, peers: [{jid, name?, ipAddress?}] }`. Peers are what beo's directory found over mDNS.
+     */
+    public static function receiver(): ?array
+    {
+        try {
+            $self = Http::timeout(3)->get(config('beolink.api_url').'/api/v1/beolink/self');
+
+            if (!$self->successful()) {
+                return null;
+            }
+
+            $peers = Http::timeout(3)->get(config('beolink.api_url').'/api/v1/beolink/peers');
+
+            return [
+                'jid' => $self->json('jid'),
+                'name' => $self->json('friendlyName'),
+                'peers' => $peers->successful() ? (array) $peers->json() : [],
+            ];
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
     /** Make the receiver leave the source it listens to. */
     public static function leave(): void
     {

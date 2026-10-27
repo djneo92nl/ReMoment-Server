@@ -68,6 +68,29 @@ class SettingsController extends Controller
         ]);
     }
 
+    public function beolink()
+    {
+        $enabled = \App\Domain\Beolink\BeolinkStream::enabled();
+        $devices = Device::orderBy('device_name')->get();
+
+        return view('settings.beolink', [
+            'enabled' => $enabled,
+            'status' => \App\Domain\Beolink\BeolinkStream::status(),
+            'receiver' => $enabled ? \App\Domain\Beolink\BeolinkStream::receiver() : null,
+            // B&O devices whose multiroom id is known can be joined; devices of any brand with stream_url can play the stream.
+            'hosts' => $devices->filter(fn ($d) => \App\Domain\Beolink\BeolinkStream::jidOf($d) !== null)->values(),
+            'players' => $devices->filter(fn ($d) => in_array('stream_url', \App\Domain\Device\DeviceCapabilities::for($d), true))->values(),
+        ]);
+    }
+
+    public function beolinkLeave()
+    {
+        \App\Domain\Beolink\BeolinkStream::leave();
+        \Illuminate\Support\Facades\Cache::forget('beolink:targets');
+
+        return redirect()->route('settings.beolink')->with('success', 'The receiver left the B&O source.');
+    }
+
     public function lastfm(LastfmSessionService $lastfm)
     {
         return view('settings.lastfm', [

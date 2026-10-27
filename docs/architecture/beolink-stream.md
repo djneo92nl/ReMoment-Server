@@ -23,6 +23,7 @@ ReMoment ──POST /api/v1/beolink/join/<jid> ──▶ receiver's Mozart API (
 ## In ReMoment
 
 - **Multiroom picker** (device card, player bar): while a B&O device plays and its multiroom id is known, a "Stream to" section lists devices of other brands with `stream_url` (UPnP, Sonos); the toggle joins the receiver to the host and starts the stream there (`ManagesMultiroom::streamTo()` / `stopStreamTo()`). The label says it is not in sync.
+- **Settings** (`/settings/beolink`, `SettingsController::beolink`, admin): receiver status (probe of its Mozart API: running, name, B&O products heard over mDNS), the stream URL, a picker of the B&O source and the devices that can play the stream, and "make the receiver leave". While the stream is off it shows how to switch it on.
 - **API**: `GET /api/beolink-stream`, `POST|DELETE /api/devices/{id}/beolink-stream` (`Api\BeolinkStreamController`), MCP tool `beolink_stream`. Clients (web, iOS) can play `url` themselves.
 - **Config**: `config/beolink.php`; env `BEOLINK_ENABLED`, `BEOLINK_NAME`, `BEOLINK_API_URL` (default `http://127.0.0.1:8081`; `http://beolink:8081` in the dev compose), `BEOLINK_ENROL`, `BEOLINK_STREAM_BITRATE`, `ICECAST_BEOLINK_MOUNT`; Icecast settings are shared with the Spotify stream (`ICECAST_PORT`, passwords).
 
