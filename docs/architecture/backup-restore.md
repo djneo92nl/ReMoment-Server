@@ -29,11 +29,11 @@ Included: devices and config, clients, library, playlists, favourites, plays, ra
 
 A plain zip is not encrypted, so by default the archive holds **no credentials**:
 
-- not written at all: the `users`, `admin_tokens`, `password_reset_tokens`, `personal_access_tokens` tables, and settings rows whose key contains `token`, `secret`, `session_key` or `password` (Spotify client secret, access and refresh token, Last.fm session key);
+- not written at all: the `users`, `admin_tokens`, `password_reset_tokens`, `personal_access_tokens` tables, and settings rows holding credentials: every key the credentials registry marks `secret` (`ServiceCredentials::secretSettingKeys()`: Spotify client secret, Last.fm key and secret, Discogs token, AcoustID and TheAudioDB keys; see `credentials.md`) plus, as a safety net, any key containing `token`, `secret`, `session_key` or `password` (Spotify access and refresh token, Last.fm session key);
 - blanked: client `api_token` and `pairing_code`, and `registration_token` replaced by a random placeholder;
 - never, even with the opt-in: anything from `.env` except the whitelist (no `APP_KEY`, no `DB_PASSWORD`, no API keys).
 
-After restoring such a backup: the fresh install's own admin login applies (the seeded one), Spotify and Last.fm must be connected again in Settings, and wall panels / apps register again at `/settings/clients`. `--with-secrets` puts the credential tables and rows into the archive too (admin password hash, OAuth tokens, client tokens, so nothing needs reconnecting) after a loud warning; treat that file like a password.
+After restoring such a backup: the fresh install's own admin login applies (the seeded one), the service keys entered on Settings › Services & keys must be entered again (unless they are in `.env`), Spotify and Last.fm must be connected again, and wall panels / apps register again at `/settings/clients`. `--with-secrets` puts the credential tables and rows into the archive too (admin password hash, OAuth tokens, client tokens, so nothing needs reconnecting) after a loud warning; treat that file like a password.
 
 ## How it is made
 

@@ -2,6 +2,7 @@
 
 namespace App\Services\Lastfm;
 
+use App\Domain\Credentials\ServiceCredentials;
 use App\Services\MetadataHttp;
 
 /** Read-only Last.fm calls (`*.getInfo`), which need only the API key. */
@@ -12,7 +13,7 @@ class LastfmInfoClient
 
     public static function enabled(): bool
     {
-        return (bool) config('lastfm.api_key');
+        return ServiceCredentials::isSet('lastfm', 'api_key');
     }
 
     /**
@@ -23,9 +24,9 @@ class LastfmInfoClient
      */
     public function get(string $method, array $params): ?array
     {
-        $response = MetadataHttp::get('https://ws.audioscrobbler.com/2.0/', $params + [
+        $response = MetadataHttp::get(ServiceCredentials::baseUrl('lastfm').'/', $params + [
             'method' => $method,
-            'api_key' => config('lastfm.api_key'),
+            'api_key' => ServiceCredentials::value('lastfm', 'api_key'),
             'format' => 'json',
             'autocorrect' => 1,
         ]);

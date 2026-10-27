@@ -2,6 +2,7 @@
 
 namespace App\Services\AudioDb;
 
+use App\Domain\Credentials\ServiceCredentials;
 use App\Services\MetadataHttp;
 
 class AudioDbClient
@@ -14,7 +15,7 @@ class AudioDbClient
      */
     public function get(string $endpoint, string $mbid): ?array
     {
-        $response = MetadataHttp::get('https://www.theaudiodb.com/api/v1/json/'.config('metadata.audiodb_key')."/{$endpoint}", ['i' => $mbid]);
+        $response = MetadataHttp::get(ServiceCredentials::baseUrl('audiodb').'/'.ServiceCredentials::value('audiodb', 'api_key')."/{$endpoint}", ['i' => $mbid]);
 
         return $response->ok() ? $response->json() : null;
     }

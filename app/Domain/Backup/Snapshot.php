@@ -3,6 +3,7 @@
 namespace App\Domain\Backup;
 
 use App\Console\Commands\Database\ImportSqlite;
+use App\Domain\Credentials\ServiceCredentials;
 use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -15,7 +16,10 @@ final class Snapshot
     /** Whole tables that only hold credentials; left out unless the backup is made with secrets. */
     public const SECRET_TABLES = ['users', 'admin_tokens', 'password_reset_tokens', 'personal_access_tokens'];
 
-    /** Settings keys holding OAuth tokens or API secrets (spotify_client_secret, spotify_*_token, lastfm_session_key). */
+    /**
+     * Safety net for settings keys holding OAuth tokens or API secrets (spotify_*_token, lastfm_session_key).
+     * The credentials registry's `secret` fields are excluded by flag as well (ServiceCredentials::secretSettingKeys()).
+     */
     public const SECRET_SETTING = '/(token|secret|session_key|password)/i';
 
     /** Not worth backing up: rebuilt by the app, or throwaway (same list as db:import-sqlite). */
@@ -41,13 +45,18 @@ final class Snapshot
             ->reject(fn ($t) => in_array($t, $skip, true) || str_starts_with($t, 'sqlite_'))->sort()->values()->all();
     }
 
+    public static function isSecretSetting(string $key): bool
+    {
+        return in_array($key, ServiceCredentials::secretSettingKeys(), true) || preg_match(self::SECRET_SETTING, $key) === 1;
+    }
+
     /** Drops or blanks credentials of a row; null when the row is left out altogether. */
     public static function redact(string $table, array $row, bool $withSecrets): ?array
     {
         if ($withSecrets) {
             return $row;
         }
-        if ($table === 'settings' && preg_match(self::SECRET_SETTING, (string) ($row['key'] ?? ''))) {
+        if ($table === 'settings' && self::isSecretSetting((string) ($row['key'] ?? ''))) {
             return null;
         }
         if ($table === 'clients') {

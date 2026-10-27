@@ -2,13 +2,14 @@
 
 namespace App\Services\Discogs;
 
+use App\Domain\Credentials\ServiceCredentials;
 use App\Services\MetadataHttp;
 
 class DiscogsClient
 {
     public static function enabled(): bool
     {
-        return (bool) config('metadata.discogs_token');
+        return ServiceCredentials::isSet('discogs', 'token');
     }
 
     /**
@@ -19,8 +20,8 @@ class DiscogsClient
      */
     public function get(string $path, array $query = []): ?array
     {
-        $response = MetadataHttp::get("https://api.discogs.com/{$path}", $query, [
-            'Authorization' => 'Discogs token='.config('metadata.discogs_token'),
+        $response = MetadataHttp::get(ServiceCredentials::baseUrl('discogs').'/'.$path, $query, [
+            'Authorization' => 'Discogs token='.ServiceCredentials::value('discogs', 'token'),
         ]);
 
         return $response->ok() ? $response->json() : null;

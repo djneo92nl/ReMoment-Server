@@ -128,7 +128,10 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/settings/mqtt', [SettingsController::class, 'mqtt'])->name('settings.mqtt');
 
+    Route::get('/settings/services', fn () => view('settings.services'))->name('settings.services');
     Route::get('/settings/spotify', [SettingsController::class, 'spotify'])->name('settings.spotify');
+    Route::get('/settings/beolink', [SettingsController::class, 'beolink'])->name('settings.beolink');
+    Route::post('/settings/beolink/leave', [SettingsController::class, 'beolinkLeave'])->name('settings.beolink.leave');
     Route::get('/settings/lastfm', [SettingsController::class, 'lastfm'])->name('settings.lastfm');
 
     Route::get('/settings/spotify-connect', [SettingsController::class, 'spotifyConnect'])->name('settings.spotify-connect');

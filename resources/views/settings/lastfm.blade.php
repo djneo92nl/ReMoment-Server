@@ -13,6 +13,12 @@
             <x-alert type="error">{{ session('error') }}</x-alert>
         @endif
 
+        @unless(\App\Domain\Credentials\ServiceCredentials::configured('lastfm'))
+            <x-alert type="warning">
+                Enter your Last.fm API key and shared secret on <a href="{{ route('settings.services') }}" class="underline">Services &amp; keys</a> first.
+            </x-alert>
+        @endunless
+
         <x-card class="p-8">
             <div class="flex items-center gap-4 mb-6">
                 <div class="w-12 h-12 bg-gray-100 dark:bg-stone-800 rounded-2xl flex items-center justify-center">

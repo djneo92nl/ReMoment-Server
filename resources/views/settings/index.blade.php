@@ -55,6 +55,17 @@
                              label="DLNA">
                 {{ $dlnaServerCount }} {{ $dlnaServerCount === 1 ? 'server' : 'servers' }}
             </x-settings-row>
+            <x-settings-row href="{{ route('settings.services') }}" icon="fa-solid fa-key"
+                             label="Services & keys">
+                @php($missingServices = collect(\App\Domain\Credentials\ServiceCredentials::all())->keys()->reject(fn ($id) => \App\Domain\Credentials\ServiceCredentials::configured($id))->count())
+                @if($missingServices > 0)
+                    {{ $missingServices }} not set &middot; Spotify, Last.fm, Discogs, AcoustID, TheAudioDB
+                @else
+                    <span class="inline-flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>All keys set
+                    </span>
+                @endif
+            </x-settings-row>
             <x-settings-row href="{{ route('settings.spotify') }}" icon="fa-brands fa-spotify"
                              label="Spotify">
                 @if($spotifyConnected)
@@ -63,6 +74,16 @@
                     </span>
                 @else
                     Not Connected
+                @endif
+            </x-settings-row>
+            <x-settings-row href="{{ route('settings.beolink') }}" icon="fa-solid fa-circle-nodes"
+                             label="BeoLink stream">
+                @if(\App\Domain\Beolink\BeolinkStream::enabled())
+                    <span class="inline-flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Enabled
+                    </span>
+                @else
+                    Off
                 @endif
             </x-settings-row>
             <x-settings-row href="{{ route('settings.lastfm') }}" icon="fa-brands fa-lastfm"

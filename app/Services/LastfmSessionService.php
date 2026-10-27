@@ -2,16 +2,15 @@
 
 namespace App\Services;
 
+use App\Domain\Credentials\ServiceCredentials;
 use App\Models\Setting;
 
 class LastfmSessionService
 {
-    private const API_URL = 'https://ws.audioscrobbler.com/2.0/';
-
     public function getAuthorizationUrl(): string
     {
         return 'https://www.last.fm/api/auth/?'.http_build_query([
-            'api_key' => config('lastfm.api_key'),
+            'api_key' => ServiceCredentials::value('lastfm', 'api_key'),
             'cb' => route('lastfm.callback'),
         ]);
     }
@@ -56,7 +55,7 @@ class LastfmSessionService
      */
     public function signedRequest(array $params): array
     {
-        $params['api_key'] = config('lastfm.api_key');
+        $params['api_key'] = ServiceCredentials::value('lastfm', 'api_key');
 
         $sessionKey = Setting::get('lastfm_session_key');
         if ($sessionKey !== null && !isset($params['sk'])) {
@@ -68,7 +67,7 @@ class LastfmSessionService
 
         $response = MetadataHttp::request()
             ->asForm()
-            ->post(self::API_URL, $params);
+            ->post(ServiceCredentials::baseUrl('lastfm').'/', $params);
 
         if ($response->failed()) {
             throw new \RuntimeException("Last.fm request failed ({$params['method']}): HTTP {$response->status()}");
@@ -95,6 +94,6 @@ class LastfmSessionService
             $signature .= $key.$value;
         }
 
-        return md5($signature.config('lastfm.shared_secret'));
+        return md5($signature.ServiceCredentials::value('lastfm', 'shared_secret'));
     }
 }

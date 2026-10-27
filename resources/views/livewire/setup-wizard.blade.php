@@ -96,6 +96,8 @@
                             <span class="text-sm text-gray-400 dark:text-gray-600">
                                 @if($spotifyConnected)
                                     <span class="inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Connected</span>
+                                @elseif(!\App\Domain\Credentials\ServiceCredentials::configured('spotify'))
+                                    Needs a Spotify app key
                                 @else
                                     Not Connected
                                 @endif

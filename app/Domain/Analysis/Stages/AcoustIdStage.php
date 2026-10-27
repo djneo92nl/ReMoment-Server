@@ -23,7 +23,7 @@ class AcoustIdStage implements AnalysisStage
     public function enabled(): bool
     {
         // The lookup needs the fingerprint stage's output, so it only runs where fpcalc does.
-        return (bool) config('analysis.acoustid_key') && (new FingerprintStage)->enabled();
+        return \App\Domain\Credentials\ServiceCredentials::isSet('acoustid', 'api_key') && (new FingerprintStage)->enabled();
     }
 
     public function run(File $file, string $localPath, FileAnalysis $analysis): array
@@ -34,8 +34,8 @@ class AcoustIdStage implements AnalysisStage
         }
 
         $response = Http::asForm()->timeout(30)->withHeaders(['User-Agent' => 'ReMoment/1.0 (remko@pionect.nl)'])
-            ->post('https://api.acoustid.org/v2/lookup', [
-                'client' => config('analysis.acoustid_key'),
+            ->post(\App\Domain\Credentials\ServiceCredentials::baseUrl('acoustid').'/lookup', [
+                'client' => \App\Domain\Credentials\ServiceCredentials::value('acoustid', 'api_key'),
                 'format' => 'json',
                 'meta' => 'recordings',
                 'duration' => $analysis->fingerprint_duration,

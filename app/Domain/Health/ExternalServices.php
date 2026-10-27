@@ -3,6 +3,7 @@
 namespace App\Domain\Health;
 
 use App\Domain\Analysis\Tools;
+use App\Domain\Credentials\ServiceCredentials;
 use App\Models\StorageLocation;
 use App\Services\LastfmSessionService;
 use App\Services\MetadataHttp;
@@ -42,12 +43,27 @@ class ExternalServices
         return $at ? \Illuminate\Support\Carbon::parse($at) : null;
     }
 
-    /** Runs every probe and stores the outcome. */
-    public function refresh(): array
+    /** @return list<string> the ids of every probe (credential declarations point at these) */
+    public function probeIds(): array
     {
-        $results = [];
+        return array_keys($this->probes());
+    }
+
+    /**
+     * Runs the probes and stores the outcome: every probe, or only the given ids (the rest of the
+     * cached results and their time stay).
+     *
+     * @param  list<string>|null  $only
+     */
+    public function refresh(?array $only = null): array
+    {
+        $results = $only === null ? [] : $this->all();
 
         foreach ($this->probes() as $key => [$name, $group, $probe]) {
+            if ($only !== null && !in_array($key, $only, true)) {
+                continue;
+            }
+
             try {
                 $check = $probe();
             } catch (ConnectionException $e) {
@@ -56,10 +72,13 @@ class ExternalServices
                 $check = ServiceCheck::error($this->short($e->getMessage()));
             }
 
-            $results[$key] = ['name' => $name, 'group' => $group] + $check->toArray();
+            $result = $check->toArray();
+            $result['message'] = $this->redact($result['message']);
+            $results[$key] = ['name' => $name, 'group' => $group] + $result;
         }
 
-        Cache::put(self::CACHE_KEY, ['at' => now()->toIso8601String(), 'results' => $results], self::TTL * 4);
+        $at = $only !== null ? ($this->checkedAt() ?? now()) : now();
+        Cache::put(self::CACHE_KEY, ['at' => $at->toIso8601String(), 'results' => $results], self::TTL * 4);
 
         return $results;
     }
@@ -114,13 +133,13 @@ class ExternalServices
         if (!config('analysis.enabled')) {
             return ServiceCheck::disabled('Audio analysis is off (ANALYSIS_ENABLED)');
         }
-        if (!config('analysis.acoustid_key')) {
-            return ServiceCheck::disabled('ACOUSTID_API_KEY not set: fingerprints are stored but not looked up');
+        if (!ServiceCredentials::isSet('acoustid', 'api_key')) {
+            return ServiceCheck::disabled('No AcoustID key set (Settings › Services): fingerprints are stored but not looked up');
         }
 
         // A deliberately invalid fingerprint: a valid key is answered with a fingerprint error, a bad key with its own.
-        $response = $this->http()->asForm()->post('https://api.acoustid.org/v2/lookup', [
-            'client' => config('analysis.acoustid_key'), 'format' => 'json', 'duration' => 1, 'fingerprint' => 'AQAA',
+        $response = $this->http()->asForm()->post(ServiceCredentials::baseUrl('acoustid').'/lookup', [
+            'client' => ServiceCredentials::value('acoustid', 'api_key'), 'format' => 'json', 'duration' => 1, 'fingerprint' => 'AQAA',
         ]);
 
         return $this->byStatus($response) ?? match ($response->json('error.code')) {
@@ -179,7 +198,7 @@ class ExternalServices
         $secret = SpotifyTokenService::clientSecret();
 
         if (!$id || !$secret) {
-            return ServiceCheck::disabled('No Spotify app configured: enter its Client ID and secret in Settings › Spotify');
+            return ServiceCheck::disabled('No Spotify app configured: enter its Client ID and secret in Settings › Services');
         }
 
         $response = Http::timeout(self::TIMEOUT)->asForm()->withBasicAuth($id, $secret)
@@ -220,13 +239,13 @@ class ExternalServices
 
     private function lastfmKey(): ServiceCheck
     {
-        if (!config('lastfm.api_key')) {
-            return ServiceCheck::disabled('LASTFM_API_KEY not set');
+        if (!ServiceCredentials::isSet('lastfm', 'api_key')) {
+            return ServiceCheck::disabled('No Last.fm API key set (Settings › Services)');
         }
 
-        $response = $this->http()->get('https://ws.audioscrobbler.com/2.0/', [
+        $response = $this->http()->get(ServiceCredentials::baseUrl('lastfm').'/', [
             'method' => 'artist.getinfo', 'artist' => 'Radiohead',
-            'api_key' => config('lastfm.api_key'), 'format' => 'json',
+            'api_key' => ServiceCredentials::value('lastfm', 'api_key'), 'format' => 'json',
         ]);
 
         return $this->byStatus($response) ?? $this->lastfmError($response->json('error'), $response->json('message'))
@@ -237,8 +256,8 @@ class ExternalServices
     {
         $session = app(LastfmSessionService::class);
 
-        if (!config('lastfm.api_key') || !config('lastfm.shared_secret')) {
-            return ServiceCheck::disabled('LASTFM_API_KEY / LASTFM_SHARED_SECRET not set');
+        if (!ServiceCredentials::configured('lastfm')) {
+            return ServiceCheck::disabled('Last.fm API key and shared secret not set (Settings › Services)');
         }
         if (!$session->isConnected()) {
             return ServiceCheck::disabled('Not connected: connect in Settings');
@@ -267,15 +286,15 @@ class ExternalServices
 
     private function audioDb(): ServiceCheck
     {
-        $key = config('metadata.audiodb_key');
-        $response = $this->http()->get("https://www.theaudiodb.com/api/v1/json/{$key}/artist-mb.php", ['i' => self::PROBE_MBID]);
+        $key = ServiceCredentials::value('audiodb', 'api_key');
+        $response = $this->http()->get(ServiceCredentials::baseUrl('audiodb')."/{$key}/artist-mb.php", ['i' => self::PROBE_MBID]);
 
         if ($check = $this->byStatus($response)) {
             return $check;
         }
 
         if (!$response->ok() || empty($response->json('artists'))) {
-            return ServiceCheck::error("Key rejected or no data (HTTP {$response->status()}): check AUDIODB_API_KEY");
+            return ServiceCheck::error("Key rejected or no data (HTTP {$response->status()}): check the key in Settings › Services");
         }
 
         return $key === '123' ? ServiceCheck::ok('Working with the public test key (about 30 requests a minute)') : ServiceCheck::ok('Key accepted');
@@ -283,14 +302,14 @@ class ExternalServices
 
     private function discogs(): ServiceCheck
     {
-        $token = config('metadata.discogs_token');
+        $token = ServiceCredentials::value('discogs', 'token');
 
         if (!$token) {
-            return ServiceCheck::disabled('DISCOGS_TOKEN not set');
+            return ServiceCheck::disabled('No Discogs token set (Settings › Services)');
         }
 
         $response = $this->http()->withHeaders(['Authorization' => "Discogs token={$token}"])
-            ->get('https://api.discogs.com/oauth/identity');
+            ->get(ServiceCredentials::baseUrl('discogs').'/oauth/identity');
 
         if ($check = $this->byStatus($response)) {
             return $check;
@@ -298,7 +317,7 @@ class ExternalServices
 
         return $response->ok()
             ? ServiceCheck::ok('Token accepted for '.$response->json('username'))
-            : ServiceCheck::error('Token rejected: check DISCOGS_TOKEN');
+            : ServiceCheck::error('Token rejected: check it in Settings › Services');
     }
 
     /** One storage location's probe with its failure turned into an error check (used by the alert checks). */
@@ -324,6 +343,21 @@ class ExternalServices
         $location->disk()->directories();
 
         return ServiceCheck::ok('Bucket reachable, credentials accepted');
+    }
+
+    /** An error message may carry the request URL; a credential must never end up in cached health output. */
+    private function redact(string $message): string
+    {
+        foreach (ServiceCredentials::all() as $id => $service) {
+            foreach ($service->fields as $field) {
+                $value = ServiceCredentials::value($id, $field->name);
+                if (strlen($value) >= 6) {
+                    $message = str_replace([$value, rawurlencode($value)], '***', $message);
+                }
+            }
+        }
+
+        return $message;
     }
 
     private function short(string $message): string

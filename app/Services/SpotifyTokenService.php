@@ -2,9 +2,8 @@
 
 namespace App\Services;
 
+use App\Domain\Credentials\ServiceCredentials;
 use App\Models\Setting;
-use Illuminate\Contracts\Encryption\DecryptException;
-use Illuminate\Support\Facades\Crypt;
 use SpotifyWebAPI\Session;
 use SpotifyWebAPI\SpotifyWebAPI;
 
@@ -39,25 +38,15 @@ class SpotifyTokenService
         );
     }
 
-    /** The admin's own Spotify app (Settings › Spotify), else SPOTIFY_CLIENT_ID from .env. */
+    /** The admin's own Spotify app (Settings › Services), else SPOTIFY_CLIENT_ID from .env. */
     public static function clientId(): string
     {
-        return (string) (Setting::get('spotify_client_id') ?: config('spotify.auth.client_id'));
+        return ServiceCredentials::value('spotify', 'client_id');
     }
 
     public static function clientSecret(): string
     {
-        $stored = Setting::get('spotify_client_secret');
-
-        if ($stored) {
-            try {
-                return Crypt::decryptString($stored);
-            } catch (DecryptException) {
-                // Unreadable (APP_KEY changed): fall back to .env.
-            }
-        }
-
-        return (string) config('spotify.auth.client_secret');
+        return ServiceCredentials::value('spotify', 'client_secret');
     }
 
     public static function hasCredentials(): bool
@@ -68,17 +57,8 @@ class SpotifyTokenService
     /** Stores the credentials of the admin's Spotify app; a different Client ID invalidates the old connection. */
     public static function saveCredentials(string $clientId, ?string $clientSecret): void
     {
-        $changed = $clientId !== self::clientId();
-
-        Setting::set('spotify_client_id', $clientId);
-        if ($clientSecret !== null && $clientSecret !== '') {
-            Setting::set('spotify_client_secret', Crypt::encryptString($clientSecret));
-            $changed = true;
-        }
-
-        if ($changed) {
-            app(self::class)->disconnect();
-        }
+        // The registry disconnects the account when the Client ID or the secret changed.
+        ServiceCredentials::save('spotify', ['client_id' => $clientId, 'client_secret' => $clientSecret]);
     }
 
     public function getAuthorizationUrl(): string

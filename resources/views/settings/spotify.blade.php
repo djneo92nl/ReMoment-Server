@@ -17,33 +17,20 @@
             $hasApp = \App\Services\SpotifyTokenService::hasCredentials();
         @endphp
 
-        <x-card class="p-8" x-data="{ open: {{ $hasApp ? 'false' : 'true' }} }">
+        <x-card class="p-8">
             <p class="text-sm font-medium text-gray-900 dark:text-gray-100">Your Spotify app</p>
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Spotify limits each app to 5 users and needs the app owner on Premium, so every install uses its own app:
-                create one at <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener" class="underline">developer.spotify.com/dashboard</a>
-                with this redirect URI, then paste its Client ID and secret.
+                Spotify limits each app to 5 users and needs the app owner on Premium, so every install uses its own app.
+                The Client ID and secret are entered on <a href="{{ route('settings.services') }}" class="underline">Services &amp; keys</a>, with the steps to create the app.
             </p>
-            <p class="text-xs text-gray-400 dark:text-gray-600 mt-2 break-all select-all">{{ route('spotify.callback') }}</p>
-
             @if($hasApp)
-                <p class="text-xs text-emerald-600 dark:text-emerald-400 mt-3" x-show="!open">
+                <p class="text-xs text-emerald-600 dark:text-emerald-400 mt-3">
                     App configured ({{ \Illuminate\Support\Str::limit(\App\Services\SpotifyTokenService::clientId(), 8, '…') }})
-                    · <button type="button" class="underline" x-on:click="open = true">Change</button>
+                    · <a href="{{ route('settings.services') }}" class="underline">Change</a>
                 </p>
+            @else
+                <x-primary-button size="md" class="mt-4" href="{{ route('settings.services') }}">Set up your Spotify app</x-primary-button>
             @endif
-
-            <form method="POST" action="{{ route('spotify.credentials') }}" class="mt-4 space-y-3" x-show="open" x-cloak>
-                @csrf
-                <input type="text" name="client_id" value="{{ old('client_id', \App\Services\SpotifyTokenService::clientId()) }}" placeholder="Client ID" autocomplete="off"
-                       class="w-full rounded-xl border-gray-300 dark:border-stone-700 dark:bg-stone-900 text-sm">
-                <input type="password" name="client_secret" placeholder="{{ $hasApp ? 'Client secret (leave empty to keep)' : 'Client secret' }}" autocomplete="off"
-                       class="w-full rounded-xl border-gray-300 dark:border-stone-700 dark:bg-stone-900 text-sm">
-                @if($errors->any())
-                    <p class="text-xs text-red-600 dark:text-red-400">{{ $errors->first() }}</p>
-                @endif
-                <x-primary-button size="md" type="submit">Save</x-primary-button>
-            </form>
         </x-card>
 
         <x-card class="p-8">
@@ -74,7 +61,7 @@
                     Connect your Spotify account to track playback.
                 </p>
                 @if(!$hasApp)
-                    <p class="text-xs text-gray-400 mb-3">Save your Spotify app above first.</p>
+                    <p class="text-xs text-gray-400 mb-3">Set up your Spotify app above first.</p>
                 @endif
                 <x-primary-button size="md" href="{{ route('spotify.authorize') }}"><i class="fa-brands fa-spotify"></i> Connect Spotify</x-primary-button>
             @endif

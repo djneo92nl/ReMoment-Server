@@ -91,7 +91,7 @@ class SpotifyLibraryApi
     private function request(string $method, string $path, array $query): Response
     {
         $http = Http::withToken((string) $this->tokens->getAccessToken())->acceptJson()->timeout(15);
-        $url = rtrim((string) config('spotify.api_url'), '/').$path;
+        $url = \App\Domain\Credentials\ServiceCredentials::baseUrl('spotify').$path;
 
         return $method === 'GET' ? $http->get($url, $query) : $http->send($method, $url.'?'.http_build_query($query));
     }
