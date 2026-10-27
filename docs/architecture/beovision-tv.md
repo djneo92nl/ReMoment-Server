@@ -139,6 +139,25 @@ A checklist or an `ase:` command that POSTs each command on the V1 with the set-
 
 Verified on the V1: **sending a source turns the TV on.** `powerManagement/standby` accepts only `standby` and `allStandby`, so the ASE `VideoPlayerDriver::powerOn()` activates a source instead: the device's default input (`device_meta` `default_source`, the same key `SwitchToDefaultSource` uses), else the first visible own source that is not a streaming service. `PUT /api/devices/{id}/power {"on": true}` and the "Power on" button on the device card both go through it; a TV with no synced sources answers 422 ("sync the sources first"). `Device/TogglePower` stays an untested alternative and is no longer needed for wake.
 
+## Chromecast on HDMI 1
+
+The V1's `hdmi_1` ("SET-TOP BOX", a name the owner gave the input; the V1 reports `externalSource.categoryList` `SET-TOP BOX`) has a **Chromecast dongle** plugged in. That makes it the first sub device ([v1-roadmap.md](v1-roadmap.md), workstream 2a): the V1 is the host, the link is the HDMI input (`kind` `input`, `via` `hdmi_1`), and the Chromecast is its own device with the Cast driver (`app/Integrations/Cast/`, `cast:probe`).
+
+What the V1 gives the link:
+- **Selecting it:** activating `hdmi_1` switches the TV to the dongle, and wakes the TV when it is in standby (so "cast to the living room" can power the TV on).
+- **Knowing it is active:** `active` on `hdmi_1` (reliability on the V1 is probe question 5) and the `source_changed` notification the listener already turns into `now_playing.source` with `input` "HDMI 1". `signal` is the V1's `signalSensed`; the scan found it false on this input with the TV in standby, so do not treat a missing signal as "dongle off" before it is checked with the TV on.
+- **Remote keys:** the cursor keys of the one-way commands go to the TV; whether they reach a Chromecast over HDMI-CEC is a probe question (the Chromecast has its own remote protocol, a cast session needs none).
+
+**Casting wakes the TV (the follow rule).** The V1 has no CEC, so a cast to the dongle does not wake the TV by itself. ReMoment can do it: the Chromecast's listener sees the cast session start and the link's follow rule activates `hdmi_1` on the V1, which wakes it and switches the input (design in the roadmap, 2a "Follow"). Defaults: only from standby (a cast never takes the screen from another input), the idle backdrop app is ignored, a short debounce, and an optional standby after the cast ends only when ReMoment woke the TV.
+
+Things to settle with the hardware:
+1. **Power of the dongle.** If the Chromecast is powered from the V1's USB port it goes off in standby and no cast can be seen; it needs its own mains adapter. Which is it on the V1? (`cast:probe` from the server with the V1 in standby answers it.)
+2. **What the Chromecast reports** to a CASTV2 connection while its HDMI is dark: whether the receiver status (app id, playing state) arrives in time for the rule, and which app id the backdrop uses.
+3. **Wake latency**: how long the V1 takes from `hdmi_1` activation until the TV shows the input, to pick the debounce and tell the user what to expect.
+4. **Our own switch** versus someone else's: the listener must not treat the `source_changed` caused by the rule as a manual change.
+
+Until the link model exists the pair is two ordinary devices; nothing in phase 1 depends on it.
+
 ## Phases
 
 1. **TV page on what exists** (built, below): grouping of sources (Input / Apps), the TV status line, standby, wake by source, digits and sleep timer. No new endpoint.
