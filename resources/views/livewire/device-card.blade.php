@@ -109,6 +109,8 @@
                         <div class="w-full lg:w-48 aspect-square rounded-2xl bg-gray-100 dark:bg-stone-800 flex items-center justify-center flex-shrink-0">
                             @if($nowPlaying->radio)
                                 <i class="fa-solid fa-tower-broadcast text-4xl text-gray-300 dark:text-stone-600"></i>
+                            @elseif($nowPlaying->source?->category === 'video')
+                                <i class="fa-solid fa-tv text-4xl text-gray-300 dark:text-stone-600"></i>
                             @elseif($nowPlaying->source)
                                 <i class="fa-solid fa-plug text-4xl text-gray-300 dark:text-stone-600"></i>
                             @else
@@ -138,6 +140,10 @@
                                         · {{ $nowPlaying->radio->name }}
                                     @endif
                                 </p>
+                                @if($nowPlaying->source?->sourceType === 'APP')
+                                    {{-- A TV app (YouTube, Netflix) playing the title --}}
+                                    <p class="mt-1 text-sm text-gray-400 dark:text-gray-500 truncate"><i class="fa-solid fa-tv text-xs mr-1.5"></i>{{ $nowPlaying->source->name }}</p>
+                                @endif
                             @elseif($nowPlaying->source)
                                 {{-- External source (line-in, HDMI, etc.) --}}
                                 <h2 class="text-2xl lg:text-3xl font-medium tracking-tight dark:text-emerald-50 truncate">{{ $nowPlaying->source->name }}</h2>
