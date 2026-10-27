@@ -25,6 +25,9 @@ Effort: S = days, M = 1–2 weeks, L = several weeks. Feasibility notes come fro
 | 9a | Distribution and upgrades: registry images, compose, Ansible, Pi image, `app:upgrade`, migration squash | L | 1a | design below | Must |
 | 9b | Release readiness: CI, end-user docs, network guardrails, performance budget, diagnostics bundle | M | 1a | design below | Must (diagnostics: Should) |
 | 10 | Manager: host service that controls the running instance (containers, processes, upgrade with rollback, host stats) and SMB shares (serve and mount) for the library and the drop directory; on every install target | L | 1b, 9a, backup | **decided, design draft** | Must |
+| 11 | WiiM (LinkPlay) driver: a dedicated driver on the public HTTP API, on top of the generic UPnP fallback | M | | to do | Should |
+| 13 | Export from the library: download a playlist, album or artist as a zip, transcoded to a chosen maximum quality, for an MP3 player or a car radio | M | 1b | to do | Should |
+| 12 | Library and audio intelligence, what is left: mixes-well, loudness-normalised playback, tag and cover suggestions, concerts, related works, lyrics extras, listening insights, Essentia on arm64 | S–M each | 4 (similar tracks), 8.4 (tag editor) | plan below; the enrichment, analysis and health base is built | Mixed (per item); platform docs Must |
 
 ## Progress (as of 2026-10-27)
 
@@ -39,13 +42,14 @@ Built and committed since this plan was written (hashes are on `main`):
 | 2 TV | Beoplay V1 page, wake by source, number keys | `5d2dab0` |
 | 2a Cast | CASTV2 codec, receiver connection, read-only `cast:probe` | `0ff1c58` |
 | 7 Ripper | `ripper/`: Tauri desktop app, signs in with the admin token, MusicBrainz disc lookup, tags files, uploads through `POST /api/admin/files`; ripping itself still to do | `d0e24af`, `6ca86f3` |
+| 9a Web server | FrankenPHP in classic mode replaces `artisan serve` in production; multi-arch image built natively per host; verified on arm64 only; see [frankenphp.md](frankenphp.md) | `a2ca384` |
 | Not in the plan | Move playback and sync groups (fake multiroom); BeoLink stream (B&O multiroom as an Icecast stream for any speaker) | `5b12aec`, `d89bc44` |
 
 Still open on workstream 1: the hardware checklist (needs the device lab), health alerts (need the MQTT alert topic of 8.6), and confirming the card fix over time.
 
 **Priority.** *Must* = 1.0 does not ship without it. *Should* = in 1.0 unless time runs out, cut in the order listed under "Cut order". *Can slip* = moves to 1.1 without hurting 1.0. Per-item tags for workstream 8 are on the items below.
 
-**Cut order** (first to go): 8.2 podcasts, 8.4 tag editor, 8.3 resume position, the HA command path (8a), 7 CD import, 6 physical library, 5 Tidal (Deezer stays if verified), 4 similar tracks. 8b's admin endpoints can ship area by area; its contract items (2, 3, 6) are Must because the app and the `features` list depend on them.
+**Cut order** (first to go): 8.2 podcasts, 12.8 lyrics extras, 12.7 related works, 12.9 listening insights, 12.6 concerts, 8.4 tag editor (with 12.4 tag suggestions), 8.3 resume position, the HA command path (8a), 12.3 loudness-normalised playback, 7 CD import, 6 physical library, 5 Tidal (Deezer stays if verified), 4 similar tracks. 12.2 (mixes well) and 12.10 (Essentia platform docs) are not cut: one is a few days, the other corrects what the docs promise. 8b's admin endpoints can ship area by area; its contract items (2, 3, 6) are Must because the app and the `features` list depend on them.
 
 Suggested order: 1 and 2 in parallel, with 1a (profiles) right behind 1 because the stack, the scheduler and the budget of 9b depend on it (independent; 2a follows the first TV work), then 3, then 4, 5 and 6 in parallel, then 7, 8 (with 8a after its scenes and alerts), 8b alongside 8 (its contract items first: they block the app and cost little), and 9, 9a and 9b last (the migration squash is the very last step before the release tag). Workstream 3 is the one that shapes the rest, so it is decided first.
 
@@ -76,7 +80,7 @@ Suggested order: 1 and 2 in parallel, with 1a (profiles) right behind 1 because 
 - **SQLite for Control: conditions.** SQLite failed in 2026-10 (lock contention and bind-mount corruption, see [database.md](database.md)); Control only works if (1) WAL mode and a `busy_timeout`, on a native or named volume, never a bind mount; (2) Redis keeps queue, cache and sessions; (3) play history is written by a single worker; (4) a **24-hour stress test** with real listeners counts `database is locked` and gates the decision; if it fails, the Pi 2 is not supported rather than flaky; (5) the backup of workstream 1 covers an SD-card install.
 - **Upgrading a profile.** Control to Standard is SQLite to MariaDB: wrap the existing `db:import-sqlite` in a `profile:upgrade` command (backup, switch `.env`, migrate, import).
 - **Meilisearch** is removed from `docker-compose.prod.yml` for Control and Standard (it costs hundreds of MB); Full may enable it as an optional compose profile. Whether search is built on it is a separate decision; Standard uses MariaDB search.
-- **Web server on a Pi 2.** The Control profile needs a web server that runs on armv7 (see 9a, web server); FrankenPHP's armv7 support is unverified.
+- **Web server on a Pi 2.** FrankenPHP (classic mode) is in place and its official image includes armv7, but it has only been verified on arm64 (see 9a, web server and [frankenphp.md](frankenphp.md)); the Pi 2 still needs a measured run.
 - **Pi 2 is 32-bit armv7.** Every image in the Control stack (app, Redis, Mosquitto) needs an armv7 build; *unverified*. If one is missing, the Control floor is the Pi 3 (arm64).
 
 Done when: the wizard offers the three profiles, each starts only what it should, a Pi 2 and a Pi 3 meet the budget of 9b for their profile, and moving Control to Standard keeps the data.
@@ -364,12 +368,127 @@ Done when: on the Pi image, the Proxmox/Ansible install and a plain compose inst
 
 **Feasibility:** high for status, logs and restart (DevDash already does it); medium for upgrade and rollback (the rollback path must be tested); medium for SMB (Samba and cifs are routine, the host differences per target are the work); the main cost is the installers on three targets and the security review.
 
+## 11. WiiM (LinkPlay) driver
+
+Status: **to do, Should.** Added 2026-10-27. WiiM streamers are built on the LinkPlay platform and have a **public HTTP API** (the LinkPlay/WiiM HTTP API documentation).
+
+**Today.** The generic UPnP MediaRenderer driver already plays on a WiiM ([upnp-renderer.md](upnp-renderer.md) names WiiM as a fallback target and says "WiiM has the LinkPlay HTTP API"): play, pause, volume, a server-managed queue. It has no sources, no multiroom, no presets and no sound adjustment, and its now playing comes from the server's own queue state. A dedicated driver always wins over the fallback (`DedicatedDrivers`, `config/devices.php`).
+
+**The API, as the public document says** ([HTTP API for WiiM Products, version 1.2](https://www.wiimhome.com/pdf/HTTP%20API%20for%20WiiM%20Products.pdf), read 2026-10-27). HTTPS `GET` only: `https://<ip>/httpapi.asp?command=<command>`, no authentication, most answers JSON (the device certificate is self-signed in practice, so the client must skip verification for that host; *the document does not say so*). Commands in the document:
+
+| Area | Commands | Maps to |
+|---|---|---|
+| Device info | `getStatusEx` (name `DeviceName`, `firmware`, `project`, `uuid`, `upnp_uuid`, `MAC`, `RSSI`, `group` 0 master / 1 slave, `GroupName`, `preset_key`, `EQ_support`, `battery`, `battery_percent`, `hardware`) | `DeviceInfoInterface`, discovery matching, `BatteryInterface` (only models that report one) |
+| Now playing | `getPlayerStatus` (`status` stop/play/loading/pause, `mode` source code, `loop`, `curpos` and `totlen` in **ms**, `vol`, `mute`, `plicount`, `plicurr`, `type` master/slave, `ch`), `getMetaInfo` (`title`, `artist`, `album`, `albumArtURI`, `sampleRate`, `bitDepth`) | `MusicPlayerDriverInterface`, listener (poll), artwork pipeline |
+| Controls | `setPlayerCmd:` `play:<url>`, `playlist:<url>:<index>`, `pause`, `resume`, `onepause`, `stop`, `prev`, `next`, `seek:<seconds>`, `vol:0-100`, `mute:0/1`, `loopmode:n` | `MediaControlsInterface`, `VolumeControlInterface`, `SeekInterface`, `ShuffleInterface`/`RepeatInterface`, `PlayStreamUrlInterface` |
+| Sources | `setPlayerCmd:switchmode:` `line-in`, `bluetooth`, `optical`, `udisk`, `wifi`; the active one is `mode` in `getPlayerStatus` (1 AirPlay, 2 DLNA, 10-19 WiiM playlist, 31 Spotify Connect, 32 TIDAL Connect, 40 AUX, 41 Bluetooth, 43 optical, 99 slave) | `SourcesInterface`, `SourceActivationInterface` |
+| Presets | `MCUKeyShortClick:<1-12>` plays one, `getPresetInfo` lists them (`number`, `name`, `url`, `source`, `picurl`) | quick-start / radio list |
+| Equaliser | `EQOn`, `EQOff`, `EQGetStat`, `EQGetList` (22 named presets: Flat, Acoustic, Bass Booster ...), `EQLoad:<name>` | a named-preset setting; **not** bass/treble, so it does not fit `SoundAdjustmentInterface` as is |
+| Device | `reboot`, `setShutdown:<sec>` (0 now, -1 cancels), `getShutdown`; alarms (`setAlarmClock`, `getAlarmClock`, `alarmStop`, `timeSync`); audio output (`getNewAudioOutputHardwareMode`, `setAudioOutputHardwareMode:1-3` SPDIF/AUX/COAX) | `PowerInterface` standby only (no wake documented), sleep timer, output mode |
+
+**Not in the document, so not assumed:** **multiroom control** (join, leave, kick: only the read-only `group`, `GroupName` and `type` fields exist, so grouping state can be shown but not changed through this API); a **queue** (only `plicount` and `plicurr`); a **list of available sources** per model; **discovery** (use SSDP/UPnP: `upnp_uuid` and `uuid` match a device to its UPnP description, *unverified*); rate limits; wake from standby. Quirks to handle: the position is in **ms** in the status but **seconds** in `seek`; the `loop` codes in `getPlayerStatus` (0 all, 1 single, 2 shuffle loop, 3 shuffle no loop, 4 none) differ from the `loopmode` codes you set (0 no loop, 1 single, 2 shuffle loop, -1 sequence loop); two keys in the `getMetaInfo` example have a trailing space (`"albumArtURI "`, `"sampleRate "`); `curpos` and `totlen` can be 0 for streams.
+
+**What the dedicated driver adds over the UPnP fallback:** the WiiM's own now playing (so an AirPlay, Spotify Connect or TIDAL Connect play shows in history, scrobbling and `/receiver`, with `mode` as the source), sources, presets, EQ presets, device info, battery where present, discovery in the device list, and a listener. **Multiroom stays out of scope** until a command source is found (another LinkPlay document, or UPnP/OpenHome); the driver shows the group state only.
+
+**No hardware (decided 2026-10-27):** there is no WiiM in the device lab. The driver is built against the document's examples as recorded fixtures and tested with fakes (`Http::fake` and a `FakeWiimDriver`), and is listed as **unverified** in the hardware table until someone with a WiiM confirms it; the `wiim:probe` (read-only: `getStatusEx`, `getPlayerStatus`, `getMetaInfo`, `getPresetInfo`, `EQGetList`) is shipped so a user with a device can run it and send the output (diagnostics bundle, 9b item 5).
+
+**Build order.** (1) `WiimClient` (HTTPS, self-signed, one request at a time, `getStatusEx`/`getPlayerStatus`/`getMetaInfo`, tolerant JSON), fixtures from the document, `wiim:probe`. (2) Driver and listener: now playing, controls, volume, seek, repeat/shuffle, stream URL, device info, discovery by UPnP match. (3) Sources and presets. (4) EQ presets and output mode. (5) Docs: `docs/architecture/wiim.md` (this table, quirks, what is unverified), the driver guide in `device-drivers.md`, the hardware table, CLAUDE.md and `docs/api/openapi.yaml` where capabilities or shapes change.
+
+Done when: with fakes, a WiiM is found by discovery, added, shows its own now playing, takes controls, volume, source and preset changes from the web UI and the API, and is listed in the hardware table as unverified; with a real device (someone's), the probe output confirms the fixtures.
+
+## 12. Library and audio intelligence: what is left
+
+Status: **plan**, added 2026-10-27. Built and not repeated here: the enrichment pipeline ([metadata-enrichment.md](metadata-enrichment.md)), audio analysis of the own files (loudness, waveform, quality and transcode checks, fingerprint, AcoustID, Essentia with the ML models, [audio-analysis.md](audio-analysis.md)), canonical genres, covers from the files, smart playlists on the analysis fields, listening modes and Camelot codes ([listening-modes.md](listening-modes.md)), and library health ([library-health.md](library-health.md)). Each item below stands alone, uses data the server already has unless it says otherwise, and can move to 1.1. Only the own files have audio to analyse: DLNA and Spotify tracks get metadata, never analysis.
+
+| # | Item | Effort | Priority | Depends on |
+|---|---|---|---|---|
+| 12.1 | Similar tracks and radio | M | Should (workstream 4) | the sidecar keeping its embedding |
+| 12.2 | "Mixes well with this" | S | Should | none (BPM, Camelot and mood exist) |
+| 12.3 | Loudness-normalised playback and ReplayGain write-back | M | Can slip | loudness analysis (built), tag writer |
+| 12.4 | Tag suggestions from AcoustID and MusicBrainz | M | Can slip (Should with CD import) | 8.4 tag editor |
+| 12.5 | Cover health: small and missing covers, replace from the Cover Art Archive | S | Can slip | none |
+| 12.6 | Concerts for artists in the library | M | Can slip | a location setting |
+| 12.7 | Related works from MusicBrainz relationships | S | Can slip | none |
+| 12.8 | Lyrics extras: language, explicit flag | S | Can slip | none |
+| 12.9 | Listening insights on `/stats` | M | Can slip | 8.8 history |
+| 12.10 | Essentia on arm64 and what the docs promise | S docs, M build | Must (docs), Should (build) | 1a, 9a |
+
+**12.1 Similar tracks and radio.** Workstream 4 owns it; the plan and the sqlite-vec measurements are in [similar-tracks.md](similar-tracks.md). The prerequisite is small but easy to miss: the sidecar computes the Discogs-EffNet embedding for every file and then throws it away (`docker/analysis/app.py`), so the first step is to return it, store one vector per file (a BLOB in the main database as the source of truth) and rebuild the vector index from that. Existing files need one more pass of the `essentia` stage (a stage version bump) to produce it.
+
+**12.2 "Mixes well with this".** From a track, list tracks that follow it well: tempo within about 6 % (also half and double time), a Camelot code that is the same, one step away or the relative key (`App\Domain\Analysis\Camelot` already lists them), optionally the same mood, never the same recording. Shown as a "Mixes well" action in a track's options and as a shelf in the player bar's Up next, with "add to queue" and "play next" (the queue editing that exists). API `GET /api/library/tracks/{id}/mixes-with` (cursor-paged, `scope`, `device_id` to keep to playable tracks), OpenAPI and an MCP tool. No new analysis and no new tables: it is a query over `file_analyses`. Done when the result for a track with a known BPM and key is sorted by closeness and respects the scope.
+
+**12.3 Loudness-normalised playback and ReplayGain write-back.** Two parts that can ship separately.
+- *Playback offset.* When a library track starts on a device with `volume_control`, the server nudges the device volume by the difference between the track's integrated loudness and a target (setting, default off, for example -14 LUFS), clamped to a few dB and returned to the user's volume at the next track, so a quiet remaster and a loud one sit at the same level. Per device switch, because volume steps differ (B&O and Sonos percent steps, UPnP renderers). *Unverified:* how a device reacts to a volume change at every track start (a pop, a delay) and whether the ASE and Sonos volume events fight the offset; a probe on the lab decides which devices get it.
+- *Write-back.* Write the computed track and album gain (`REPLAYGAIN_*`) into the files' tags with the existing tag writer (`LibraryFiles::writeTags`: mp3 pure PHP, FLAC needs `metaflac`, Ogg `vorbiscomment`), so other players benefit too. It rewrites the user's files and changes their hash, so it is opt-in, confirmed, and re-indexes the files it touches; album gain needs the whole album analysed.
+
+**12.4 Tag suggestions.** For a file whose tags disagree with the recording AcoustID found (a different title spelling, a missing year, no track number) list a suggestion built from MusicBrainz, in a "Tag suggestions" report next to the others in [library-health.md](library-health.md) (the page already names it as a gap), together with "inconsistent tags within an album". Applying a suggestion is the tag editor of 8.4; without it the report is read-only. Never applied automatically.
+
+**12.5 Cover health.** A report for albums without a cover or with a small one (needs the pixel size of the cover kept per album when it is processed, the gap named in library-health.md), and a "replace from the Cover Art Archive" action that takes the best front image of the album's MusicBrainz release and goes through `ProcessArtwork`. A person's own choice of cover (artist-settings, `manual` source) is never overwritten.
+
+**12.6 Concerts.** Upcoming concerts for the artists in the library in a place the user sets (country or city and a radius): a "Coming up" shelf in Discover and an event for Home Assistant (8a). Sources to evaluate: setlist.fm (free key, mostly past setlists and some upcoming), Bandsintown (an app id, artist-name lookups), Songkick (access has been restricted; *unverified*). Artist names are sent to the service, so it is opt-in and says so (credential source rule of 9b item 8). Rate limits and terms of each source are *unverified*; pick one after reading them.
+
+**12.7 Related works.** MusicBrainz relationships on a track and album page: this is a cover of, a remix of, samples, is sampled by, other versions. One more `inc` on the recording lookup the track job already makes (`recording-rels`, `work-rels` are partly requested for credits); stored as metadata, shown as links to the library when the related recording is owned and as plain text otherwise.
+
+**12.8 Lyrics extras.** Language of the lyrics (a small local detector over the LRCLIB text, no external call), an explicit flag derived from the lyrics for tracks where the source gave none, and a filter on both (smart fields `lyrics_language`, `explicit` exists already). Translation stays a link, not a feature.
+
+**12.9 Listening insights.** More on `/stats` from `plays` and the analysis: skip rate per artist, mood and hour, how many tracks per week are new against repeats, the mood and tempo of each part of the day, and "what you play when it is late". Household-wide like everything else. Shares the history schema and its index work with 8.8; the page and `GET /api/library/insights` come after the history API exists.
+
+**12.10 Essentia on arm64 and what the docs promise.** Found while building the sidecar on an Apple Silicon Mac (2026-10): PyPI has **no aarch64 wheel for `essentia`** (only an sdist, which needs a full C++ build), so the sidecar only runs there as `linux/amd64` under emulation, which the dev compose now pins. [system-requirements.md](system-requirements.md) lists the Essentia and Essentia + ML tiers as "64-bit x86 or arm64"; that is *unverified* for native arm64 and probably wrong for a Pi 4 or 5 and an arm64 NAS. Actions: (1) correct the tier table and `audio-analysis.md` now (x86-64 is the verified target; arm64 runs emulated or from a source build); (2) decide between documenting x86-only for the Full profile, building Essentia from source for arm64 in the sidecar image (a long CI build, cached, multi-arch image of 9a), or another extractor for BPM and key on arm64; (3) check the licence of the Essentia ML models before they are offered in a public image (9b item 7 already lists the check). Tier 0 analysis (ffmpeg, Chromaprint, quality, waveform) runs on every architecture and is unaffected.
+
+Done when: 12.2 is in the track options and the API, the platform tier table and the Full profile (1a) tell the truth about arm64, and the other items are either built or moved to 1.1 with their notes kept here.
+
+## 13. Export from the library (download with transcode)
+
+Status: **to do, Should.** Added 2026-10-27.
+
+**Goal.** Pick a playlist, an album or an artist (or any track selection) and get a download that plays on an MP3 player or a car radio: the files, named and tagged for such a device, at a quality ceiling the user chooses. Anything above the ceiling is transcoded first, anything at or below it is copied untouched.
+
+**Scope.** Only **tracks with an own file** (`files`, present on a storage location): Spotify and DLNA-only tracks have nothing to hand over and are listed as skipped ("12 of 14 tracks can be exported"). Smart playlists, favourites and the queue work too, as they are track lists.
+
+**What exists to build on.**
+- **Proxies** (`config/proxies.php`, `App\Domain\Storage\Proxies`, the `TranscodeProxy` job on the `heavy` queue): ffmpeg profiles, on-demand transcodes cached on a private disk and pruned oldest-first. Today's profiles drop metadata (`-map_metadata -1`) because they serve small players; export profiles keep tags and cover art, so they are new profiles on the same machinery, and the cached copies are reused by a second export.
+- **`files.codec` and `files.bitrate`** are indexed per file, so "keep or transcode" is decided without probing each file again.
+- ffmpeg is in the app image (`docker/frankenphp/Dockerfile`), and the `heavy` queue and worker exist for jobs of minutes (1b).
+
+**Quality options (export profile):**
+
+| Profile | Rule |
+|---|---|
+| **Highest available** | Copy every file as it is (FLAC stays FLAC). A warning when the target is likely to not play it |
+| **MP3, max 320 kbit/s** (the default for players and cars) | A file that is already MP3 or AAC at or below 320 kbit/s is **copied**; lossless files and anything above 320 kbit/s are transcoded to MP3 320 CBR; a file is **never upsampled** (a 128 kbit/s MP3 stays 128) |
+| **MP3 at a lower ceiling** (256, 192, 128) | Same rule with the lower number |
+| **Compatibility** (older head units) | Everything not MP3 is transcoded; 44.1 kHz; stereo; no ID3v2.4 |
+
+Lossy to lossy loses quality, so the dialog says which files will be transcoded and from what; the rule above transcodes lossy files only when they exceed the ceiling. **MP3 320 is the default profile (decided).** Further formats (AAC/M4A, Opus) and more options may come later, depending on which proxy profiles are built; MP3 is what car radios share.
+
+**Options:**
+- **Tags and cover.** Keep title, artist, album artist, album, track and disc number, year, genre; embed the album cover as a **baseline JPEG capped at 500 px** (many head units reject large or progressive covers, the same rule as the ESP32 clients). Optionally bake ReplayGain or loudness normalisation into the files (cars have no ReplayGain; the analysis already stores loudness, [audio-analysis.md](audio-analysis.md)); off by default. This overlaps item 12.3 (loudness-normalised playback and ReplayGain write-back): settle that one first and reuse its gain values.
+- **Naming and layout.** `Artist/Album/01 - Title.mp3`, or flat with the playlist order as a prefix (`001 - Artist - Title.mp3`) so a player that sorts by name plays a playlist in order; FAT32-safe characters and length; an `.m3u8` with relative paths for a playlist. Sample rate 44.1 or 48 kHz at most.
+- **Size.** An estimate before the export starts (tracks, total size, how many are transcoded); a configured maximum; a split into several zips of at most 4 GB (FAT32 file limit) where needed.
+
+**Delivery and access.**
+- A queued job (`ExportLibrarySelection`, `heavy` queue, one at a time) writes a **store-mode zip** (MP3s do not compress) to a private `exports/` directory, streamed to disk, never built in memory (a Pi has 1 GB); progress is live like other jobs; the download link is a short-lived signed URL; finished exports are deleted after a configured time.
+- **Zip download only (decided).** No export share and no USB target in 1.0; how the files reach the player or the car is up to the user. **1.1 or later:** an `exports` SMB share (a finished export appears on the share, through the Manager of workstream 10) and a USB drive on the host; wanted, but not for 1.0.
+- **Who may export (decided 2026-10-27): the admin login only.** The media itself is treated as open to the household, but an export is a heavy operation (CPU, disk, a long `heavy` queue job), so it is gated to protect the server, not the files. Apps use the admin token (8b); no guest option for 1.0.
+- **Limits (agreed 2026-10-27; defaults proposed, tune with the Pi budget):** one export may hold at most `EXPORT_MAX_GB` (default 8 GB, split into zips of at most 4 GB), finished exports are deleted after `EXPORT_KEEP_HOURS` (default 24), and the whole `exports/` directory is capped at `EXPORT_DIR_MAX_GB` (default 16 GB, oldest first, like the proxies). An export that would exceed the limits is refused with the estimate.
+- Pi budget (9b): one transcode at a time, `nice`, disk space checked before starting, the export directory pruned like the proxies; a Pi 3 transcodes an album in about a minute or more (estimate, unmeasured).
+
+**API and clients.** `POST /api/library/exports` `{ type: album|playlist|artist|tracks, id, profile, options }` returns `{ id, status }`; `GET /api/library/exports/{id}` reports progress, skipped tracks and, when ready, the download URL; `DELETE` cancels or removes it. MCP tool, OpenAPI entry (8b), `features` key `export`. Web: an Export button on the album, artist and playlist pages and in the player bar's queue, with a dialog for profile, naming and the estimate.
+
+**Build order.** (1) The export profiles and the keep-or-transcode decision (`ExportPlanner`: per file, copy or transcode and why), with tests on codec and bitrate combinations. (2) The job, zip streaming, naming, m3u8 and cover handling. (3) API, MCP and OpenAPI. (4) The web dialog. (5) Retention and size limits. (6) Docs: `docs/api/library.md`, `docs/architecture/export.md`, the CLAUDE.md commands and docs list.
+
+**Unverified:** that the ffmpeg in the image has `libmp3lame` (the proxy profiles already use it, so likely yes), zip64 behaviour for archives over 4 GB, transcode speed on a Pi 2 and Pi 3, and which car head units reject which covers or tag versions (ID3v2.3 is the safe default).
+
+Done when: from an album, playlist or artist page an admin picks "MP3, max 320 kbit/s", sees how many tracks are copied and how many transcoded, and downloads a zip whose files play on a FAT32 stick in a plain MP3 player, with the right tags, a cover and an `.m3u8`; a second export of the same album reuses the cached transcodes; streaming-only tracks are reported as skipped; the whole run stays within the Pi memory budget.
+
 ## Not in 1.0
 
+- 1.1 or later, wanted: an SMB share and a USB target for finished exports (workstream 13); more export formats (AAC, Opus).
 - Accounts, profiles, per-user stats or any role model (permanent constraint).
 - Re-streaming Deezer or Tidal audio to other speakers; a Tidal catalogue with its own OAuth login unless a playback path is verified.
 - Qobuz (same pattern as Deezer once a device path exists).
 - Ripping without an attached drive; tape/vinyl digitising.
+- Audio analysis of DLNA and Spotify tracks (the server never sees their audio; Spotify's audio-features endpoint is closed to new apps, and previews are *unverified*). Beat grids, cue points and other DJ tooling, spectrogram views, hosting or embedding music videos (a link at most).
 
 ## Risks
 
@@ -383,6 +502,8 @@ Done when: on the Pi image, the Proxmox/Ansible install and a plain compose inst
 | Scope creep in workstream 8 | Each item stands alone and can move to 1.1 |
 | The app is blocked on web-only admin features | Workstream 8b item 1 is split per area (tokens, health, clients, presets, devices, radio, connections); ship them one by one, the app adds a screen per endpoint |
 | An undocumented field changes under a client | The OpenAPI contract test (8b item 3); the app reads only what is documented |
+| Essentia has no aarch64 wheel, so the analysis sidecar is x86-only unless built from source | Correct the docs (12.10); tier 0 analysis is architecture-independent; decide between x86-only for Full, a source build in the image, or another extractor |
+| Loudness-normalised playback fights a device's own volume events | Opt-in per device, clamped offset, probe on the lab before offering it (12.3) |
 
 ## Decisions log
 
@@ -410,7 +531,13 @@ Done when: on the Pi image, the Proxmox/Ansible install and a plain compose inst
 
 - Manager and shares (2026-10-27): a **hard requirement for 1.0** (workstream 10). A separate host service in the spirit of DevDash (`~/Code/devdash`) that controls containers and processes, upgrades with backup and rollback, and reports host health; installed on every target (Pi image, Proxmox/Ansible, plain compose). SMB: both serve (library read-only, drop directory read-write) and mount (a NAS share as a storage location), with Samba on the host, configured by the manager. Queue management and stability is 1b. This reverses "upgrades by command line only / updater later" (9a): the CLI stays, the manager adds the web path.
 
-- Web server (2026-10-27, proposed): replace `artisan serve`; try FrankenPHP in classic mode against nginx plus php-fpm on the Pi 2 and Pi 3; Octane worker mode only later and opt-in (workstream 9a).
+- Web server (2026-10-27): **done in classic mode** (`a2ca384`): FrankenPHP replaced `artisan serve`. Octane worker mode stays later and opt-in, after a static-state audit and a memory soak; the Pi 2/Pi 3 measurement against the old setup is still open (workstream 9a, 9b item 4).
+
+- WiiM (2026-10-27): a dedicated LinkPlay driver is wanted as workstream 11, Should; the generic UPnP fallback keeps working until it exists.
+
+- Library and audio intelligence (2026-10-27): what is left after the enrichment, analysis, covers, waveform, listening modes and library health work is collected as workstream 12 (mixes-well, loudness-normalised playback, tag and cover suggestions, concerts, related works, lyrics extras, insights, Essentia on arm64). Similar tracks stays in workstream 4. Analysis only ever covers the own files.
+
+- Library export (2026-10-27): workstream 13, Should: download a playlist, album or artist as a zip at a chosen maximum quality (copy what fits, transcode what does not), for MP3 players and car radios; built on the proxy machinery. **Admin only** (the export is a heavy operation, not a secret), **MP3 320 default**, **zip download only** (no share or USB in 1.0), size and retention limits with the defaults in section 13.
 
 ## Open questions
 
@@ -424,4 +551,8 @@ CD import: (d) a headless ripper for a Pi, or desktop only; (e) does CD import m
 
 Workstream 10: (a) Go or Node for the manager; (b) may the manager token be the admin password, or must it stay separate (the manager has to work when the app is down); (c) how does the manager itself get updated; (d) init system and paths on each target (plain-compose hosts may have no systemd); (e) the Pi image console and Wi-Fi setup: in the manager or the image.
 
-Web server (9a): (a) does FrankenPHP run on armv7 (Pi 2); (b) do all required PHP extensions exist for its ZTS build; (c) measured RAM and page times against nginx plus php-fpm; (d) is worker mode worth it after a statics audit.
+Web server (9a): (a) does the FrankenPHP armv7 image build and run on a real Pi 2 (verified only on arm64); (b) measured idle RAM and RAM under concurrent requests on the Pi 2 and Pi 3, and lower `FRANKENPHP_THREADS` if memory is tight; (c) is worker mode worth it after a statics audit.
+
+Workstream 11: (a) is there a source for WiiM multiroom control (another LinkPlay document, UPnP, OpenHome); (b) does newer firmware still answer on HTTPS with a self-signed certificate only; (c) which models report a battery and which sources they have (the document gives no per-model list); (d) does a WiiM's UPnP description let the discoverer tell it from a generic renderer, so the dedicated driver wins.
+
+Workstream 13: (a) is loudness normalisation off by default, and does it wait for 12.3; (b) the default numbers of the three limits once measured on the Pi; (c) which further profiles (AAC, Opus) follow from the proxies built for the players.
