@@ -40,7 +40,7 @@ class ServiceCredentialsTest extends TestCase
 
     public function test_every_service_is_declared_and_every_probe_exists(): void
     {
-        $this->assertEqualsCanonicalizing(['spotify', 'lastfm', 'discogs', 'acoustid', 'audiodb'], array_keys(ServiceCredentials::all()));
+        $this->assertEqualsCanonicalizing(['spotify', 'lastfm', 'discogs', 'acoustid', 'audiodb', 'jellyfin'], array_keys(ServiceCredentials::all()));
 
         $probes = (new ExternalServices)->probeIds();
         foreach (ServiceCredentials::all() as $service) {

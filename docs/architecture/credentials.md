@@ -2,7 +2,7 @@
 
 One registry and one settings page for the keys of the external services, so each service is not its own form, storage rule and health probe, and so a hosted relay can later stand in for the user's own keys without a rewrite. Every public install brings its own keys (Spotify Development Mode allows 5 users per Client ID; Last.fm, Discogs, AcoustID and TheAudioDB have their own terms).
 
-Page: **Settings › Services & keys** (`/settings/services`, admin login, Livewire `App\Livewire\ServiceCredentialsManager`). Services in 1.0: Spotify, Last.fm, Discogs, AcoustID, TheAudioDB.
+Page: **Settings › Services & keys** (`/settings/services`, admin login, Livewire `App\Livewire\ServiceCredentialsManager`). Services in 1.0: Spotify, Last.fm, Discogs, AcoustID, TheAudioDB, and Jellyfin (a media server on your own network, for TV now playing).
 
 ## The registry
 
@@ -61,6 +61,7 @@ Shown on the page (the declaration's `steps`); sources checked 2026-10-27.
 | Last.fm | API account at `last.fm/api/account/create`, copy key and shared secret, Connect. Non-commercial use only; commercial or research use: contact partners@last.fm; limits are Last.fm's to set | `last.fm/api` and `last.fm/api/tos` (the create page itself needs a login, so its form fields were not read) |
 | Discogs | Settings › Developers › Generate new token | the repository's earlier note (`config/metadata.php`); discogs.com answered 403 to automated fetching, so **limits and terms are unconfirmed**: "check the service's terms" |
 | AcoustID | Register an application at `acoustid.org/new-application`; use the application key, not the personal one. Free for non-commercial use, 3 requests/second; commercial use via acoustid.biz | `acoustid.org/webservice` |
+| Jellyfin | Dashboard › Advanced › API Keys, add a key, paste it; set the server address as Base URL. Used by the Philips TV listener (`Integrations/Jellyfin`) for the title the Jellyfin app plays | the Jellyfin REST API (`GET /Sessions`); **unverified against a real server**: no key was available |
 | TheAudioDB | Key `123` works (30 requests/minute); Premium (100/minute, $8/month) key is on the profile page | `theaudiodb.com/free_music_api`; its terms page was not read |
 
 ## Not verified

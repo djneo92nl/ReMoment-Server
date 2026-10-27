@@ -94,6 +94,7 @@ class ExternalServices
             'musicbrainz' => ['MusicBrainz', 'Metadata', fn () => $this->reachable('https://musicbrainz.org/ws/2/artist/'.self::PROBE_MBID, ['fmt' => 'json'])],
             'audiodb' => ['TheAudioDB', 'Metadata', fn () => $this->audioDb()],
             'discogs' => ['Discogs', 'Metadata', fn () => $this->discogs()],
+            'jellyfin' => ['Jellyfin', 'Media servers', fn () => $this->jellyfin()],
             'wikipedia' => ['Wikipedia', 'Metadata', fn () => $this->reachable('https://en.wikipedia.org/api/rest_v1/page/summary/Radiohead')],
             'coverart' => ['Cover Art Archive', 'Metadata', fn () => $this->reachable('https://coverartarchive.org/release-group/'.self::PROBE_MBID)],
             'radiobrowser' => ['radio-browser.info', 'Metadata', fn () => $this->reachable('https://de1.api.radio-browser.info/json/stats')],
@@ -318,6 +319,24 @@ class ExternalServices
         return $response->ok()
             ? ServiceCheck::ok('Token accepted for '.$response->json('username'))
             : ServiceCheck::error('Token rejected: check it in Settings › Services');
+    }
+
+    private function jellyfin(): ServiceCheck
+    {
+        if (!ServiceCredentials::isSet('jellyfin', 'api_key')) {
+            return ServiceCheck::disabled('No Jellyfin key set (Settings › Services): the TV card shows the app name only');
+        }
+
+        $response = $this->http()->withHeaders(['Authorization' => 'MediaBrowser Token="'.ServiceCredentials::value('jellyfin', 'api_key').'"'])
+            ->get(ServiceCredentials::baseUrl('jellyfin').'/System/Info');
+
+        if ($check = $this->byStatus($response)) {
+            return $check;
+        }
+
+        return $response->ok()
+            ? ServiceCheck::ok('Connected to '.$response->json('ServerName'))
+            : ServiceCheck::error('Key rejected or server not found: check it and the base URL in Settings › Services');
     }
 
     /** One storage location's probe with its failure turned into an error check (used by the alert checks). */

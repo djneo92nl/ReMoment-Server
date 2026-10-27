@@ -329,6 +329,24 @@ final class ServiceCredentials
                 ],
                 terms: 'Free 30, Premium 100, Business 120 requests per minute (theaudiodb.com/free_music_api, checked 2026-10-27); check the service\'s terms for attribution and commercial use.',
             ),
+            new ServiceDeclaration(
+                id: 'jellyfin',
+                label: 'Jellyfin',
+                icon: 'fa-solid fa-clapperboard',
+                purpose: 'What the Jellyfin app on a TV is playing (title, poster, position), shown on the TV\'s card.',
+                fields: [
+                    new CredentialField('api_key', 'API key', 'jellyfin_api_key', 'services.jellyfin.api_key', type: 'password', secret: true, required: true),
+                ],
+                baseUrl: 'http://jellyfin.local:8096',
+                probes: ['jellyfin'],
+                link: ['label' => 'jellyfin.org/docs', 'url' => 'https://jellyfin.org/docs/'],
+                steps: [
+                    'In the Jellyfin web interface open Dashboard › Advanced › API Keys and add a key for ReMoment.',
+                    'Paste the key into the field here.',
+                    'Set the address of your Jellyfin server in "Base URL" (for example http://192.168.1.20:8096).',
+                ],
+                terms: 'Your own Jellyfin server: nothing leaves your network.',
+            ),
         ];
     }
 }

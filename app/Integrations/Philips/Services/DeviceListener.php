@@ -11,6 +11,8 @@ use App\Events\Device\NowPlayingUpdated;
 use App\Events\Device\ProgressUpdated;
 use App\Integrations\Cast\CastConnection;
 use App\Integrations\Cast\CastNowPlaying;
+use App\Integrations\Jellyfin\JellyfinClient;
+use App\Integrations\Jellyfin\JellyfinNowPlaying;
 use App\Integrations\Philips\VideoPlayerDriver;
 use App\Integrations\Upnp\Services\DeviceListener as UpnpListener;
 
@@ -28,6 +30,8 @@ class DeviceListener extends UpnpListener
     /** Packages that are the TV's menu or launcher: the TV is on, at its home screen. */
     private const IDLE_PACKAGES = ['com.google.android.tvlauncher', 'com.google.android.apps.tv.launcherx', 'org.droidtv.nettvbrowser', 'me.efesser.flauncher'];
 
+    private const JELLYFIN_PACKAGE = 'org.jellyfin.androidtv';
+
     private const CAST_EVERY_SECONDS = 5;
 
     private const CAST_RETRY_AFTER_FAILURE_SECONDS = 300;
@@ -40,6 +44,10 @@ class DeviceListener extends UpnpListener
     private bool $upnpDown = false;
 
     private bool $macKnown = false;
+
+    private int $nextJellyfinCheck = 0;
+
+    private ?NowPlaying $lastJellyfin = null;
 
     private int $nextUpnpCheck = 0;
 
@@ -118,6 +126,26 @@ class DeviceListener extends UpnpListener
         }
     }
 
+    /** What the Jellyfin server says this TV plays, every few seconds; null without a key or a playing item. */
+    private function jellyfinNowPlaying(): ?NowPlaying
+    {
+        if (!JellyfinClient::configured()) {
+            return null;
+        }
+
+        if (now()->timestamp < $this->nextJellyfinCheck) {
+            return $this->lastJellyfin;
+        }
+
+        $this->nextJellyfinCheck = now()->timestamp + self::CAST_EVERY_SECONDS;
+
+        try {
+            return $this->lastJellyfin = JellyfinNowPlaying::forClient((new JellyfinClient)->sessions(), (string) $this->device->ip_address, JellyfinClient::baseUrl());
+        } catch (\Throwable) {
+            return $this->lastJellyfin = null;
+        }
+    }
+
     /** Once, while the TV answers: its MAC, so it can be woken from standby. */
     private function rememberMac(): void
     {
@@ -158,6 +186,11 @@ class DeviceListener extends UpnpListener
 
         $reading = $this->castReading();
         $cast = $reading['now'] ?? null;
+
+        // Cast says nothing about the native Jellyfin app: its own server does.
+        if ($cast?->track === null && $package === self::JELLYFIN_PACKAGE) {
+            $cast = $this->jellyfinNowPlaying() ?? $cast;
+        }
 
         if ($reading['standby'] ?? false) {
             $package = null;
