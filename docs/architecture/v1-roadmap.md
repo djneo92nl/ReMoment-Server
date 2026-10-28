@@ -13,7 +13,7 @@ Effort: S = days, M = 1–2 weeks, L = several weeks. Feasibility notes come fro
 | 1b | Queue stability and management: are the runners stable, per-queue health, pause/cancel/prioritise jobs | M | 1 | partly built; review below | Must (stability), Should (management) |
 | 2 | TV control | M | | **mostly built**: V1 page, wake, number keys; remote keys (API, MCP, card) and the Philips key map; Philips power on, volume, Jointspace. **Left:** the V1 one-way command probe, other ASE BeoVision models, Philips HDMI switching (no API on this firmware, fallbacks documented) | Must |
 | 2a | Sub devices (devices connected to other devices: converter, Chromecast on a TV, changers) | M | 2 (first case) | design below | Should |
-| 3 | Availability layer (external libraries add to the collection) | L | | design decision first | Must |
+| 3 | Availability layer (external libraries add to the collection) | L | | **design in progress** ([availability-layer.md](availability-layer.md), written 2026-10-28; implementation starts after 14.2 lands) | Must |
 | 4 | Discovery | M | 3 (partly) | to do | Should |
 | 5 | Deezer and Tidal | L | 3, hardware probes | design in [streaming-services.md](streaming-services.md) | Should |
 | 6 | Physical library (CDs, tapes, vinyl) | M | 3 | to do | Should |
@@ -27,7 +27,7 @@ Effort: S = days, M = 1–2 weeks, L = several weeks. Feasibility notes come fro
 | 10 | Manager: host service that controls the running instance (containers, processes, upgrade with rollback, host stats) and SMB shares (serve and mount) for the library and the drop directory; on every install target | L | 1b, 9a, backup | **decided, design draft** | Must |
 | 11 | WiiM (LinkPlay) driver: a dedicated driver on the public HTTP API, on top of the generic UPnP fallback | M | | to do | Should |
 | 13 | Export from the library: download a playlist, album or artist as a zip, transcoded to a chosen maximum quality, for an MP3 player or a car radio | M | 1b | to do | Should |
-| 14 | Foundations, decided early (phase 2): one alert and event model, stable IDs for clients, a schema review before the migration squash, a shared credentials layer, and an action-layer design spike | M | | **14.1 and 14.4 built**; the rest to do | Must (14.1, 14.3), Should (14.2, 14.4, 14.5 spike) |
+| 14 | Foundations, decided early (phase 2): one alert and event model, stable IDs for clients, a schema review before the migration squash, a shared credentials layer, and an action-layer design spike | M | | **14.1 and 14.4 built**; 14.2 in progress; the rest to do | Must (14.1, 14.3), Should (14.2, 14.4, 14.5 spike) |
 | 15 | Media servers: one abstraction for video (and later music) servers (Jellyfin built as a TV-only feature; Plex, Emby, Kodi follow the same contract), linked to the devices that can play them | M | 14.4, 2a | **started** (Jellyfin shelf); abstraction to do | Should |
 | 12 | Library and audio intelligence, what is left: mixes-well, loudness-normalised playback, tag and cover suggestions, concerts, related works, lyrics extras, listening insights, Essentia on arm64 | S–M each | 4 (similar tracks), 8.4 (tag editor) | plan below; the enrichment, analysis and health base is built | Mixed (per item); platform docs Must |
 
@@ -507,6 +507,8 @@ Done when: the health checks that exist today (queue stuck, scheduler silent, ba
 
 ### 14.2 Stable IDs for clients *[Should]*
 
+**Status: in progress** (a session started 2026-10-28; nothing committed yet).
+
 **Problem.** `library:merge-duplicates` deletes the merged records, so a client that cached an album or artist id gets `404` (or `422` in a play body) until it re-reads the list (`CLAUDE.md`, Library). For a public API with firmware and apps in the wild that is a breaking behaviour.
 
 **Design.** An `id_aliases` table (`entity` artist|album|track|playlist, `old_id`, `new_id`, `merged_at`) written by `LibraryMerger`. Detail endpoints and play bodies **resolve an alias to the surviving record** and answer normally, adding `canonical_id` to the response so a client can update its cache; list endpoints never contain a retired id; web routes redirect (`301`). Rows are kept (they are tiny); chains are collapsed when a survivor is itself merged. A really unknown id stays `404`.
@@ -628,6 +630,8 @@ Done when: Jellyfin runs on the abstraction, a second server type is added by a 
 - Credentials (2026-10-27): the credentials layer (14.4) is built for the five services; secrets are encrypted with `APP_KEY` and excluded from backups by the registry flag.
 
 - Media servers (2026-10-28): Jellyfin was built TV-only and Jellyfin-only; it is to become a **media-server abstraction** (workstream 15): a contract and capabilities per server, a registry, one normalised item, servers linked to the devices that can play them (the sub-device concept), a generic API and card, and a second driver (Plex or Emby) as the proof. TV status: workstream 2 is mostly built; left are the V1 one-way command probe and other ASE BeoVision models; Philips has no HDMI input API on its firmware.
+
+- Order (2026-10-28): 14.2 (stable IDs) is built first because it changes the library merge code and API; workstream 3 starts as a design document in parallel (docs only), and its implementation follows 14.2 and the schema review 14.3.
 
 ## Open questions
 
