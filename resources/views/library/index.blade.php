@@ -84,12 +84,16 @@
             </x-shelf>
         @endif
 
-        @if(!empty($wishes))
+        @if(!empty($wishes) || !empty($wishedSongs))
             <x-shelf title="Wishlist" :href="route('library.wishlist')">
                 @foreach($wishes as $wish)
                     <x-media-card :href="route('artists.show', $wish['artist']['id'])" :src="$wish['artwork']['proxy_320'] ?? null" :colors="$wish['artwork']['colors'] ?? null"
                                   :title="$wish['title']" :subtitle="$wish['artist']['name'].($wish['year'] ? ' · '.$wish['year'] : '')"
                                   icon="fa-solid fa-compact-disc" />
+                @endforeach
+                @foreach($wishedSongs as $song)
+                    <x-media-card :href="route('library.wishlist')" :src="$song['artwork']['proxy_320'] ?? null" :colors="$song['artwork']['colors'] ?? null"
+                                  :title="$song['title']" :subtitle="$song['artist']" icon="fa-solid fa-music" />
                 @endforeach
             </x-shelf>
         @endif

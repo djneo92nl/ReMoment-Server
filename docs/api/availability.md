@@ -31,11 +31,21 @@ Browse/play/add from external sources and other providers than Spotify are not b
 - `availability`: the providers that have it. `playable` appears only with `?device_id=` (the library's per-device check, `LibrarySources::playableOn`).
 - `artwork`: the library album's cover, else the MusicBrainz release-group cover through the artwork pipeline; `null` until processed (queued, never waited for).
 
+## Wished songs
+
+A song wished for from the play history, a radio station or by hand (`wanted_tracks`): something to buy or rip, not an album. One wish per artist and title (spelling differences like "The Band" or "(Remastered 2011)" are one song); household-wide.
+
+```json
+{ "id": 7, "artist": "Station Band", "title": "Radio Song", "album": "Some LP", "track_id": null, "fulfilled": false, "source": "radio", "wanted_at": "2026-10-28T12:00:00+00:00", "artwork": null }
+```
+
+`track_id` is the library track of the song when there is one. The wish closes (`fulfilled`, and it leaves the wishlist) when that track has an own file or is on a DLNA server; saving it in Spotify does not close it.
+
 ## Endpoints
 
 ```
 GET /api/library/artists/{id}/discography?availability=owned|streamable|missing&wanted=1&ignored=1&device_id=   → { data: [CatalogueItem] }
-GET /api/library/wishlist?cursor=&device_id=                                                                     → { data: [CatalogueItem], next_cursor }
+GET /api/library/wishlist?cursor=&device_id=                                                                     → { data: [CatalogueItem], songs: [WantedSong], next_cursor }   `songs` on the first page only
 GET /api/library/catalogue/{id}?device_id=                                                                       → CatalogueItem
 GET /api/library/artists/{id}?include=discography[&device_id=]                                                   → the artist detail plus discography: [CatalogueItem]
 GET /api/library/albums?availability=owned|streamable                                                            → the usual AlbumItem list, narrowed
@@ -45,6 +55,13 @@ PUT /api/library/catalogue/{id}/ignored  { "ignored": true }   → { "ignored": 
 ```
 
 `availability` for Spotify fills in a little after the first look at an artist's discography (a background lookup; reload to see it), then stays for 180 days (7 for a wished album, 90 when Spotify did not have it). Import needs Spotify connected and an entry whose Spotify answer is available; the album shows up linked a moment later.
+
+```
+POST   /api/library/wanted-tracks  { artist, title, album?, image_url?, source?: history|radio|manual }   → WantedSong   201 new, 200 when it was already wished
+DELETE /api/library/wanted-tracks/{id}                                                                    → { status: "ok" }
+```
+
+Both answer `403` for a client token, `422` without artist and title, `404` for an unknown id.
 
 A wish closes by itself: when the linked library album gets an own file (scan, import) or is on a DLNA server, `fulfilled` becomes true and the entry leaves the wishlist; if the files go away it comes back (`catalogue:reconcile`, nightly, is the safety net). Saving the album in Spotify does **not** close it (streamable is not owned).
 

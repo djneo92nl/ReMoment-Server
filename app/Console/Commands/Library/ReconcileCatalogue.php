@@ -23,6 +23,9 @@ class ReconcileCatalogue extends Command
                 }
             });
 
+        // Wished songs: link the library track and close the ones that are owned now (or open them again).
+        \App\Models\Media\WantedTrack::query()->orderBy('id')->each(fn ($song) => \App\Domain\Catalogue\WantedTracks::refresh($song));
+
         $this->info("{$linked} album(s) linked to the catalogue.");
 
         return self::SUCCESS;

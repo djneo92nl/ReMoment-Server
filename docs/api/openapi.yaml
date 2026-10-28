@@ -1108,8 +1108,60 @@ paths:
                   data:
                     type: array
                     items: { $ref: "#/components/schemas/CatalogueItem" }
+                  songs:
+                    type: array
+                    description: Wished songs (first page only).
+                    items: { $ref: "#/components/schemas/WantedSong" }
                   next_cursor: { type: string, nullable: true }
         "403": { description: Forbidden for client devices }
+  /library/wanted-tracks:
+    post:
+      tags: [Library]
+      operationId: wantTrack
+      description: Wish for a song (from the play history, a radio station or by hand): something to buy or rip. One wish per artist and title. Not available to client devices.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [artist, title]
+              properties:
+                artist: { type: string }
+                title: { type: string }
+                album: { type: string, nullable: true }
+                image_url: { type: string, nullable: true }
+                source: { type: string, enum: [history, radio, manual] }
+      responses:
+        "200":
+          description: Already wished
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WantedSong" }
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WantedSong" }
+        "403": { description: Forbidden for client devices }
+        "422": { description: Validation error (artist and title are required) }
+  /library/wanted-tracks/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    delete:
+      tags: [Library]
+      operationId: unwantTrack
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [ok] }
+        "403": { description: Forbidden for client devices }
+        "404": { $ref: "#/components/responses/NotFound" }
   /library/catalogue/{id}:
     parameters:
       - { name: id, in: path, required: true, schema: { type: integer } }
@@ -2724,6 +2776,18 @@ components:
             bucketed in steps of 32, most albums per bucket, at most 200 albums sampled). Empty when no
             cover is processed. Cached 1 hour.
           items: { type: string, pattern: "^#[0-9a-f]{6}$", example: "#2a4d8f" }
+    WantedSong:
+      type: object
+      properties:
+        id: { type: integer }
+        artist: { type: string }
+        title: { type: string }
+        album: { type: string, nullable: true }
+        track_id: { type: integer, nullable: true, description: The library track of the song, when there is one. }
+        fulfilled: { type: boolean, description: The library track has an own file or a DLNA copy: the wish is closed. }
+        source: { type: string, enum: [history, radio, manual] }
+        wanted_at: { type: string, format: date-time }
+        artwork: { type: object, nullable: true, additionalProperties: true }
     CatalogueItem:
       type: object
       properties:

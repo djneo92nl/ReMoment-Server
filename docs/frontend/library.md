@@ -44,3 +44,7 @@ The old "Recently played" track list (it listed plays of tracks that are not in 
 
 Wish and "not interested" are household-wide, guest accessible like favourites; the component calls the same rules as `PUT /api/library/catalogue/{id}/wanted|ignored` (`docs/api/availability.md`). Playing a streamable-only entry needs the generic play-external path (design PR 1b) and has no button yet.
 
+### Songs from the history
+
+Each track row of `/history` (`Livewire\PlayHistory`, radio tracks included) has a heart and a star next to Match: the **heart** favorites the song (a play only logged as text, or a radio station's announcement, is first put in the library with `PlayedTrackAdder::addFromPlay`: Spotify match when connected, else the play's artist, title and album), the **star** wishes for it ("Want to buy or rip this song", `wanted_tracks`, filled star when it is on the wishlist) without adding it to the library. Wished songs show as a *Songs* list at the top of `/library/wishlist` and in the Wishlist shelf of `/library`.
+

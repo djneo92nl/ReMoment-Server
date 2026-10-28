@@ -24,11 +24,28 @@
                 @endif
             </div>
 
-            @if($items === [])
+            @if($items === [] && $songs === [])
                 <p class="text-sm text-gray-400 dark:text-gray-600">
                     {{ $artist ? 'No entry matches this filter.' : 'Nothing wished for yet. Open an artist and press Want on an album you miss.' }}
                 </p>
             @else
+                @if($songs !== [])
+                    <h3 class="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-600">Songs</h3>
+                    <ul class="mb-6 divide-y divide-gray-100 dark:divide-stone-800/70" data-test="wished-songs">
+                        @foreach($songs as $song)
+                            <li class="flex items-center gap-3 py-2.5">
+                                <x-artwork-thumb :src="$song['artwork']['proxy_120'] ?? null" :seed="$song['title']" icon="fa-solid fa-music" size="w-10 h-10" />
+                                <div class="min-w-0 flex-1">
+                                    <p class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{{ $song['title'] }}</p>
+                                    <p class="truncate text-xs text-gray-400 dark:text-gray-600">{{ $song['artist'] }}{{ $song['album'] ? ' · '.$song['album'] : '' }}</p>
+                                </div>
+                                @if($song['track_id'])<x-badge variant="info">In your library</x-badge>@endif
+                                <button wire:click="removeSong({{ $song['id'] }})" type="button" class="text-xs text-gray-400 underline hover:text-gray-600 dark:text-gray-600" title="Take off the wishlist">Remove</button>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+                @if($items !== [])
                 <x-album-grid>
                     @foreach($shown as $item)
                         @php
@@ -100,6 +117,7 @@
                         </x-card>
                     @endforeach
                 </x-album-grid>
+                @endif
 
                 <div class="mt-5 flex flex-wrap items-center gap-4">
                     @if(count($items) > count($shown))

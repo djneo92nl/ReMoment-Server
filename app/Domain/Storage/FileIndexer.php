@@ -112,6 +112,7 @@ class FileIndexer
 
         // An own file makes the album owned: closes a wish on its release-group (docs/architecture/availability-layer.md).
         CatalogueLinker::refreshOwnershipQuietly($album);
+        \App\Domain\Catalogue\WantedTracks::refreshForTrackQuietly($track);
 
         return $track;
     }

@@ -2,10 +2,13 @@
 
 namespace App\Livewire;
 
+use App\Domain\Catalogue\WantedTracks;
+use App\Domain\Library\Normalizer;
 use App\Domain\Library\PlayedTrackAdder;
 use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
 use App\Models\Device;
 use App\Models\Media\Track;
+use App\Models\Media\WantedTrack;
 use App\Models\Play;
 use App\Services\SpotifyTokenService;
 use Livewire\Component;
@@ -181,6 +184,35 @@ class PlayHistory extends Component
         $this->closeMatch();
     }
 
+    /** The heart of a history row: favorites the song, putting it in the library first when it is only logged as text or a radio stub. */
+    public function favorite(int $playId): void
+    {
+        $play = Play::find($playId);
+        $track = $play ? PlayedTrackAdder::addFromPlay($play) : null;
+
+        $track?->toggleFavorite();
+    }
+
+    /** The star of a history row: wish for the song (something to buy or rip), or take it off the wishlist. */
+    public function want(int $playId): void
+    {
+        $play = Play::with(['track.artist', 'track.album'])->find($playId);
+        $artist = $play?->artistTitle();
+        $title = $play?->trackTitle();
+
+        if ($artist === null || $title === null) {
+            return;
+        }
+
+        if (WantedTracks::isWished($artist, $title)) {
+            WantedTrack::where('artist_key', Normalizer::artist($artist))->where('title_key', Normalizer::track($title))->get()->each(fn ($s) => WantedTracks::unwish($s));
+
+            return;
+        }
+
+        WantedTracks::wish($artist, $title, $play->track?->album?->name ?? $play->album_name, $play->image_url, $play->radioStation || $play->radio_name || $play->track?->isRadioStub() ? 'radio' : 'history');
+    }
+
     public function setSource(?string $source): void
     {
         $this->sourceFilter = $source;
@@ -244,7 +276,13 @@ class PlayHistory extends Component
             ->orderBy('source_type')
             ->pluck('source_type');
 
+        // Which songs of this page are wished for (one query; the keys decide), for the star.
+        $titles = $plays->getCollection()->map(fn (Play $p) => $p->trackTitle())->filter()->map(fn ($t) => Normalizer::track($t))->unique()->all();
+        $wished = WantedTrack::whereIn('title_key', $titles)->whereNull('fulfilled_at')->get()
+            ->mapWithKeys(fn (WantedTrack $w) => [$w->artist_key.'|'.$w->title_key => true])->all();
+
         return view('livewire.play-history', [
+            'wished' => $wished,
             'plays' => $plays,
             'devices' => $devices,
             'sourceTypes' => $sourceTypes,

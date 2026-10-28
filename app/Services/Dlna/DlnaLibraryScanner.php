@@ -132,6 +132,7 @@ class DlnaLibraryScanner
         $this->storeTags($track, $item, $server);
 
         CatalogueLinker::refreshOwnershipQuietly($album);
+        \App\Domain\Catalogue\WantedTracks::refreshForTrackQuietly($track);
 
         if (!empty($item['released_at']) && $album->released_at === null) {
             $album->update(['released_at' => $item['released_at']]);

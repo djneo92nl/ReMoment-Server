@@ -7,6 +7,7 @@ use App\Domain\Artwork\LibraryItemArtwork;
 use App\Domain\Artwork\PlaylistArtwork;
 use App\Domain\Catalogue\CatalogueItems;
 use App\Domain\Catalogue\SpotifyAvailability;
+use App\Domain\Catalogue\WantedTracks;
 use App\Domain\Health\LibraryReports;
 use App\Domain\Library\AlbumKind;
 use App\Domain\Library\AlbumPage;
@@ -38,6 +39,7 @@ use App\Models\Media\CatalogueAlbum;
 use App\Models\Media\Genre;
 use App\Models\Media\Playlist;
 use App\Models\Media\Track;
+use App\Models\Media\WantedTrack;
 use App\Models\Play;
 use App\Services\SpotifyTokenService;
 use Illuminate\Database\Eloquent\Builder;
@@ -319,6 +321,8 @@ class LibraryController extends Controller
 
         return response()->json([
             'data' => $items,
+            // Wished songs (not tied to an album): the first page only, newest first.
+            'songs' => $offset === 0 ? WantedTracks::wishlist() : [],
             'next_cursor' => $rows->count() > CatalogueItems::WISHLIST_PAGE_SIZE ? $this->encodeCursor($offset + CatalogueItems::WISHLIST_PAGE_SIZE) : null,
         ]);
     }
@@ -347,6 +351,33 @@ class LibraryController extends Controller
         ImportSpotifyAlbumById::dispatch($spotifyId);
 
         return response()->json(['status' => 'queued'], 202);
+    }
+
+    /** Wish for a song (from the play history, a radio station or by hand): something to buy or rip. */
+    public function wantTrack(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'artist' => ['required', 'string', 'max:255'],
+            'title' => ['required', 'string', 'max:255'],
+            'album' => ['nullable', 'string', 'max:255'],
+            'image_url' => ['nullable', 'string', 'max:2000'],
+            'source' => ['nullable', 'in:'.implode(',', WantedTracks::SOURCES)],
+        ]);
+        $this->refuseClients($request);
+
+        $existed = WantedTrack::where('artist_key', Normalizer::artist($data['artist']))->where('title_key', Normalizer::track($data['title']))->exists();
+        $song = WantedTracks::wish($data['artist'], $data['title'], $data['album'] ?? null, $data['image_url'] ?? null, $data['source'] ?? 'manual');
+
+        return response()->json(WantedTracks::item($song), $existed ? 200 : 201);
+    }
+
+    /** Takes a song off the wishlist. */
+    public function unwantTrack(Request $request, WantedTrack $wantedTrack): JsonResponse
+    {
+        $this->refuseClients($request);
+        WantedTracks::unwish($wantedTrack);
+
+        return response()->json(['status' => 'ok']);
     }
 
     /** Wish for an album you miss (household-wide); clears "not interested". */

@@ -2,7 +2,10 @@
 
 namespace App\Domain\Library;
 
+use App\Domain\Media\AlbumData;
+use App\Domain\Media\ArtistData;
 use App\Domain\Media\NowPlaying;
+use App\Domain\Media\TrackData;
 use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
 use App\Models\Media\Track;
 use App\Models\Play;
@@ -60,6 +63,45 @@ class PlayedTrackAdder
         [$track] = NowPlayingTrackResolver::resolve($nowPlaying);
 
         self::linkPlays($track, $name, $artistName);
+
+        return $track;
+    }
+
+    /**
+     * The library track of a play from the history: the track itself when it is a real one, else the play's artist and
+     * name put in the library like "Add to library" does (a radio stub is replaced, a text-only play is linked).
+     */
+    public static function addFromPlay(Play $play): ?Track
+    {
+        $play->loadMissing('track');
+
+        if ($play->track !== null && !$play->track->isRadioStub()) {
+            return $play->track;
+        }
+
+        $artist = trim((string) ($play->track?->artist?->name ?? $play->artist_name));
+        $name = trim((string) ($play->track?->name ?? $play->track_name));
+        if ($artist === '' || $name === '') {
+            return null;
+        }
+
+        $track = self::add(new NowPlaying(
+            track: new TrackData(
+                name: $name,
+                source: $play->source_type === 'spotify' ? 'spotify' : null,
+                artist: new ArtistData(name: $artist),
+                duration: $play->duration,
+                images: $play->image_url ? [$play->image_url] : [],
+            ),
+            album: ($album = trim((string) ($play->track?->album?->name ?? $play->album_name))) !== '' ? new AlbumData(name: $album, images: $play->image_url ? [$play->image_url] : []) : null,
+        ));
+
+        // Nothing else (Spotify) took the stub's place: the station's announcement becomes a library track itself.
+        if ($track !== null && $track->isRadioStub()) {
+            $track->update(['source' => null]);
+        }
+
+        $play->refresh();
 
         return $track;
     }

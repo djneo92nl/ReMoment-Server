@@ -257,6 +257,26 @@
                                                 </div>
                                             @endif
 
+                                            {{-- Heart (favorite, adding the song to the library when it only exists as text or a radio stub) and star (wish for it: something to buy or rip) --}}
+                                            @if($play->isTrackPlay() && $play->trackTitle() && $play->artistTitle())
+                                                @php
+                                                    $isFav = $play->track && !$play->track->isRadioStub() && $play->track->favorited_at !== null;
+                                                    $isWished = isset($wished[\App\Domain\Library\Normalizer::artist($play->artistTitle()).'|'.\App\Domain\Library\Normalizer::track($play->trackTitle())]);
+                                                @endphp
+                                                <div class="flex flex-shrink-0 items-center gap-1">
+                                                    <button wire:click="favorite({{ $play->id }})" wire:loading.attr="disabled" type="button" data-test="fav-{{ $play->id }}"
+                                                            aria-label="{{ $isFav ? 'Remove from favorites' : 'Favorite this song' }}" title="{{ $isFav ? 'Remove from favorites' : 'Favorite (adds the song to the library)' }}"
+                                                            class="flex h-8 w-8 items-center justify-center rounded-full text-sm transition-colors hover:bg-gray-100 dark:hover:bg-stone-800 {{ $isFav ? 'text-rose-500' : 'text-gray-300 dark:text-stone-600' }}">
+                                                        <i class="fa-{{ $isFav ? 'solid' : 'regular' }} fa-heart"></i>
+                                                    </button>
+                                                    <button wire:click="want({{ $play->id }})" type="button" data-test="want-{{ $play->id }}"
+                                                            aria-label="{{ $isWished ? 'Take off the wishlist' : 'Add to the wishlist' }}" title="{{ $isWished ? 'On the wishlist: a song you want to buy or rip' : 'Want to buy or rip this song' }}"
+                                                            class="flex h-8 w-8 items-center justify-center rounded-full text-sm transition-colors hover:bg-gray-100 dark:hover:bg-stone-800 {{ $isWished ? 'text-amber-500' : 'text-gray-300 dark:text-stone-600' }}">
+                                                        <i class="fa-{{ $isWished ? 'solid' : 'regular' }} fa-star"></i>
+                                                    </button>
+                                                </div>
+                                            @endif
+
                                             @if(($play->track_id === null && $play->track_name !== null) || $play->track?->isRadioStub())
                                                 <button wire:click="openMatch({{ $play->id }})" type="button" title="Match to a library track"
                                                         class="flex-shrink-0 text-[11px] px-2 py-1 rounded-xl bg-gray-100 dark:bg-stone-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-stone-700 transition-colors">

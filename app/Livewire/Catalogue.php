@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Domain\Catalogue\CatalogueItems;
 use App\Domain\Catalogue\SpotifyAvailability;
+use App\Domain\Catalogue\WantedTracks;
 use App\Domain\Library\LibrarySources;
 use App\Domain\Library\SpotifyUri;
 use App\Jobs\ImportSpotifyAlbumById;
@@ -11,6 +12,7 @@ use App\Jobs\LookupSpotifyAvailability;
 use App\Models\Device;
 use App\Models\Media\Artist;
 use App\Models\Media\CatalogueAlbum;
+use App\Models\Media\WantedTrack;
 use App\Services\SpotifyTokenService;
 use Livewire\Component;
 
@@ -68,6 +70,13 @@ class Catalogue extends Component
         }
     }
 
+    public function removeSong(int $id): void
+    {
+        if ($song = WantedTrack::find($id)) {
+            WantedTracks::unwish($song);
+        }
+    }
+
     public function add(int $id): void
     {
         $row = CatalogueAlbum::find($id);
@@ -111,6 +120,7 @@ class Catalogue extends Component
             'playsOn' => $playsOn,
             'hasRows' => $artist !== null && CatalogueAlbum::where('artist_id', $artist->id)->exists(),
             'canImport' => app(SpotifyTokenService::class)->isConnected(),
+            'songs' => $artist === null ? WantedTracks::wishlist() : [],
             'pending' => $artist !== null && $spotify->enabled() && $spotify->staleRows($artist)->isNotEmpty(),
             'artist' => $artist,
         ]);
