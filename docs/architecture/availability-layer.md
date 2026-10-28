@@ -424,5 +424,5 @@ Parallel (MusicBrainz track 2 → 3 → 4 → 5 and browse track 1b run side by 
 6. Is the 30/90-day refresh policy acceptable, or should new releases be detected faster once ListenBrainz (workstream 4) is in?
 7. Spotify availability: lazy-on-view plus wishes plus a trickle for owned artists (recommended), or eager for the whole catalogue?
 8. Toggle for singles/live/compilations: confirm it stays out of 1.0, and that rows are not stored for those types (turning it on later means a resync, about 250 requests).
-9. ~~Order of 1b vs MusicBrainz~~ **Answered: MusicBrainz from the start**, two tracks in parallel (1b and 2-5). Still open: is Spotify-only enough for 1b's first release?
+9. ~~Order of 1b vs MusicBrainz~~ **Answered: MusicBrainz from the start**, two tracks in parallel (1b and 2-5). **Answered (2026-10-28): Spotify-only is enough for browse, play and add in 1b's first release, but not for discovery**: discovery and the discography (missing albums, wishlist, new releases) are provider-independent and come from MusicBrainz, so nothing in tables 2 to 5 may assume Spotify. Providers only add "playable here" to rows MusicBrainz already lists.
 10. `?availability=missing` only on discography/catalogue endpoints: confirm the narrowing.
