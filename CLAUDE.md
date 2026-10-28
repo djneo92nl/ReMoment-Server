@@ -530,6 +530,7 @@ GET /api/library/wishlist?cursor=                                               
 GET /api/library/catalogue/{id}                                                                                → CatalogueItem
 GET /api/library/artists/{id}?include=discography                                                              → artist detail + discography
 GET /api/library/albums?availability=owned|streamable                                                          → narrowed list (`missing` is 422: missing albums have no album row)
+POST /api/library/catalogue/{id}/import → 202 { status: queued }   add an album Spotify has (`album_availability` answer, filled lazily and by `catalogue:availability`) to the library
 PUT /api/library/catalogue/{id}/wanted  { wanted }  → { wanted }      household-wide wish (clears ignored); closes by itself when the album gets an own file
 PUT /api/library/catalogue/{id}/ignored { ignored } → { ignored }    "I don't want this" (clears the wish)
 ```

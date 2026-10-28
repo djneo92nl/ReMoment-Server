@@ -2,7 +2,7 @@
 
 Read endpoints of the availability layer ([design](../architecture/availability-layer.md)). Open like the rest of the API (no login), but **not for client devices**: a request with `?client={api_token}` answers `403 forbidden`, and `include=discography` is ignored for a client. Touch clients and the artwork pre-cache never see a release-group nobody owns.
 
-Browse/play/add from external sources and the Spotify lookups are not built yet (design PRs 8 and later).
+Browse/play/add from external sources and other providers than Spotify are not built yet (design PR 1b and later).
 
 ## CatalogueItem
 
@@ -39,9 +39,12 @@ GET /api/library/wishlist?cursor=&device_id=                                    
 GET /api/library/catalogue/{id}?device_id=                                                                       → CatalogueItem
 GET /api/library/artists/{id}?include=discography[&device_id=]                                                   → the artist detail plus discography: [CatalogueItem]
 GET /api/library/albums?availability=owned|streamable                                                            → the usual AlbumItem list, narrowed
+POST /api/library/catalogue/{id}/import                                                                          → 202 { status: "queued" }   adds an album Spotify has to the library; 422 not_importable
 PUT /api/library/catalogue/{id}/wanted   { "wanted": true }    → { "wanted": true }     household-wide wish; clears "ignored"; a second wish keeps the first timestamp
 PUT /api/library/catalogue/{id}/ignored  { "ignored": true }   → { "ignored": true }    "I don't want this": hidden from the discography and wishlist; clears the wish
 ```
+
+`availability` for Spotify fills in a little after the first look at an artist's discography (a background lookup; reload to see it), then stays for 180 days (7 for a wished album, 90 when Spotify did not have it). Import needs Spotify connected and an entry whose Spotify answer is available; the album shows up linked a moment later.
 
 A wish closes by itself: when the linked library album gets an own file (scan, import) or is on a DLNA server, `fulfilled` becomes true and the entry leaves the wishlist; if the files go away it comes back (`catalogue:reconcile`, nightly, is the safety net). Saving the album in Spotify does **not** close it (streamable is not owned).
 

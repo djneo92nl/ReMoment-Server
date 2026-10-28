@@ -124,6 +124,7 @@ Route::get('/library/artists/{artist}', [LibraryController::class, 'artist']);
 Route::get('/library/artists/{artist}/discography', [LibraryController::class, 'discography']);
 Route::get('/library/wishlist', [LibraryController::class, 'wishlist']);
 Route::get('/library/catalogue/{catalogue_album}', [LibraryController::class, 'catalogueAlbum']);
+Route::post('/library/catalogue/{catalogue_album}/import', [LibraryController::class, 'importCatalogueAlbum']);
 Route::put('/library/catalogue/{catalogue_album}/wanted', [LibraryController::class, 'wantCatalogueAlbum']);
 Route::put('/library/catalogue/{catalogue_album}/ignored', [LibraryController::class, 'ignoreCatalogueAlbum']);
 Route::put('/library/artists/{artist}/favorite', [LibraryController::class, 'favoriteArtist']);

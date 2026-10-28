@@ -6,6 +6,7 @@ use App\Domain\Artwork\LibraryArtwork;
 use App\Domain\Artwork\LibraryItemArtwork;
 use App\Domain\Artwork\PlaylistArtwork;
 use App\Domain\Catalogue\CatalogueItems;
+use App\Domain\Catalogue\SpotifyAvailability;
 use App\Domain\Health\LibraryReports;
 use App\Domain\Library\AlbumKind;
 use App\Domain\Library\AlbumPage;
@@ -24,8 +25,11 @@ use App\Domain\Library\RandomAlbum;
 use App\Domain\Library\RecentItems;
 use App\Domain\Library\SmartPlaylist\SmartPlaylistDescriber;
 use App\Domain\Library\SpotifyCatalog;
+use App\Domain\Library\SpotifyUri;
 use App\Http\Controllers\Controller;
 use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
+use App\Jobs\ImportSpotifyAlbumById;
+use App\Jobs\LookupSpotifyAvailability;
 use App\Models\Client;
 use App\Models\Device;
 use App\Models\Media\Album;
@@ -276,8 +280,15 @@ class LibraryController extends Controller
             ], $sources),
             'albums' => $albums->map(fn (Album $album) => $this->albumItem($album) + ['kind' => AlbumKind::of($album, $album->tracks_count)])->values(),
         ] + ($request->query('include') === 'discography' && !$request->filled('client')
-            ? ['discography' => CatalogueItems::forArtist($artist, device: $this->deviceOf($request))]
+            ? ['discography' => $this->discographyOf($artist, $request)]
             : []));
+    }
+
+    private function discographyOf(Artist $artist, Request $request): array
+    {
+        LookupSpotifyAvailability::queueFor($artist);
+
+        return CatalogueItems::forArtist($artist, device: $this->deviceOf($request));
     }
 
     /** The MusicBrainz discography of an artist, newest first (docs/api/availability.md). Not for client devices. */
@@ -290,6 +301,7 @@ class LibraryController extends Controller
             'device_id' => ['nullable', 'integer', 'exists:devices,id'],
         ]);
         $this->refuseClients($request);
+        LookupSpotifyAvailability::queueFor($artist);
 
         return response()->json(['data' => CatalogueItems::forArtist(
             $artist, $request->query('availability'), $request->boolean('wanted'), $request->boolean('ignored'), $this->deviceOf($request),
@@ -317,6 +329,24 @@ class LibraryController extends Controller
         $this->refuseClients($request);
 
         return response()->json(CatalogueItems::one($catalogueAlbum, $this->deviceOf($request)) + ['canonical_id' => $catalogueAlbum->id]);
+    }
+
+    /** Adds an album Spotify has (and the library lacks) to the library: queued, the album appears linked a moment later. */
+    public function importCatalogueAlbum(Request $request, CatalogueAlbum $catalogueAlbum, SpotifyTokenService $spotify): JsonResponse
+    {
+        $this->refuseClients($request);
+
+        $answer = $catalogueAlbum->availability()->where('provider', SpotifyAvailability::PROVIDER)->where('status', 'available')->first();
+        $spotifyId = SpotifyUri::albumId($answer?->external_id);
+        if ($catalogueAlbum->album_id !== null || $spotifyId === null || !$spotify->isConnected()) {
+            return response()->json(['error' => 'not_importable', 'message' => $catalogueAlbum->album_id !== null
+                ? 'The library already has this album.'
+                : 'Only an album Spotify has can be added, with Spotify connected.'], 422);
+        }
+
+        ImportSpotifyAlbumById::dispatch($spotifyId);
+
+        return response()->json(['status' => 'queued'], 202);
     }
 
     /** Wish for an album you miss (household-wide); clears "not interested". */

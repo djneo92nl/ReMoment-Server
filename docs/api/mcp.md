@@ -39,7 +39,7 @@ Device and library tools do not re-implement anything: `ApiBridge` dispatches an
 | `search_library`, `browse_library` | search; lists and details of artists, albums, tracks, genres, playlists, recent, favorites |
 | `set_favorite` | favorite an album, artist or track |
 | `play_from_library` | play a track (or a Spotify track by `spotify_track_id`), an album (optionally limited to a `source`), artist or playlist on a device, or `type: tracks` to shuffle the whole library |
-| `catalogue` | the MusicBrainz discography of an artist (owned / streamable / known per album, filters), the household wishlist, one entry, and `wish`/`unwish`/`ignore`/`unignore` (open, no admin token); see `docs/api/availability.md` |
+| `catalogue` | the MusicBrainz discography of an artist (owned / streamable / known per album, filters), the household wishlist, one entry, and `wish`/`unwish`/`ignore`/`unignore`/`import` (open, no admin token); see `docs/api/availability.md` |
 | `manage_playlist` | create (normal or smart), rename, delete (`confirm`), add (tracks, or an album with `source`)/remove/move tracks, set smart rules; ids merged away by `library:merge-duplicates` still work (see `docs/api/library.md`) |
 | `album_spotify` | an album as Spotify has it (`tracks`, with the library track holding each), or `fill` the library album from it |
 | `library_maintenance` | **ADMIN**: `scan_dlna` and `verify_files` (queued), `enrich`, `merge_duplicates` (`dry_run`, else `confirm`), `sync_genres`, `refresh_smart_playlists` |

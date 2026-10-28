@@ -5,6 +5,7 @@ namespace App\Domain\Catalogue;
 use App\Domain\Library\LibrarySources;
 use App\Domain\Library\Normalizer;
 use App\Models\Media\Album;
+use App\Models\Media\AlbumAvailability;
 use App\Models\Media\Artist;
 use App\Models\Media\CatalogueAlbum;
 use App\Models\Media\Metadata;
@@ -54,6 +55,7 @@ final class CatalogueLinker
         }
 
         $match->forceFill(['album_id' => $album->id, 'linked_at' => now(), 'link_method' => $method])->save();
+        self::moveAnswers($match, $album);
         self::syncOwnership($match, $album);
 
         return $match;
@@ -130,6 +132,22 @@ final class CatalogueLinker
         }
 
         return [$best['row'], 'name'];
+    }
+
+    /** Promotion: lookup answers recorded on the release-group now belong to the library album (the most specific entity). */
+    private static function moveAnswers(CatalogueAlbum $row, Album $album): void
+    {
+        foreach (AlbumAvailability::where('catalogue_album_id', $row->id)->get() as $answer) {
+            $same = AlbumAvailability::where('album_id', $album->id)->where('provider', $answer->provider)->first();
+            if ($same === null) {
+                $answer->update(['album_id' => $album->id, 'catalogue_album_id' => null]);
+            } elseif ($answer->checked_at > $same->checked_at) {
+                $same->delete();
+                $answer->update(['album_id' => $album->id, 'catalogue_album_id' => null]);
+            } else {
+                $answer->delete();
+            }
+        }
     }
 
     private static function syncOwnership(CatalogueAlbum $row, Album $album): void
