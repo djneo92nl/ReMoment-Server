@@ -327,6 +327,15 @@ class LibraryController extends Controller
         ]);
     }
 
+    /** New and upcoming albums and EPs of the library's artists that the library lacks ("New from your artists"). */
+    public function newReleases(Request $request): JsonResponse
+    {
+        $request->validate(['days' => ['nullable', 'integer', 'min:1', 'max:365'], 'device_id' => ['nullable', 'integer', 'exists:devices,id']]);
+        $this->refuseClients($request);
+
+        return response()->json(['data' => CatalogueItems::newReleases($request->integer('days', 90), $this->deviceOf($request))]);
+    }
+
     public function catalogueAlbum(Request $request, CatalogueAlbum $catalogueAlbum): JsonResponse
     {
         $request->validate(['device_id' => ['nullable', 'integer', 'exists:devices,id']]);

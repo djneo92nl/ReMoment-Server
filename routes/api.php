@@ -129,6 +129,7 @@ Route::get('/library/external/{provider}/artists/{id}', [ExternalCatalogueContro
 Route::get('/library/external/{provider}/albums/{id}', [ExternalCatalogueController::class, 'album']);
 Route::post('/library/external/{provider}/add', [ExternalCatalogueController::class, 'add']);
 Route::get('/library/wishlist', [LibraryController::class, 'wishlist']);
+Route::get('/library/new-releases', [LibraryController::class, 'newReleases']);
 Route::post('/library/wanted-tracks', [LibraryController::class, 'wantTrack']);
 Route::delete('/library/wanted-tracks/{wantedTrack}', [LibraryController::class, 'unwantTrack']);
 Route::get('/library/catalogue/{catalogue_album}', [LibraryController::class, 'catalogueAlbum']);

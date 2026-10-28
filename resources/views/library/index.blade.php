@@ -84,6 +84,18 @@
             </x-shelf>
         @endif
 
+        {{-- New and upcoming albums and EPs of your artists that the library lacks (MusicBrainz, found through ListenBrainz) --}}
+        @if(!empty($newReleases))
+            <x-shelf title="New from your artists">
+                @foreach($newReleases as $release)
+                    <x-media-card :href="route('artists.show', $release['artist']['id'])" :src="$release['artwork']['proxy_320'] ?? null" :colors="$release['artwork']['colors'] ?? null"
+                                  :title="$release['title']"
+                                  :subtitle="$release['artist']['name'].' · '.(\Illuminate\Support\Carbon::parse($release['release_date'])->isFuture() ? 'coming '.\Illuminate\Support\Carbon::parse($release['release_date'])->format('j M') : \Illuminate\Support\Carbon::parse($release['release_date'])->format('j M Y'))"
+                                  icon="fa-solid fa-compact-disc" />
+                @endforeach
+            </x-shelf>
+        @endif
+
         @if(!empty($wishes) || !empty($wishedSongs))
             <x-shelf title="Wishlist" :href="route('library.wishlist')">
                 @foreach($wishes as $wish)

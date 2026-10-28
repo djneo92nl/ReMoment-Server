@@ -9,7 +9,7 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
-#[Description('The MusicBrainz discography of the library: what an artist released (albums and EPs) and whether each is owned, streamable or only known (missing), and the household wishlist. action: discography (needs artist_id; optional availability owned|streamable|missing, wanted, ignored), wishlist (optional cursor), item (needs id, a catalogue entry), wish / unwish (needs id: put it on or take it off the household wishlist, something to buy or rip), ignore / unignore (needs id: "not interested", hides it), import (needs id: add an album Spotify has to the library), wish_song (needs artist and title, optional album: a song to buy or rip, e.g. heard on the radio), unwish_song (needs id of a wished song, see `songs` in the wishlist). Pass device_id to see where each entry can play. Full shapes: docs/api/availability.md.')]
+#[Description('The MusicBrainz discography of the library: what an artist released (albums and EPs) and whether each is owned, streamable or only known (missing), and the household wishlist. action: discography (needs artist_id; optional availability owned|streamable|missing, wanted, ignored), wishlist (optional cursor), item (needs id, a catalogue entry), wish / unwish (needs id: put it on or take it off the household wishlist, something to buy or rip), ignore / unignore (needs id: "not interested", hides it), import (needs id: add an album Spotify has to the library), wish_song (needs artist and title, optional album: a song to buy or rip, e.g. heard on the radio), unwish_song (needs id of a wished song, see `songs` in the wishlist), new_releases (optional days: new and upcoming albums and EPs of the artists in the library that the library lacks). Pass device_id to see where each entry can play. Full shapes: docs/api/availability.md.')]
 class Catalogue extends Tool
 {
     use CallsApi;
@@ -17,7 +17,7 @@ class Catalogue extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'action' => $schema->string()->enum(['discography', 'wishlist', 'item', 'wish', 'unwish', 'ignore', 'unignore', 'import', 'wish_song', 'unwish_song'])->required(),
+            'action' => $schema->string()->enum(['discography', 'wishlist', 'item', 'wish', 'unwish', 'ignore', 'unignore', 'import', 'wish_song', 'unwish_song', 'new_releases'])->required(),
             'artist_id' => $schema->integer()->description('discography: the library artist'),
             'id' => $schema->integer()->description('item, wish, unwish, ignore, unignore, import: the catalogue entry id; unwish_song: the wished song id'),
             'artist' => $schema->string()->description('wish_song: the artist'),
@@ -26,6 +26,7 @@ class Catalogue extends Tool
             'availability' => $schema->string()->enum(['owned', 'streamable', 'missing'])->description('discography filter; missing = not in the library'),
             'wanted' => $schema->boolean()->description('discography: only wished entries'),
             'ignored' => $schema->boolean()->description('discography: include entries marked "not interested"'),
+            'days' => $schema->integer()->description('new_releases: how far back in days, default 90'),
             'cursor' => $schema->string()->description('wishlist: next_cursor of the previous page'),
             'device_id' => $schema->integer()->description('Mark where each entry can play'),
         ];
@@ -34,14 +35,18 @@ class Catalogue extends Tool
     public function handle(Request $request): Response
     {
         $data = $request->validate([
-            'action' => 'required|in:discography,wishlist,item,wish,unwish,ignore,unignore,import,wish_song,unwish_song',
+            'action' => 'required|in:discography,wishlist,item,wish,unwish,ignore,unignore,import,wish_song,unwish_song,new_releases',
             'artist_id' => 'nullable|integer', 'id' => 'nullable|integer',
             'availability' => 'nullable|in:owned,streamable,missing', 'wanted' => 'nullable|boolean', 'ignored' => 'nullable|boolean',
-            'cursor' => 'nullable|string', 'device_id' => 'nullable|integer',
+            'cursor' => 'nullable|string', 'device_id' => 'nullable|integer', 'days' => 'nullable|integer|min:1|max:365',
             'artist' => 'nullable|string|max:255', 'title' => 'nullable|string|max:255', 'album' => 'nullable|string|max:255',
         ]);
 
         $common = $this->filled(['device_id' => $data['device_id'] ?? null]);
+
+        if ($data['action'] === 'new_releases') {
+            return $this->api('GET', 'library/new-releases', $common + $this->filled(['days' => $data['days'] ?? null]));
+        }
 
         if ($data['action'] === 'wish_song') {
             return ($data['artist'] ?? '') !== '' && ($data['title'] ?? '') !== ''

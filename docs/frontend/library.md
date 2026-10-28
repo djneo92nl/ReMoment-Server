@@ -52,3 +52,7 @@ Each track row of `/history` (`Livewire\PlayHistory`, radio tracks included) has
 
 The search box (`Livewire\GlobalSearch`) shows a *From Spotify* block under the library's own results (Spotify connected, 3 or more characters): artists, albums and tracks, each with **Play** (on the player pinned in this browser, through `LibraryPlayback::playExternal`; a note under the box when no player is pinned or it cannot play Spotify), and **Add** / **Add albums** (queued imports) or "In library". The same operations are the `external` API and MCP tool.
 
+### New from your artists
+
+A shelf on `/library` (between the browse shelves and Wishlist; `<x-shelf>` of `<x-media-card>`s, up to 20): albums and EPs of your artists released in the last 90 days or still to come that the library lacks, each linking to the artist page (where the Discography card offers Want, Add or Play). Subtitle: artist and date, or "coming 12 Nov". Left out entirely when there is nothing.
+

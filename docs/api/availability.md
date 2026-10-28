@@ -46,6 +46,7 @@ A song wished for from the play history, a radio station or by hand (`wanted_tra
 ```
 GET /api/library/artists/{id}/discography?availability=owned|streamable|missing&wanted=1&ignored=1&device_id=   → { data: [CatalogueItem] }
 GET /api/library/wishlist?cursor=&device_id=                                                                     → { data: [CatalogueItem], songs: [WantedSong], next_cursor }   `songs` on the first page only
+GET /api/library/new-releases?days=90&device_id=                                                                 → { data: [CatalogueItem + release_date] }   new and upcoming albums and EPs of your artists that the library lacks
 GET /api/library/catalogue/{id}?device_id=                                                                       → CatalogueItem
 GET /api/library/artists/{id}?include=discography[&device_id=]                                                   → the artist detail plus discography: [CatalogueItem]
 GET /api/library/albums?availability=owned|streamable                                                            → the usual AlbumItem list, narrowed
@@ -97,4 +98,10 @@ POST /api/devices/{id}/library/play-external { provider, type, id, shuffle? }   
 - **Play** needs no import: Spotify plays the album or artist as its context, a track by URI, on a device that can play Spotify (the Spotify device, or a speaker mapped to a Connect name). `422 not_playable` otherwise (`LibrarySources::playableOn`), `503` unreachable, `502 driver_error`.
 - MCP: the `external` tool (`search`, `artist`, `album`, `play`, `add`).
 - Web: the search box offers Spotify's artists, albums and tracks with Play (on the player pinned in this browser) and Add.
+
+## New releases
+
+`GET /api/library/new-releases?days=90` lists the albums and EPs of the library's artists released in the last `days` days (1-365, default 90) **or still to come**, that the library does not have and nobody marked "not interested", newest first (up to 50). It is the catalogue's own rows: each item carries `release_date` (`YYYY-MM-DD`; entries MusicBrainz only dates by year are left out). Closed to client tokens (`403`); MCP: `catalogue` action `new_releases`; web: the *New from your artists* shelf on `/library` (shown only when there is something).
+
+How it fills: `php artisan catalogue:new-releases` (daily 02:15; `--days=30`, `--dry-run`) reads ListenBrainz's fresh-releases feed once (`GET https://api.listenbrainz.org/1/explore/fresh-releases/`, at most 90 days, past and future) and, for every library artist with an album or EP release-group the catalogue does not hold yet, queues that artist's MusicBrainz discography sync at once instead of waiting for its monthly turn. The feed is only a trigger: nothing is stored from it, MusicBrainz stays the authority.
 

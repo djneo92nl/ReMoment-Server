@@ -30,6 +30,7 @@ Schedule::call(fn () => \App\Domain\Radio\RadioPlayLog::prune())->daily()->name(
 
 // Discography of the library's artists from MusicBrainz (release-groups), a bounded batch per night, and the link/wish bookkeeping after it.
 Schedule::command('catalogue:sync')->dailyAt('02:30');
+Schedule::command('catalogue:new-releases')->dailyAt('02:15');
 Schedule::command('catalogue:availability')->dailyAt('03:00');
 Schedule::command('catalogue:reconcile')->dailyAt('05:00');
 

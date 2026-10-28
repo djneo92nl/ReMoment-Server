@@ -35,7 +35,7 @@ class LibraryController extends Controller
             : [];
         $wishedSongs = \App\Models\Media\WantedTrack::whereNull('fulfilled_at')->exists() ? array_slice(\App\Domain\Catalogue\WantedTracks::wishlist(20), 0, 20) : [];
 
-        return view('library.index', LibraryHome::build($scope, LeadingSource::hidden($scope)) + ['scope' => $scope, 'wishes' => $wishes, 'wishedSongs' => $wishedSongs]);
+        return view('library.index', LibraryHome::build($scope, LeadingSource::hidden($scope)) + ['scope' => $scope, 'wishes' => $wishes, 'wishedSongs' => $wishedSongs, 'newReleases' => \App\Domain\Catalogue\CatalogueItems::newReleases(90, limit: 20)]);
     }
 
     /** The hero's Shuffle: a random album of the scope, shuffled, on the player pinned in this browser. */

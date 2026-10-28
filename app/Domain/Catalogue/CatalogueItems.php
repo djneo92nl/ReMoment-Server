@@ -57,6 +57,21 @@ final class CatalogueItems
         return [$rows, self::present($rows->take(self::WISHLIST_PAGE_SIZE), $device)];
     }
 
+    /**
+     * Release-groups of the library's artists released in the last $days days or still to come, that the library lacks, newest
+     * first (the "New from your artists" shelf). Only full dates count: a release known only by its year cannot be placed.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function newReleases(int $days = 90, ?Device $device = null, int $limit = 50): array
+    {
+        $rows = CatalogueAlbum::whereNull('album_id')->whereNull('ignored_at')
+            ->whereRaw('length(first_release_date) = 10')->where('first_release_date', '>=', now()->subDays(max(1, $days))->toDateString())
+            ->orderByDesc('first_release_date')->orderBy('id')->limit($limit)->with('artist')->get();
+
+        return $rows->isEmpty() ? [] : self::present($rows, $device);
+    }
+
     /** @return array<string, mixed> */
     public static function one(CatalogueAlbum $row, ?Device $device = null): array
     {
@@ -126,6 +141,7 @@ final class CatalogueItems
                 'title' => $row->title,
                 'type' => $row->type,
                 'year' => $row->first_release_year,
+                'release_date' => $row->first_release_date,
                 'artist' => ['id' => $row->artist_id, 'name' => $row->artist?->name],
                 'state' => $state,
                 'album_id' => $row->album_id,

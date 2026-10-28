@@ -527,6 +527,7 @@ POST /api/devices/{id}/library/play-artist     body: { "artist_id": 5, "shuffle"
 ```
 GET /api/library/artists/{id}/discography?availability=owned|streamable|missing&wanted=1&ignored=1&device_id=   → { data: [CatalogueItem] }   albums and EPs, newest first
 GET /api/library/wishlist?cursor=                                                                              → { data: [CatalogueItem], songs: [WantedSong], next_cursor }   (songs: first page)
+GET /api/library/new-releases?days=90                                                                    → { data: [CatalogueItem + release_date] }   new/upcoming albums and EPs of your artists the library lacks (`catalogue:new-releases`, daily: ListenBrainz feed triggers the MusicBrainz sync)
 GET /api/library/catalogue/{id}                                                                                → CatalogueItem
 GET /api/library/artists/{id}?include=discography                                                              → artist detail + discography
 GET /api/library/albums?availability=owned|streamable                                                          → narrowed list (`missing` is 422: missing albums have no album row)

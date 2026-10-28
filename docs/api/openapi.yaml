@@ -1114,6 +1114,32 @@ paths:
                     items: { $ref: "#/components/schemas/WantedSong" }
                   next_cursor: { type: string, nullable: true }
         "403": { description: Forbidden for client devices }
+  /library/new-releases:
+    get:
+      tags: [Library]
+      operationId: getNewReleases
+      description: New and upcoming albums and EPs of the library's artists that the library lacks, newest first (up to 50). Not available to client devices.
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 365, default: 90 }, description: How far back; releases still to come are always included. }
+        - { name: device_id, in: query, schema: { type: integer } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      allOf:
+                        - { $ref: "#/components/schemas/CatalogueItem" }
+                        - type: object
+                          properties:
+                            release_date: { type: string, description: YYYY-MM-DD }
+        "403": { description: Forbidden for client devices }
+        "422": { description: Validation error }
   /library/wanted-tracks:
     post:
       tags: [Library]
