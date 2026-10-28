@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Log;
 final class CatalogueLinker
 {
     /** Providers whose albums count as owned (DLNA serves the household's own files). Physical items join with workstream 6. */
-    private const OWNED_SOURCES = ['files', 'dlna'];
+    public const OWNED_SOURCES = ['files', 'dlna'];
 
     /** A year gap beyond which a name-only match among several is not trusted. */
     private const YEAR_TOLERANCE = 2;

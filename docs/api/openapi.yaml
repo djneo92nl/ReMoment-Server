@@ -1047,6 +1047,8 @@ paths:
         in: query
         description: The library to show (an artist is never shown merged across libraries). Default the artist's default source, else the one the scope browses.
         schema: { type: string, enum: [files, dlna, spotify] }
+      - { name: include, in: query, schema: { type: string, enum: [discography] }, description: "Adds `discography` (CatalogueItem list). Ignored for client devices." }
+      - { name: device_id, in: query, schema: { type: integer } }
     get:
       tags: [Library]
       operationId: getArtist
@@ -1056,6 +1058,72 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ArtistDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /library/artists/{artist}/discography:
+    parameters:
+      - name: artist
+        in: path
+        required: true
+        schema: { type: integer }
+      - name: availability
+        in: query
+        description: "`missing` means not in the library (album_id null)."
+        schema: { type: string, enum: [owned, streamable, missing] }
+      - { name: wanted, in: query, schema: { type: boolean }, description: Only wished entries. }
+      - { name: ignored, in: query, schema: { type: boolean }, description: Include entries marked "I don't want this". }
+      - { name: device_id, in: query, schema: { type: integer }, description: Adds `playable` to each availability entry. }
+    get:
+      tags: [Library]
+      operationId: getArtistDiscography
+      description: The MusicBrainz discography (albums and EPs), newest first. Not available to client devices (`?client=` answers 403). See docs/api/availability.md.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/CatalogueItem" }
+        "403": { description: Forbidden for client devices }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /library/wishlist:
+    get:
+      tags: [Library]
+      operationId: getWishlist
+      description: Wished albums the library does not own yet, most recently wished first. Not available to client devices.
+      parameters:
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: device_id, in: query, schema: { type: integer } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/CatalogueItem" }
+                  next_cursor: { type: string, nullable: true }
+        "403": { description: Forbidden for client devices }
+  /library/catalogue/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+      - { name: device_id, in: query, schema: { type: integer } }
+    get:
+      tags: [Library]
+      operationId: getCatalogueAlbum
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CatalogueItem" }
+        "403": { description: Forbidden for client devices }
         "404": { $ref: "#/components/responses/NotFound" }
   /library/artists/{artist}/favorite:
     parameters:
@@ -2583,6 +2651,34 @@ components:
             bucketed in steps of 32, most albums per bucket, at most 200 albums sampled). Empty when no
             cover is processed. Cached 1 hour.
           items: { type: string, pattern: "^#[0-9a-f]{6}$", example: "#2a4d8f" }
+    CatalogueItem:
+      type: object
+      properties:
+        id: { type: integer }
+        release_group_mbid: { type: string }
+        title: { type: string }
+        type: { type: string, enum: [album, ep] }
+        year: { type: integer, nullable: true }
+        artist:
+          type: object
+          properties:
+            id: { type: integer }
+            name: { type: string, nullable: true }
+        state: { type: string, enum: [owned, streamable, known], description: "Derived: owned (own files or DLNA), streamable (a streaming provider has it), known (MusicBrainz only, not playable)." }
+        album_id: { type: integer, nullable: true, description: The library album when the library has it; null = missing from the library. }
+        wanted: { type: boolean }
+        ignored: { type: boolean }
+        fulfilled: { type: boolean, description: Wished and now owned: the wish is closed. }
+        availability:
+          type: array
+          items:
+            type: object
+            properties:
+              provider: { type: string }
+              library: { type: string, nullable: true }
+              status: { type: string, enum: [available] }
+              playable: { type: boolean, description: Only with device_id. }
+        artwork: { type: object, nullable: true, additionalProperties: true }
     ArtistDetail:
       type: object
       properties:

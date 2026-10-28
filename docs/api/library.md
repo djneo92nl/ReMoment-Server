@@ -386,3 +386,7 @@ A device lists `library_playback` in `capabilities` when either path exists for 
 **Artist fanart** — `details.fanart` is `{ hash, proxy_120, proxy_320, proxy_512, proxy_bg, proxy_bg_320x480, proxy_bg_480x480, colors, safe_colors }` (the TheAudioDB fanart run through the artwork pipeline; root-relative `/storage/…` paths) or `null` until processed (queued, at most once an hour) or when the artist has none. The `proxy_bg*` keys are blurred, darkened backdrops for a screen of that size. The web artist page uses `proxy_bg` as its hero background.
 
 `details.gallery` is the same for every wide photo TheAudioDB has (fanart 1–4 and the wide thumb): a list of those objects, only the processed ones (the rest are queued). The web artist page shows them as a strip under the hero, each linking to the original.
+
+## Discography and wishlist
+
+`GET /api/library/artists/{id}?include=discography`, `/artists/{id}/discography`, `/wishlist`, `/catalogue/{id}` and `?availability=owned|streamable` on `/albums` are described in [availability.md](availability.md). They are opt-in and closed to client devices; the responses above are unchanged without them.

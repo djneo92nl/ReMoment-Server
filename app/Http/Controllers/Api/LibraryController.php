@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Domain\Artwork\LibraryArtwork;
 use App\Domain\Artwork\LibraryItemArtwork;
 use App\Domain\Artwork\PlaylistArtwork;
+use App\Domain\Catalogue\CatalogueItems;
 use App\Domain\Health\LibraryReports;
 use App\Domain\Library\AlbumKind;
 use App\Domain\Library\AlbumPage;
@@ -29,6 +30,7 @@ use App\Models\Client;
 use App\Models\Device;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
+use App\Models\Media\CatalogueAlbum;
 use App\Models\Media\Genre;
 use App\Models\Media\Playlist;
 use App\Models\Media\Track;
@@ -134,12 +136,15 @@ class LibraryController extends Controller
             'cursor' => ['nullable', 'string', 'max:200'],
             'letter' => ['nullable', 'string', 'regex:/^[A-Za-z#]$/'],
             'sort' => ['nullable', 'in:name,artist,year,added,plays'],
+            // `missing` is not an album filter: missing albums have no album row (see GET /library/artists/{id}/discography).
+            'availability' => ['nullable', 'in:owned,streamable'],
         ]);
         $hidden = $this->hiddenSources($request);
         $offset = $this->decodeCursor($request->query('cursor'));
         $sort = $request->query('sort', 'name');
 
-        $query = LibrarySources::albums(Album::query(), $hidden)->whereHas('tracks')->with('artist');
+        $query = LibrarySources::albums(Album::query(), $hidden)->whereHas('tracks')->with('artist')
+            ->when($request->query('availability'), fn ($q, $availability) => CatalogueItems::scopeAlbums($q, $availability));
 
         match ($sort) {
             'artist' => $query->join('artists', 'artists.id', '=', 'albums.artist_id')
@@ -225,7 +230,12 @@ class LibraryController extends Controller
 
     public function artist(Request $request, Artist $artist): JsonResponse
     {
-        $request->validate(['source' => ['nullable', 'in:files,dlna,spotify'], 'scope' => ['nullable', 'in:'.implode(',', LeadingSource::apiScopes())]]);
+        $request->validate([
+            'source' => ['nullable', 'in:files,dlna,spotify'],
+            'scope' => ['nullable', 'in:'.implode(',', LeadingSource::apiScopes())],
+            'include' => ['nullable', 'in:discography'],
+            'device_id' => ['nullable', 'integer', 'exists:devices,id'],
+        ]);
         // Only what the client hides applies: the page shows one chosen library, so the leading-library scope that
         // trims the browse lists must not hide a streaming library's own albums here.
         $hidden = $this->clientHidden($request);
@@ -265,7 +275,61 @@ class LibraryController extends Controller
                 'tracks' => LibrarySources::availableFrom($artist->tracks(), $id)->count(),
             ], $sources),
             'albums' => $albums->map(fn (Album $album) => $this->albumItem($album) + ['kind' => AlbumKind::of($album, $album->tracks_count)])->values(),
+        ] + ($request->query('include') === 'discography' && !$request->filled('client')
+            ? ['discography' => CatalogueItems::forArtist($artist, device: $this->deviceOf($request))]
+            : []));
+    }
+
+    /** The MusicBrainz discography of an artist, newest first (docs/api/availability.md). Not for client devices. */
+    public function discography(Request $request, Artist $artist): JsonResponse
+    {
+        $request->validate([
+            'availability' => ['nullable', 'in:owned,streamable,missing'],
+            'wanted' => ['nullable', 'boolean'],
+            'ignored' => ['nullable', 'boolean'],
+            'device_id' => ['nullable', 'integer', 'exists:devices,id'],
         ]);
+        $this->refuseClients($request);
+
+        return response()->json(['data' => CatalogueItems::forArtist(
+            $artist, $request->query('availability'), $request->boolean('wanted'), $request->boolean('ignored'), $this->deviceOf($request),
+        )]);
+    }
+
+    /** What the household wants and does not own yet, most recently wished first. */
+    public function wishlist(Request $request): JsonResponse
+    {
+        $request->validate(['cursor' => ['nullable', 'string', 'max:200'], 'device_id' => ['nullable', 'integer', 'exists:devices,id']]);
+        $this->refuseClients($request);
+
+        $offset = $this->decodeCursor($request->query('cursor'));
+        [$rows, $items] = CatalogueItems::wishlist($offset, $this->deviceOf($request));
+
+        return response()->json([
+            'data' => $items,
+            'next_cursor' => $rows->count() > CatalogueItems::WISHLIST_PAGE_SIZE ? $this->encodeCursor($offset + CatalogueItems::WISHLIST_PAGE_SIZE) : null,
+        ]);
+    }
+
+    public function catalogueAlbum(Request $request, CatalogueAlbum $catalogueAlbum): JsonResponse
+    {
+        $request->validate(['device_id' => ['nullable', 'integer', 'exists:devices,id']]);
+        $this->refuseClients($request);
+
+        return response()->json(CatalogueItems::one($catalogueAlbum, $this->deviceOf($request)));
+    }
+
+    private function deviceOf(Request $request): ?Device
+    {
+        return $request->filled('device_id') ? Device::find($request->integer('device_id')) : null;
+    }
+
+    /** Release-groups nobody owns are for the household's apps, never for a registered client device. */
+    private function refuseClients(Request $request): void
+    {
+        if ($request->filled('client')) {
+            abort(response()->json(['error' => 'forbidden', 'message' => 'The catalogue is not available to client devices.'], 403));
+        }
     }
 
     /**
