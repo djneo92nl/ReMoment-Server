@@ -21,6 +21,7 @@ docs/
     jellyfin.md             Jellyfin on a Philips TV: continue watching / next up and play in the Jellyfin app (GET /api/devices/{id}/jellyfin, POST .../jellyfin/play)
     library.md              Library browse (artists, albums, playlists), favorites, play album/artist/playlist on a device (DLNA or Spotify), playlist artwork
     source-controls.md      Per-source controls (change disc, FM presets) from control profiles: GET/POST /api/devices/{id}/controls, resolution, transports
+    physical.md             Physical collection (CDs, records, tapes): items by barcode or by hand, MusicBrainz barcode lookup, `physical` availability provider, wishes closed by owning it
     sync-groups.md          Sync groups (fake multiroom) REST API: leader + members, offsets, errors
     playback-move.md        Move playback to another device: POST /api/devices/{id}/move, what moves (library queue, radio, Spotify transfer), what is refused (local inputs)
     queue.md                Editing the queue: add, play next, remove, move, clear (queue_add/next/remove/move/clear), positions, `expect`, per-platform support
@@ -543,6 +544,16 @@ PUT /api/library/catalogue/{id}/ignored { ignored } → { ignored }    "I don't 
 ```
 
 CatalogueItem `{ id, release_group_mbid, title, type: album|ep, year, artist, state: owned|streamable|known, album_id|null, wanted, ignored, fulfilled, availability: [{ provider, library, status, playable? }], artwork }`; MCP tool `catalogue`. Filled by `php artisan catalogue:sync` (nightly, queue `catalogue`).
+
+**Physical collection** (workstream 6; `docs/api/physical.md`). Open, closed to client tokens. An item makes its album owned and closes a wish on its release-group.
+
+```
+GET|POST /api/library/physical   ?medium=&q=&ripped=&cursor=  |  { artist, title, medium, year?, barcode?, location?, release_group_mbid?, … }
+GET|PUT|DELETE /api/library/physical/{id}                      PUT also takes `ripped`
+GET /api/library/physical/lookup?barcode=                      → { data: [Release] }   MusicBrainz releases for a barcode, to choose from
+```
+
+MCP tool `physical`; web `/library/collection` (Livewire `PhysicalCollection`); table `physical_items`, `App\Domain\Catalogue\PhysicalItems`.
 
 ### Client Device API
 

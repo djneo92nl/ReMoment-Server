@@ -44,6 +44,7 @@ class ReMomentServer extends Server
         Tools\ManagePlaylist::class,
         Tools\Catalogue::class,
         Tools\External::class,
+        Tools\Physical::class,
         Tools\AlbumSpotify::class,
         Tools\LibraryMaintenance::class,
         Tools\RemoveLibraryItem::class,

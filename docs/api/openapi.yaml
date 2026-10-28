@@ -1140,6 +1140,125 @@ paths:
                             release_date: { type: string, description: YYYY-MM-DD }
         "403": { description: Forbidden for client devices }
         "422": { description: Validation error }
+  /library/physical:
+    get:
+      tags: [Library]
+      operationId: listPhysical
+      description: The physical collection (CDs, records, tapes). Not available to client devices. See docs/api/physical.md.
+      parameters:
+        - { name: medium, in: query, schema: { type: string, enum: [cd, tape, vinyl, minidisc, other] } }
+        - { name: q, in: query, schema: { type: string } }
+        - { name: ripped, in: query, schema: { type: boolean } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/PhysicalItem" }
+                  next_cursor: { type: string, nullable: true }
+        "403": { description: Forbidden for client devices }
+    post:
+      tags: [Library]
+      operationId: addPhysical
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PhysicalItemInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PhysicalItem" }
+        "403": { description: Forbidden for client devices }
+        "422": { description: Validation error }
+  /library/physical/lookup:
+    get:
+      tags: [Library]
+      operationId: lookupPhysicalBarcode
+      description: The releases MusicBrainz knows for a barcode, to choose from before adding.
+      parameters:
+        - { name: barcode, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        release_mbid: { type: string }
+                        release_group_mbid: { type: string, nullable: true }
+                        artist: { type: string }
+                        title: { type: string }
+                        year: { type: integer, nullable: true }
+                        label: { type: string, nullable: true }
+                        catalogue_number: { type: string, nullable: true }
+                        country: { type: string, nullable: true }
+                        medium: { type: string }
+        "403": { description: Forbidden for client devices }
+        "422": { description: Validation error }
+        "502": { description: MusicBrainz did not answer (driver_error) }
+  /library/physical/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Library]
+      operationId: getPhysical
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PhysicalItem" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Library]
+      operationId: updatePhysical
+      description: Any field of the item; `ripped` marks it ripped to files.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - { $ref: "#/components/schemas/PhysicalItemInput" }
+                - type: object
+                  properties:
+                    ripped: { type: boolean }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PhysicalItem" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: Validation error }
+    delete:
+      tags: [Library]
+      operationId: removePhysical
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [ok] }
+        "404": { $ref: "#/components/responses/NotFound" }
   /library/wanted-tracks:
     post:
       tags: [Library]
@@ -2956,6 +3075,40 @@ components:
         image: { type: string, nullable: true, description: "The service's own image URL; show it through the artwork pipeline." }
         in_library: { type: boolean }
         library_id: { type: integer, nullable: true, description: The library artist, album or track when in_library. }
+    PhysicalItemInput:
+      type: object
+      required: [artist, title, medium]
+      properties:
+        artist: { type: string }
+        title: { type: string }
+        medium: { type: string, enum: [cd, tape, vinyl, minidisc, other] }
+        year: { type: integer, nullable: true }
+        barcode: { type: string, nullable: true }
+        catalogue_number: { type: string, nullable: true }
+        condition: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        location: { type: string, nullable: true }
+        acquired_on: { type: string, format: date, nullable: true }
+        release_group_mbid: { type: string, format: uuid, nullable: true }
+        release_mbid: { type: string, format: uuid, nullable: true }
+    PhysicalItem:
+      type: object
+      properties:
+        id: { type: integer }
+        artist: { type: string }
+        title: { type: string }
+        year: { type: integer, nullable: true }
+        medium: { type: string, enum: [cd, tape, vinyl, minidisc, other] }
+        barcode: { type: string, nullable: true }
+        catalogue_number: { type: string, nullable: true }
+        condition: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        location: { type: string, nullable: true }
+        acquired_on: { type: string, nullable: true }
+        album_id: { type: integer, nullable: true, description: The library album with the same artist and title. }
+        release_group_mbid: { type: string, nullable: true }
+        ripped: { type: boolean }
+        ripped_at: { type: string, nullable: true }
     WantedSong:
       type: object
       properties:

@@ -10,6 +10,7 @@ use App\Models\Media\AlbumAvailability;
 use App\Models\Media\Artist;
 use App\Models\Media\CatalogueAlbum;
 use App\Models\Media\Metadata;
+use App\Models\Media\PhysicalItem;
 use App\Models\Media\Track;
 use Illuminate\Support\Facades\Log;
 
@@ -40,6 +41,11 @@ final class CatalogueLinker
         if (!$album->artist_id) {
             return null;
         }
+
+        // An album that appears after its physical items (a CD catalogued before it was ripped or scanned) takes them over.
+        PhysicalItem::whereNull('album_id')->where('title_key', $album->name_key ?: Normalizer::album($album->name))
+            ->whereIn('artist_key', array_filter([$album->artist?->name_key ?: ($album->artist ? Normalizer::artist($album->artist->name) : null)]))
+            ->update(['album_id' => $album->id]);
 
         if ($linked = CatalogueAlbum::where('album_id', $album->id)->first()) {
             self::syncOwnership($linked, $album);
@@ -79,6 +85,23 @@ final class CatalogueLinker
         }
     }
 
+    /**
+     * A physical item came or went: set or clear `fulfilled_at` on the release-group row it belongs to (by release-group id,
+     * or through the library album), whether or not the library has that album.
+     */
+    public static function refreshPhysical(?string $releaseGroupMbid, ?Album $album): void
+    {
+        foreach (PhysicalItems::catalogueRows($releaseGroupMbid, $album) as $row) {
+            $owned = PhysicalItem::where('release_group_mbid', $row->release_group_mbid)->exists()
+                || ($row->album_id !== null && ($a = Album::find($row->album_id)) && self::isOwned($a));
+            if ($owned && $row->fulfilled_at === null) {
+                $row->forceFill(['fulfilled_at' => now()])->save();
+            } elseif (!$owned && $row->fulfilled_at !== null) {
+                $row->forceFill(['fulfilled_at' => null])->save();
+            }
+        }
+    }
+
     /** Sets or clears `fulfilled_at` of the rows linked to an album, e.g. after a scan or an import added or removed files. */
     public static function refreshOwnership(Album $album): void
     {
@@ -90,6 +113,10 @@ final class CatalogueLinker
     /** Whether the album has a track from an owned provider. */
     public static function isOwned(Album $album): bool
     {
+        if (PhysicalItem::where('album_id', $album->id)->exists()) {
+            return true;
+        }
+
         foreach (Providers::ownedLibraries() as $source) {
             if (LibrarySources::availableFrom(Track::query()->where('album_id', $album->id), $source)->exists()) {
                 return true;

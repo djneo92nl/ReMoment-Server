@@ -10,6 +10,7 @@ use App\Models\Media\Album;
 use App\Models\Media\AlbumAvailability;
 use App\Models\Media\Artist;
 use App\Models\Media\CatalogueAlbum;
+use App\Models\Media\PhysicalItem;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
@@ -116,6 +117,10 @@ final class CatalogueItems
         $albums = Album::whereIn('id', $albumIds)
             ->with(['tracks.metadata' => fn ($q) => $q->whereIn('key', ['dlna_url', 'external_id'])])->get()->keyBy('id');
 
+        // Physical items (CD, vinyl, tape): by the library album, or by the release-group when the library has no such album.
+        $physicalByAlbum = PhysicalItem::whereIn('album_id', $albumIds)->pluck('album_id')->flip();
+        $physicalByGroup = PhysicalItem::whereIn('release_group_mbid', $rows->pluck('release_group_mbid')->all())->pluck('release_group_mbid')->flip();
+
         $answers = AlbumAvailability::where('status', 'available')
             ->where(fn ($q) => $q->whereIn('album_id', $albumIds)->orWhereIn('catalogue_album_id', $rows->pluck('id')->all()))->get();
 
@@ -123,13 +128,16 @@ final class CatalogueItems
             ? null : sprintf(self::COVER_URL, $r->release_group_mbid)]);
         LibraryItemArtwork::preload([...$covers->filter()->values(), ...LibraryItemArtwork::urlsOfAlbums($albums)]);
 
-        return $rows->map(function (CatalogueAlbum $row) use ($albums, $answers, $covers, $device) {
+        return $rows->map(function (CatalogueAlbum $row) use ($albums, $answers, $covers, $device, $physicalByAlbum, $physicalByGroup) {
             $album = $row->album_id ? $albums->get($row->album_id) : null;
             $providers = $album ? LibrarySources::ofTracks($album->tracks) : [];
             foreach ($answers as $answer) {
                 if (($answer->album_id !== null && $answer->album_id === $row->album_id) || $answer->catalogue_album_id === $row->id) {
                     $providers[] = $answer->provider;
                 }
+            }
+            if (($row->album_id && $physicalByAlbum->has($row->album_id)) || $physicalByGroup->has($row->release_group_mbid)) {
+                $providers[] = 'physical';
             }
             $providers = array_values(array_unique($providers));
 

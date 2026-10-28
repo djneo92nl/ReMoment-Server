@@ -7,6 +7,7 @@ use App\Domain\Library\Normalizer;
 use App\Models\Media\Artist;
 use App\Models\Media\CatalogueAlbum;
 use App\Models\Media\CatalogueArtist;
+use App\Models\Media\PhysicalItem;
 use App\Models\Play;
 use App\Services\MusicBrainz\MusicBrainzClient;
 use Illuminate\Support\Facades\DB;
@@ -78,6 +79,12 @@ final class ArtistCatalogueSync
         });
 
         CatalogueLinker::linkArtist($artist);
+
+        // Release-groups the household already owns on a shelf (physical items catalogued by barcode) are fulfilled from the start.
+        $shelved = PhysicalItem::whereIn('release_group_mbid', array_column($groups, 'id'))->pluck('release_group_mbid')->all();
+        if ($shelved !== []) {
+            CatalogueAlbum::where('artist_id', $artist->id)->whereIn('release_group_mbid', $shelved)->whereNull('fulfilled_at')->update(['fulfilled_at' => now()]);
+        }
 
         return $this->finish($artist, $mbid, 'ok', count($groups), $this->isActive($artist) ? self::ACTIVE_DAYS : self::IDLE_DAYS);
     }

@@ -65,3 +65,7 @@ Pages for what a service has, also for artists the library lacks (`routes/web.ph
 - Play goes to the player pinned in this browser (`PlaysExternal`: a note when none is pinned or it cannot play Spotify); nothing is added to the library by playing.
 - Entry points: the search box (names link to these pages), the artist page's *More on Spotify* (`/artists/{id}?source=spotify`: each card opens the album and can be played, and "Browse all on Spotify" opens the artist's page; the Spotify artist id is remembered as `spotify_id` metadata once found), and the Discography card's Add.
 
+### Collection (`/library/collection`)
+
+`Livewire\PhysicalCollection`: the physical shelf. An *Add to the collection* card (a barcode finds releases on MusicBrainz, "Use this" fills the form; or type it by hand for tapes and bootlegs: artist, title, year, medium, where it is), filters (search, medium, ripped), and one row per item with the album link when the library has it, a *Ripped* badge, **Mark ripped** and **Remove**. A chip on `/library` links to it. Owning an item shows `Owned` on that album's release-group in the artist's Discography card and closes a wish.
+
