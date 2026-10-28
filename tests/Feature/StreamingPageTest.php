@@ -65,6 +65,8 @@ class StreamingPageTest extends TestCase
             ->call('toggleWant', ['title' => 'Liked Song', 'artist' => 'Band', 'album' => null, 'image' => null])->assertSee('On the wishlist')
             ->html();
 
+        $this->assertStringContainsString('data-test="track-rows"', $html, 'tracks are compact rows like the radio stations, not shelf cards');
+        $this->assertStringNotContainsString('w-36 shrink-0', $html);
         $this->assertMatchesRegularExpression('/Local Song.{0,300}In your library/s', $html);
         $this->assertDoesNotMatchRegularExpression('/Liked Song.{0,200}In your library/s', $html);
         $this->assertSame(['Liked Song'], WantedTrack::pluck('title')->all());
