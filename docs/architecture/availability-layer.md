@@ -4,6 +4,13 @@ Status: **design, nothing built.** Written 2026-10-28 for workstream 3 of [v1-ro
 
 The problem in one paragraph: the library is a copy of what each source gave us. Nothing says which albums of an artist we lack, which of those a service could play, or lets the household wish for one. Spotify, Deezer/Tidal ([streaming-services.md](streaming-services.md)), the physical library (roadmap 6), media servers (15) and discovery (4) all need the same answer to "where can this album be had, and can device X play it", so they plug into one model as **providers**.
 
+## What the end user gets (two jobs, one model)
+
+1. **Browse, play and add from a service.** Find any artist, album or track on Spotify (later Deezer, Tidal, media servers), play it on a device that can, and add it to the streaming library with one action. This works for artists you do not have yet and is the core for a streaming-first household. See [Browse, play and add](#browse-play-and-add-from-an-external-source).
+2. **Know what is missing from the collection.** On an artist page: "you have 6 of 14 albums". For someone who buys records or CDs and rips them, the missing ones can be put on a **wishlist** that closes by itself when the album becomes owned. Copy rule: the wishlist is about **buying or ripping** what you are missing ("Want to buy or rip"), never "getting" files; no wording that suggests acquiring music from anywhere but a shop, a disc or a service.
+
+The two meet on one screen: a missing album is also **streamable** when a service has it, so the row offers **Play** (stream it now) next to **Wish** (buy/rip it someday) and **Add to library**. "Missing" never means "unplayable".
+
 ## Decisions taken as fixed
 
 1. The discography lists **albums and EPs only** by default (no singles, live, compilations; a toggle may come later).
@@ -40,6 +47,8 @@ An album **entry** (a release-group of an artist, or a library album with no rel
 `wanted` and `ignored` are **flags** on a catalogue row, not states. Wanted + `owned` is a closed wish (`fulfilled_at`).
 
 ### Providers
+
+**DLNA counts as owned** (owner's answer, 2026-10-28): it serves the household's own files, so it earns the Owned badge and closes a wish; it is `streaming` in `LIBRARIES` only because this server does not hold the files. Later, DLNA tracks may be **synced into the own-file library** (copied and indexed as `files`) and playlists mix all sources as they do today; that is outside this design and needs nothing from it beyond the existing derived provider.
 
 A provider is where an album can be had. Ownership is **a property of the provider, not of `LibrarySources::LIBRARIES['kind']`**: `kind` (`local`/`streaming`) is a scope concept for the hide switches and defaults, and DLNA is `streaming` there although a DLNA server serves the household's own files. Reusing `kind` for "owned" would make DLNA albums "streamable". So the registry has its own field.
 
@@ -94,6 +103,19 @@ interface LooksUpAvailability extends AvailabilityProvider
     /** Cheaper bulk path when the service lists an artist's albums in one call (Spotify, Deezer, Jellyfin); optional. */
     public function lookupArtist(ArtistQuery $query): iterable;
 }
+
+/** Browse: what the service offers, for any artist, not only library ones. Results are transient (never stored). */
+interface BrowsesExternalCatalogue extends AvailabilityProvider
+{
+    /** @param  'artist'|'album'|'track'  $type  @return list<ExternalItem>  limit per the service (Spotify search: max 10) */
+    public function search(string $query, string $type, int $limit = 10): array;
+    /** @return list<ExternalItem> the albums (and top tracks where the service has them) of an artist */
+    public function artistItems(string $externalArtistId): array;
+    public function albumTracks(string $externalAlbumId): array;
+    /** Create the library records through LibraryIdentity (source = this provider) and return them. */
+    public function addToLibrary(string $type, string $externalId): LibraryAddResult;
+}
+/** ExternalItem: provider, type, externalId, title, artist name, year, track count, image URL, in_library (album_id/artist_id when LibraryIdentity already knows it). */
 
 /** AlbumQuery: artist name + name_key, album title + name_key, year, track count (if known), MusicBrainz links (spotify/deezer/tidal urls from `links` metadata), barcode. */
 /** AvailabilityHit: provider, externalId, confidence 0-100, match (link|search|reported|manual). */
@@ -251,6 +273,16 @@ Albums are created through `LibraryIdentity::album()` in every path (`FileIndexe
 - Nothing in 14.2 blocks the read-only parts (registry, tables, sync, API reads): they only add tables. The merger step and the alias resolution in the new endpoints wait for 14.2.
 - `Normalizer::VERSION` bumps must re-key `catalogue_albums.name_key` too: `library:merge-duplicates` (which re-keys all rows) gets a `catalogue_albums` re-key line, or `catalogue:sync --force` re-derives it from `title`.
 
+## Browse, play and add from an external source
+
+Spotify already has the pieces (`SpotifyCatalog`, `ArtistMoreOnSpotify`/`AlbumMoreOnSpotify`, `ImportSpotifyAlbumById`, the Spotify path of `LibraryPlayback`); this section makes them provider-neutral so Deezer, Tidal and media servers are a driver, not new endpoints.
+
+- **Search and browse** call the provider live (`BrowsesExternalCatalogue`), cache the answer briefly (5 minutes, keyed by provider+query), go through the provider's rate limiter, and are done in the request only because a user is waiting on one call; a failure shows "Spotify is not answering", never an error page. Nothing is stored: results are `ExternalItem`s. Each carries `in_library` (resolved with one `name_key` query) so the UI shows "Added" instead of an Add button.
+- **Play** any item without importing it: `LibraryPlayback` gets `playExternal(provider, type, id)`; Spotify plays an album/artist/track context URI on a Connect-capable device, Deezer/Tidal hand an id to a device with `deezer_playback`/`tidal_playback`. It answers `422 not_playable` when the device cannot play that provider (the same `LibrarySources::playableOn` check).
+- **Add** creates the artist, album and tracks through `LibraryIdentity` with `source` = the provider (the same path as the Spotify import), so the item appears in the streaming library, merges with copies from other sources and gets enriched. For an album: all its tracks; for an artist: the artist plus **all albums** the user confirms (a dialog lists them, album/EP only by default); for a track: the track on its album. The Album observer then links it to the catalogue, closing nothing (streamable is not owned) but turning "Missing" into "In your library on Spotify".
+- **Discography from the provider as well as MusicBrainz.** For an artist the service knows, the artist page can show "On Spotify: 14 albums, 6 in your library" straight from `artistItems`, with no MusicBrainz id needed. MusicBrainz stays the authority for *missing* (collector view); the provider list is the authority for *what you can stream now*. Matching the two reuses the Spotify lookup of section 3, so one artist-albums call fills `album_availability` for every catalogue row of that artist.
+- Adding is what lets an artist with **no MusicBrainz id** still be wished or marked: once added, wish by title attaches to a library album through `albums` (see open question 4: for those artists a wish may be stored against the album's `release_group_mbid` when it appears, else as a manual catalogue row with `release_group_mbid` null). 
+
 ## 4. API and UI
 
 Rules of the repo apply to each endpoint: an OpenAPI entry (`docs/api/openapi.yaml`), an MCP tool or extension (`app/Mcp/Tools` + the table in `docs/api/mcp.md`), a row in `docs/api/library.md` (or the new `docs/api/availability.md`) and the CLAUDE.md reference. All new routes are **guest-accessible like favourites**, except the two maintenance calls.
@@ -291,11 +323,15 @@ GET  /api/library/catalogue/{id}                         → CatalogueItem with 
 PUT  /api/library/catalogue/{id}/wanted    { "wanted": true }    → { "wanted": true }    clears "ignored"
 PUT  /api/library/catalogue/{id}/ignored   { "ignored": true }   → { "ignored": true }   clears "wanted"
 POST /api/library/catalogue/{id}/import                  → { status, album_id }    streamable → create the library album (Spotify first); 422 not_importable
-POST /api/devices/{id}/library/play-catalogue   { catalogue_id, provider?, shuffle? }   → { status, album }   plays an external id without an albums row; 422 not_playable
+GET  /api/library/external/{provider}/search?q=&type=artist|album|track&limit=   → { data: [ExternalItem] }
+GET  /api/library/external/{provider}/artists/{externalId}                      → { artist: ExternalItem, albums: [ExternalItem] }   in_library flags included
+GET  /api/library/external/{provider}/albums/{externalId}                       → { album: ExternalItem, tracks: [ExternalItem] }
+POST /api/library/external/{provider}/add   { type: artist|album|track, id, album_ids? }   → { status, added: { artists, albums, tracks } }   needs the provider enabled; 422 unknown provider / not_importable
+POST /api/devices/{id}/library/play-external   { provider, type: artist|album|track, id, shuffle? }   → { status, name }   plays without importing; 422 not_playable
 POST /api/admin/library/artists/{id}/catalogue-sync      → { status: "queued" }   admin token
 ```
 
-- A catalogue row of an album the library has **redirects the caller to the album** (`album_id`), so play and favourite stay on the existing endpoints; `play-catalogue` is only for rows without `album_id`. Ids resolved through `id_aliases` answer normally with `canonical_id` (14.2 pattern).
+- A catalogue row of an album the library has **redirects the caller to the album** (`album_id`), so play and favourite stay on the existing endpoints; `play-external` (with the row's provider and `external_id`) is for rows without `album_id`. Ids resolved through `id_aliases` answer normally with `canonical_id` (14.2 pattern).
 - **`?availability=` on the browse endpoints** (`/library/albums`, `/library/artists/{id}` albums, `/library/search`): `owned` and `streamable` filter albums by the provider rule (`LibrarySources::availableFrom` for derived, an `exists` on `album_availability` for lookups). **`missing` cannot be an album filter** (missing albums have no `albums` row and `AlbumItem` has no shape for them): it is valid only on `…/discography` and `…/catalogue`; on `/library/albums` it answers `422 invalid`. This narrows what the owner wrote ("`?availability=owned|streamable|missing` on the browse endpoints") and is listed in the open questions.
 - Capabilities: no device capability is added; `playable` rides on the existing `library_playback` and per-library checks.
 
@@ -305,11 +341,12 @@ Touch ESP32 clients and the artwork pre-cache read `albums` and the `…/artwork
 
 ### MCP
 
-One tool `catalogue` (`app/Mcp/Tools/Catalogue.php`) with actions `discography`, `wishlist`, `wish`, `unwish`, `ignore`, `unignore`, `import`; the `sync` action is ADMIN (listed only with the admin bearer token, like the maintenance tools). It goes through `ApiBridge`, so the REST API stays the single implementation. `BrowseLibrary` gains the `availability` argument.
+One tool `catalogue` (`app/Mcp/Tools/Catalogue.php`) with actions `discography`, `wishlist`, `wish`, `unwish`, `ignore`, `unignore`, `import`, and one tool `external` (`search`, `artist`, `album`, `add`, `play`) for browse/play/add; the `sync` action is ADMIN (listed only with the admin bearer token, like the maintenance tools). It goes through `ApiBridge`, so the REST API stays the single implementation. `BrowseLibrary` gains the `availability` argument.
 
 ### Web (no views are changed by this document)
 
-- **Artist page** (`/artists/{id}`, Overview tab): a "Discography" panel below the albums using the shared `x-card`, `x-badge` and `x-empty-state` components (docs/frontend/components.md), one row per entry: cover, title, year, type, an `x-badge` for the state (`Owned`, `On Spotify`, `Missing`), a Wish control and an overflow "Not interested". A chip row filters All / Missing / Wanted; above 12 entries only the first 12 show with "Show all 34", because a long-career artist (a hundred release-groups) must not push the page's real content down. Albums the library has link to `/albums/{id}`. The source switch of the page does not apply to missing rows.
+- **Search** (the library search page gains a provider switch, "Spotify" next to "Library"): result rows with Play, Add (or "Added") and a link to the external artist/album page, which lists the artist's albums with the same Play / Add / Wish row as below. Add on an artist opens the album picker.
+- **Artist page** (`/artists/{id}`, Overview tab): a "Discography" panel below the albums using the shared `x-card`, `x-badge` and `x-empty-state` components (docs/frontend/components.md), one row per entry: cover, title, year, type, an `x-badge` for the state (`Owned`, `On Spotify`, `Not in your library`), **Play** when a provider has it and the pinned device can play it, **Add to library**, a Wish control ("Want to buy or rip") and an overflow "Not interested". A chip row filters All / Missing / Wanted; above 12 entries only the first 12 show with "Show all 34", because a long-career artist (a hundred release-groups) must not push the page's real content down. Albums the library has link to `/albums/{id}`. The source switch of the page does not apply to missing rows.
 - **Playable-on labels:** a streamable entry reads "Plays on Kitchen, Study" (devices from `LibrarySources::playableOn` per provider), or "Not playable on any device yet" for owned-elsewhere or known entries; on the pinned device the play button appears only when playable there, like `x-play-button`.
 - **Wishlist shelf** on `/library` (`x-shelf`, as the other shelves; hidden when empty) and a `/library/wishlist` page for the full list with "Remove wish" and the streamable badge.
 - Livewire stays the renderer: the lookups finish in the background, so the panel refreshes through the same `$wire.$refresh()` glue (a short poll while lookups for the artist are pending), no new JS framework.
@@ -336,17 +373,18 @@ Dependencies: **14.3** (schema plan) is where PR 2's tables are written straight
 | # | PR | Depends on | Notes |
 |---|---|---|---|
 | 1 | `Availability` read service + provider registry + `config/availability.php`, derived providers (`files`, `dlna`, `spotify` saved), `Ownership` on providers; test that registry and `LIBRARIES` agree | none (touches `LibrarySources` only by reading; **does not touch** the merger or controllers) | no schema; can start now |
+| 1b | **External browse/play/add:** `BrowsesExternalCatalogue`, `ExternalItem`, `LibraryPlayback::playExternal`, `/api/library/external/*`, `play-external`, Spotify implementation on the existing catalogue code, search UI switch; OpenAPI, MCP `external`, docs | 1 (no schema, no controllers shared with 14.2 beyond new routes: add after 14.2 lands if it still edits `LibraryController`/routes) | the streaming-first core; ships value without MusicBrainz or any new table |
 | 2 | Migrations + models: `catalogue_artists`, `catalogue_albums`, `album_availability`; factories; model rules (exclusive wanted/ignored, `name_key` hook) | 14.3 plan reviewed | parallel with 1 |
 | 3 | `MusicBrainzClient::browseReleaseGroups`, `SyncArtistCatalogue`, `CatalogueLinker`, `catalogue:sync`, `catalogue` queue on the `heavy` worker, `Queues::all`, `catalogue_sync` alert, Album observer; `Http::fake` tests incl. paging, filter, idempotence, 503 | 1, 2 | verifies the unverified browse fields with one real call first; docs/architecture update |
 | 4 | Artist mbid discovery (search + verify by owned albums) | 3 | optional; skip if the owner's mbid coverage is high |
 | 5 | Read API: `…/discography`, `include=discography`, `/library/wishlist`, `/catalogue/{id}`, `?availability=` owned or streamable; OpenAPI, `docs/api/availability.md`, MCP `catalogue` (read actions) | 3, **14.2 landed** (controllers, routes) | |
 | 6 | Wish and ignore endpoints, `wanted_at`/`fulfilled_at` rules, `catalogue:reconcile`, ownership hooks in scan/import end; MCP actions | 5 | closes wishes |
 | 7 | **`LibraryMerger`/`LibraryRemover` integration** and `catalogue_album` alias resolution | **14.2 landed** | the interaction with stable IDs; do not start earlier |
-| 8 | Spotify availability (`SpotifyAvailability`, lazy and trickle jobs), `play-catalogue`, `import` | 3, 5 | needs the artist-albums probe result |
+| 8 | Spotify availability for catalogue rows (`SpotifyAvailability`, lazy and trickle jobs; reuses 1b's client), `import` | 1b, 3, 5 | needs the artist-albums probe result |
 | 9 | Web: discography panel, wishlist shelf and page, playable-on labels | 5, 6, 8 | follows DESIGN.md and the components |
 | 10+ | Providers as separate PRs: Deezer/Tidal (workstream 5), physical (6), media servers (15), ListenBrainz new releases into `catalogue_albums` (4) | 1-3 | each is "a declaration plus a driver", and proves the contract; if one needs a change in the API or web, the contract is wrong |
 
-Parallel: 1 ∥ 2; 4 ∥ 5; 9 ∥ 8. Strictly sequential: 3 after 1+2, 7 after 14.2.
+Parallel: 1 ∥ 2; 1b ∥ 2/3 (different code); 4 ∥ 5; 9 ∥ 8. Strictly sequential: 3 after 1+2, 7 after 14.2.
 
 ## 6. Risks and open questions
 
@@ -378,7 +416,7 @@ Parallel: 1 ∥ 2; 4 ∥ 5; 9 ∥ 8. Strictly sequential: 3 after 1+2, 7 after 1
 
 ### Questions the owner must answer before implementation
 
-1. Is DLNA "owned" for availability purposes (a closed wish, the Owned badge)? Recommended: yes, via the separate `ownership` field.
+1. ~~Is DLNA owned?~~ **Answered: yes** (badge and closing wishes); syncing DLNA into own files is a later, separate step.
 2. Run the mbid one-liner above and tell the coverage; it decides whether PR 4 is in 1.0.
 3. Queue: add `catalogue` to the existing `heavy` worker (recommended, no extra process), or its own worker?
 4. May an album be wished only if its artist has an mbid (and so a release-group)? Or is a manual "wish by title" for artists without one needed?
@@ -386,4 +424,5 @@ Parallel: 1 ∥ 2; 4 ∥ 5; 9 ∥ 8. Strictly sequential: 3 after 1+2, 7 after 1
 6. Is the 30/90-day refresh policy acceptable, or should new releases be detected faster once ListenBrainz (workstream 4) is in?
 7. Spotify availability: lazy-on-view plus wishes plus a trickle for owned artists (recommended), or eager for the whole catalogue?
 8. Toggle for singles/live/compilations: confirm it stays out of 1.0, and that rows are not stored for those types (turning it on later means a resync, about 250 requests).
-9. `?availability=missing` only on discography/catalogue endpoints: confirm the narrowing.
+9. Should 1b (browse/play/add) ship **before** the MusicBrainz discography (recommended: it is the streaming-first value and needs no new table), and is Spotify-only enough for its first release?
+10. `?availability=missing` only on discography/catalogue endpoints: confirm the narrowing.
