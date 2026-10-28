@@ -8,7 +8,7 @@
     // Play follows the selected source and the pinned player: it plays where that player can play the source,
     // is hidden where it can't (a Spotify device can only do Spotify), and opens the player panel while none is pinned.
     $source = $page->source;
-    $sourceName = $source ? \App\Domain\Library\LibrarySources::LIBRARIES[$source]['name'] : null;
+    $sourceName = $source ? \App\Domain\Library\LibrarySources::sourceName($source) : null;
     $direct = $pinned !== null && $source !== null && \App\Domain\Library\LibrarySources::playableOn($source, $pinned);
     $hasSomething = $page->tracks->isNotEmpty() || $page->spotifyAlbum;
     $playable = $hasSomething && ($pinned === null ? $devices->isNotEmpty() : $direct);
@@ -16,7 +16,7 @@
     $primary = 'inline-flex items-center justify-center gap-2 rounded-full bg-gray-900 px-6 py-3 text-base font-medium text-white shadow-sm transition hover:bg-gray-700 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200';
     $secondary = 'inline-flex items-center justify-center gap-2 rounded-full border border-black/20 bg-black/5 dark:border-white/25 px-6 py-3 text-base font-medium transition hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10';
     $round = 'flex h-11 w-11 items-center justify-center rounded-full bg-black/10 transition hover:bg-black/20 dark:bg-white/10 dark:hover:bg-white/20';
-    $label = $page->source ? \App\Domain\Library\LibrarySources::LIBRARIES[$page->source]['name'] : null;
+    $label = $page->source ? \App\Domain\Library\LibrarySources::sourceName($page->source) : null;
 @endphp
 <div class="tint-hero relative overflow-hidden rounded-3xl" style="{{ \App\Domain\Artwork\ArtworkTint::style($album->colors) }}">
     <div class="flex items-center justify-between px-5 pt-5 sm:px-8 sm:pt-6">

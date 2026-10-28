@@ -136,8 +136,11 @@ php artisan playlists:refresh-smart [--playlist=ID]
 # Rebuild canonical genres from stored genre metadata (after changing GenreNormalizer)
 php artisan library:sync-genres
 
-# Remove the DLNA/Spotify library data (tracks without an own file, Spotify playlists); the Spotify sync and library:scan bring it back. Used once by the production SQLite→MariaDB move
+# Remove the DLNA/Spotify library data (tracks without an own file, Spotify playlists); library:scan brings the DLNA part back. Used once by the production SQLite→MariaDB move
 php artisan library:drop-streaming [--dry-run] [--force]
+
+# Remove what an old Spotify import left in the library (tracks only Spotify has, Spotify playlists, empty albums/artists). The library is the local tracks; Spotify extends it live. A migration ran it once
+php artisan library:drop-spotify [--dry-run] [--force]
 
 # Merge library duplicates across sources (DLNA / Spotify / plays) — dry run first
 php artisan library:merge-duplicates --dry-run
@@ -491,7 +494,7 @@ For Sonos, `joinable` is always empty (returns `[]`); the UI falls back to showi
 Browse, favorites and playback for clients; full shapes in `docs/api/library.md`. Artwork in these responses is the small object `{ hash, proxy_120, proxy_320, colors, safe_colors }` or `null` while unprocessed (queued at most once an hour per image). `colors`/`safe_colors` are the full artwork object's palette from the cover's cache entry (`null` when the entry expired or predates it); list endpoints read the entries of a page in one cache round trip (`LibraryItemArtwork::preload`).
 
 ```
-GET  /api/library/libraries[?device_id=]    → { data: [{ id, name, kind, album_count, artist_count, playlist_count, artwork, playable? }] }   music libraries (files = Local own files, dlna, spotify, …; LibrarySources::LIBRARIES) with content, not hidden for ?client=; `playable` only with ?device_id= (can that device play it: LibrarySources::LIBRARIES `device` check, 422 unknown device); a library id is also a valid ?scope= on the browse endpoints (next to local|streaming|all)
+GET  /api/library/libraries[?device_id=]    → { data: [{ id, name, kind, album_count, artist_count, playlist_count, artwork, playable? }] }   music libraries (files = Local own files, dlna; LibrarySources::LIBRARIES; Spotify is not a library) with content, not hidden for ?client=; `playable` only with ?device_id= (can that device play it: LibrarySources::LIBRARIES `device` check, 422 unknown device); a library id is also a valid ?scope= on the browse endpoints (next to local|streaming|all)
 GET  /api/library/recent-items?limit=30   → { data: [{ type: album|playlist|radio, library, played_at, album, playlist, station }] }   mixed recently played, newest first
 GET  /api/library/artists?cursor=&sort=&letter= → { data: [ArtistItem], next_cursor }   sort name (default, "The " ignored) | plays (most played first, plays of visible tracks in the scope, unplayed last, ties name then id), 50/page, only artists with albums; letter A-Z/# starts there (ignored for plays)
 GET  /api/library/albums?cursor=&sort=&letter= → { data: [AlbumItem], next_cursor }   sort name (default) | artist | year | added | plays, 60/page, only albums with tracks; letter A-Z/# starts at that letter of the name/artist sort (ignored for year/added/plays)
@@ -533,10 +536,9 @@ GET /api/library/catalogue/{id}                                                 
 GET /api/library/artists/{id}?include=discography                                                              → artist detail + discography
 GET /api/library/albums?availability=owned|streamable                                                          → narrowed list (`missing` is 422: missing albums have no album row)
 GET  /api/library/external/{provider}/search?q=&type=artist|album|track → { data: [ExternalItem] }   browse an external service (Spotify; `config/availability.php`), any artist; `in_library` says what the library has; never stored
-GET  /api/library/external/{provider}/artists/{id} | /albums/{id}        → { artist|album, albums|tracks: [ExternalItem] }
-POST /api/library/external/{provider}/add { type, id, album_ids? }      → 202 { status: queued, queued: { albums, tracks } }   queued import through LibraryIdentity (an artist: its albums the library lacks, max 100)
-POST /api/devices/{id}/library/play-external { provider, type, id, shuffle? } → plays the album/artist context or track without importing (`LibraryPlayback::playExternal`; 422 not_playable)
-POST /api/library/catalogue/{id}/import → 202 { status: queued }   add an album Spotify has (`album_availability` answer, filled lazily and by `catalogue:availability`) to the library
+GET  /api/library/external/{provider}/artists/{id} | /albums/{id}        → { artist|album, albums|tracks: [ExternalItem] }   an artist also has the popular tracks in the web (Last.fm top tracks matched on Spotify, else Spotify search)
+GET  /api/library/external/{provider}/playlists | /playlists/{id}        → the account's playlists (live) / { playlist, tracks | null }   Spotify only shares the tracks of playlists you own or collaborate on
+POST /api/devices/{id}/library/play-external { provider, type: artist|album|track|playlist, id, shuffle? } → plays the album/artist/playlist context or track without importing (`LibraryPlayback::playExternal`; 422 not_playable)
 POST   /api/library/wanted-tracks  { artist, title, album?, image_url?, source? } → WantedSong   wish for a song (history, radio, by hand); one per artist+title; closes when the library track has an own file or DLNA copy
 DELETE /api/library/wanted-tracks/{id}                                              → { status: ok }
 PUT /api/library/catalogue/{id}/wanted  { wanted }  → { wanted }      household-wide wish (clears ignored); closes by itself when the album gets an own file
@@ -733,13 +735,17 @@ DLNA servers are discovered on the network and their tracks imported into the sh
 
 **Scanner:** `DlnaLibraryScanner` recursively browses the DLNA content tree via `DlnaContentDirectoryClient` (SOAP/UPnP), finding or creating `Artist`, `Album` and `Track` records through `LibraryIdentity` (a track already imported from Spotify or recorded from a play is reused and gets the `dlna_url`) and `Metadata` records. Triggered via the Settings UI or `php artisan library:scan [--server=ip]`.
 
+### Streaming extends the library
+
+The library is the local tracks (own files, DLNA). A streaming service (Spotify; Deezer and Tidal later) **extends** it live and nothing of it is imported: no Spotify library, no sync of saved tracks or playlists, no "add to library". What a service gives: search and **play** (`/api/library/external/...`, `play-external`), browse (an artist with all its albums and popular tracks, an album, a playlist), and **want** (a streaming track goes on the wishlist as a `wanted_tracks` row, source `streaming`). A streaming track is never favorited (favorites are local). Web: the artist and album pages have a Spotify side that shows what Spotify has (`/artists/{id}?source=spotify`, `Livewire\ExternalArtist`/`AlbumMoreOnSpotify`), `/external/spotify/{artists|albums|playlists}/{id}`, and `/playlists` has a Local | Streaming filter (the account's playlists read live). `LibrarySources::STREAMING_SERVICES` names them, `config/availability.php` lists the providers; `docs/api/availability.md`.
+
 ### Leading source
 
-`App\Domain\Library\LeadingSource`: the own files (library `files`, kind `local`) lead when indexed, else DLNA when it has imported tracks, else Spotify (DLNA, Spotify and future Tidal/Deezer are kind `streaming`; scope `local` = own files, `streaming` = all of those; setting at `/settings/storage` › Library). Web pages and `/api/library/*` default to that source's scope; `?scope=local|streaming|all` overrides it, nothing is deleted. See `docs/architecture/library-identity.md`.
+`App\Domain\Library\LeadingSource`: the own files (library `files`, kind `local`) lead when indexed, else DLNA when it has tracks, else the own files (DLNA is kind `streaming`; scope `local` = own files, `streaming` = DLNA; **Spotify is not a library**: it extends the library live, see "Streaming extends the library" below; setting at `/settings/storage` › Library). Web pages and `/api/library/*` default to that source's scope; `?scope=local|streaming|all` overrides it, nothing is deleted. See `docs/architecture/library-identity.md`.
 
 ### Library Identity
 
-One record per artist, album and track across all sources (DLNA scan, Spotify import, plays); see `docs/architecture/library-identity.md`.
+One record per artist, album and track across all sources (DLNA scan, own files, plays); see `docs/architecture/library-identity.md`.
 
 - `App\Domain\Library\Normalizer` — comparison keys stored in `name_key` on `artists`/`albums`/`tracks` (set by a `saving` hook): case, diacritics, punctuation, `&`/"and", whitespace; artists also a leading "The " and "feat." credits; albums/tracks trailing pure edition markers ("(Remastered 2011)", "- Deluxe Edition"; not "(Live)", "(Acoustic)", "(Mono)", "(Remix)"); tracks a "(feat. …)" credit. Bump `Normalizer::VERSION` when a rule changes.
 - `App\Domain\Library\LibraryIdentity` — find-or-create used by every creation path: artist by key; album by artist + key; track by external id (own, or kept as `external_id` metadata), then album + key (album-less: artist + key, preferring an album track), durations within 5 s. A second source's external id is kept as `external_id` metadata, so a track can have both a DLNA URL and a Spotify URI.

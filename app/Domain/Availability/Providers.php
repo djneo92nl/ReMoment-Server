@@ -62,6 +62,21 @@ final class Providers
         return array_values(array_diff(LibrarySources::libraryIds(), self::ownedLibraries()));
     }
 
+    /**
+     * Whether $device can play what $provider has: the library's own per-device check, or for a streaming service that is not a
+     * library (Spotify) whether the device plays it. A provider with neither (physical items) never plays.
+     */
+    public static function playableOn(string $provider, \App\Models\Device $device): bool
+    {
+        $base = self::base($provider);
+
+        if (isset(LibrarySources::LIBRARIES[$base])) {
+            return LibrarySources::playableOn($base, $device);
+        }
+
+        return $base === 'spotify' && \App\Domain\Library\LibraryPlayback::canPlaySpotify($device);
+    }
+
     /** @return list<string> every configured provider id */
     public static function ids(): array
     {

@@ -37,7 +37,6 @@ use App\Models\Media\Playlist;
 use App\Models\Media\Track;
 use App\Models\Media\WantedTrack;
 use App\Models\Play;
-use App\Services\SpotifyTokenService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -232,7 +231,7 @@ class LibraryController extends Controller
     public function artist(Request $request, Artist $artist): JsonResponse
     {
         $request->validate([
-            'source' => ['nullable', 'in:files,dlna,spotify'],
+            'source' => ['nullable', 'in:files,dlna'],
             'scope' => ['nullable', 'in:'.implode(',', LeadingSource::apiScopes())],
             'include' => ['nullable', 'in:discography'],
             'device_id' => ['nullable', 'integer', 'exists:devices,id'],
@@ -244,9 +243,6 @@ class LibraryController extends Controller
         // One library at a time, like the web page: streaming is never merged with local. The libraries the artist
         // has tracks in, plus Spotify while it is connected (its side is always one request away).
         $sources = array_values(array_intersect(LibrarySources::libraryIds(), LibrarySources::ofTracks($artist->tracks()->with(['metadata' => fn ($q) => $q->whereIn('key', ['dlna_url', 'external_id'])])->get())));
-        if (app(SpotifyTokenService::class)->isConnected() && !in_array('spotify', $sources, true)) {
-            $sources[] = 'spotify';
-        }
         $source = AlbumPage::selectSource($sources, $request->query('source') ?? $artist->metaValue('default_source'), LeadingSource::scope($request->query('scope')));
 
         $albums = $this->artistAlbums($artist, $source, $hidden)
@@ -271,7 +267,7 @@ class LibraryController extends Controller
             'source' => $source,
             'sources' => array_map(fn (string $id) => [
                 'id' => $id,
-                'name' => LibrarySources::LIBRARIES[$id]['name'],
+                'name' => LibrarySources::sourceName($id),
                 'albums' => $this->artistAlbums($artist, $id, $hidden)->count(),
                 'tracks' => LibrarySources::availableFrom($artist->tracks(), $id)->count(),
             ], $sources),

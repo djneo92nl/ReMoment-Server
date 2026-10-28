@@ -32,7 +32,7 @@
     ])->filter()->implode(' · ');
 
     // Play follows the selected source and the pinned player, as on the album page: it plays where that player can play the source.
-    $sourceName = $source ? \App\Domain\Library\LibrarySources::LIBRARIES[$source]['name'] : null;
+    $sourceName = $source ? \App\Domain\Library\LibrarySources::sourceName($source) : null;
     $direct = $pinned !== null && $source !== null && \App\Domain\Library\LibrarySources::playableOn($source, $pinned);
     $playable = $trackCount > 0 && ($pinned === null ? $devices->isNotEmpty() : $direct);
     $action = fn (bool $shuffle) => \App\Support\DeviceAction::template('artists.play', ['artist' => $artist, 'source' => $source, 'shuffle' => $shuffle ? 1 : null]);

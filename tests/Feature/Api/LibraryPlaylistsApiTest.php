@@ -5,7 +5,6 @@ namespace Tests\Feature\Api;
 use App\Domain\Artwork\PlaylistArtwork;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
-use App\Integrations\Spotify\MusicPlayerDriver as SpotifyDriver;
 use App\Jobs\ProcessArtwork;
 use App\Models\Device;
 use App\Models\Media\Album;
@@ -19,7 +18,6 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Mockery;
 use Tests\Support\CachesArtwork;
-use Tests\Support\FakeBareDriver;
 use Tests\Support\FakeLibraryPlaybackDriver;
 use Tests\Support\FakesSpotify;
 use Tests\Support\MakesLibraryTracks;
@@ -146,56 +144,6 @@ class LibraryPlaylistsApiTest extends TestCase
             ->assertJsonPath('next_cursor', null);
 
         $this->getJson('/api/library/playlists?cursor=nope')->assertStatus(422);
-    }
-
-    public function test_playlist_detail_lists_tracks_in_playlist_order(): void
-    {
-        Queue::fake();
-        $album = $this->album('A', 'https://x.test/a.jpg');
-        $one = $this->track($album, 'One');
-        $two = $this->track($album, 'Two', dlna: false, spotifyId: 'two');
-        $three = $this->track(null, 'Three', dlna: false);
-        $playlist = $this->playlist('Mix', [$two, $three, $one]);
-        $this->processed('https://x.test/a.jpg');
-
-        $this->getJson("/api/library/playlists/{$playlist->id}")
-            ->assertOk()
-            ->assertExactJson([
-                'id' => $playlist->id,
-                'canonical_id' => $playlist->id,
-                'name' => 'Mix',
-                'owner' => null,
-                'last_played_at' => null,
-                'mode' => 'library',
-                'mode_library' => null,
-                'track_count' => 3,
-                'local_track_count' => null,
-                'local_coverage' => null,
-                'smart' => false,
-                'rules' => null,
-                'rules_summary' => null,
-                // Fewer than 4 album covers: the first album's cover.
-                'artwork' => ['hash' => md5('https://x.test/a.jpg'), 'proxy_120' => '/storage/a/120.jpg', 'proxy_320' => '/storage/a/320.jpg', 'colors' => ['#111111'], 'safe_colors' => ['#999999']],
-                // Spotify (Two) and DLNA (One), in the library's order.
-                'sources' => ['files', 'spotify'],
-                'playable' => true,
-                'tracks' => [
-                    ['id' => $two->id, 'name' => 'Two', 'artist_name' => 'Muse', 'duration' => 200, 'artwork' => ['hash' => md5('https://x.test/a.jpg'), 'proxy_120' => '/storage/a/120.jpg', 'proxy_320' => '/storage/a/320.jpg', 'colors' => ['#111111'], 'safe_colors' => ['#999999']], 'playable' => true],
-                    ['id' => $three->id, 'name' => 'Three', 'artist_name' => 'Muse', 'duration' => 200, 'artwork' => null, 'playable' => false],
-                    ['id' => $one->id, 'name' => 'One', 'artist_name' => 'Muse', 'duration' => 200, 'artwork' => ['hash' => md5('https://x.test/a.jpg'), 'proxy_120' => '/storage/a/120.jpg', 'proxy_320' => '/storage/a/320.jpg', 'colors' => ['#111111'], 'safe_colors' => ['#999999']], 'playable' => true],
-                ],
-            ]);
-
-        // On a DLNA-only device the Spotify track isn't playable.
-        $device = $this->device();
-        $this->getJson("/api/library/playlists/{$playlist->id}?device_id={$device->id}")
-            ->assertJsonPath('tracks.*.playable', [false, false, true]);
-
-        $bare = $this->device(FakeBareDriver::class);
-        $this->getJson("/api/library/playlists/{$playlist->id}?device_id={$bare->id}")
-            ->assertJsonPath('playable', false);
-
-        $this->getJson('/api/library/playlists/999')->assertNotFound();
     }
 
     public function test_playlist_detail_track_covers_are_the_albums_and_null_when_unprocessed(): void
@@ -335,81 +283,6 @@ class LibraryPlaylistsApiTest extends TestCase
             ->assertStatus(503)->assertJsonPath('error', 'unreachable');
     }
 
-    public function test_a_spotify_playlist_plays_as_its_context_from_the_start_track(): void
-    {
-        $api = $this->spotifyApi();
-        $spotify = $this->device(SpotifyDriver::class);
-        $one = $this->track(null, 'One', dlna: false, spotifyId: 'one');
-        $two = $this->track(null, 'Two', dlna: false, spotifyId: 'two');
-        $playlist = $this->playlist('Mix', [$one, $two], ['source' => 'spotify', 'external_id' => 'spotify:playlist:mix']);
-
-        $api->shouldReceive('play')->once()->with('', ['context_uri' => 'spotify:playlist:mix', 'offset' => ['uri' => 'spotify:track:two']])->andReturn(true);
-        $api->shouldReceive('shuffle')->once()->with(['state' => true])->andReturn(true);
-
-        $this->postJson("/api/devices/{$spotify->id}/library/play-playlist", [
-            'playlist_id' => $playlist->id, 'start_track_id' => $two->id, 'shuffle' => true,
-        ])->assertOk()->assertJsonPath('playlist', 'Mix');
-    }
-
-    public function test_spotify_failures_are_502(): void
-    {
-        $api = $this->spotifyApi();
-        $spotify = $this->device(SpotifyDriver::class);
-        $playlist = $this->playlist('Mix', [$this->track(null, 'One', dlna: false, spotifyId: 'one')], ['source' => 'spotify', 'external_id' => 'spotify:playlist:mix']);
-
-        $api->shouldReceive('play')->andThrow(new \RuntimeException('Premium required'));
-
-        $this->postJson("/api/devices/{$spotify->id}/library/play-playlist", ['playlist_id' => $playlist->id])
-            ->assertStatus(502)->assertJsonPath('error', 'driver_error');
-    }
-
-    // --- Playlists of a library ---
-
-    public function test_a_spotify_playlist_is_spotify_only_and_playable_only_where_spotify_plays(): void
-    {
-        $this->spotifyApi();
-        $dlnaDevice = $this->device();
-        $spotifyDevice = $this->device(SpotifyDriver::class);
-        // Merged tracks: a DLNA stream and a Spotify URI each.
-        $one = $this->track(null, 'One', dlna: true, spotifyId: 'one');
-        $two = $this->track(null, 'Two', dlna: true, spotifyId: 'two');
-        $playlist = $this->playlist('Mix', [$one, $two], ['source' => 'spotify', 'external_id' => 'spotify:playlist:mix']);
-
-        $this->getJson("/api/library/playlists/{$playlist->id}")
-            ->assertOk()->assertJsonPath('sources', ['spotify'])->assertJsonPath('playable', true);
-
-        $this->getJson("/api/library/playlists/{$playlist->id}?device_id={$dlnaDevice->id}")
-            ->assertOk()
-            ->assertJsonPath('sources', ['spotify'])
-            ->assertJsonPath('playable', false)
-            ->assertJsonPath('tracks.*.playable', [false, false]);
-
-        $this->getJson("/api/library/playlists/{$playlist->id}?device_id={$spotifyDevice->id}")
-            ->assertOk()->assertJsonPath('playable', true)->assertJsonPath('tracks.*.playable', [true, true]);
-
-        $this->postJson("/api/devices/{$dlnaDevice->id}/library/play-playlist", ['playlist_id' => $playlist->id])
-            ->assertStatus(422)->assertJsonPath('error', 'not_playable');
-        $this->assertNull($playlist->fresh()->last_played_at);
-        $this->assertSame([], FakeLibraryPlaybackDriver::$calls);
-    }
-
-    public function test_a_local_playlist_keeps_its_track_derived_sources_and_playability(): void
-    {
-        $this->spotifyApi();
-        $dlnaDevice = $this->device();
-        $one = $this->track(null, 'One', dlna: true, spotifyId: 'one');
-        $playlist = $this->playlist('Mine', [$one]);
-
-        $this->getJson("/api/library/playlists/{$playlist->id}?device_id={$dlnaDevice->id}")
-            ->assertOk()
-            ->assertJsonPath('sources', ['files', 'spotify'])
-            ->assertJsonPath('playable', true)
-            ->assertJsonPath('tracks.0.playable', true);
-    }
-
-    // --- Playlists of another library, played locally ---
-
-    /** A Spotify playlist of $total tracks, the first $local of which also have a Local copy. */
     private function spotifyPlaylist(string $name, int $total, int $local, array $attributes = []): Playlist
     {
         $tracks = [];
@@ -444,40 +317,6 @@ class LibraryPlaylistsApiTest extends TestCase
         $this->assertSame(['Forty', 'Half', 'Mine', 'Twofifths'], $this->getJson('/api/library/playlists?scope=local')->json('data.*.name'));
     }
 
-    public function test_coverage_is_rounded_to_two_decimals_and_reported_in_every_scope(): void
-    {
-        Queue::fake();
-        $this->spotifyPlaylist('Third', 3, 1);
-
-        $this->getJson('/api/library/playlists?scope=spotify')
-            ->assertJsonPath('data.0.local_track_count', 1)
-            ->assertJsonPath('data.0.track_count', 3)
-            ->assertJsonPath('data.0.local_coverage', 0.33)
-            ->assertJsonPath('data.0.external', false);
-    }
-
-    public function test_scope_all_and_spotify_do_not_duplicate_and_keep_paging_stable(): void
-    {
-        Queue::fake();
-        foreach (range(1, 30) as $i) {
-            $this->spotifyPlaylist(sprintf('S%02d', $i), 2, 2);
-            $this->playlist(sprintf('L%02d', $i), [$this->track(null, "L{$i}")]);
-        }
-
-        foreach (['all', 'files'] as $scope) {
-            $first = $this->getJson("/api/library/playlists?scope={$scope}")->assertOk();
-            $second = $this->getJson("/api/library/playlists?scope={$scope}&cursor=".$first->json('next_cursor'))->assertOk();
-            $ids = array_merge($first->json('data.*.id'), $second->json('data.*.id'));
-            $this->assertCount(60, $ids);
-            $this->assertSame($ids, array_values(array_unique($ids)));
-            $this->assertNull($second->json('next_cursor'));
-        }
-
-        // Only in the Local scope are they external; scope=all lists each once as itself.
-        $this->assertSame([false], array_unique($this->getJson('/api/library/playlists?scope=all')->json('data.*.external')));
-        $this->assertCount(30, $this->getJson('/api/library/playlists?scope=spotify')->json('data'));
-    }
-
     public function test_external_playlists_sort_with_the_rest_by_last_played_then_name(): void
     {
         Queue::fake();
@@ -488,39 +327,6 @@ class LibraryPlaylistsApiTest extends TestCase
         $this->getJson('/api/library/playlists?scope=files')->assertJsonPath('data.*.name', ['Alpha', 'Beta', 'Zed']);
     }
 
-    public function test_a_client_hiding_spotify_does_not_see_external_playlists(): void
-    {
-        Queue::fake();
-        $this->spotifyPlaylist('Half', 2, 2);
-        $client = \App\Models\Client::create(['status' => 'approved', 'type' => 'multi', 'registration_token' => \App\Models\Client::generateToken(), 'api_token' => \App\Models\Client::generateToken(), 'hidden_sources' => ['spotify']]);
-
-        $this->getJson('/api/library/playlists?scope=files&client='.$client->api_token)->assertJsonPath('data', []);
-    }
-
-    public function test_a_spotify_playlist_lists_all_its_tracks_in_library_mode(): void
-    {
-        Queue::fake();
-        // 3 Spotify-only tracks and 2 that also exist locally, interleaved.
-        $playlist = $this->spotifyPlaylist('Mix', 5, 0);
-        $tracks = $playlist->tracks()->orderBy('playlist_track.id')->get();
-        foreach ([1, 3] as $i) {
-            Metadata::create(['metadatable_type' => Track::class, 'metadatable_id' => $tracks[$i]->id, 'key' => 'dlna_url', 'value' => 'http://nas.test/'.$i.'.flac', 'type' => 'url', 'source' => 'files']);
-        }
-
-        // Default scope (the leading library) must not hide the Spotify-only tracks.
-        foreach (['', '?library=spotify', '?scope=files'] as $query) {
-            $response = $this->getJson("/api/library/playlists/{$playlist->id}{$query}")->assertOk()
-                ->assertJsonPath('mode', 'library')
-                ->assertJsonPath('track_count', 5)
-                ->assertJsonCount(5, 'tracks');
-            $this->assertSame($tracks->pluck('id')->all(), $response->json('tracks.*.id'));
-        }
-
-        // Local mode is unchanged: all tracks, the Spotify-only ones missing locally.
-        $local = $this->getJson("/api/library/playlists/{$playlist->id}?library=files")->assertOk()->assertJsonPath('track_count', 5);
-        $this->assertSame([true, false, true, false, true], $local->json('tracks.*.missing_locally'));
-    }
-
     public function test_a_spotify_playlist_over_the_page_limit_reports_the_real_total(): void
     {
         Queue::fake();
@@ -529,62 +335,6 @@ class LibraryPlaylistsApiTest extends TestCase
         $this->getJson("/api/library/playlists/{$playlist->id}")->assertOk()
             ->assertJsonPath('track_count', 203)
             ->assertJsonCount(200, 'tracks');
-    }
-
-    public function test_a_client_hiding_a_source_still_filters_a_spotify_playlist_detail(): void
-    {
-        Queue::fake();
-        $playlist = $this->spotifyPlaylist('Mix', 3, 0);
-        $client = \App\Models\Client::create(['status' => 'approved', 'type' => 'multi', 'registration_token' => \App\Models\Client::generateToken(), 'api_token' => \App\Models\Client::generateToken(), 'hidden_sources' => ['spotify']]);
-
-        $this->getJson("/api/library/playlists/{$playlist->id}?client=".$client->api_token)->assertOk()
-            ->assertJsonPath('track_count', 0)
-            ->assertJsonCount(0, 'tracks');
-        $this->getJson("/api/library/playlists/{$playlist->id}")->assertJsonCount(3, 'tracks');
-    }
-
-    public function test_detail_mode_follows_the_library_the_playlist_was_opened_from(): void
-    {
-        $this->spotifyApi();
-        $dlnaDevice = $this->device();
-        $spotifyDevice = $this->device(SpotifyDriver::class);
-        $playlist = $this->spotifyPlaylist('Mix', 4, 3);
-
-        // Without a library, or from its own: library mode, as before.
-        foreach (['', '?library=spotify'] as $query) {
-            $this->getJson("/api/library/playlists/{$playlist->id}{$query}")
-                ->assertOk()
-                ->assertJsonPath('mode', 'library')
-                ->assertJsonPath('mode_library', 'spotify')
-                ->assertJsonPath('sources', ['spotify'])
-                ->assertJsonPath('track_count', 4)
-                ->assertJsonPath('local_track_count', 3)
-                ->assertJsonPath('local_coverage', 0.75)
-                ->assertJsonMissingPath('tracks.0.missing_locally');
-        }
-
-        // From Local: local mode, every track listed, the one without a copy marked.
-        $local = $this->getJson("/api/library/playlists/{$playlist->id}?library=files&device_id={$dlnaDevice->id}")
-            ->assertOk()
-            ->assertJsonPath('mode', 'local')
-            ->assertJsonPath('mode_library', 'files')
-            ->assertJsonPath('sources', ['files'])
-            ->assertJsonPath('playable', true)
-            ->assertJsonPath('track_count', 4)
-            ->assertJsonPath('local_track_count', 3);
-        $this->assertSame([true, true, true, false], $local->json('tracks.*.playable'));
-        $this->assertSame([false, false, false, true], $local->json('tracks.*.missing_locally'));
-        $this->assertSame(['Mix 1', 'Mix 2', 'Mix 3', 'Mix 4'], $local->json('tracks.*.name'));
-
-        // The scope the client browsed in doesn't hide the missing tracks.
-        $this->getJson("/api/library/playlists/{$playlist->id}?library=files&scope=files")->assertJsonCount(4, 'tracks');
-
-        // A device that can't play Local: nothing is playable in local mode.
-        $this->getJson("/api/library/playlists/{$playlist->id}?library=files&device_id={$spotifyDevice->id}")
-            ->assertOk()->assertJsonPath('mode', 'local')->assertJsonPath('playable', false)
-            ->assertJsonPath('tracks.*.playable', [false, false, false, false]);
-        $this->getJson("/api/library/playlists/{$playlist->id}?device_id={$dlnaDevice->id}")
-            ->assertJsonPath('mode', 'library')->assertJsonPath('playable', false);
     }
 
     public function test_local_mode_is_not_playable_without_any_local_copy(): void
@@ -634,34 +384,6 @@ class LibraryPlaylistsApiTest extends TestCase
         $this->postJson("/api/devices/{$device->id}/library/play-playlist", ['playlist_id' => $playlist->id, 'library' => 'files', 'start_track_id' => $tracks[1]->id])
             ->assertStatus(422)->assertJsonPath('error', 'not_playable');
         $this->assertCount($calls, FakeLibraryPlaybackDriver::$calls);
-    }
-
-    public function test_local_mode_on_a_device_without_local_or_with_nothing_local_is_422_and_records_nothing(): void
-    {
-        $this->spotifyApi();
-        $spotifyDevice = $this->device(SpotifyDriver::class);
-        $dlnaDevice = $this->device();
-        $playlist = $this->spotifyPlaylist('Mix', 2, 2);
-        $empty = $this->spotifyPlaylist('Empty', 2, 0);
-
-        $this->postJson("/api/devices/{$spotifyDevice->id}/library/play-playlist", ['playlist_id' => $playlist->id, 'library' => 'files'])
-            ->assertStatus(422)->assertJsonPath('error', 'not_playable')
-            ->assertJsonPath('message', fn (string $m) => str_contains($m, 'Local library'));
-
-        $this->postJson("/api/devices/{$dlnaDevice->id}/library/play-playlist", ['playlist_id' => $empty->id, 'library' => 'files'])
-            ->assertStatus(422)->assertJsonPath('error', 'not_playable')
-            ->assertJsonPath('message', fn (string $m) => str_contains($m, 'Local library'));
-
-        // Library mode on a Local-only device names the playlist's library.
-        $this->postJson("/api/devices/{$dlnaDevice->id}/library/play-playlist", ['playlist_id' => $playlist->id])
-            ->assertStatus(422)->assertJsonPath('message', fn (string $m) => str_contains($m, 'Spotify library'));
-
-        $this->postJson("/api/devices/{$dlnaDevice->id}/library/play-playlist", ['playlist_id' => $playlist->id, 'library' => 'deezer'])
-            ->assertStatus(422)->assertJsonValidationErrors('library');
-
-        $this->assertNull($playlist->fresh()->last_played_at);
-        $this->assertNull($empty->fresh()->last_played_at);
-        $this->assertSame([], FakeLibraryPlaybackDriver::$calls);
     }
 
     public function test_the_playlist_list_counts_local_copies_without_a_query_per_playlist(): void

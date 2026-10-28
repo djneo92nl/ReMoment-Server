@@ -163,7 +163,7 @@ final class CatalogueItems
                     // The service's own id (a lookup provider's answer), so a client can play it without the library having the album.
                     $entry = ['provider' => $provider, 'library' => $library, 'status' => 'available', 'external_id' => $answer?->external_id];
                     if ($device !== null) {
-                        $entry['playable'] = $library !== null && LibrarySources::playableOn($library, $device);
+                        $entry['playable'] = Providers::playableOn($provider, $device);
                     }
 
                     return $entry;

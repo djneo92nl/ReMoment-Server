@@ -50,15 +50,12 @@ GET /api/library/new-releases?days=90&device_id=                                
 GET /api/library/catalogue/{id}?device_id=                                                                       → CatalogueItem
 GET /api/library/artists/{id}?include=discography[&device_id=]                                                   → the artist detail plus discography: [CatalogueItem]
 GET /api/library/albums?availability=owned|streamable                                                            → the usual AlbumItem list, narrowed
-POST /api/library/catalogue/{id}/import                                                                          → 202 { status: "queued" }   adds an album Spotify has to the library; 422 not_importable
 PUT /api/library/catalogue/{id}/wanted   { "wanted": true }    → { "wanted": true }     household-wide wish; clears "ignored"; a second wish keeps the first timestamp
 PUT /api/library/catalogue/{id}/ignored  { "ignored": true }   → { "ignored": true }    "I don't want this": hidden from the discography and wishlist; clears the wish
 ```
 
-`availability` for Spotify fills in a little after the first look at an artist's discography (a background lookup; reload to see it), then stays for 180 days (7 for a wished album, 90 when Spotify did not have it). Import needs Spotify connected and an entry whose Spotify answer is available; the album shows up linked a moment later.
-
-```
-POST   /api/library/wanted-tracks  { artist, title, album?, image_url?, source?: history|radio|manual }   → WantedSong   201 new, 200 when it was already wished
+`availability` for Spotify fills in a little after the first look at an artist's discography (a background lookup; reload to see it), then stays for 180 days (7 for a wished album, 90 when Spotify did not have it). ```
+POST   /api/library/wanted-tracks  { artist, title, album?, image_url?, source?: history|radio|manual|streaming }   → WantedSong   201 new, 200 when it was already wished
 DELETE /api/library/wanted-tracks/{id}                                                                    → { status: "ok" }
 ```
 
@@ -77,7 +74,7 @@ MCP: the `catalogue` tool (`discography`, `wishlist`, `item`, `wish`, `unwish`, 
 
 ## External catalogues: browse, play and add
 
-What a service offers, for **any** artist, not only the ones in the library. Spotify is the first provider (`config/availability.php`, `App\Domain\Availability\SpotifyBrowser`); results are transient (nothing is stored) and each says whether the library already has it. Needs the service connected (`422 not_connected`), and is closed to client tokens like the rest of the catalogue (`403`); an unknown provider is `404 unknown_provider`, a service that does not answer `502 driver_error`.
+What a service offers, for **any** artist, not only the ones in the library. **Nothing is imported**: the library is the local tracks and a service extends it live, so there is no add to library; you play it, or want a track (`POST /api/library/wanted-tracks`, source `streaming`). Spotify is the first provider (`config/availability.php`, `App\Domain\Availability\SpotifyBrowser`); results are transient (nothing is stored) and each says whether the library already has it. Needs the service connected (`422 not_connected`), and is closed to client tokens like the rest of the catalogue (`403`); an unknown provider is `404 unknown_provider`, a service that does not answer `502 driver_error`.
 
 ```json
 { "provider": "spotify", "type": "album", "id": "4aawyAB9vmqN3uQ7FjRGTy", "title": "Selected Ambient Works Volume II", "artist": "Aphex Twin",
@@ -92,14 +89,12 @@ GET  /api/library/external/{provider}/artists/{id}                              
 GET  /api/library/external/{provider}/albums/{id}                                 → { album: ExternalItem, tracks: [ExternalItem] }
 GET  /api/library/external/{provider}/playlists                                   → { data: [ExternalItem] }   the account's playlists, read live (type `playlist`: title, `artist` = owner, track_count)
 GET  /api/library/external/{provider}/playlists/{id}                              → { playlist: ExternalItem, tracks: [ExternalItem] | null }   null: the service does not share the tracks (Spotify: only playlists you own or collaborate on)
-POST /api/library/external/{provider}/add   { type, id, album_ids? }              → 202 { status: "queued", queued: { albums, tracks } }
 POST /api/devices/{id}/library/play-external { provider, type: artist|album|track|playlist, id, shuffle? }     → { status: "ok", provider, type, id }
 ```
 
-- **Add** queues the import; the records appear in the library a moment later (through `LibraryIdentity`, source = the provider, so they merge with copies from other sources and get enriched). An artist adds the given `album_ids`, else **all** its albums the library does not have yet (at most 100 per call).
 - **Play** needs no import: Spotify plays the album or artist as its context, a track by URI, on a device that can play Spotify (the Spotify device, or a speaker mapped to a Connect name). `422 not_playable` otherwise (`LibrarySources::playableOn`), `503` unreachable, `502 driver_error`.
-- MCP: the `external` tool (`search`, `artist`, `album`, `play`, `add`).
-- Web: the search box offers Spotify's artists, albums and tracks with Play (on the player pinned in this browser) and Add.
+- MCP: the `external` tool (`search`, `artist`, `album`, `playlists`, `playlist`, `play`).
+- Web: the search box offers Spotify's artists, albums and tracks with Play (on the player pinned in this browser) and, for tracks, a star to want them; see `docs/frontend/library.md`.
 
 ## New releases
 

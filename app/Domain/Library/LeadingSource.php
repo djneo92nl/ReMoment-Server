@@ -20,7 +20,7 @@ class LeadingSource
     public const SETTING = 'library_leading_source';
 
     /** Admin setting: pick automatically, force a source, or show everything (no leading source). */
-    public const MODES = ['auto', 'files', 'dlna', 'spotify', 'all'];
+    public const MODES = ['auto', 'files', 'dlna', 'all'];
 
     public const SCOPES = ['local', 'streaming', 'all'];
 
@@ -33,7 +33,7 @@ class LeadingSource
         return in_array($mode, self::MODES, true) ? $mode : 'auto';
     }
 
-    /** `files`, `dlna`, `spotify` or `all`: the forced choice, else the own files when indexed, else DLNA when it has imported tracks, else Spotify. */
+    /** `files`, `dlna` or `all`: the forced choice, else the own files when indexed, else DLNA when it has tracks, else the own files. */
     public static function leading(): string
     {
         $mode = self::mode();
@@ -44,7 +44,7 @@ class LeadingSource
         return match (true) {
             Track::where('source', 'files')->exists() => 'files',
             Track::where('source', 'dlna')->exists() => 'dlna',
-            default => 'spotify',
+            default => 'files',
         };
     }
 
@@ -52,7 +52,7 @@ class LeadingSource
     {
         return match (self::leading()) {
             'files' => 'local',
-            'dlna', 'spotify' => 'streaming',
+            'dlna' => 'streaming',
             default => 'all',
         };
     }

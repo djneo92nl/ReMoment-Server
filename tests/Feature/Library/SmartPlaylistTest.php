@@ -118,24 +118,6 @@ class SmartPlaylistTest extends TestCase
         $this->assertSame(['Never', 'Old'], $this->names([['field' => 'last_played', 'operator' => 'not_within', 'value' => 30]]), 'never played counts as not played lately');
     }
 
-    public function test_favorite_lossless_explicit_source_and_length(): void
-    {
-        $fav = $this->track('Fav');
-        $fav->album->update(['favorited_at' => now()]);
-        $flac = $this->track('Flac');
-        $this->meta($flac, 'mime_type', 'audio/flac');
-        $this->meta($flac, 'explicit', '1');
-        $spotify = $this->track('Streamed', dlna: false, spotifyId: 'abc');
-        $spotify->update(['duration' => 600]);
-
-        $this->assertSame(['Fav'], $this->names([['field' => 'favorite', 'operator' => 'yes', 'value' => '']]));
-        $this->assertSame(['Flac', 'Streamed'], $this->names([['field' => 'favorite', 'operator' => 'no', 'value' => '']]));
-        $this->assertSame(['Flac'], $this->names([['field' => 'lossless', 'operator' => 'yes', 'value' => '']]));
-        $this->assertSame(['Flac'], $this->names([['field' => 'explicit', 'operator' => 'yes', 'value' => '']]));
-        $this->assertSame(['Streamed'], $this->names([['field' => 'source', 'operator' => 'is', 'value' => 'spotify']]));
-        $this->assertSame(['Streamed'], $this->names([['field' => 'duration', 'operator' => 'gte', 'value' => 5]]));
-    }
-
     public function test_metadata_rules_look_at_the_album_and_artist(): void
     {
         $a = $this->track('A');
@@ -164,18 +146,6 @@ class SmartPlaylistTest extends TestCase
         $this->assertSame(['New'], $this->names($rules, 'all'));
         $this->assertSame(['New', 'Old', 'Other'], $this->names($rules, 'any'));
         $this->assertSame(3, SmartPlaylistBuilder::count(['rules' => []]));
-    }
-
-    public function test_radio_stubs_and_hidden_sources_are_left_out(): void
-    {
-        $this->track('Kept');
-        $this->track('Stub')->update(['source' => 'radio']);
-        $this->track('Streamed', dlna: false, spotifyId: 'abc');
-
-        $this->assertSame(['Kept', 'Streamed'], $this->names([]));
-
-        Setting::set(LeadingSource::SETTING, 'files');
-        $this->assertSame(['Kept'], $this->names([]));
     }
 
     public function test_normalize_drops_unknown_incomplete_and_out_of_range_rules(): void

@@ -30,7 +30,7 @@ class AvailabilityProvidersTest extends TestCase
     public function test_owned_and_streaming_libraries_split_the_registry(): void
     {
         $this->assertEqualsCanonicalizing(['files', 'dlna'], Providers::ownedLibraries());
-        $this->assertSame(['spotify'], Providers::streamingLibraries());
+        $this->assertSame([], Providers::streamingLibraries(), 'Spotify extends the library live, it is not a library');
         $this->assertTrue(Providers::anyOwned(['spotify', 'dlna:2']));
         $this->assertFalse(Providers::anyOwned(['spotify']));
     }

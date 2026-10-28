@@ -106,16 +106,6 @@ class GenreColorsTest extends TestCase
         $this->assertSame([], GenreColors::dominant([null, [], ['nonsense']]));
     }
 
-    public function test_scope_is_respected(): void
-    {
-        $this->album('Rock', ['#d03030'], 'dlna');
-        $this->album('Rock', ['#3030d0'], 'spotify');
-
-        $this->assertSame(['#d03030'], $this->colors('?scope=dlna'));
-        $this->assertSame(['#3030d0'], $this->colors('?scope=spotify'));
-        $this->assertCount(2, $this->colors('?scope=all'));
-    }
-
     public function test_computed_colours_are_cached_per_scope(): void
     {
         $this->album('Rock', ['#d03030']);

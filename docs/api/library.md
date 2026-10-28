@@ -1,5 +1,8 @@
 # Library API
 
+> **Direction change (2026-10-28): Spotify is not a library.** The library is the local tracks (`files`, `dlna`); Spotify extends it live and nothing of it is imported (see "Streaming extends the library" in CLAUDE.md and [availability.md](availability.md)). Gone: the `spotify` library id (`/api/library/libraries`, `scope=spotify` is `422`), `source=spotify` on the artist detail, the saved-tracks and playlist sync, `fill-from-spotify` and every add/import endpoint. A migration (`library:drop-spotify`) removed the Spotify rows an old import left. Still valid: `GET /api/library/albums/{id}/spotify` (the album as Spotify has it, read live), `play-album` with `source=spotify` and `spotify_track_id` plays (library tracks that carry a Spotify id play through Spotify). The sections below that still describe **Spotify playlists as a library** (playlist `mode`, `mode_library`, `local_coverage`, `external`, playing a Spotify playlist's context from the library) are legacy: with no imported Spotify playlists they never apply, and the code is a candidate for removal. Streaming playlists are read live at `/api/library/external/spotify/playlists`.
+
+
 Browse the shared media library and its playlists, keep household favorites, and play albums, artists or playlists on a device. All endpoints are under `/api`, unauthenticated like the rest of the API. Controller: `app/Http/Controllers/Api/LibraryController.php` (browse, favorites) and `Api/DeviceController` (`library/*` playback); playback logic: `app/Domain/Library/LibraryPlayback.php`, shared with the web Album/Artist/Playlist/track play buttons.
 
 ## Shapes
@@ -22,7 +25,7 @@ Duplicates from before identity existed are merged by an admin running `php arti
 - `PUT …/favorite` (albums, artists, tracks) favorites the survivor; the response adds `canonical_id`.
 - Play and queue bodies take an old id as if the survivor's had been sent: `library/play` (`track_id`), `play-album` (`album_id`, `start_track_id`), `play-artist` (`artist_id`), `play-playlist` (`playlist_id`, `start_track_id`), `POST /devices/{id}/queue` (`id`), and `POST /library/playlists/{id}/tracks` (`track_id`, `album_id`). Their responses do not carry `canonical_id`; read the detail to learn it.
 - Lists (`artists`, `albums`, `tracks`, `recent`, `favorites`, search…) never contain a retired id.
-- `GET /api/library/tracks/{id}/waveform`, `albums/{id}/spotify` and `fill-from-spotify` resolve too.
+- `GET /api/library/tracks/{id}/waveform` and `albums/{id}/spotify` resolve too.
 - An id that never existed, or whose record was **removed** (not merged), stays `404` (`422` where a body validation says so today). `DELETE`s and the admin remove actions never follow an alias: a stale id cannot delete the record it became.
 - Web pages (`/albums/{id}`, `/artists/{id}`, `/playlists/{id}`) answer `301` to the canonical URL.
 
@@ -259,7 +262,6 @@ An album is added in album order, limited to `source` (`files`, `dlna`, `spotify
 
 ```
 GET  /api/library/albums/{id}/spotify               → { "missing": 2, "tracks": [ { "spotify_id", "name", "number", "disc", "duration", "track_id": 34|null } ] }
-POST /api/library/albums/{id}/fill-from-spotify     → { "added": 2 }
 ```
 
 Spotify's own track list in album order (cached an hour); `track_id` is the library track that holds it (matched by normalized name), `null` when the library lacks it (`missing` counts those). Both need Spotify connected on the server: `422 spotify_unavailable` otherwise; `404` when Spotify does not have the album, `502 driver_error` when it fails. Fill adds the missing tracks to the library album (the web "Fill out album from Spotify").

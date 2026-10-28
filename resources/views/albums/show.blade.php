@@ -2,7 +2,7 @@
     @php
         $album = $page->album;
         $pinned = app(\App\Support\SelectedDevice::class)->device();
-        $sourceNames = collect($page->sources)->mapWithKeys(fn ($s) => [$s => \App\Domain\Library\LibrarySources::LIBRARIES[$s]['name']]);
+        $sourceNames = collect($page->sources)->mapWithKeys(fn ($s) => [$s => \App\Domain\Library\LibrarySources::sourceName($s)]);
     @endphp
 
     <div class="space-y-8">

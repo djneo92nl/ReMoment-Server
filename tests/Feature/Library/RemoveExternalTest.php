@@ -90,21 +90,6 @@ class RemoveExternalTest extends TestCase
         $this->assertNotNull(Album::find($album->id));
     }
 
-    public function test_only_the_admin_can_remove_and_the_page_offers_it(): void
-    {
-        $album = $this->spotifyAlbum();
-
-        $this->delete(route('albums.destroy', $album))->assertRedirect('/login');
-        $this->assertSame(1, Album::count());
-
-        $this->get(route('albums.show', $album))->assertDontSee('Remove from library');
-
-        $this->actingAs(User::factory()->create());
-        $this->get(route('albums.show', $album))->assertSee('Remove from library')->assertSee('Spotify');
-        $this->delete(route('albums.destroy', $album))->assertRedirect()->assertSessionHas('success');
-        $this->assertSame(0, Album::count());
-    }
-
     public function test_album_cards_show_where_an_album_comes_from(): void
     {
         $this->dlnaTrackOn($this->spotifyAlbum());

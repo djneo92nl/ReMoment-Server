@@ -3,7 +3,7 @@
         $pinned = app(\App\Support\SelectedDevice::class)->device();
         $details = $artist->details();
 
-        $sourceNames = collect($sources)->mapWithKeys(fn ($s) => [$s => \App\Domain\Library\LibrarySources::LIBRARIES[$s]['name']]);
+        $sourceNames = collect($sources)->mapWithKeys(fn ($s) => [$s => \App\Domain\Library\LibrarySources::sourceName($s)]);
 
         $tabs = array_filter([
             'overview' => ['Overview', 'house'],

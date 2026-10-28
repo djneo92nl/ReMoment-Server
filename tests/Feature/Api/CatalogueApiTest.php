@@ -35,10 +35,15 @@ class CatalogueApiTest extends TestCase
         ]);
     }
 
+    /** A library album; with source `spotify` it is one a streaming service has (a lookup answer), not a library copy: Spotify extends the library live. */
     private function album(string $name, string $source): Album
     {
-        $album = Album::create(['artist_id' => $this->artist->id, 'name' => $name, 'source' => $source]);
-        Track::create(['album_id' => $album->id, 'artist_id' => $this->artist->id, 'name' => 'T', 'source' => $source, 'external_id' => $source.':'.$album->id]);
+        $streaming = $source === 'spotify';
+        $album = Album::create(['artist_id' => $this->artist->id, 'name' => $name, 'source' => $streaming ? null : $source]);
+        Track::create(['album_id' => $album->id, 'artist_id' => $this->artist->id, 'name' => 'T', 'source' => $streaming ? null : $source, 'external_id' => $source.':'.$album->id]);
+        if ($streaming) {
+            AlbumAvailability::create(['album_id' => $album->id, 'provider' => 'spotify', 'status' => 'available', 'external_id' => 'spotify:album:'.$album->id, 'confidence' => 90, 'match' => 'search', 'checked_at' => now()]);
+        }
 
         return $album;
     }
@@ -56,7 +61,7 @@ class CatalogueApiTest extends TestCase
         $this->assertSame(['Known One', 'Spotify One', 'Mine'], array_column($data, 'title'));
         $this->assertSame(['known', 'streamable', 'owned'], array_column($data, 'state'));
         $this->assertNull($data[0]['album_id']);
-        $this->assertSame('spotify', $data[1]['availability'][0]['library']);
+        $this->assertSame(['spotify', null], [$data[1]['availability'][0]['provider'], $data[1]['availability'][0]['library']]);
         $this->assertNotNull($data[2]['album_id']);
         $this->assertArrayNotHasKey('playable', $data[1]['availability'][0]);
     }

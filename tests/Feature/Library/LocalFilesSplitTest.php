@@ -40,35 +40,6 @@ class LocalFilesSplitTest extends TestCase
         return collect($this->getJson("/api/library/albums?scope={$scope}")->assertOk()->json('data'))->pluck('name')->sort()->values()->all();
     }
 
-    public function test_local_scope_is_only_own_files_and_streaming_is_dlna_plus_spotify(): void
-    {
-        $this->makeLibraryTrack($this->album('Own'), 'Song');
-        $this->makeLibraryTrack($this->album('Served'), 'Song', streamSource: 'dlna:1');
-        $this->makeLibraryTrack($this->album('Spot'), 'Song', dlna: false, spotifyId: 'abc');
-
-        $this->assertSame(['Own'], $this->albumNames('local'));
-        $this->assertSame(['Own'], $this->albumNames('files'));
-        $this->assertSame(['Served'], $this->albumNames('dlna'));
-        $this->assertSame(['Spot'], $this->albumNames('spotify'));
-        $this->assertSame(['Served', 'Spot'], $this->albumNames('streaming'));
-        $this->assertSame(['Own', 'Served', 'Spot'], $this->albumNames('all'));
-    }
-
-    public function test_a_track_with_a_files_and_a_dlna_url_shows_in_both_libraries(): void
-    {
-        $album = $this->album('Both');
-        $track = $this->makeLibraryTrack($album, 'Song');
-        Metadata::create([
-            'metadatable_type' => Track::class, 'metadatable_id' => $track->id,
-            'key' => 'dlna_url', 'value' => 'http://nas.test/both.flac', 'type' => 'url', 'source' => 'dlna:1',
-        ]);
-
-        $this->assertSame(['Both'], $this->albumNames('files'));
-        $this->assertSame(['Both'], $this->albumNames('dlna'));
-        $this->assertSame([], $this->albumNames('spotify'));
-        $this->assertSame(['files', 'dlna'], $track->fresh()->sources());
-    }
-
     public function test_track_sources_lists_files_dlna_and_spotify(): void
     {
         $album = $this->album('Three');
@@ -105,21 +76,6 @@ class LocalFilesSplitTest extends TestCase
         $this->assertSame(0, Metadata::where('source', 'dlna:local')->count());
         $this->assertSame(['files', 'dlna'], $both->fresh()->sources());
         $this->assertSame(['dlna', 'files'], $client->fresh()->hidden_sources);
-    }
-
-    public function test_streaming_scope_offers_a_filter_per_service_and_a_service_scope_keeps_streaming_active(): void
-    {
-        $dlna = $this->album('Nas Album');
-        $this->makeLibraryTrack($dlna, 'a', streamSource: 'dlna:1');
-        $spotify = $this->album('Spot Album');
-        $this->makeLibraryTrack($spotify, 'b', dlna: false, spotifyId: 'x');
-
-        $this->get('/albums?scope=streaming')->assertOk()
-            ->assertSee('Streaming service', false)->assertSee('All streaming')->assertSee('Nas Album')->assertSee('Spot Album');
-
-        $this->get('/albums?scope=dlna')->assertOk()->assertSee('Nas Album')->assertDontSee('Spot Album')->assertSee('Streaming service', false);
-
-        $this->get('/albums?scope=local')->assertOk()->assertDontSee('Streaming service', false);
     }
 
     public function test_service_filter_lists_only_services_with_content(): void

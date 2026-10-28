@@ -1046,7 +1046,7 @@ paths:
       - name: source
         in: query
         description: The library to show (an artist is never shown merged across libraries). Default the artist's default source, else the one the scope browses.
-        schema: { type: string, enum: [files, dlna, spotify] }
+        schema: { type: string, enum: [files, dlna] }
       - { name: include, in: query, schema: { type: string, enum: [discography] }, description: "Adds `discography` (CatalogueItem list). Ignored for client devices." }
       - { name: device_id, in: query, schema: { type: integer } }
     get:
@@ -1439,42 +1439,6 @@ paths:
         "404": { description: unknown_provider or not_found }
         "422": { description: not_connected }
         "502": { description: The service did not answer (driver_error) }
-  /library/external/{provider}/add:
-    parameters:
-      - { name: provider, in: path, required: true, schema: { type: string, enum: [spotify] } }
-    post:
-      tags: [Library]
-      operationId: addExternal
-      description: Queues the import of an artist, album or track into the library. An artist adds `album_ids`, else all its albums the library lacks (at most 100). Not available to client devices.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [type, id]
-              properties:
-                type: { type: string, enum: [artist, album, track] }
-                id: { type: string }
-                album_ids: { type: array, items: { type: string }, maxItems: 100 }
-      responses:
-        "202":
-          description: Queued
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status: { type: string, enum: [queued] }
-                  queued:
-                    type: object
-                    properties:
-                      albums: { type: integer }
-                      tracks: { type: integer }
-        "403": { description: Forbidden for client devices }
-        "404": { description: unknown_provider }
-        "422": { description: Validation error, or not_connected }
-        "502": { description: The service did not answer (driver_error) }
   /devices/{device}/library/play-external:
     parameters:
       - { name: device, in: path, required: true, schema: { type: integer } }
@@ -1509,25 +1473,6 @@ paths:
         "422": { $ref: "#/components/responses/DeviceError" }
         "502": { $ref: "#/components/responses/DeviceError" }
         "503": { $ref: "#/components/responses/DeviceError" }
-  /library/catalogue/{id}/import:
-    parameters:
-      - { name: id, in: path, required: true, schema: { type: integer } }
-    post:
-      tags: [Library]
-      operationId: importCatalogueAlbum
-      description: Adds an album Spotify has (an available Spotify answer on the entry) to the library. Queued; the album appears linked a moment later. Not available to client devices.
-      responses:
-        "202":
-          description: Queued
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status: { type: string, enum: [queued] }
-        "403": { description: Forbidden for client devices }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "422": { description: not_importable (no Spotify answer, already in the library, or Spotify not connected) }
   /library/catalogue/{id}/wanted:
     parameters:
       - { name: id, in: path, required: true, schema: { type: integer } }
@@ -1733,28 +1678,6 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { description: "`spotify_unavailable`: Spotify is not connected" }
         "502": { description: "`driver_error`: Spotify did not answer" }
-  /library/albums/{album}/fill-from-spotify:
-    parameters:
-      - name: album
-        in: path
-        required: true
-        schema: { type: integer }
-    post:
-      tags: [Library]
-      summary: Add the album's missing tracks from Spotify to the library
-      operationId: fillAlbumFromSpotify
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  added: { type: integer }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "422": { description: "`spotify_unavailable`" }
-        "502": { description: "`driver_error`" }
   /library/tracks/{track}/favorite:
     parameters:
       - name: track
@@ -2679,12 +2602,12 @@ components:
       name: scope
       in: query
       description: >-
-        What to show: a library id (`dlna`, `spotify`, and any library added later, see
+        What to show: a library id (`files`, `dlna`, and any library added later, see
         `GET /library/libraries`), or `local` / `streaming` (kept for compatibility: the libraries of
         that kind) / `all` (every library combined; the library list never offers this to a player UI).
         Without it the default is the leading library (DLNA when it has tracks, else Spotify), so pass
         `all` to list e.g. the playlists of every library. Anything else is 422.
-      schema: { type: string, enum: [dlna, spotify, local, streaming, all] }
+      schema: { type: string, enum: [files, dlna, local, streaming, all] }
 
   responses:
     Unauthenticated:

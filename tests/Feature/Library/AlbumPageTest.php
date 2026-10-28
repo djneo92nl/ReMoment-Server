@@ -184,38 +184,6 @@ class AlbumPageTest extends TestCase
         $this->assertSame($count($few), $count($many));
     }
 
-    public function test_the_source_switch_shows_only_for_albums_in_several_sources_and_each_lists_its_own_tracks(): void
-    {
-        $album = $this->album();
-        $this->track($album, 'Local Song');
-        $this->spotifyTrack($album, 'Streamed Song', 'abc');
-
-        $this->get(route('albums.show', [$album, 'source' => 'files']))->assertOk()
-            ->assertSee('data-test="source-spotify"', false)->assertSee('data-test="source-files"', false)
-            ->assertSee('Local Song')->assertDontSee('Streamed Song');
-
-        $this->get(route('albums.show', [$album, 'source' => 'spotify']))->assertOk()
-            ->assertSee('Streamed Song')->assertDontSee('Local Song');
-
-        // An unknown source falls back to the scope's, never an empty list.
-        $this->get(route('albums.show', [$album, 'source' => 'tidal']))->assertOk()->assertSee('Local Song');
-
-        $single = $this->album('Single');
-        $this->track($single, 'Only Song');
-        $this->get(route('albums.show', $single))->assertOk()
-            ->assertDontSee('data-test="source-files"', false)->assertSee('In Local');
-    }
-
-    public function test_the_scope_picks_the_default_source(): void
-    {
-        $album = $this->album();
-        $this->track($album, 'Local Song');
-        $this->spotifyTrack($album, 'Streamed Song', 'abc');
-
-        $this->get(route('albums.show', [$album, 'scope' => 'streaming']))->assertOk()
-            ->assertSee('Streamed Song')->assertDontSee('Local Song');
-    }
-
     public function test_adding_an_album_to_a_playlist_adds_the_selected_sources_tracks_in_order(): void
     {
         $album = $this->album();
@@ -284,30 +252,6 @@ class AlbumPageTest extends TestCase
         // The Spotify side hosts the lazily loaded Spotify tracklist, not the library's rows.
         $this->get(route('albums.show', [$album, 'source' => 'spotify']))->assertOk()
             ->assertSee('album-more-on-spotify', false)->assertDontSee('Local Song');
-    }
-
-    public function test_play_follows_what_the_pinned_player_can_play_from_the_selected_source(): void
-    {
-        $album = $this->album();
-        $this->track($album, 'Local Song');
-        $api = \Mockery::mock(\SpotifyWebAPI\SpotifyWebAPI::class);
-        $this->connectSpotify($api);
-        $spotifyDevice = Device::factory()->create(['device_name' => 'Spotify Connect', 'device_driver' => \App\Integrations\Spotify\MusicPlayerDriver::class, 'device_driver_name' => 'Spotify']);
-        $play = "/albums/{$album->id}/play/{$spotifyDevice->id}";
-
-        // A Spotify device only does Spotify: nothing to play on the Local side, and rows have no play button.
-        $this->app->forgetScopedInstances();
-        $this->withCookie(SelectedDevice::COOKIE, (string) $spotifyDevice->id)->get(route('albums.show', [$album, 'source' => 'files']))->assertOk()
-            ->assertDontSee($play, false)->assertSee("Spotify Connect can't play Local", false)->assertDontSee('Play Local Song on', false);
-
-        // On the Spotify side it plays the album from Spotify.
-        $this->app->forgetScopedInstances();
-        $this->withCookie(SelectedDevice::COOKIE, (string) $spotifyDevice->id)->get(route('albums.show', [$album, 'source' => 'spotify']))->assertOk()
-            ->assertSee($play.'?source=spotify', false)->assertSee('Plays on Spotify Connect');
-
-        // Without a pinned player the buttons open the player panel instead.
-        $this->app->forgetScopedInstances();
-        $this->get(route('albums.show', [$album, 'source' => 'spotify']))->assertOk()->assertSee('open-player-panel', false);
     }
 
     public function test_playing_the_spotify_side_starts_the_album_on_spotify_even_without_library_tracks(): void

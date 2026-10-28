@@ -27,15 +27,30 @@ class LibrarySources
      * The music libraries: id => name (what clients list), kind (`local` or
      * `streaming`, which the legacy scopes of that name select), the label of the hide switch and
      * `device`: the static `fn (Device): bool` callable saying whether a device can play the library
-     * (the same check the play endpoints use). Adding a library (Deezer, Tidal) starts here: it then
+     * (the same check the play endpoints use). Adding a library (a future local source) starts here: it then
      * appears in `GET /api/library/libraries` (with its `playable`), is accepted as a `scope`, and
      * can be hidden per client.
      */
     public const LIBRARIES = [
         'files' => ['name' => 'Local', 'kind' => 'local', 'label' => 'Local files', 'device' => [LibraryPlayback::class, 'canPlayDlna']],
         'dlna' => ['name' => 'DLNA', 'kind' => 'streaming', 'label' => 'DLNA library', 'device' => [LibraryPlayback::class, 'canPlayDlna']],
-        'spotify' => ['name' => 'Spotify', 'kind' => 'streaming', 'label' => 'Spotify', 'device' => [LibraryPlayback::class, 'canPlaySpotify']],
     ];
+
+    /**
+     * Streaming services that extend the library live (id => name). They are not libraries: nothing of them is imported, so
+     * they have no scope, no hide switch and no tracks of their own; pages show them as a side next to the library's.
+     */
+    public const STREAMING_SERVICES = ['spotify' => 'Spotify'];
+
+    /** The display name of a library or a streaming service (`dlna` -> DLNA, `spotify` -> Spotify); the id itself when unknown. */
+    public static function sourceName(?string $id): ?string
+    {
+        if ($id === null) {
+            return null;
+        }
+
+        return self::LIBRARIES[$id]['name'] ?? self::STREAMING_SERVICES[$id] ?? $id;
+    }
 
     /** Whether $device can play the library $id; false for an unknown library. */
     public static function playableOn(string $id, Device $device): bool

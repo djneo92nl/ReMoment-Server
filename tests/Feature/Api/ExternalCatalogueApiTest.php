@@ -4,7 +4,6 @@ namespace Tests\Feature\Api;
 
 use App\Domain\Availability\ExternalCatalogues;
 use App\Domain\Device\State;
-use App\Domain\Library\LibrarySources;
 use App\Mcp\Servers\ReMomentServer;
 use App\Mcp\Tools;
 use App\Models\Client;
@@ -53,7 +52,7 @@ class ExternalCatalogueApiTest extends TestCase
     public function test_the_registry_and_the_libraries_agree(): void
     {
         foreach (ExternalCatalogues::ids() as $id) {
-            $this->assertArrayHasKey($id, LibrarySources::LIBRARIES, "provider {$id} needs a LibrarySources entry");
+            $this->assertTrue(\App\Domain\Availability\Providers::known($id), "provider {$id} needs an entry in config/availability.php providers");
             $this->assertSame($id, ExternalCatalogues::for($id)->id());
         }
         $this->assertNull(ExternalCatalogues::for('nope'));
