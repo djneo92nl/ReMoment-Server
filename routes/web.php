@@ -79,6 +79,7 @@ Route::post('/library/listening-modes/{mode}', [LibraryController::class, 'playL
 Route::get('/library/tracks', [LibraryController::class, 'tracks'])->name('library.tracks');
 Route::post('/library/tracks/shuffle', [LibraryController::class, 'shuffleTracks'])->name('library.tracks.shuffle');
 Route::get('/library/favorites', [LibraryController::class, 'favorites'])->name('library.favorites');
+Route::get('/library/wishlist', [LibraryController::class, 'wishlist'])->name('library.wishlist');
 Route::get('/playlists', [PlaylistController::class, 'index'])->name('playlists.index');
 Route::post('/playlists', [PlaylistController::class, 'store'])->name('playlists.store');
 Route::get('/playlists/{playlist}', [PlaylistController::class, 'show'])->name('playlists.show');

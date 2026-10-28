@@ -96,6 +96,10 @@
                     </x-shelf>
                 @endif
 
+                @if(\App\Models\Media\CatalogueAlbum::where('artist_id', $artist->id)->exists())
+                    <livewire:catalogue :artist-id="$artist->id" :key="'catalogue-'.$artist->id" />
+                @endif
+
                 @if($similarArtists->isNotEmpty())
                     <x-shelf title="Similar artists">
                         @foreach($similarArtists as $similarArtist)

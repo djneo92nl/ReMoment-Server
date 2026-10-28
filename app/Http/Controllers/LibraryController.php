@@ -29,7 +29,12 @@ class LibraryController extends Controller
     {
         $scope = LeadingSource::forRequest($request);
 
-        return view('library.index', LibraryHome::build($scope, LeadingSource::hidden($scope)) + ['scope' => $scope]);
+        // Albums wished for and not owned yet (household-wide, outside the scope switch); not cached, one cheap query while there are none.
+        $wishes = \App\Models\Media\CatalogueAlbum::whereNotNull('wanted_at')->whereNull('fulfilled_at')->whereNull('ignored_at')->exists()
+            ? array_slice(\App\Domain\Catalogue\CatalogueItems::wishlist(0)[1], 0, 20)
+            : [];
+
+        return view('library.index', LibraryHome::build($scope, LeadingSource::hidden($scope)) + ['scope' => $scope, 'wishes' => $wishes]);
     }
 
     /** The hero's Shuffle: a random album of the scope, shuffled, on the player pinned in this browser. */
@@ -114,5 +119,11 @@ class LibraryController extends Controller
         ]);
 
         return view('library.favorites', compact('albums', 'artists', 'tracks', 'scope'));
+    }
+
+    /** The household wishlist: albums to buy or rip (docs/api/availability.md). */
+    public function wishlist()
+    {
+        return view('library.wishlist');
     }
 }
