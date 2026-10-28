@@ -129,6 +129,7 @@ Route::get('/library/external/{provider}/search', [ExternalCatalogueController::
 Route::get('/library/external/{provider}/artists/{id}', [ExternalCatalogueController::class, 'artist']);
 Route::get('/library/external/{provider}/albums/{id}', [ExternalCatalogueController::class, 'album']);
 Route::get('/library/external/{provider}/playlists', [ExternalCatalogueController::class, 'playlists']);
+Route::get('/library/external/{provider}/{section}', [ExternalCatalogueController::class, 'account'])->whereIn('section', ['saved-albums', 'liked-tracks', 'recent']);
 Route::get('/library/external/{provider}/playlists/{id}', [ExternalCatalogueController::class, 'playlist']);
 Route::get('/library/physical', [PhysicalController::class, 'index']);
 Route::get('/library/physical/lookup', [PhysicalController::class, 'lookup']);

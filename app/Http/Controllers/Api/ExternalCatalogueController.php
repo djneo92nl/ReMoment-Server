@@ -51,6 +51,16 @@ class ExternalCatalogueController extends Controller
         });
     }
 
+    /** The account's saved albums, liked songs or recently played tracks (`/saved-albums`, `/liked-tracks`, `/recent`). */
+    public function account(Request $request, string $provider, string $section): JsonResponse
+    {
+        abort_unless(in_array($section, ['saved-albums', 'liked-tracks', 'recent'], true), 404);
+
+        return $this->guarded($request, $provider, fn (BrowsesExternalCatalogue $catalogue) => response()->json([
+            'data' => array_map(fn (ExternalItem $i) => $i->toArray(), $catalogue->account($section)),
+        ]));
+    }
+
     public function playlists(Request $request, string $provider): JsonResponse
     {
         return $this->guarded($request, $provider, fn (BrowsesExternalCatalogue $catalogue) => response()->json([

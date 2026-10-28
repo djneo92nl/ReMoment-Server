@@ -25,6 +25,11 @@
             @endforeach
         </nav>
 
+        {{-- Streaming scope: the library's DLNA shelves below, your live Spotify here --}}
+        @if(\App\Domain\Library\LeadingSource::group($scope) === 'streaming')
+            @include('library.streaming-sections')
+        @endif
+
         {{-- Listening modes: a random selection of analysed tracks that fit, on the player pinned in this browser --}}
         @if($listeningModes)
             <section>

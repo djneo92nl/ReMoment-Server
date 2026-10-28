@@ -25,6 +25,8 @@ class SpotifyTokenService
      */
     private const OPTIONAL_SCOPES = [
         'user-library-modify',
+        // The Streaming page's recently played (a connection made before it was added shows a hint to reconnect).
+        'user-read-recently-played',
     ];
 
     private Session $session;

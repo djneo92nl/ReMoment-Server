@@ -1393,6 +1393,29 @@ paths:
         "404": { description: unknown_provider or not_found }
         "422": { description: not_connected }
         "502": { description: The service did not answer (driver_error) }
+  /library/external/{provider}/{section}:
+    parameters:
+      - { name: provider, in: path, required: true, schema: { type: string, enum: [spotify] } }
+      - { name: section, in: path, required: true, schema: { type: string, enum: [saved-albums, liked-tracks, recent] } }
+    get:
+      tags: [Library]
+      operationId: getExternalAccountSection
+      description: What the account saved (albums), liked (tracks) or played recently (tracks) on the service, read live, newest first, at most 50. Recently played needs the `user-read-recently-played` scope. Not available to client devices.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/ExternalItem" }
+        "403": { description: Forbidden for client devices }
+        "404": { description: unknown provider or section }
+        "422": { description: not_connected }
+        "502": { description: The service did not answer or refused the scope (driver_error) }
   /library/external/{provider}/playlists:
     parameters:
       - { name: provider, in: path, required: true, schema: { type: string, enum: [spotify] } }

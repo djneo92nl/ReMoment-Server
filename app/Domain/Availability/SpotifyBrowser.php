@@ -88,6 +88,35 @@ final class SpotifyBrowser implements BrowsesExternalCatalogue
         return array_map(fn (array $p) => $this->playlistItem($p), $raw);
     }
 
+    public function account(string $section, int $limit = 50): array
+    {
+        $limit = max(1, min(50, $limit));
+
+        // Short cache: the Streaming page is opened often, and a liked song should show soon.
+        $raw = Cache::remember('spotify-browse:account:'.$section.':'.$limit, 120, function () use ($section, $limit) {
+            $api = $this->spotify->makeApiClient();
+
+            return match ($section) {
+                'saved-albums' => array_values(array_filter(array_column($api->getMySavedAlbums(['limit' => $limit])['items'] ?? [], 'album'))),
+                'liked-tracks' => array_values(array_filter(array_column($api->getMySavedTracks(['limit' => $limit])['items'] ?? [], 'track'))),
+                'recent' => array_values(array_filter(array_column($api->getMyRecentTracks(['limit' => $limit])['items'] ?? [], 'track'))),
+                default => [],
+            };
+        });
+
+        $type = $section === 'saved-albums' ? 'album' : 'track';
+        $items = [];
+        foreach ($raw as $data) {
+            // A track played twice in a row (or an episode) is listed once; only tracks and albums with an id.
+            if (empty($data['id']) || isset($items[$data['id']])) {
+                continue;
+            }
+            $items[$data['id']] = $this->item($type, $data);
+        }
+
+        return array_values($items);
+    }
+
     public function playlist(string $id): ?array
     {
         $info = Cache::remember('spotify-browse:playlist:'.$id, self::TTL, fn () => $this->spotify->makeApiClient()->getPlaylist($id, ['fields' => 'id,name,owner(display_name),images,tracks(total)']));

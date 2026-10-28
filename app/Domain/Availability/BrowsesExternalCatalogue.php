@@ -33,6 +33,15 @@ interface BrowsesExternalCatalogue
     public function playlists(): array;
 
     /**
+     * What the account saved on the service: its saved albums, liked songs and recently played tracks (read live, newest first).
+     * A service refuses what the account's grant does not cover; that throws and the caller says so.
+     *
+     * @param  'saved-albums'|'liked-tracks'|'recent'  $section
+     * @return list<ExternalItem>
+     */
+    public function account(string $section, int $limit = 50): array;
+
+    /**
      * One playlist and its tracks; `tracks` is null when the service does not share them (a followed playlist of someone else).
      *
      * @return array{playlist: ExternalItem, tracks: list<ExternalItem>|null}|null null when the service does not know it

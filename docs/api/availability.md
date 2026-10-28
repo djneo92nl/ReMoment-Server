@@ -89,6 +89,7 @@ GET  /api/library/external/{provider}/artists/{id}                              
 GET  /api/library/external/{provider}/albums/{id}                                 → { album: ExternalItem, tracks: [ExternalItem] }
 GET  /api/library/external/{provider}/playlists                                   → { data: [ExternalItem] }   the account's playlists, read live (type `playlist`: title, `artist` = owner, track_count)
 GET  /api/library/external/{provider}/playlists/{id}                              → { playlist: ExternalItem, tracks: [ExternalItem] | null }   null: the service does not share the tracks (Spotify: only playlists you own or collaborate on)
+GET  /api/library/external/{provider}/saved-albums | /liked-tracks | /recent      → { data: [ExternalItem] }   what the account saved, liked and played recently, live (newest first, 50; Spotify's recently played needs the `user-read-recently-played` scope: reconnect Spotify once; a refused scope is `502 driver_error`)
 POST /api/devices/{id}/library/play-external { provider, type: artist|album|track|playlist, id, shuffle? }     → { status: "ok", provider, type, id }
 ```
 

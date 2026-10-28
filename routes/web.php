@@ -80,6 +80,8 @@ Route::post('/library/tracks/shuffle', [LibraryController::class, 'shuffleTracks
 Route::get('/library/favorites', [LibraryController::class, 'favorites'])->name('library.favorites');
 Route::get('/library/wishlist', [LibraryController::class, 'wishlist'])->name('library.wishlist');
 Route::view('/library/collection', 'library.collection')->name('library.collection');
+// Streaming is a scope of the library page now (your live Spotify above the DLNA shelves); the old page address keeps working.
+Route::redirect('/library/streaming', '/library?scope=streaming')->name('library.streaming');
 
 // An external service's albums and artists (Spotify), browsable also for artists the library lacks (docs/frontend/library.md).
 Route::get('/external/{provider}/albums/{id}', fn (string $provider, string $id) => view('external.album', compact('provider', 'id')))
