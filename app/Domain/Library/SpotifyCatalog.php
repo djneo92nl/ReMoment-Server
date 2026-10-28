@@ -29,11 +29,11 @@ class SpotifyCatalog
         return $this->spotify->isConnected();
     }
 
-    /** @return array{artists: list<array>, albums: list<array>} */
+    /** @return array{artists: list<array>, albums: list<array>, tracks: list<array>} */
     public function search(string $term): array
     {
         return Cache::remember('spotify-catalog:search:'.md5(mb_strtolower($term)), self::TTL, function () use ($term) {
-            $results = $this->spotify->makeApiClient()->search($term, ['artist', 'album'], ['limit' => 5]);
+            $results = $this->spotify->makeApiClient()->search($term, ['artist', 'album', 'track'], ['limit' => 5]);
 
             return [
                 'artists' => array_map(fn ($a) => [
@@ -42,6 +42,13 @@ class SpotifyCatalog
                     'image' => SpotifyImages::pick($a['images'] ?? [], 200),
                 ], $results['artists']['items'] ?? []),
                 'albums' => array_map(fn ($a) => $this->albumItem($a), $results['albums']['items'] ?? []),
+                'tracks' => array_map(fn ($t) => [
+                    'id' => $t['id'],
+                    'name' => $t['name'],
+                    'artist' => $t['artists'][0]['name'] ?? null,
+                    'album' => $t['album']['name'] ?? null,
+                    'image' => SpotifyImages::pick($t['album']['images'] ?? [], 200),
+                ], $results['tracks']['items'] ?? []),
             ];
         });
     }
@@ -97,6 +104,16 @@ class SpotifyCatalog
             return null;
         }
 
+        return $this->tracksOfSpotifyAlbum($spotifyAlbumId);
+    }
+
+    /**
+     * The tracks of a Spotify album by its Spotify id (cached for an hour).
+     *
+     * @return list<array{id: string, name: string, number: int, disc: int, duration: int}>
+     */
+    public function tracksOfSpotifyAlbum(string $spotifyAlbumId): array
+    {
         return Cache::remember('spotify-catalog:album-tracks:'.$spotifyAlbumId, self::TTL, function () use ($spotifyAlbumId) {
             $api = $this->spotify->makeApiClient();
             $tracks = [];

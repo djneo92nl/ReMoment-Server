@@ -257,6 +257,29 @@ class LibraryPlayback
         return new PlaybackResult(PlaybackResult::VIA_SPOTIFY, 1, 1);
     }
 
+    /**
+     * Plays an item of an external catalogue without it being in the library (a search or "More on Spotify" result):
+     * Spotify as the album or artist context, or the track URI. Other providers join with workstream 5.
+     */
+    public function playExternal(Device $device, string $provider, string $type, string $id, bool $shuffle = false): PlaybackResult
+    {
+        if ($provider !== 'spotify' || !in_array($type, ['artist', 'album', 'track'], true) || !preg_match('/^[A-Za-z0-9]{10,40}$/', $id)) {
+            throw new NotPlayableException("Nothing can be played from \"{$provider}\" like that.");
+        }
+
+        if (!self::canPlaySpotify($device)) {
+            throw new NotPlayableException("That can't be played from Spotify on {$device->device_name}.");
+        }
+
+        if ($type === 'track') {
+            return $this->playSpotifyUri($device, SpotifyUri::track($id));
+        }
+
+        $this->playOnSpotify($device, collect(), null, $shuffle, context: "spotify:{$type}:{$id}");
+
+        return new PlaybackResult(PlaybackResult::VIA_SPOTIFY, 1, 1);
+    }
+
     /** Tracks in playlist order, with what playback reads; $limit for a listing. */
     public static function playlistTracks(Playlist $playlist, ?int $limit = null, array $hiddenSources = []): Collection
     {

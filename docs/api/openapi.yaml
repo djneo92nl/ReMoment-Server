@@ -1177,6 +1177,147 @@ paths:
               schema: { $ref: "#/components/schemas/CatalogueItem" }
         "403": { description: Forbidden for client devices }
         "404": { $ref: "#/components/responses/NotFound" }
+  /library/external/{provider}/search:
+    parameters:
+      - { name: provider, in: path, required: true, schema: { type: string, enum: [spotify] } }
+      - { name: q, in: query, required: true, schema: { type: string, minLength: 2 } }
+      - { name: type, in: query, required: true, schema: { type: string, enum: [artist, album, track] } }
+      - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 10 } }
+    get:
+      tags: [Library]
+      operationId: searchExternal
+      description: What an external service offers (Spotify), for any artist. Not available to client devices. See docs/api/availability.md.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/ExternalItem" }
+        "403": { description: Forbidden for client devices }
+        "404": { description: unknown_provider }
+        "422": { description: Validation error, or not_connected }
+        "502": { description: The service did not answer (driver_error) }
+  /library/external/{provider}/artists/{id}:
+    parameters:
+      - { name: provider, in: path, required: true, schema: { type: string, enum: [spotify] } }
+      - { name: id, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [Library]
+      operationId: getExternalArtist
+      responses:
+        "200":
+          description: The artist and its albums, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  artist: { $ref: "#/components/schemas/ExternalItem" }
+                  albums:
+                    type: array
+                    items: { $ref: "#/components/schemas/ExternalItem" }
+        "403": { description: Forbidden for client devices }
+        "404": { description: unknown_provider or not_found }
+        "422": { description: not_connected }
+        "502": { description: The service did not answer (driver_error) }
+  /library/external/{provider}/albums/{id}:
+    parameters:
+      - { name: provider, in: path, required: true, schema: { type: string, enum: [spotify] } }
+      - { name: id, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [Library]
+      operationId: getExternalAlbum
+      responses:
+        "200":
+          description: The album and its tracks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  album: { $ref: "#/components/schemas/ExternalItem" }
+                  tracks:
+                    type: array
+                    items: { $ref: "#/components/schemas/ExternalItem" }
+        "403": { description: Forbidden for client devices }
+        "404": { description: unknown_provider or not_found }
+        "422": { description: not_connected }
+        "502": { description: The service did not answer (driver_error) }
+  /library/external/{provider}/add:
+    parameters:
+      - { name: provider, in: path, required: true, schema: { type: string, enum: [spotify] } }
+    post:
+      tags: [Library]
+      operationId: addExternal
+      description: Queues the import of an artist, album or track into the library. An artist adds `album_ids`, else all its albums the library lacks (at most 100). Not available to client devices.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, id]
+              properties:
+                type: { type: string, enum: [artist, album, track] }
+                id: { type: string }
+                album_ids: { type: array, items: { type: string }, maxItems: 100 }
+      responses:
+        "202":
+          description: Queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [queued] }
+                  queued:
+                    type: object
+                    properties:
+                      albums: { type: integer }
+                      tracks: { type: integer }
+        "403": { description: Forbidden for client devices }
+        "404": { description: unknown_provider }
+        "422": { description: Validation error, or not_connected }
+        "502": { description: The service did not answer (driver_error) }
+  /devices/{device}/library/play-external:
+    parameters:
+      - { name: device, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Library]
+      operationId: playExternal
+      description: Plays an item of an external catalogue on a device without importing it (Spotify as the album/artist context or the track URI).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider, type, id]
+              properties:
+                provider: { type: string, enum: [spotify] }
+                type: { type: string, enum: [artist, album, track] }
+                id: { type: string }
+                shuffle: { type: boolean }
+      responses:
+        "200":
+          description: Playing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [ok] }
+                  provider: { type: string }
+                  type: { type: string }
+                  id: { type: string }
+        "422": { $ref: "#/components/responses/DeviceError" }
+        "502": { $ref: "#/components/responses/DeviceError" }
+        "503": { $ref: "#/components/responses/DeviceError" }
   /library/catalogue/{id}/import:
     parameters:
       - { name: id, in: path, required: true, schema: { type: integer } }
@@ -2776,6 +2917,19 @@ components:
             bucketed in steps of 32, most albums per bucket, at most 200 albums sampled). Empty when no
             cover is processed. Cached 1 hour.
           items: { type: string, pattern: "^#[0-9a-f]{6}$", example: "#2a4d8f" }
+    ExternalItem:
+      type: object
+      properties:
+        provider: { type: string }
+        type: { type: string, enum: [artist, album, track] }
+        id: { type: string, description: The service's own id. }
+        title: { type: string }
+        artist: { type: string, nullable: true }
+        year: { type: string, nullable: true }
+        track_count: { type: integer, nullable: true }
+        image: { type: string, nullable: true, description: "The service's own image URL; show it through the artwork pipeline." }
+        in_library: { type: boolean }
+        library_id: { type: integer, nullable: true, description: The library artist, album or track when in_library. }
     WantedSong:
       type: object
       properties:

@@ -530,6 +530,10 @@ GET /api/library/wishlist?cursor=                                               
 GET /api/library/catalogue/{id}                                                                                → CatalogueItem
 GET /api/library/artists/{id}?include=discography                                                              → artist detail + discography
 GET /api/library/albums?availability=owned|streamable                                                          → narrowed list (`missing` is 422: missing albums have no album row)
+GET  /api/library/external/{provider}/search?q=&type=artist|album|track → { data: [ExternalItem] }   browse an external service (Spotify; `config/availability.php`), any artist; `in_library` says what the library has; never stored
+GET  /api/library/external/{provider}/artists/{id} | /albums/{id}        → { artist|album, albums|tracks: [ExternalItem] }
+POST /api/library/external/{provider}/add { type, id, album_ids? }      → 202 { status: queued, queued: { albums, tracks } }   queued import through LibraryIdentity (an artist: its albums the library lacks, max 100)
+POST /api/devices/{id}/library/play-external { provider, type, id, shuffle? } → plays the album/artist context or track without importing (`LibraryPlayback::playExternal`; 422 not_playable)
 POST /api/library/catalogue/{id}/import → 202 { status: queued }   add an album Spotify has (`album_availability` answer, filled lazily and by `catalogue:availability`) to the library
 POST   /api/library/wanted-tracks  { artist, title, album?, image_url?, source? } → WantedSong   wish for a song (history, radio, by hand); one per artist+title; closes when the library track has an own file or DLNA copy
 DELETE /api/library/wanted-tracks/{id}                                              → { status: ok }

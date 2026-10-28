@@ -48,3 +48,7 @@ Wish and "not interested" are household-wide, guest accessible like favourites; 
 
 Each track row of `/history` (`Livewire\PlayHistory`, radio tracks included) has a heart and a star next to Match: the **heart** favorites the song (a play only logged as text, or a radio station's announcement, is first put in the library with `PlayedTrackAdder::addFromPlay`: Spotify match when connected, else the play's artist, title and album), the **star** wishes for it ("Want to buy or rip this song", `wanted_tracks`, filled star when it is on the wishlist) without adding it to the library. Wished songs show as a *Songs* list at the top of `/library/wishlist` and in the Wishlist shelf of `/library`.
 
+### Search: Spotify results
+
+The search box (`Livewire\GlobalSearch`) shows a *From Spotify* block under the library's own results (Spotify connected, 3 or more characters): artists, albums and tracks, each with **Play** (on the player pinned in this browser, through `LibraryPlayback::playExternal`; a note under the box when no player is pinned or it cannot play Spotify), and **Add** / **Add albums** (queued imports) or "In library". The same operations are the `external` API and MCP tool.
+

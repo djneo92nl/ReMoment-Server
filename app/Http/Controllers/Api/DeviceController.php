@@ -541,6 +541,26 @@ class DeviceController extends Controller
         return $this->playFromLibrary(fn () => $library->playArtist($device, $artist, $request->boolean('shuffle'), $data['source'] ?? null), ['artist' => $artist->name]);
     }
 
+    /** Plays an item of an external catalogue (Spotify) without importing it; see docs/api/availability.md. */
+    public function libraryPlayExternal(Request $request, Device $device, LibraryPlayback $library): JsonResponse
+    {
+        $data = $request->validate([
+            'provider' => ['required', 'string', 'max:32'],
+            'type' => ['required', 'in:artist,album,track'],
+            'id' => ['required', 'string', 'regex:/^[A-Za-z0-9]{10,40}$/'],
+            'shuffle' => ['nullable', 'boolean'],
+        ]);
+
+        if ($error = $this->assertReachable($device)) {
+            return $error;
+        }
+
+        return $this->playFromLibrary(
+            fn () => $library->playExternal($device, $data['provider'], $data['type'], $data['id'], $request->boolean('shuffle')),
+            ['provider' => $data['provider'], 'type' => $data['type'], 'id' => $data['id']],
+        );
+    }
+
     /** Runs a LibraryPlayback call and maps its outcome to the API's responses. */
     private function playFromLibrary(\Closure $play, array $response, ?array $notPlayable = null, ?\Closure $withResult = null): JsonResponse
     {

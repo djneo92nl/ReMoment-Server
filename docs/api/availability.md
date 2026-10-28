@@ -2,7 +2,7 @@
 
 Read endpoints of the availability layer ([design](../architecture/availability-layer.md)). Open like the rest of the API (no login), but **not for client devices**: a request with `?client={api_token}` answers `403 forbidden`, and `include=discography` is ignored for a client. Touch clients and the artwork pre-cache never see a release-group nobody owns.
 
-Browse/play/add from external sources and other providers than Spotify are not built yet (design PR 1b and later).
+Other providers than Spotify (Deezer, Tidal, media servers) are not built yet; the endpoints below are provider-neutral, so they need a driver and a `LibrarySources` entry, nothing else.
 
 ## CatalogueItem
 
@@ -73,3 +73,28 @@ A wish closes by itself: when the linked library album gets an own file (scan, i
 Catalogue ids follow the stable-id rule of `docs/api/library.md`: after `library:merge-duplicates` folds two release-group rows into one, the old id still works on `GET`/`PUT /api/library/catalogue/{id}` and the response carries `canonical_id` (the surviving id; `id` in a CatalogueItem is always the surviving one). A really unknown id is `404`.
 
 MCP: the `catalogue` tool (`discography`, `wishlist`, `item`, `wish`, `unwish`, `ignore`, `unignore`). The PUT endpoints answer `403` for a client token, `404` unknown id, `422` without the boolean.
+
+## External catalogues: browse, play and add
+
+What a service offers, for **any** artist, not only the ones in the library. Spotify is the first provider (`config/availability.php`, `App\Domain\Availability\SpotifyBrowser`); results are transient (nothing is stored) and each says whether the library already has it. Needs the service connected (`422 not_connected`), and is closed to client tokens like the rest of the catalogue (`403`); an unknown provider is `404 unknown_provider`, a service that does not answer `502 driver_error`.
+
+```json
+{ "provider": "spotify", "type": "album", "id": "4aawyAB9vmqN3uQ7FjRGTy", "title": "Selected Ambient Works Volume II", "artist": "Aphex Twin",
+  "year": "1994", "track_count": 25, "image": "https://…", "in_library": false, "library_id": null }
+```
+
+`type` is `artist`, `album` or `track`; `library_id` is the library's artist, album or track id when `in_library`. `image` is the service's own URL: show it through the artwork pipeline, never hot-linked.
+
+```
+GET  /api/library/external/{provider}/search?q=&type=artist|album|track&limit=   → { data: [ExternalItem] }   q at least 2 characters; Spotify answers at most 10
+GET  /api/library/external/{provider}/artists/{id}                                → { artist: ExternalItem, albums: [ExternalItem] }   albums newest first
+GET  /api/library/external/{provider}/albums/{id}                                 → { album: ExternalItem, tracks: [ExternalItem] }
+POST /api/library/external/{provider}/add   { type, id, album_ids? }              → 202 { status: "queued", queued: { albums, tracks } }
+POST /api/devices/{id}/library/play-external { provider, type, id, shuffle? }     → { status: "ok", provider, type, id }
+```
+
+- **Add** queues the import; the records appear in the library a moment later (through `LibraryIdentity`, source = the provider, so they merge with copies from other sources and get enriched). An artist adds the given `album_ids`, else **all** its albums the library does not have yet (at most 100 per call).
+- **Play** needs no import: Spotify plays the album or artist as its context, a track by URI, on a device that can play Spotify (the Spotify device, or a speaker mapped to a Connect name). `422 not_playable` otherwise (`LibrarySources::playableOn`), `503` unreachable, `502 driver_error`.
+- MCP: the `external` tool (`search`, `artist`, `album`, `play`, `add`).
+- Web: the search box offers Spotify's artists, albums and tracks with Play (on the player pinned in this browser) and Add.
+

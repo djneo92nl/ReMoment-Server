@@ -13,10 +13,14 @@
         @endif
     </div>
 
+    @if($notice)
+        <p class="mt-2 text-xs text-amber-600 dark:text-amber-400" role="status">{{ $notice }}</p>
+    @endif
+
     @if(mb_strlen(trim($query)) >= 2)
         <div x-show="open" x-transition @click="open = false"
              class="absolute left-0 right-0 mt-2 z-30 bg-white dark:bg-stone-900 rounded-2xl shadow-xl border border-gray-200/70 dark:border-stone-700/80 py-2 max-h-96 overflow-y-auto">
-            @php($spotifyHas = $spotify && (count($spotify['artists']) > 0 || count($spotify['albums']) > 0))
+            @php($spotifyHas = $spotify && (count($spotify['artists']) > 0 || count($spotify['albums']) > 0 || count($spotify['tracks']) > 0))
             @if($artists->isEmpty() && $albums->isEmpty() && $tracks->isEmpty() && $playlists->isEmpty() && !$spotifyHas)
                 <p class="px-4 py-3 text-sm text-gray-400 dark:text-gray-600">No results found.</p>
             @else
@@ -70,6 +74,8 @@
                         <div class="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 dark:hover:bg-stone-800 transition-colors">
                             <div style="width:28px;height:28px;flex:none"><x-artwork-thumb :src="$sArtist['image']" :seed="$sArtist['name']" icon="fa-solid fa-microphone-lines" size="w-full h-full" rounded="rounded-xl" class="text-[10px]" /></div>
                             <span class="text-sm text-gray-800 dark:text-gray-200 truncate flex-1 min-w-0">{{ $sArtist['name'] }}</span>
+                            <button type="button" wire:click="playExternal('artist', '{{ $sArtist['id'] }}')" @click.stop aria-label="Play {{ $sArtist['name'] }} from Spotify" title="Play from Spotify on the pinned player"
+                                    class="flex-shrink-0 text-xs text-gray-900 dark:text-gray-100"><i class="fa-solid fa-play"></i></button>
                             @if($sArtist['local'])
                                 <a href="{{ route('artists.show', $sArtist['local']) }}" class="text-xs text-gray-900 dark:text-gray-100 underline flex-shrink-0">In library</a>
                             @elseif(in_array($sArtist['id'], $queued, true))
@@ -87,12 +93,33 @@
                                 <p class="text-sm text-gray-800 dark:text-gray-200 truncate">{{ $sAlbum['name'] }}</p>
                                 <p class="text-xs text-gray-400 dark:text-gray-600 truncate">{{ $sAlbum['artist'] }}{{ $sAlbum['year'] ? ' · '.$sAlbum['year'] : '' }}</p>
                             </div>
+                            <button type="button" wire:click="playExternal('album', '{{ $sAlbum['id'] }}')" @click.stop aria-label="Play {{ $sAlbum['name'] }} from Spotify" title="Play from Spotify on the pinned player"
+                                    class="flex-shrink-0 text-xs text-gray-900 dark:text-gray-100"><i class="fa-solid fa-play"></i></button>
                             @if($sAlbum['local'])
                                 <a href="{{ route('albums.show', $sAlbum['local']) }}" class="text-xs text-gray-900 dark:text-gray-100 underline flex-shrink-0">In library</a>
                             @elseif(in_array($sAlbum['id'], $queued, true))
                                 <span class="text-xs text-emerald-600 dark:text-emerald-400 flex-shrink-0">Adding…</span>
                             @else
                                 <button type="button" wire:click="addAlbum('{{ $sAlbum['id'] }}')" @click.stop
+                                        class="text-xs text-gray-900 dark:text-gray-100 underline flex-shrink-0">Add</button>
+                            @endif
+                        </div>
+                    @endforeach
+                    @foreach($spotify['tracks'] as $sTrack)
+                        <div class="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 dark:hover:bg-stone-800 transition-colors" data-test="spotify-track-{{ $sTrack['id'] }}">
+                            <div style="width:28px;height:28px;flex:none"><x-artwork-thumb :src="$sTrack['image']" :seed="$sTrack['name']" icon="fa-solid fa-music" size="w-full h-full" rounded="rounded-xl" /></div>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm text-gray-800 dark:text-gray-200 truncate">{{ $sTrack['name'] }}</p>
+                                <p class="text-xs text-gray-400 dark:text-gray-600 truncate">{{ $sTrack['artist'] }}{{ $sTrack['album'] ? ' · '.$sTrack['album'] : '' }}</p>
+                            </div>
+                            <button type="button" wire:click="playExternal('track', '{{ $sTrack['id'] }}')" @click.stop aria-label="Play {{ $sTrack['name'] }} from Spotify" title="Play from Spotify on the pinned player"
+                                    class="flex-shrink-0 text-xs text-gray-900 dark:text-gray-100"><i class="fa-solid fa-play"></i></button>
+                            @if($sTrack['local'])
+                                <span class="text-xs text-gray-500 flex-shrink-0">In library</span>
+                            @elseif(in_array($sTrack['id'], $queuedTracks, true))
+                                <span class="text-xs text-emerald-600 dark:text-emerald-400 flex-shrink-0">Adding…</span>
+                            @else
+                                <button type="button" wire:click="addTrack('{{ $sTrack['id'] }}')" @click.stop
                                         class="text-xs text-gray-900 dark:text-gray-100 underline flex-shrink-0">Add</button>
                             @endif
                         </div>
