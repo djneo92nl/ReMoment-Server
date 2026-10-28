@@ -73,7 +73,7 @@
                     @foreach($spotify['artists'] as $sArtist)
                         <div class="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 dark:hover:bg-stone-800 transition-colors">
                             <div style="width:28px;height:28px;flex:none"><x-artwork-thumb :src="$sArtist['image']" :seed="$sArtist['name']" icon="fa-solid fa-microphone-lines" size="w-full h-full" rounded="rounded-xl" class="text-[10px]" /></div>
-                            <span class="text-sm text-gray-800 dark:text-gray-200 truncate flex-1 min-w-0">{{ $sArtist['name'] }}</span>
+                            <a href="{{ route('external.artist', ['provider' => 'spotify', 'id' => $sArtist['id']]) }}" class="text-sm text-gray-800 dark:text-gray-200 truncate flex-1 min-w-0 hover:underline" title="Browse on Spotify">{{ $sArtist['name'] }}</a>
                             <button type="button" wire:click="playExternal('artist', '{{ $sArtist['id'] }}')" @click.stop aria-label="Play {{ $sArtist['name'] }} from Spotify" title="Play from Spotify on the pinned player"
                                     class="flex-shrink-0 text-xs text-gray-900 dark:text-gray-100"><i class="fa-solid fa-play"></i></button>
                             @if($sArtist['local'])
@@ -90,7 +90,7 @@
                         <div class="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 dark:hover:bg-stone-800 transition-colors">
                             <div style="width:28px;height:28px;flex:none"><x-artwork-thumb :src="$sAlbum['image']" :seed="$sAlbum['name']" icon="fa-solid fa-compact-disc" size="w-full h-full" rounded="rounded-xl" class="text-[10px]" /></div>
                             <div class="min-w-0 flex-1">
-                                <p class="text-sm text-gray-800 dark:text-gray-200 truncate">{{ $sAlbum['name'] }}</p>
+                                <a href="{{ route('external.album', ['provider' => 'spotify', 'id' => $sAlbum['id']]) }}" class="block text-sm text-gray-800 dark:text-gray-200 truncate hover:underline" title="See the tracks on Spotify">{{ $sAlbum['name'] }}</a>
                                 <p class="text-xs text-gray-400 dark:text-gray-600 truncate">{{ $sAlbum['artist'] }}{{ $sAlbum['year'] ? ' · '.$sAlbum['year'] : '' }}</p>
                             </div>
                             <button type="button" wire:click="playExternal('album', '{{ $sAlbum['id'] }}')" @click.stop aria-label="Play {{ $sAlbum['name'] }} from Spotify" title="Play from Spotify on the pinned player"

@@ -5,12 +5,15 @@ namespace App\Livewire;
 use App\Domain\Library\Normalizer;
 use App\Domain\Library\SpotifyCatalog;
 use App\Jobs\ImportSpotifyAlbumById;
+use App\Livewire\Concerns\PlaysExternal;
 use App\Models\Media\Artist;
 use Livewire\Component;
 
 /** The artist's Spotify albums that the library doesn't have, loaded lazily, each addable. */
 class ArtistMoreOnSpotify extends Component
 {
+    use PlaysExternal;
+
     public Artist $artist;
 
     public bool $loaded = false;
@@ -37,6 +40,12 @@ class ArtistMoreOnSpotify extends Component
     {
         ImportSpotifyAlbumById::dispatch($spotifyAlbumId);
         $this->queued[] = $spotifyAlbumId;
+    }
+
+    /** Plays the album from Spotify on the pinned player, without adding it. */
+    public function play(string $spotifyAlbumId): void
+    {
+        $this->playExternal('album', $spotifyAlbumId);
     }
 
     public function addAll(): void
@@ -75,6 +84,7 @@ class ArtistMoreOnSpotify extends Component
             'albums' => $albums = $this->loaded ? $this->missing() : [],
             'shown' => array_slice($albums, 0, $this->limit),
             'available' => app(SpotifyCatalog::class)->available(),
+            'spotifyArtistId' => $this->artist->metadata()->where('key', 'spotify_id')->value('value'),
         ]);
     }
 }

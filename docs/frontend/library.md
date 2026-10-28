@@ -56,3 +56,12 @@ The search box (`Livewire\GlobalSearch`) shows a *From Spotify* block under the 
 
 A shelf on `/library` (between the browse shelves and Wishlist; `<x-shelf>` of `<x-media-card>`s, up to 20): albums and EPs of your artists released in the last 90 days or still to come that the library lacks, each linking to the artist page (where the Discography card offers Want, Add or Play). Subtitle: artist and date, or "coming 12 Nov". Left out entirely when there is nothing.
 
+### Browsing a streaming service (Spotify)
+
+Pages for what a service has, also for artists the library lacks (`routes/web.php`, guest accessible, built on `ExternalCatalogues`):
+
+- **`/external/spotify/artists/{id}`** (`Livewire\ExternalArtist`): the artist's albums and singles as a grid of compact cards (cover and title open the album), with **Play** and **Add to library** per album, **Play / Shuffle** the artist, **Add all albums** (confirms; queues what the library lacks) and "In your library" when the library has the artist.
+- **`/external/spotify/albums/{id}`** (`Livewire\ExternalAlbum`): cover, title, artist, year, track count, **Play / Shuffle**, **Add to library** (or "In your library", linking to the album), and the track list with a play button and **Add** per track (or "In library").
+- Play goes to the player pinned in this browser (`PlaysExternal`: a note when none is pinned or it cannot play Spotify); nothing is added to the library by playing.
+- Entry points: the search box (names link to these pages), the artist page's *More on Spotify* (`/artists/{id}?source=spotify`: each card opens the album and can be played, and "Browse all on Spotify" opens the artist's page; the Spotify artist id is remembered as `spotify_id` metadata once found), and the Discography card's Add.
+

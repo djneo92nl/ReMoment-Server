@@ -80,6 +80,12 @@ Route::get('/library/tracks', [LibraryController::class, 'tracks'])->name('libra
 Route::post('/library/tracks/shuffle', [LibraryController::class, 'shuffleTracks'])->name('library.tracks.shuffle');
 Route::get('/library/favorites', [LibraryController::class, 'favorites'])->name('library.favorites');
 Route::get('/library/wishlist', [LibraryController::class, 'wishlist'])->name('library.wishlist');
+
+// An external service's albums and artists (Spotify), browsable also for artists the library lacks (docs/frontend/library.md).
+Route::get('/external/{provider}/albums/{id}', fn (string $provider, string $id) => view('external.album', compact('provider', 'id')))
+    ->where(['provider' => '[a-z]+', 'id' => '[A-Za-z0-9]{10,40}'])->name('external.album');
+Route::get('/external/{provider}/artists/{id}', fn (string $provider, string $id) => view('external.artist', compact('provider', 'id')))
+    ->where(['provider' => '[a-z]+', 'id' => '[A-Za-z0-9]{10,40}'])->name('external.artist');
 Route::get('/playlists', [PlaylistController::class, 'index'])->name('playlists.index');
 Route::post('/playlists', [PlaylistController::class, 'store'])->name('playlists.store');
 Route::get('/playlists/{playlist}', [PlaylistController::class, 'show'])->name('playlists.show');
