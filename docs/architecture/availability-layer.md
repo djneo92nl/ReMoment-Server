@@ -280,7 +280,7 @@ Spotify already has the pieces (`SpotifyCatalog`, `ArtistMoreOnSpotify`/`AlbumMo
 - **Search and browse** call the provider live (`BrowsesExternalCatalogue`), cache the answer briefly (5 minutes, keyed by provider+query), go through the provider's rate limiter, and are done in the request only because a user is waiting on one call; a failure shows "Spotify is not answering", never an error page. Nothing is stored: results are `ExternalItem`s. Each carries `in_library` (resolved with one `name_key` query) so the UI shows "Added" instead of an Add button.
 - **Play** any item without importing it: `LibraryPlayback` gets `playExternal(provider, type, id)`; Spotify plays an album/artist/track context URI on a Connect-capable device, Deezer/Tidal hand an id to a device with `deezer_playback`/`tidal_playback`. It answers `422 not_playable` when the device cannot play that provider (the same `LibrarySources::playableOn` check).
 - **Add** creates the artist, album and tracks through `LibraryIdentity` with `source` = the provider (the same path as the Spotify import), so the item appears in the streaming library, merges with copies from other sources and gets enriched. For an album: all its tracks; for an artist: the artist plus **all albums** the user confirms (a dialog lists them, album/EP only by default); for a track: the track on its album. The Album observer then links it to the catalogue, closing nothing (streamable is not owned) but turning "Missing" into "In your library on Spotify".
-- **Discography from the provider as well as MusicBrainz.** For an artist the service knows, the artist page can show "On Spotify: 14 albums, 6 in your library" straight from `artistItems`, with no MusicBrainz id needed. MusicBrainz stays the authority for *missing* (collector view); the provider list is the authority for *what you can stream now*. Matching the two reuses the Spotify lookup of section 3, so one artist-albums call fills `album_availability` for every catalogue row of that artist.
+- **MusicBrainz is the spine of the discography, the provider fills in what it can play** (owner decision 2026-10-28: MusicBrainz from the start, because a streaming service often lacks part of an artist's discography, so its list alone would hide what is missing). For an artist the service knows, the artist page can show "On Spotify: 14 albums, 6 in your library" straight from `artistItems`; this also works as a first answer before the MusicBrainz sync has run for that artist. MusicBrainz stays the authority for *missing* (collector view); the provider list is the authority for *what you can stream now*. Matching the two reuses the Spotify lookup of section 3, so one artist-albums call fills `album_availability` for every catalogue row of that artist.
 - Adding is what lets an artist with **no MusicBrainz id** still be wished or marked: once added, wish by title attaches to a library album through `albums` (see open question 4: for those artists a wish may be stored against the album's `release_group_mbid` when it appears, else as a manual catalogue row with `release_group_mbid` null). 
 
 ## 4. API and UI
@@ -373,10 +373,10 @@ Dependencies: **14.3** (schema plan) is where PR 2's tables are written straight
 | # | PR | Depends on | Notes |
 |---|---|---|---|
 | 1 | `Availability` read service + provider registry + `config/availability.php`, derived providers (`files`, `dlna`, `spotify` saved), `Ownership` on providers; test that registry and `LIBRARIES` agree | none (touches `LibrarySources` only by reading; **does not touch** the merger or controllers) | no schema; can start now |
-| 1b | **External browse/play/add:** `BrowsesExternalCatalogue`, `ExternalItem`, `LibraryPlayback::playExternal`, `/api/library/external/*`, `play-external`, Spotify implementation on the existing catalogue code, search UI switch; OpenAPI, MCP `external`, docs | 1 (no schema, no controllers shared with 14.2 beyond new routes: add after 14.2 lands if it still edits `LibraryController`/routes) | the streaming-first core; ships value without MusicBrainz or any new table |
+| 1b | **External browse/play/add:** `BrowsesExternalCatalogue`, `ExternalItem`, `LibraryPlayback::playExternal`, `/api/library/external/*`, `play-external`, Spotify implementation on the existing catalogue code, search UI switch; OpenAPI, MCP `external`, docs | 1 (no schema, no controllers shared with 14.2 beyond new routes: add after 14.2 lands if it still edits `LibraryController`/routes) | the streaming-first core, built in parallel with the MusicBrainz track (2, 3); ships value without MusicBrainz or any new table |
 | 2 | Migrations + models: `catalogue_artists`, `catalogue_albums`, `album_availability`; factories; model rules (exclusive wanted/ignored, `name_key` hook) | 14.3 plan reviewed | parallel with 1 |
 | 3 | `MusicBrainzClient::browseReleaseGroups`, `SyncArtistCatalogue`, `CatalogueLinker`, `catalogue:sync`, `catalogue` queue on the `heavy` worker, `Queues::all`, `catalogue_sync` alert, Album observer; `Http::fake` tests incl. paging, filter, idempotence, 503 | 1, 2 | verifies the unverified browse fields with one real call first; docs/architecture update |
-| 4 | Artist mbid discovery (search + verify by owned albums) | 3 | optional; skip if the owner's mbid coverage is high |
+| 4 | Artist mbid discovery (search + verify by owned albums) | 3 | **required, part of the first release**: the discography is only as complete as the artists' mbids |
 | 5 | Read API: `…/discography`, `include=discography`, `/library/wishlist`, `/catalogue/{id}`, `?availability=` owned or streamable; OpenAPI, `docs/api/availability.md`, MCP `catalogue` (read actions) | 3, **14.2 landed** (controllers, routes) | |
 | 6 | Wish and ignore endpoints, `wanted_at`/`fulfilled_at` rules, `catalogue:reconcile`, ownership hooks in scan/import end; MCP actions | 5 | closes wishes |
 | 7 | **`LibraryMerger`/`LibraryRemover` integration** and `catalogue_album` alias resolution | **14.2 landed** | the interaction with stable IDs; do not start earlier |
@@ -384,7 +384,7 @@ Dependencies: **14.3** (schema plan) is where PR 2's tables are written straight
 | 9 | Web: discography panel, wishlist shelf and page, playable-on labels | 5, 6, 8 | follows DESIGN.md and the components |
 | 10+ | Providers as separate PRs: Deezer/Tidal (workstream 5), physical (6), media servers (15), ListenBrainz new releases into `catalogue_albums` (4) | 1-3 | each is "a declaration plus a driver", and proves the contract; if one needs a change in the API or web, the contract is wrong |
 
-Parallel: 1 ∥ 2; 1b ∥ 2/3 (different code); 4 ∥ 5; 9 ∥ 8. Strictly sequential: 3 after 1+2, 7 after 14.2.
+Parallel (MusicBrainz track 2 → 3 → 4 → 5 and browse track 1b run side by side, both in the first release): 1 ∥ 2; 1b ∥ 2/3 (different code); 4 ∥ 5; 9 ∥ 8. Strictly sequential: 3 after 1+2, 7 after 14.2.
 
 ## 6. Risks and open questions
 
@@ -396,7 +396,7 @@ Parallel: 1 ∥ 2; 1b ∥ 2/3 (different code); 4 ∥ 5; 9 ∥ 8. Strictly seque
   php artisan tinker --execute='$a=\App\Models\Media\Artist::whereHas("albums"); $with=(clone $a)->whereHas("metadata",fn($q)=>$q->where("key","mbid")->whereIn("source",["musicbrainz","manual"])); echo $with->count()." of ".$a->count()." artists with albums have an mbid".PHP_EOL; $al=\App\Models\Media\Album::count(); $rg=\App\Models\Media\Album::whereHas("metadata",fn($q)=>$q->where("key","release_group_mbid"))->count(); echo "$rg of $al albums have a release_group_mbid".PHP_EOL;'
   ```
 
-  (Written for this document, not yet run.) Below ~60% the PR 4 search step is a must, not optional.
+  (Written for this document, not yet run.) PR 4 (search + verify) is in the first release regardless; the number says how much it will have to do.
 - **MusicBrainz data quality:** duplicate release-groups for one record (rare, shown twice until one is ignored), release-groups of the wrong primary type, an artist merged into another (the stored mbid redirects or 404s), self-titled albums that share a key (the linker refuses ambiguous matches rather than guessing, so such an album shows both as owned elsewhere and missing until linked by hand), compilations credited to the artist, classical works where "album" is a performance. Mitigation: `ignored`, the manual link, and a conservative linker.
 - **UI noise:** an artist with 80 albums and EPs. Collapsed list, default sort newest first, "Missing" chip, ignored hidden; the wishlist is the only global surface, and nothing about missing albums appears in counts.
 - **MusicBrainz block:** exceeding 1 request/s declines the whole IP. All MusicBrainz calls use the shared limiter, and the first-sync batch is capped.
@@ -417,12 +417,12 @@ Parallel: 1 ∥ 2; 1b ∥ 2/3 (different code); 4 ∥ 5; 9 ∥ 8. Strictly seque
 ### Questions the owner must answer before implementation
 
 1. ~~Is DLNA owned?~~ **Answered: yes** (badge and closing wishes); syncing DLNA into own files is a later, separate step.
-2. Run the mbid one-liner above and tell the coverage; it decides whether PR 4 is in 1.0.
+2. Run the mbid one-liner above and tell the coverage; it sizes PR 4's workload (PR 4 is in regardless).
 3. Queue: add `catalogue` to the existing `heavy` worker (recommended, no extra process), or its own worker?
 4. May an album be wished only if its artist has an mbid (and so a release-group)? Or is a manual "wish by title" for artists without one needed?
 5. Should a wish also close when the album is saved in Spotify (streamable), or only when owned (recommended: only owned, matching the roadmap)? A "wanted, now streamable" badge covers the rest.
 6. Is the 30/90-day refresh policy acceptable, or should new releases be detected faster once ListenBrainz (workstream 4) is in?
 7. Spotify availability: lazy-on-view plus wishes plus a trickle for owned artists (recommended), or eager for the whole catalogue?
 8. Toggle for singles/live/compilations: confirm it stays out of 1.0, and that rows are not stored for those types (turning it on later means a resync, about 250 requests).
-9. Should 1b (browse/play/add) ship **before** the MusicBrainz discography (recommended: it is the streaming-first value and needs no new table), and is Spotify-only enough for its first release?
+9. ~~Order of 1b vs MusicBrainz~~ **Answered: MusicBrainz from the start**, two tracks in parallel (1b and 2-5). Still open: is Spotify-only enough for 1b's first release?
 10. `?availability=missing` only on discography/catalogue endpoints: confirm the narrowing.
