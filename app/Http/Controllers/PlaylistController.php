@@ -16,13 +16,15 @@ class PlaylistController extends Controller
 {
     use FlashesLibraryPlayback;
 
-    public function index()
+    public function index(Request $request)
     {
-        $playlists = Playlist::withCount('tracks')
-            ->orderBy('name')
-            ->get();
+        // Local (made here, smart) or streaming (the account's playlists on a service, read live and never imported).
+        $source = $request->query('source') === 'streaming' ? 'streaming' : 'local';
+        $playlists = $source === 'streaming'
+            ? collect()
+            : Playlist::withCount('tracks')->where(fn ($q) => $q->whereNull('source')->orWhere('source', '!=', 'spotify'))->orderBy('name')->get();
 
-        return view('playlists.index', compact('playlists'));
+        return view('playlists.index', compact('playlists', 'source'));
     }
 
     public function store(Request $request, PlaylistEditor $editor)

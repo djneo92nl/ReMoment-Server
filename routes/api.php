@@ -128,6 +128,8 @@ Route::get('/library/artists/{artist}/discography', [LibraryController::class, '
 Route::get('/library/external/{provider}/search', [ExternalCatalogueController::class, 'search']);
 Route::get('/library/external/{provider}/artists/{id}', [ExternalCatalogueController::class, 'artist']);
 Route::get('/library/external/{provider}/albums/{id}', [ExternalCatalogueController::class, 'album']);
+Route::get('/library/external/{provider}/playlists', [ExternalCatalogueController::class, 'playlists']);
+Route::get('/library/external/{provider}/playlists/{id}', [ExternalCatalogueController::class, 'playlist']);
 Route::post('/library/external/{provider}/add', [ExternalCatalogueController::class, 'add']);
 Route::get('/library/physical', [PhysicalController::class, 'index']);
 Route::get('/library/physical/lookup', [PhysicalController::class, 'lookup']);

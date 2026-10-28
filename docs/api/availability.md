@@ -90,8 +90,10 @@ What a service offers, for **any** artist, not only the ones in the library. Spo
 GET  /api/library/external/{provider}/search?q=&type=artist|album|track&limit=   → { data: [ExternalItem] }   q at least 2 characters; Spotify answers at most 10
 GET  /api/library/external/{provider}/artists/{id}                                → { artist: ExternalItem, albums: [ExternalItem] }   albums newest first
 GET  /api/library/external/{provider}/albums/{id}                                 → { album: ExternalItem, tracks: [ExternalItem] }
+GET  /api/library/external/{provider}/playlists                                   → { data: [ExternalItem] }   the account's playlists, read live (type `playlist`: title, `artist` = owner, track_count)
+GET  /api/library/external/{provider}/playlists/{id}                              → { playlist: ExternalItem, tracks: [ExternalItem] | null }   null: the service does not share the tracks (Spotify: only playlists you own or collaborate on)
 POST /api/library/external/{provider}/add   { type, id, album_ids? }              → 202 { status: "queued", queued: { albums, tracks } }
-POST /api/devices/{id}/library/play-external { provider, type, id, shuffle? }     → { status: "ok", provider, type, id }
+POST /api/devices/{id}/library/play-external { provider, type: artist|album|track|playlist, id, shuffle? }     → { status: "ok", provider, type, id }
 ```
 
 - **Add** queues the import; the records appear in the library a moment later (through `LibraryIdentity`, source = the provider, so they merge with copies from other sources and get enriched). An artist adds the given `album_ids`, else **all** its albums the library does not have yet (at most 100 per call).

@@ -85,6 +85,8 @@ Route::view('/library/collection', 'library.collection')->name('library.collecti
 // An external service's albums and artists (Spotify), browsable also for artists the library lacks (docs/frontend/library.md).
 Route::get('/external/{provider}/albums/{id}', fn (string $provider, string $id) => view('external.album', compact('provider', 'id')))
     ->where(['provider' => '[a-z]+', 'id' => '[A-Za-z0-9]{10,40}'])->name('external.album');
+Route::get('/external/{provider}/playlists/{id}', fn (string $provider, string $id) => view('external.playlist', compact('provider', 'id')))
+    ->where(['provider' => '[a-z]+', 'id' => '[A-Za-z0-9]{10,40}'])->name('external.playlist');
 Route::get('/external/{provider}/artists/{id}', fn (string $provider, string $id) => view('external.artist', compact('provider', 'id')))
     ->where(['provider' => '[a-z]+', 'id' => '[A-Za-z0-9]{10,40}'])->name('external.artist');
 Route::get('/playlists', [PlaylistController::class, 'index'])->name('playlists.index');

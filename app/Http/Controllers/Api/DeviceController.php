@@ -546,7 +546,7 @@ class DeviceController extends Controller
     {
         $data = $request->validate([
             'provider' => ['required', 'string', 'max:32'],
-            'type' => ['required', 'in:artist,album,track'],
+            'type' => ['required', 'in:artist,album,track,playlist'],
             'id' => ['required', 'string', 'regex:/^[A-Za-z0-9]{10,40}$/'],
             'shuffle' => ['nullable', 'boolean'],
         ]);

@@ -51,6 +51,27 @@ class ExternalCatalogueController extends Controller
         });
     }
 
+    public function playlists(Request $request, string $provider): JsonResponse
+    {
+        return $this->guarded($request, $provider, fn (BrowsesExternalCatalogue $catalogue) => response()->json([
+            'data' => array_map(fn (ExternalItem $i) => $i->toArray(), $catalogue->playlists()),
+        ]));
+    }
+
+    public function playlist(Request $request, string $provider, string $id): JsonResponse
+    {
+        return $this->guarded($request, $provider, function (BrowsesExternalCatalogue $catalogue) use ($id) {
+            $found = $catalogue->playlist($id);
+
+            return $found === null
+                ? response()->json(['error' => 'not_found', 'message' => 'The service does not know this playlist.'], 404)
+                : response()->json([
+                    'playlist' => $found['playlist']->toArray(),
+                    'tracks' => $found['tracks'] === null ? null : array_map(fn (ExternalItem $i) => $i->toArray(), $found['tracks']),
+                ]);
+        });
+    }
+
     /** Queues the import of an artist, album or track; the records appear in the library a moment later. */
     public function add(Request $request, string $provider): JsonResponse
     {

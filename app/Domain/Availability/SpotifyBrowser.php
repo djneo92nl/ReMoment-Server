@@ -7,6 +7,7 @@ use App\Domain\Library\Normalizer;
 use App\Domain\Library\SpotifyCatalog;
 use App\Domain\Library\SpotifyImages;
 use App\Domain\Library\SpotifyUri;
+use App\Domain\Spotify\SpotifyLibraryApi;
 use App\Jobs\ImportSpotifyAlbumById;
 use App\Jobs\ImportSpotifyTrackById;
 use App\Services\Lastfm\LastfmInfoClient;
@@ -67,6 +68,78 @@ final class SpotifyBrowser implements BrowsesExternalCatalogue
         $tracks = array_map(fn (array $t) => $this->item('track', $t + ['album' => ['name' => $info['name'], 'images' => $info['images'] ?? []]]), $this->catalog->tracksOfSpotifyAlbum($id));
 
         return ['album' => $album, 'tracks' => $tracks];
+    }
+
+    public function playlists(): array
+    {
+        $raw = Cache::remember('spotify-browse:playlists', self::TTL, function () {
+            $api = $this->spotify->makeApiClient();
+            $all = [];
+            for ($page = 0; $page < 4; $page++) {
+                $response = $api->getMyPlaylists(['limit' => 50, 'offset' => $page * 50]);
+                foreach ($response['items'] ?? [] as $playlist) {
+                    if (!empty($playlist['id'])) {
+                        $all[] = $playlist;
+                    }
+                }
+                if (empty($response['next'])) {
+                    break;
+                }
+            }
+
+            return $all;
+        });
+
+        return array_map(fn (array $p) => $this->playlistItem($p), $raw);
+    }
+
+    public function playlist(string $id): ?array
+    {
+        $info = Cache::remember('spotify-browse:playlist:'.$id, self::TTL, fn () => $this->spotify->makeApiClient()->getPlaylist($id, ['fields' => 'id,name,owner(display_name),images,tracks(total)']));
+        if (empty($info['id'])) {
+            return null;
+        }
+
+        $tracks = Cache::remember('spotify-browse:playlist-tracks:'.$id, self::TTL, function () use ($id) {
+            $api = app(SpotifyLibraryApi::class);
+            $items = [];
+            for ($offset = 0; $offset < 500; $offset += 100) {
+                $page = $api->playlistEntries($id, $offset, 100);
+                if ($page === null) {
+                    return $offset === 0 ? false : $items;
+                }
+                foreach ($page['items'] as $entry) {
+                    $track = $entry['track'] ?? null;
+                    if (is_array($track) && !empty($track['id']) && ($track['type'] ?? 'track') === 'track') {
+                        $items[] = $track;
+                    }
+                }
+                if (count($page['items']) < 100 || $offset + 100 >= $page['total']) {
+                    break;
+                }
+            }
+
+            return $items;
+        });
+
+        return [
+            'playlist' => $this->playlistItem($info),
+            'tracks' => $tracks === false ? null : array_map(fn (array $t) => $this->item('track', $t), $tracks),
+        ];
+    }
+
+    /** @param  array<string, mixed>  $data  a Spotify playlist object */
+    private function playlistItem(array $data): ExternalItem
+    {
+        return new ExternalItem(
+            provider: 'spotify',
+            type: 'playlist',
+            id: (string) $data['id'],
+            title: (string) ($data['name'] ?? ''),
+            artist: $data['owner']['display_name'] ?? null,
+            trackCount: isset($data['tracks']['total']) ? (int) $data['tracks']['total'] : (isset($data['items']['total']) ? (int) $data['items']['total'] : null),
+            image: SpotifyImages::pick($data['images'] ?? [], 200),
+        );
     }
 
     /**

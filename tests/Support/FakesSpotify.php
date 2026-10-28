@@ -17,6 +17,7 @@ trait FakesSpotify
         $this->mock(SpotifyTokenService::class, function ($mock) use ($api) {
             $mock->shouldReceive('isConnected')->andReturn(true);
             $mock->shouldReceive('makeApiClient')->andReturn($api);
+            $mock->shouldReceive('getAccessToken')->andReturn('test-token');
         });
 
         return $api;

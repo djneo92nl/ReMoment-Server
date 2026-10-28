@@ -26,6 +26,20 @@ interface BrowsesExternalCatalogue
     public function album(string $id): ?array;
 
     /**
+     * The account's playlists on the service (read live, never imported).
+     *
+     * @return list<ExternalItem> type `playlist`: title, `artist` = the owner, track count
+     */
+    public function playlists(): array;
+
+    /**
+     * One playlist and its tracks; `tracks` is null when the service does not share them (a followed playlist of someone else).
+     *
+     * @return array{playlist: ExternalItem, tracks: list<ExternalItem>|null}|null null when the service does not know it
+     */
+    public function playlist(string $id): ?array;
+
+    /**
      * The artist's popular tracks on the service, most popular first (the service's own endpoint, or a stand-in).
      *
      * @return list<ExternalItem>

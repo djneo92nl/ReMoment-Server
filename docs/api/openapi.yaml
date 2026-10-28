@@ -1393,6 +1393,52 @@ paths:
         "404": { description: unknown_provider or not_found }
         "422": { description: not_connected }
         "502": { description: The service did not answer (driver_error) }
+  /library/external/{provider}/playlists:
+    parameters:
+      - { name: provider, in: path, required: true, schema: { type: string, enum: [spotify] } }
+    get:
+      tags: [Library]
+      operationId: listExternalPlaylists
+      description: The account's playlists on the service, read live (never imported). Not available to client devices.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/ExternalItem" }
+        "403": { description: Forbidden for client devices }
+        "404": { description: unknown_provider }
+        "422": { description: not_connected }
+        "502": { description: The service did not answer (driver_error) }
+  /library/external/{provider}/playlists/{id}:
+    parameters:
+      - { name: provider, in: path, required: true, schema: { type: string, enum: [spotify] } }
+      - { name: id, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [Library]
+      operationId: getExternalPlaylist
+      responses:
+        "200":
+          description: The playlist and its tracks (`tracks` is null when the service does not share them)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  playlist: { $ref: "#/components/schemas/ExternalItem" }
+                  tracks:
+                    type: array
+                    nullable: true
+                    items: { $ref: "#/components/schemas/ExternalItem" }
+        "403": { description: Forbidden for client devices }
+        "404": { description: unknown_provider or not_found }
+        "422": { description: not_connected }
+        "502": { description: The service did not answer (driver_error) }
   /library/external/{provider}/add:
     parameters:
       - { name: provider, in: path, required: true, schema: { type: string, enum: [spotify] } }
@@ -1445,7 +1491,7 @@ paths:
               required: [provider, type, id]
               properties:
                 provider: { type: string, enum: [spotify] }
-                type: { type: string, enum: [artist, album, track] }
+                type: { type: string, enum: [artist, album, track, playlist] }
                 id: { type: string }
                 shuffle: { type: boolean }
       responses:
@@ -3066,7 +3112,7 @@ components:
       type: object
       properties:
         provider: { type: string }
-        type: { type: string, enum: [artist, album, track] }
+        type: { type: string, enum: [artist, album, track, playlist] }
         id: { type: string, description: The service's own id. }
         title: { type: string }
         artist: { type: string, nullable: true }

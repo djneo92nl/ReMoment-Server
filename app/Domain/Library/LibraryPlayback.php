@@ -263,7 +263,7 @@ class LibraryPlayback
      */
     public function playExternal(Device $device, string $provider, string $type, string $id, bool $shuffle = false): PlaybackResult
     {
-        if ($provider !== 'spotify' || !in_array($type, ['artist', 'album', 'track'], true) || !preg_match('/^[A-Za-z0-9]{10,40}$/', $id)) {
+        if ($provider !== 'spotify' || !in_array($type, ['artist', 'album', 'track', 'playlist'], true) || !preg_match('/^[A-Za-z0-9]{10,40}$/', $id)) {
             throw new NotPlayableException("Nothing can be played from \"{$provider}\" like that.");
         }
 
