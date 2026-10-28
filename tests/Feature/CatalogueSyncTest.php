@@ -106,13 +106,14 @@ class CatalogueSyncTest extends TestCase
         $this->assertSame(['rg-1'], CatalogueAlbum::where('artist_id', $artist->id)->pluck('release_group_mbid')->all());
     }
 
-    public function test_artist_without_mbid_is_recorded_without_a_request(): void
+    public function test_artist_unknown_to_musicbrainz_is_recorded_as_no_mbid(): void
     {
         $artist = $this->artist(null);
+        Http::fake(['musicbrainz.org/ws/2/artist*' => Http::response(['artists' => []])]);
 
         $this->assertSame('no_mbid', (new ArtistCatalogueSync)->sync($artist));
 
-        Http::assertNothingSent();
+        Http::assertNotSent(fn ($r) => str_contains($r->url(), 'release-group'));
         $this->assertSame('no_mbid', CatalogueArtist::find($artist->id)->status);
     }
 
@@ -233,5 +234,57 @@ class CatalogueSyncTest extends TestCase
 
         Queue::assertPushedOn('catalogue', SyncArtistCatalogue::class, fn ($job) => $job->artist->id === $files->id);
         Queue::assertPushed(SyncArtistCatalogue::class, 1);
+    }
+
+    private function fakeSearchThenBrowse(array $artists, array $groups): void
+    {
+        Http::fake([
+            'musicbrainz.org/ws/2/artist*' => Http::response(['artists' => $artists]),
+            'musicbrainz.org/ws/2/release-group*' => Http::response(['release-groups' => $groups]),
+        ]);
+    }
+
+    public function test_artist_without_mbid_is_discovered_and_verified_by_an_owned_album(): void
+    {
+        $artist = $this->artist(null);
+        Album::create(['artist_id' => $artist->id, 'name' => 'First Album', 'source' => 'files']);
+        $this->fakeSearchThenBrowse([['id' => 'art-9', 'name' => 'Band', 'score' => 100], ['id' => 'art-8', 'name' => 'Bandit', 'score' => 70]], [$this->group('rg-1', 'First Album')]);
+
+        $this->assertSame('ok', (new ArtistCatalogueSync)->sync($artist));
+
+        $this->assertSame('art-9', Enrichment::mbid($artist));
+        $this->assertSame($artist->albums()->value('id'), CatalogueAlbum::first()->album_id, 'linked in the same run');
+    }
+
+    public function test_a_namesake_without_a_shared_album_is_not_taken(): void
+    {
+        $artist = $this->artist(null);
+        Album::create(['artist_id' => $artist->id, 'name' => 'My Own Record', 'source' => 'files']);
+        $this->fakeSearchThenBrowse([['id' => 'art-9', 'name' => 'Band', 'score' => 100]], [$this->group('rg-1', 'Totally Different')]);
+
+        $this->assertSame('unverified', (new ArtistCatalogueSync)->sync($artist));
+
+        $this->assertNull(Enrichment::mbid($artist));
+        $this->assertSame(0, CatalogueAlbum::count());
+    }
+
+    public function test_two_equally_named_candidates_are_not_taken(): void
+    {
+        $artist = $this->artist(null);
+        Album::create(['artist_id' => $artist->id, 'name' => 'First Album', 'source' => 'files']);
+        $this->fakeSearchThenBrowse([['id' => 'a', 'name' => 'Band', 'score' => 100], ['id' => 'b', 'name' => 'Band', 'score' => 98]], []);
+
+        $this->assertSame('unverified', (new ArtistCatalogueSync)->sync($artist));
+        $this->assertNull(Enrichment::mbid($artist));
+        Http::assertNotSent(fn ($r) => str_contains($r->url(), 'release-group'));
+    }
+
+    public function test_a_weak_score_is_not_taken(): void
+    {
+        $artist = $this->artist(null);
+        $this->fakeSearchThenBrowse([['id' => 'a', 'name' => 'Band', 'score' => 80]], []);
+
+        $this->assertSame('no_mbid', (new ArtistCatalogueSync)->sync($artist));
+        Http::assertNotSent(fn ($r) => str_contains($r->url(), 'release-group'));
     }
 }

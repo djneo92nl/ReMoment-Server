@@ -3,6 +3,7 @@
 namespace App\Domain\Catalogue;
 
 use App\Domain\Library\Enrichment;
+use App\Domain\Library\Normalizer;
 use App\Models\Media\Artist;
 use App\Models\Media\CatalogueAlbum;
 use App\Models\Media\CatalogueArtist;
@@ -24,15 +25,21 @@ final class ArtistCatalogueSync
 
     public function __construct(private readonly MusicBrainzClient $mb = new MusicBrainzClient) {}
 
-    /** @return string the resulting status: ok, no_mbid or not_found */
+    /** @return string the resulting status: ok, no_mbid, unverified or not_found */
     public function sync(Artist $artist): string
     {
         $mbid = Enrichment::mbid($artist);
+        $groups = null;
+
         if ($mbid === null) {
-            return $this->finish($artist, null, 'no_mbid', null, self::IDLE_DAYS);
+            [$mbid, $groups] = $this->discover($artist);
+            if ($mbid === null) {
+                return $this->finish($artist, null, $this->lookedUp ? 'unverified' : 'no_mbid', null, self::IDLE_DAYS);
+            }
+        } else {
+            $groups = $this->mb->releaseGroups($mbid);
         }
 
-        $groups = $this->mb->releaseGroups($mbid);
         if ($groups === null) {
             return $this->finish($artist, $mbid, 'not_found', null, self::IDLE_DAYS);
         }
@@ -70,6 +77,45 @@ final class ArtistCatalogueSync
         CatalogueLinker::linkArtist($artist);
 
         return $this->finish($artist, $mbid, 'ok', count($groups), $this->isActive($artist) ? self::ACTIVE_DAYS : self::IDLE_DAYS);
+    }
+
+    /** Whether discover() found a candidate it then could not verify (else the artist is simply unknown to MusicBrainz). */
+    private bool $lookedUp = false;
+
+    /**
+     * An artist without a MusicBrainz id: search by name and accept a candidate only when its name key equals ours,
+     * its score is at least 95 and it is the only such candidate, then **verify** it: one of the library's albums by
+     * this artist must equal one of its release-groups (so a namesake is never taken). Only a verified id is saved.
+     *
+     * @return array{0: ?string, 1: ?list<array<string, mixed>>} the id and the release-groups already fetched for it
+     */
+    private function discover(Artist $artist): array
+    {
+        $this->lookedUp = false;
+        $key = Normalizer::artist($artist->name);
+        if ($key === '' || strcasecmp($artist->name, 'Unknown Artist') === 0) {
+            return [null, null];
+        }
+
+        $found = $this->mb->searchArtists($artist->name);
+        $candidates = array_values(array_filter($found, fn ($c) => ($c['score'] ?? 0) >= 95 && Normalizer::artist($c['name'] ?? '') === $key));
+        if (count($candidates) !== 1) {
+            $this->lookedUp = count($candidates) > 1;
+
+            return [null, null];
+        }
+
+        $this->lookedUp = true;
+        $mbid = $candidates[0]['id'];
+        $groups = $this->mb->releaseGroups($mbid);
+        $owned = $artist->albums()->pluck('name_key')->filter()->all();
+        if ($groups === null || !array_intersect($owned, array_map(fn ($g) => Normalizer::album($g['title']), $groups))) {
+            return [null, null];
+        }
+
+        Enrichment::save($artist, 'mbid', $mbid, 'string', Enrichment::MUSICBRAINZ);
+
+        return [$mbid, $groups];
     }
 
     /** Records a failed run (called by the job when it gives up). */

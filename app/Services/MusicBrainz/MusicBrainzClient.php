@@ -57,6 +57,22 @@ class MusicBrainzClient
     }
 
     /**
+     * Artists matching a name, best first, each with MusicBrainz's `score` (0-100); empty when none.
+     *
+     * @return list<array{id: string, name: string, score: int}>
+     */
+    public function searchArtists(string $name, int $limit = 5): array
+    {
+        $escaped = str_replace(['\\', '"'], ['\\\\', '\\"'], $name);
+        $data = $this->get('artist', ['query' => 'artist:"'.$escaped.'"', 'limit' => $limit]);
+
+        return array_values(array_map(
+            fn ($a) => ['id' => $a['id'], 'name' => $a['name'] ?? '', 'score' => (int) ($a['score'] ?? 0)],
+            array_filter($data['artists'] ?? [], fn ($a) => !empty($a['id'])),
+        ));
+    }
+
+    /**
      * Every album and EP release-group of an artist without secondary types (live, compilation, soundtrack ...),
      * paged 100 at a time, or null when MusicBrainz does not know the artist. A rate limit or outage throws.
      * The type filter covers primary types only, so secondary types are filtered here.
