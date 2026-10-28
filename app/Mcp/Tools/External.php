@@ -9,7 +9,7 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
-#[Description('Browse, play and add what an external service (Spotify for now) offers, also artists the library does not have. action: search (needs q and type artist|album|track), artist (needs id: the artist and its albums), album (needs id: the album and its tracks), playlists (the account's playlists on the service, read live), playlist (needs id: the playlist and its tracks; tracks is null when the service does not share them), play (needs device_id, type artist|album|track|playlist, id; optional shuffle: plays on that device without adding it to the library), add (needs type and id; for an artist optional album_ids, else all albums the library lacks: queued import). Results say `in_library`. provider defaults to spotify. Full shapes: docs/api/availability.md.')]
+#[Description('Browse, play and add what an external service (Spotify for now) offers, also artists the library does not have. action: search (needs q and type artist|album|track), artist (needs id: the artist and its albums), album (needs id: the album and its tracks), playlists (the playlists of the account on the service, read live), playlist (needs id: the playlist and its tracks; tracks is null when the service does not share them), play (needs device_id, type artist|album|track|playlist, id; optional shuffle: plays on that device without adding it to the library), add (needs type and id; for an artist optional album_ids, else all albums the library lacks: queued import). Results say `in_library`. provider defaults to spotify. Full shapes: docs/api/availability.md.')]
 class External extends Tool
 {
     use CallsApi;
