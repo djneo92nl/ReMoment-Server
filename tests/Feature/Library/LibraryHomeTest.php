@@ -109,7 +109,8 @@ class LibraryHomeTest extends TestCase
         $this->assertSame('Morning', $items[1]['playlist']->name);
         $this->assertSame('Parachutes', $items[2]['album']->name);
 
-        $this->get('/library')->assertOk()->assertSee('Recently played')->assertSee('Radio Fip')->assertSee('Morning')->assertSee('Parachutes');
+        // The web shows the tracks played (rows, see RecentTracksTest); the mixed list stays the API's recent-items.
+        $this->get('/library')->assertOk()->assertSee('Recently played')->assertSee('data-test="recent-tracks"', false);
     }
 
     public function test_random_album_prefers_one_the_device_can_play(): void

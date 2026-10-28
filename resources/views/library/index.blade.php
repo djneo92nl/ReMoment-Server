@@ -49,28 +49,8 @@
         @endif
 
         {{-- What was played last: albums, playlists and radio stations together --}}
-        @if($recentPlayed->isNotEmpty())
-            <x-shelf title="Recently played" :href="route('history.index')">
-                @foreach($recentPlayed as $item)
-                    @if($item['album'])
-                        <x-album-card :album="$item['album']" tinted />
-                    @elseif($item['playlist'])
-                        @php
-                            $choice = $playedArtwork[$item['playlist']->id] ?? null;
-                            $art = $choice ? \App\Domain\Artwork\LibraryItemArtwork::forUrl($choice['url'], $choice['sources']) : null;
-                        @endphp
-                        <x-media-card :href="route('playlists.show', $item['playlist'])" :src="$art['proxy_320'] ?? null" :colors="$art['colors'] ?? null"
-                                      :title="$item['playlist']->name" :subtitle="'Playlist · '.number_format($item['playlist']->tracks_count).' '.Str::plural('track', $item['playlist']->tracks_count)"
-                                      icon="fa-solid fa-list-ul" :play="\App\Support\DeviceAction::template('playlists.play', ['playlist' => $item['playlist']])" />
-                    @else
-                        @php $art = \App\Domain\Artwork\LibraryItemArtwork::forUrl($item['station']->image_url); @endphp
-                        <x-media-card :href="route('radio.index')" :src="$art['proxy_320'] ?? null" :colors="$art['colors'] ?? null"
-                                      :title="$item['station']->name" subtitle="Radio" icon="fa-solid fa-radio"
-                                      :play="\App\Support\DeviceAction::template('radio.play', ['radio' => $item['station']])" />
-                    @endif
-                @endforeach
-            </x-shelf>
-        @endif
+        {{-- Recently played tracks as compact rows: the scope's own plays (Streaming also merges in what you played on Spotify) --}}
+        <livewire:recent-tracks :scope="$scope" :key="'recent-tracks-'.$scope" />
 
         @if($recentAdded->isNotEmpty())
             <x-shelf title="Recently added" :href="route('albums.index', ['sort' => 'recent'])">

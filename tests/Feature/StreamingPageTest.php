@@ -42,8 +42,7 @@ class StreamingPageTest extends TestCase
     {
         $this->api();
 
-        $this->get('/library?scope=streaming')->assertOk()->assertSee('data-test="section-liked-tracks"', false)->assertSee('data-test="section-saved-albums"', false)->assertSee('data-test="section-recent"', false)
-            ->assertDontSee('Road Trip');
+        $this->get('/library?scope=streaming')->assertOk()->assertSee('data-test="section-liked-tracks"', false)->assertSee('data-test="section-saved-albums"', false)->assertDontSee('Road Trip');
         $this->get('/library?scope=local')->assertOk()->assertDontSee('Liked songs')->assertDontSee('streaming-sections', false);
         $this->get('/library/streaming')->assertRedirect('/library?scope=streaming');
 

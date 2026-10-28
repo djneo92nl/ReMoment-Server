@@ -99,7 +99,7 @@ final class SpotifyBrowser implements BrowsesExternalCatalogue
             return match ($section) {
                 'saved-albums' => array_values(array_filter(array_column($api->getMySavedAlbums(['limit' => $limit])['items'] ?? [], 'album'))),
                 'liked-tracks' => array_values(array_filter(array_column($api->getMySavedTracks(['limit' => $limit])['items'] ?? [], 'track'))),
-                'recent' => array_values(array_filter(array_column($api->getMyRecentTracks(['limit' => $limit])['items'] ?? [], 'track'))),
+                'recent' => array_values(array_filter(array_map(fn ($i) => isset($i['track']) ? $i['track'] + ['played_at' => $i['played_at'] ?? null] : null, $api->getMyRecentTracks(['limit' => $limit])['items'] ?? []))),
                 default => [],
             };
         });
@@ -232,6 +232,7 @@ final class SpotifyBrowser implements BrowsesExternalCatalogue
             year: isset($data['release_date']) ? substr($data['release_date'], 0, 4) : (isset($data['album']['release_date']) ? substr($data['album']['release_date'], 0, 4) : null),
             trackCount: isset($data['total_tracks']) ? (int) $data['total_tracks'] : null,
             image: SpotifyImages::pick($images, 200),
+            playedAt: $data['played_at'] ?? null,
             libraryId: match ($type) {
                 'artist' => SpotifyCatalog::localArtist((string) ($data['name'] ?? ''))?->id,
                 'album' => SpotifyCatalog::localAlbum((string) ($data['name'] ?? ''), $artistName)?->id,

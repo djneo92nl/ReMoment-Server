@@ -16,6 +16,8 @@ final class ExternalItem
         public readonly ?string $image = null,
         /** The library record (artist, album or track id) when the library already has it. */
         public readonly ?int $libraryId = null,
+        /** When the account played it (recently played only), ISO 8601. */
+        public readonly ?string $playedAt = null,
     ) {}
 
     /** @return array<string, mixed> */
@@ -32,6 +34,7 @@ final class ExternalItem
             'image' => $this->image,
             'in_library' => $this->libraryId !== null,
             'library_id' => $this->libraryId,
+            'played_at' => $this->playedAt,
         ];
     }
 }
