@@ -11,6 +11,16 @@ info:
     checked against it). The prose docs in `docs/api/*.md` and CLAUDE.md stay the
     detailed reference; when an endpoint's shape changes, change this file too.
 
+    **Stable library ids.** `library:merge-duplicates` merges duplicate artists, albums and
+    tracks. The id of a merged-away record is kept as an alias: `GET /library/artists/{id}`,
+    `/albums/{id}`, `/playlists/{id}`, the favorite endpoints, the library play bodies
+    (`track_id`, `album_id`, `artist_id`, `playlist_id`, `start_track_id`), `POST .../queue`
+    and `POST /library/playlists/{id}/tracks` accept the old id and act on the surviving
+    record. Detail responses carry `canonical_id` (the surviving id; equal to `id` when
+    nothing was merged), the favorite responses too; update the cached id from it. Lists
+    never contain a retired id. An id that never existed or was removed stays 404 (422 in
+    a body). Merges made before this behaviour existed are not covered.
+
     Not yet described here: per-device settings (`sound-adjustment`, `bluetooth`,
     `network`, `wireless-speakers`, `info` — see `docs/api/device-settings.md`) and
     source controls (`/devices/{id}/controls` — see `docs/api/source-controls.md`).
@@ -2577,6 +2587,7 @@ components:
       type: object
       properties:
         id: { type: integer }
+        canonical_id: { type: integer, description: "The surviving id. Equal to `id` unless the id in the URL was merged away by library:merge-duplicates; then `id` is the survivor too. Replace a cached id with this. See docs/api/library.md, Merged records and stale ids." }
         name: { type: string }
         favorite: { type: boolean }
         genres: { type: array, items: { type: string } }
@@ -2607,6 +2618,7 @@ components:
       type: object
       properties:
         id: { type: integer }
+        canonical_id: { type: integer, description: "The surviving id. Equal to `id` unless the id in the URL was merged away by library:merge-duplicates; then `id` is the survivor too. Replace a cached id with this. See docs/api/library.md, Merged records and stale ids." }
         name: { type: string }
         artist:
           type: object
@@ -2638,6 +2650,7 @@ components:
       type: object
       properties:
         id: { type: integer }
+        canonical_id: { type: integer, description: "The surviving id. Equal to `id` unless the id in the URL was merged away by library:merge-duplicates; then `id` is the survivor too. Replace a cached id with this. See docs/api/library.md, Merged records and stale ids." }
         name: { type: string }
         owner: { type: string, nullable: true }
         last_played_at: { type: string, format: date-time, nullable: true, description: When it was last started from the server }

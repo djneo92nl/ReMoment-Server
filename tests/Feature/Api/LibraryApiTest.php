@@ -466,6 +466,7 @@ class LibraryApiTest extends TestCase
             ->assertOk()
             ->assertExactJson([
                 'id' => $album->id,
+                'canonical_id' => $album->id,
                 'name' => 'Absolution',
                 'artist' => ['id' => $artist->id, 'name' => 'Muse'],
                 'year' => 2003,
@@ -557,12 +558,12 @@ class LibraryApiTest extends TestCase
         $second = $this->album($artist, 'Second');
 
         $this->travel(-2)->minutes();
-        $this->putJson("/api/library/albums/{$first->id}/favorite", ['favorite' => true])->assertExactJson(['favorite' => true]);
+        $this->putJson("/api/library/albums/{$first->id}/favorite", ['favorite' => true])->assertExactJson(['favorite' => true, 'canonical_id' => $first->id]);
         $this->travelBack();
         $this->putJson("/api/library/albums/{$second->id}/favorite", ['favorite' => true])->assertOk();
         // Favoriting again keeps the original time.
         $this->putJson("/api/library/albums/{$first->id}/favorite", ['favorite' => true])->assertOk();
-        $this->putJson("/api/library/artists/{$artist->id}/favorite", ['favorite' => true])->assertExactJson(['favorite' => true]);
+        $this->putJson("/api/library/artists/{$artist->id}/favorite", ['favorite' => true])->assertExactJson(['favorite' => true, 'canonical_id' => $artist->id]);
 
         $this->getJson('/api/library/favorites')
             ->assertOk()
@@ -572,7 +573,7 @@ class LibraryApiTest extends TestCase
             ->assertJsonPath('artists.0.album_count', 2)
             ->assertJsonPath('artists.0.favorite', true);
 
-        $this->putJson("/api/library/albums/{$second->id}/favorite", ['favorite' => false])->assertExactJson(['favorite' => false]);
+        $this->putJson("/api/library/albums/{$second->id}/favorite", ['favorite' => false])->assertExactJson(['favorite' => false, 'canonical_id' => $second->id]);
         $this->getJson('/api/library/favorites')->assertJsonPath('albums.*.name', ['First']);
         $this->getJson("/api/library/albums/{$first->id}")->assertJsonPath('favorite', true);
         $this->putJson("/api/library/albums/{$first->id}/favorite", [])->assertStatus(422);

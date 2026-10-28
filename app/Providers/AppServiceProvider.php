@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Domain\Library\IdAliases;
 use App\Domain\Library\LibraryCache;
 use App\Events\Device\BatteryUpdated;
 use App\Events\Device\DeviceStateChanged;
@@ -30,9 +31,12 @@ use App\Listeners\Device\SyncNowPlayingDataWithState;
 use App\Listeners\Device\UpdateDeviceCache;
 use App\Services\MqttService;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -45,6 +49,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(MqttService::class);
         $this->app->scoped(\App\Support\SelectedDevice::class);
         $this->app->scoped(\App\Domain\Artwork\ArtworkEntryMemo::class);
+        $this->app->scoped(\App\Domain\Library\IdAliases::class);
     }
 
     /**
@@ -52,6 +57,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->bindLibraryIds();
+
         // MusicBrainz asks for at most one request per second; shared by every enrichment worker.
         RateLimiter::for('musicbrainz', fn () => Limit::perSecond(1));
         // TheAudioDB's free key allows about 30 requests a minute, Discogs 60 with a token.
@@ -96,5 +103,44 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(DeviceStateChanged::class, SyncNowPlayingDataWithState::class);
         Event::listen(DeviceStateChanged::class, SwitchToDefaultSource::class);
         Event::listen(DeviceStateChanged::class, SyncGroupMirror::class);
+    }
+
+    /**
+     * Route parameters {artist} {album} {track} {playlist}: an id that `library:merge-duplicates` merged away resolves to
+     * the surviving record (IdAliases). A plain page GET redirects to the canonical URL (301); the API and other
+     * methods serve the survivor. DELETE never follows an alias: a stale id must not remove the record it became.
+     */
+    private function bindLibraryIds(): void
+    {
+        $plural = ['artist' => 'artists', 'album' => 'albums', 'track' => 'tracks', 'playlist' => 'playlists'];
+
+        foreach (IdAliases::MODELS as $entity => $class) {
+            Route::bind($entity, function (string $value) use ($entity, $class, $plural) {
+                $request = request();
+
+                if (ctype_digit($value) && $class::query()->whereKey($value)->exists()) {
+                    return $class::query()->find($value);
+                }
+
+                $notFound = (new ModelNotFoundException)->setModel($class, [$value]);
+                if ($request->isMethod('DELETE') || !ctype_digit($value)) {
+                    throw $notFound;
+                }
+
+                $id = app(IdAliases::class)->resolve($entity, (int) $value);
+                if ($id === (int) $value) {
+                    throw $notFound;
+                }
+
+                if ($request->isMethod('GET') && !$request->is('api/*', 'stream/*')) {
+                    $path = preg_replace('#/'.$plural[$entity].'/'.$value.'(?=/|$|\.)#', '/'.$plural[$entity].'/'.$id, $request->getPathInfo(), 1);
+                    $query = $request->getQueryString();
+
+                    throw new HttpResponseException(redirect()->to($request->getSchemeAndHttpHost().$path.($query ? '?'.$query : ''), 301));
+                }
+
+                return $class::query()->findOrFail($id);
+            });
+        }
     }
 }

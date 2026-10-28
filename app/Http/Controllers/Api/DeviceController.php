@@ -9,6 +9,7 @@ use App\Domain\Device\PlaybackModes;
 use App\Domain\Device\RepeatMode;
 use App\Domain\Device\SourceSync;
 use App\Domain\Device\SpotifyRouting;
+use App\Domain\Library\IdAliases;
 use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\LibrarySources;
@@ -386,6 +387,7 @@ class DeviceController extends Controller
 
     public function libraryPlay(Request $request, Device $device, LibraryPlayback $library): JsonResponse
     {
+        app(IdAliases::class)->resolveInput($request, ['track_id' => 'track']);
         $request->validate([
             'track_id' => ['required_without:spotify_track_id', 'nullable', 'integer', 'exists:tracks,id'],
             'spotify_track_id' => ['required_without:track_id', 'nullable', 'string', 'regex:/^[A-Za-z0-9]+$/'],
@@ -417,6 +419,7 @@ class DeviceController extends Controller
     /** Plays a library playlist, optionally from a track of it and shuffled; see docs/api/library.md. */
     public function libraryPlayPlaylist(Request $request, Device $device, LibraryPlayback $library): JsonResponse
     {
+        app(IdAliases::class)->resolveInput($request, ['playlist_id' => 'playlist', 'start_track_id' => 'track']);
         $data = $request->validate([
             'playlist_id' => ['required', 'integer', 'exists:playlists,id'],
             'start_track_id' => ['nullable', 'integer', Rule::exists('playlist_track', 'track_id')->where('playlist_id', $request->integer('playlist_id'))],
@@ -501,6 +504,7 @@ class DeviceController extends Controller
     /** Plays a library album by DLNA or Spotify; see docs/api/library.md. */
     public function libraryPlayAlbum(Request $request, Device $device, LibraryPlayback $library): JsonResponse
     {
+        app(IdAliases::class)->resolveInput($request, ['album_id' => 'album', 'start_track_id' => 'track']);
         $data = $request->validate([
             'album_id' => ['required', 'integer', 'exists:albums,id'],
             'start_track_id' => ['nullable', 'integer', Rule::exists('tracks', 'id')->where('album_id', $request->integer('album_id'))],
@@ -521,6 +525,7 @@ class DeviceController extends Controller
     /** Plays all library tracks of an artist by DLNA or Spotify; see docs/api/library.md. */
     public function libraryPlayArtist(Request $request, Device $device, LibraryPlayback $library): JsonResponse
     {
+        app(IdAliases::class)->resolveInput($request, ['artist_id' => 'artist']);
         $data = $request->validate([
             'artist_id' => ['required', 'integer', 'exists:artists,id'],
             'shuffle' => ['nullable', 'boolean'],

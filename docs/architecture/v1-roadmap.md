@@ -507,6 +507,8 @@ Done when: the health checks that exist today (queue stuck, scheduler silent, ba
 
 ### 14.2 Stable IDs for clients *[Should]*
 
+**Status: built** (see [library-identity.md](library-identity.md), Stable ids; `canonical_id` on the detail responses). Merges made before it are not covered.
+
 **Status: in progress** (a session started 2026-10-28; nothing committed yet).
 
 **Problem.** `library:merge-duplicates` deletes the merged records, so a client that cached an album or artist id gets `404` (or `422` in a play body) until it re-reads the list (`CLAUDE.md`, Library). For a public API with firmware and apps in the wild that is a breaking behaviour.

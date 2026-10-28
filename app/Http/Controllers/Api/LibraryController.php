@@ -9,6 +9,7 @@ use App\Domain\Health\LibraryReports;
 use App\Domain\Library\AlbumKind;
 use App\Domain\Library\AlbumPage;
 use App\Domain\Library\GenreColors;
+use App\Domain\Library\IdAliases;
 use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibraryCache;
 use App\Domain\Library\LibraryPlayback;
@@ -248,6 +249,7 @@ class LibraryController extends Controller
 
         return response()->json([
             'id' => $artist->id,
+            'canonical_id' => $artist->id,
             'name' => $artist->name,
             'favorite' => $artist->favorited_at !== null,
             'genres' => $artist->genres(),
@@ -308,6 +310,7 @@ class LibraryController extends Controller
 
         return response()->json([
             'id' => $album->id,
+            'canonical_id' => $album->id,
             'name' => $album->name,
             'artist' => $album->artist ? ['id' => $album->artist->id, 'name' => $album->artist->name] : null,
             'year' => $album->released_at?->year,
@@ -529,6 +532,7 @@ class LibraryController extends Controller
 
         return response()->json([
             'id' => $playlist->id,
+            'canonical_id' => $playlist->id,
             'name' => $playlist->name,
             'owner' => $this->owner($playlist),
             'last_played_at' => $playlist->last_played_at?->toIso8601String(),
@@ -728,7 +732,7 @@ class LibraryController extends Controller
 
     public function favoriteTrack(Request $request, Track $track): JsonResponse
     {
-        return response()->json(['favorite' => $this->setFavorite($request, $track)]);
+        return response()->json(['favorite' => $this->setFavorite($request, $track), 'canonical_id' => $track->id]);
     }
 
     /**
@@ -762,6 +766,7 @@ class LibraryController extends Controller
      */
     public function addPlaylistTracks(Request $request, Playlist $playlist, PlaylistEditor $editor): JsonResponse
     {
+        app(IdAliases::class)->resolveInput($request, ['track_id' => 'track', 'album_id' => 'album']);
         $data = $request->validate([
             'track_id' => ['required_without:album_id', 'nullable', 'integer', 'exists:tracks,id'],
             'album_id' => ['required_without:track_id', 'nullable', 'integer', 'exists:albums,id'],
@@ -874,12 +879,12 @@ class LibraryController extends Controller
 
     public function favoriteAlbum(Request $request, Album $album): JsonResponse
     {
-        return response()->json(['favorite' => $this->setFavorite($request, $album)]);
+        return response()->json(['favorite' => $this->setFavorite($request, $album), 'canonical_id' => $album->id]);
     }
 
     public function favoriteArtist(Request $request, Artist $artist): JsonResponse
     {
-        return response()->json(['favorite' => $this->setFavorite($request, $artist)]);
+        return response()->json(['favorite' => $this->setFavorite($request, $artist), 'canonical_id' => $artist->id]);
     }
 
     private function setFavorite(Request $request, Album|Artist|Track $model): bool

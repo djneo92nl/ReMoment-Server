@@ -60,7 +60,7 @@ php artisan library:merge-duplicates             # asks for confirmation, then m
 php artisan library:merge-duplicates --force     # no confirmation (scripts)
 ```
 
-Scheduled weekly (Sunday 04:00, `--force`, `routes/console.php`). It deletes records whose ids clients may hold, so a client that cached the id of a merged-away record gets a 404 until it re-reads the list; that is why it isn't daily. Run it by hand after a Normalizer rule change or when duplicates appear (e.g. after two imports ran concurrently). It is idempotent: a second run reports "No duplicates found."
+Scheduled weekly (Sunday 04:00, `--force`, `routes/console.php`). It deletes records whose ids clients may hold; each deleted id is kept as an alias (see Stable ids below), so clients keep working. It stays weekly because a merge still changes what a client's lists show. Run it by hand after a Normalizer rule change or when duplicates appear (e.g. after two imports ran concurrently). It is idempotent: a second run reports "No duplicates found."
 
 `LibraryMerger::plan()` computes keys in memory and groups:
 
@@ -80,7 +80,18 @@ Metadata with the same key and source on both is not duplicated: the survivor's 
 
 Everything referencing library rows: `tracks.album_id`, `tracks.artist_id`, `albums.artist_id`, `plays.track_id`, `playlist_track.track_id`, and the `metadata` morph (`metadatable_type` = the model class). Nothing in Redis is keyed by library ids: artwork is keyed by `md5(cover URL)`, so `ArtworkCache`, the pre-cache list (`LibraryArtwork::albumsByRecency()`), `artwork:prerender`, the SD card export and the stats (joins over `plays` → `tracks`) work unchanged on the merged rows. Queued `EnrichTrackMetadata`, `EnrichArtistLastfm` and `SendNowPlayingToLastfm` jobs for a merged-away record are dropped (`$deleteWhenMissingModels`).
 
-**For clients:** the ids of merged-away artists, albums and tracks stop existing. `GET /api/library/albums/{id}` / `artists/{id}` answer `404`, and play/favorite requests with such an id a `422` validation error or `404`; clients should drop the cached id and re-read the list (see `docs/api/library.md`).
+## Stable ids (workstream 14.2)
+
+`id_aliases` (`entity` artist|album|track|playlist, `old_id`, `new_id`, `merged_at`; unique on `(entity, old_id)`, index on `(entity, new_id)`; no foreign keys) is written by `LibraryMerger` for every record it deletes. `mergeAlbums/Artists/Tracks` each run in one transaction (alias rows included), so a failed merge leaves neither a deletion nor an alias, whoever calls them (`library:merge-duplicates`, `ArtistIdentity`, `PlayedTrackAdder`). `App\Domain\Library\IdAliases::record()` collapses chains: rows pointing at a record that is merged later are re-pointed to the new survivor, and a new alias never points at an alias, so resolution is always one hop. Playlists are not merged by anything today; the `playlist` entity is supported by the table and resolver for when they are.
+
+`IdAliases` (scoped, memoised per request) is the one resolver: `resolve($entity, $id)` returns `$id` while that record exists, else the survivor, else `$id` unchanged (the caller then answers 404/422 as before). A live record always wins over an alias with the same id. It is used by
+
+- route model binding for `{artist}`, `{album}`, `{track}`, `{playlist}` (`AppServiceProvider::bindLibraryIds`): API routes and non-GET web routes serve the survivor, a web page GET redirects 301 to the canonical URL, `/stream/*` serves the survivor, and `DELETE` never follows an alias;
+- request bodies, resolved before validation (`IdAliases::resolveInput`): the library play endpoints, the queue add, the playlist add-tracks (API and web) and the MCP `manage_playlist` tool. MCP tools that read or favorite go through `ApiBridge` and so inherit the routes' behaviour. `remove_library_item` deliberately does not resolve.
+
+`LibraryRemover` REMOVES records: a removed record is a real 404, and `IdAliases::forget()` drops the aliases that pointed at it (so does `PlaylistEditor::delete`). Detail responses carry `canonical_id`; see `docs/api/library.md`. The table is part of backups (every table but the skip list is) and of `db:import-sqlite`. Schema review 14.3 consolidates its migration.
+
+**Not recoverable:** merges that happened before this table existed left no record (the deleted rows are gone, and neither the command output nor any log lists their ids), so those ids still 404.
 
 ## Known limits
 

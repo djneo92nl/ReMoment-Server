@@ -162,6 +162,7 @@ class LibraryPlaylistsApiTest extends TestCase
             ->assertOk()
             ->assertExactJson([
                 'id' => $playlist->id,
+                'canonical_id' => $playlist->id,
                 'name' => 'Mix',
                 'owner' => null,
                 'last_played_at' => null,

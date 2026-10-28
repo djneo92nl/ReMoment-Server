@@ -45,6 +45,7 @@ class PlaylistEditor
         }
 
         $playlist->delete();
+        app(IdAliases::class)->forget('playlist', $playlist->id);
 
         return true;
     }

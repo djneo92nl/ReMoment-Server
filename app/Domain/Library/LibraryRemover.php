@@ -113,6 +113,11 @@ class LibraryRemover
         $model->metadata()->delete();
         $model->genreRelation()->detach();
         $model->delete();
+        // A removed record is a real 404: ids that were merged into it stop resolving too (IdAliases).
+        $entity = array_search($model::class, IdAliases::MODELS, true);
+        if ($entity !== false) {
+            app(IdAliases::class)->forget($entity, $model->getKey());
+        }
     }
 
     /** Whether any of the tracks is in the Local files or on a DLNA server: those are removed at their source, not here. */

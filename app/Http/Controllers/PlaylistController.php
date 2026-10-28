@@ -70,6 +70,7 @@ class PlaylistController extends Controller
      */
     private function tracksToAdd(Request $request): array
     {
+        app(\App\Domain\Library\IdAliases::class)->resolveInput($request, ['track_id' => 'track', 'album_id' => 'album']);
         $data = $request->validate([
             'track_id' => ['nullable', 'integer', 'exists:tracks,id'],
             'album_id' => ['nullable', 'integer', 'exists:albums,id'],

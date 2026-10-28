@@ -23,7 +23,8 @@ use Illuminate\Support\Facades\DB;
  * merge() runs a plan, one transaction per group: albums first, then
  * artists, then tracks. The oldest record (lowest id) of a group survives;
  * everything that pointed at the others is re-pointed to it, then they are
- * deleted. Running it again finds nothing more to merge.
+ * deleted. Running it again finds nothing more to merge. Every deleted id is written to `id_aliases` (IdAliases) in
+ * the same transaction, so clients that cached it keep working.
  */
 final class LibraryMerger
 {
@@ -100,6 +101,12 @@ final class LibraryMerger
      */
     public function mergeAlbums(int $survivorId, array $loserIds): int
     {
+        return DB::transaction(fn () => $this->doMergeAlbums($survivorId, $loserIds));
+    }
+
+    /** @param  list<int>  $loserIds */
+    private function doMergeAlbums(int $survivorId, array $loserIds): int
+    {
         $survivor = Album::find($survivorId);
         $losers = Album::query()->whereKey($loserIds)->whereKeyNot($survivorId)->orderBy('id')->get();
 
@@ -119,6 +126,7 @@ final class LibraryMerger
             $survivor->favorited_at = $this->earliest($survivor->favorited_at, $loser->favorited_at);
             $survivor->released_at ??= $loser->released_at;
             $loser->delete();
+            app(IdAliases::class)->record('album', $loser->id, $survivor->id);
         }
 
         $survivor->save();
@@ -131,6 +139,12 @@ final class LibraryMerger
      * @return int artists merged away
      */
     public function mergeArtists(int $survivorId, array $loserIds): int
+    {
+        return DB::transaction(fn () => $this->doMergeArtists($survivorId, $loserIds));
+    }
+
+    /** @param  list<int>  $loserIds */
+    private function doMergeArtists(int $survivorId, array $loserIds): int
     {
         $survivor = Artist::find($survivorId);
         $losers = Artist::query()->whereKey($loserIds)->whereKeyNot($survivorId)->orderBy('id')->get();
@@ -156,6 +170,7 @@ final class LibraryMerger
             $this->mergeMetadata($loser, $survivor);
             $survivor->favorited_at = $this->earliest($survivor->favorited_at, $loser->favorited_at);
             $loser->delete();
+            app(IdAliases::class)->record('artist', $loser->id, $survivor->id);
         }
 
         $survivor->save();
@@ -168,6 +183,12 @@ final class LibraryMerger
      * @return int tracks merged away
      */
     public function mergeTracks(int $survivorId, array $loserIds): int
+    {
+        return DB::transaction(fn () => $this->doMergeTracks($survivorId, $loserIds));
+    }
+
+    /** @param  list<int>  $loserIds */
+    private function doMergeTracks(int $survivorId, array $loserIds): int
     {
         $survivor = Track::find($survivorId);
         $losers = Track::query()->whereKey($loserIds)->whereKeyNot($survivorId)->orderBy('id')->get();
@@ -199,6 +220,7 @@ final class LibraryMerger
             }
 
             $loser->delete();
+            app(IdAliases::class)->record('track', $loser->id, $survivor->id);
         }
 
         if ($adopt !== null) {

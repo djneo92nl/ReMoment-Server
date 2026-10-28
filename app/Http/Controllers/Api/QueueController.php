@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Library\IdAliases;
 use App\Domain\Library\QueueTracks;
 use App\Events\Device\QueueUpdated;
 use App\Http\Controllers\Api\Concerns\GuardsDeviceAccess;
@@ -24,6 +25,10 @@ class QueueController extends Controller
     /** Appends a track, album, artist or playlist to the queue, or puts it right after the current track (`next`). */
     public function store(Request $request, Device $device): JsonResponse
     {
+        if (isset(IdAliases::MODELS[$request->input('type')])) {
+            app(IdAliases::class)->resolveInput($request, ['id' => $request->input('type')]);
+        }
+
         $data = $request->validate([
             'type' => ['required', Rule::in(array_keys(QueueTracks::TYPES))],
             'id' => ['required', 'integer', fn ($attribute, $value, $fail) => QueueTracks::exists($request->input('type'), (int) $value) || $fail('The selected id is invalid.')],

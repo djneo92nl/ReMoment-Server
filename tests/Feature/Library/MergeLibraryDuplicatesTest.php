@@ -137,14 +137,16 @@ class MergeLibraryDuplicatesTest extends TestCase
         $this->getJson('/api/library/albums/'.Album::first()->id)->assertOk()->assertJsonPath('tracks.0.playable', true);
     }
 
-    public function test_the_ids_of_merged_records_are_gone(): void
+    public function test_the_ids_of_merged_records_resolve_to_the_survivor_and_are_not_listed(): void
     {
         $r = $this->duplicates();
 
         $this->artisan('library:merge-duplicates', ['--force' => true])->assertSuccessful();
 
-        $this->getJson('/api/library/albums/'.$r['spotifyAlbum']->id)->assertNotFound();
-        $this->getJson('/api/library/artists/'.$r['spotifyArtist']->id)->assertNotFound();
+        $this->assertNull(Album::find($r['spotifyAlbum']->id));
+        $this->getJson('/api/library/albums/'.$r['spotifyAlbum']->id)->assertOk()->assertJsonPath('canonical_id', $r['dlnaAlbum']->id);
+        $this->getJson('/api/library/artists/'.$r['spotifyArtist']->id)->assertOk()->assertJsonPath('canonical_id', $r['dlnaArtist']->id);
+        $this->assertSame([$r['dlnaAlbum']->id], collect($this->getJson('/api/library/albums')->json('data'))->pluck('id')->all());
     }
 
     public function test_dry_run_changes_nothing(): void

@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Tools;
 
+use App\Domain\Library\IdAliases;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\PlaylistEditor;
 use App\Domain\Library\SmartPlaylist\SmartPlaylistBuilder;
@@ -35,6 +36,20 @@ class ManagePlaylist extends Tool
 
     public function handle(Request $request, PlaylistEditor $editor): Response
     {
+        $ids = app(IdAliases::class);
+        $raw = $request->all();
+        foreach (['track_ids' => 'track'] as $key => $entity) {
+            if (is_array($raw[$key] ?? null)) {
+                $raw[$key] = array_map(fn ($v) => is_numeric($v) ? $ids->resolve($entity, (int) $v) : $v, $raw[$key]);
+            }
+        }
+        foreach (['id' => 'playlist', 'album_id' => 'album', 'track_id' => 'track'] as $key => $entity) {
+            if (isset($raw[$key]) && is_numeric($raw[$key])) {
+                $raw[$key] = $ids->resolve($entity, (int) $raw[$key]);
+            }
+        }
+        $request->merge($raw);
+
         $data = $request->validate([
             'action' => 'required|in:create,rename,delete,add_tracks,remove_tracks,move_track,set_rules',
             'id' => 'nullable|integer', 'name' => 'nullable|string|max:255', 'smart' => 'nullable|boolean',

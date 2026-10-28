@@ -16,7 +16,17 @@ Browse the shared media library and its playlists, keep household favorites, and
 
 ### Merged records and stale ids
 
-Duplicates from before that are merged by an admin running `php artisan library:merge-duplicates`: the oldest record keeps its id, the others' **ids disappear**. A client holding such an id gets `404` from `GET /api/library/artists/{id}`, `GET /api/library/albums/{id}` and the `PUT …/favorite` endpoints, and a `422` validation error for `album_id`/`artist_id`/`track_id`/`start_track_id` in the play requests. Treat either as "gone": drop the cached id and re-read the list (`/api/library/artists`, `recent`, `favorites`), where the merged record appears with its surviving id. Favorites survive a merge (the earliest `favorited_at` is kept). Artwork `hash`es are per cover URL, so cached covers stay valid.
+Duplicates from before identity existed are merged by an admin running `php artisan library:merge-duplicates` (also weekly): the oldest record keeps its id and the others are deleted. **Their ids keep working.** The merger writes an alias (`id_aliases`: entity, old id, surviving id) in the same transaction as the merge, and every endpoint that takes a library id follows it:
+
+- `GET /api/library/artists/{id}`, `albums/{id}`, `playlists/{id}` answer `200` with the surviving record. The response has **`canonical_id`**: the surviving id, always present, equal to `id` when nothing was merged. A client that sees `canonical_id` differ from the id it asked for should replace the id in its cache. (`id` in the body is the survivor's too.)
+- `PUT …/favorite` (albums, artists, tracks) favorites the survivor; the response adds `canonical_id`.
+- Play and queue bodies take an old id as if the survivor's had been sent: `library/play` (`track_id`), `play-album` (`album_id`, `start_track_id`), `play-artist` (`artist_id`), `play-playlist` (`playlist_id`, `start_track_id`), `POST /devices/{id}/queue` (`id`), and `POST /library/playlists/{id}/tracks` (`track_id`, `album_id`). Their responses do not carry `canonical_id`; read the detail to learn it.
+- Lists (`artists`, `albums`, `tracks`, `recent`, `favorites`, search…) never contain a retired id.
+- `GET /api/library/tracks/{id}/waveform`, `albums/{id}/spotify` and `fill-from-spotify` resolve too.
+- An id that never existed, or whose record was **removed** (not merged), stays `404` (`422` where a body validation says so today). `DELETE`s and the admin remove actions never follow an alias: a stale id cannot delete the record it became.
+- Web pages (`/albums/{id}`, `/artists/{id}`, `/playlists/{id}`) answer `301` to the canonical URL.
+
+Aliases are collapsed (an id merged twice resolves to the final survivor in one hop) and kept for good. **Merges that happened before this behaviour was added are not covered**: those ids were deleted without a record and cannot be recovered, so such an id is still a plain `404` (or `422`); re-read the lists. Favorites survive a merge (the earliest `favorited_at` is kept). Artwork `hash`es are per cover URL, so cached covers stay valid.
 
 ## Browse
 
