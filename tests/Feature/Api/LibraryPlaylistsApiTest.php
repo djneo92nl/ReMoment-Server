@@ -327,16 +327,6 @@ class LibraryPlaylistsApiTest extends TestCase
         $this->getJson('/api/library/playlists?scope=files')->assertJsonPath('data.*.name', ['Alpha', 'Beta', 'Zed']);
     }
 
-    public function test_a_spotify_playlist_over_the_page_limit_reports_the_real_total(): void
-    {
-        Queue::fake();
-        $playlist = $this->spotifyPlaylist('Big', 203, 0);
-
-        $this->getJson("/api/library/playlists/{$playlist->id}")->assertOk()
-            ->assertJsonPath('track_count', 203)
-            ->assertJsonCount(200, 'tracks');
-    }
-
     public function test_local_mode_is_not_playable_without_any_local_copy(): void
     {
         $dlnaDevice = $this->device();

@@ -189,7 +189,11 @@ class LibrarySources
         return array_values(array_filter(array_keys(self::all()), fn ($key) => isset($found[$key])));
     }
 
-    /** Tracks available from at least one source that isn't hidden. */
+    /**
+     * Tracks available from at least one library that isn't hidden. A streaming service (Spotify) is not a library: a Spotify
+     * source, or a Spotify id kept as metadata on a track another library has, never makes a track visible (that would leak
+     * DLNA tracks into Local, where Spotify used to be hidden with the other streaming libraries).
+     */
     public static function tracks(Builder|Relation $query, array $hidden): Builder|Relation
     {
         $hidden = array_values(array_diff($hidden, [self::RADIO]));
@@ -198,18 +202,22 @@ class LibrarySources
             return $query;
         }
 
-        return $query->where(function (Builder $q) use ($hidden) {
+        $visible = array_values(array_diff(self::libraryIds(), $hidden));
+        $hidden = [...$hidden, ...array_keys(self::STREAMING_SERVICES)];
+
+        return $query->where(function (Builder $q) use ($hidden, $visible) {
             $q->whereNull('tracks.source')
                 ->orWhereNotIn('tracks.source', $hidden)
-                ->orWhereExists(function ($m) use ($hidden) {
+                ->orWhereExists(function ($m) use ($visible) {
                     $m->selectRaw('1')->from('metadata')
                         ->whereColumn('metadata.metadatable_id', 'tracks.id')
                         ->where('metadata.metadatable_type', (new Track)->getMorphClass())
                         ->whereIn('metadata.key', self::SOURCE_METADATA)
-                        ->where(function ($s) use ($hidden) {
-                            foreach ($hidden as $source) {
-                                $s->where('metadata.source', '!=', $source)
-                                    ->where('metadata.source', 'not like', $source.':%');
+                        ->where(function ($s) use ($visible) {
+                            // Only a source that is a visible library counts (`dlna:3` is `dlna`).
+                            $s->whereRaw('1 = 0');
+                            foreach ($visible as $source) {
+                                $s->orWhere('metadata.source', $source)->orWhere('metadata.source', 'like', $source.':%');
                             }
                         });
                 });

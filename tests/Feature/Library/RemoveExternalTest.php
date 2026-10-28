@@ -90,11 +90,11 @@ class RemoveExternalTest extends TestCase
         $this->assertNotNull(Album::find($album->id));
     }
 
-    public function test_album_cards_show_where_an_album_comes_from(): void
+    public function test_album_cards_show_the_library_an_album_comes_from_and_never_spotify(): void
     {
         $this->dlnaTrackOn($this->spotifyAlbum());
 
-        $this->get('/albums')->assertSee('In the DLNA library')->assertSee('From Spotify');
+        $this->get('/albums')->assertSee('In the DLNA library')->assertDontSee('From Spotify');
     }
 
     public function test_an_empty_artist_can_be_removed(): void

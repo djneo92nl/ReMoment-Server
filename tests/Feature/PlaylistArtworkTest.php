@@ -207,6 +207,8 @@ class PlaylistArtworkTest extends TestCase
     public function test_the_client_pre_cache_list_has_processed_composites_as_playlist_items(): void
     {
         Queue::fake();
+        // The fixtures are Spotify-sourced rows; show every source (Spotify is not a library any more).
+        \App\Models\Setting::set(\App\Domain\Library\LeadingSource::SETTING, 'all');
         foreach (SourceLogo::KEYS as $key) {
             $this->processed(SourceLogo::url($key));
         }
