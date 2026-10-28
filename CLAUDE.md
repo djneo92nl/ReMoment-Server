@@ -32,6 +32,7 @@ docs/
   architecture/
     client-devices.md       DB schema, model, controller, admin UI internals
     backup-restore.md       backup:run / backup:restore: archive contents, secrets excluded by default, fresh-install restore, SQLite and SD-card note, upgrade flow
+    availability-layer.md   Availability layer design (workstream 3): providers, catalogue_albums/album_availability, MusicBrainz discography sync, wishlist, API/UI, build order (plan, not built)
     alerts.md               Alert model (workstream 14.1): one place raises/resolves alerts, kinds and thresholds, dedupe, MQTT remoment/alerts/*, GET /api/alerts, ack, how to add a kind
     credentials.md          Credentials layer (workstream 14.4): ServiceCredentials registry for Spotify/Last.fm/Discogs/AcoustID/TheAudioDB keys, /settings/services, encrypted secrets, backup exclusion, base-URL/relay hook, setup steps, how to add a service
     database.md             MariaDB (SQLite for tests only): why, .env settings, db:import-sqlite, recovering a corrupt file, driver-specific SQL
