@@ -19,7 +19,6 @@ if (config('devices.auto_discover')) {
     Schedule::command('device:discover')->hourly()->withoutOverlapping(120)->runInBackground();
 }
 
-Schedule::command('spotify:sync-library')->daily();
 Schedule::command('artwork:backfill')->daily();
 Schedule::command('artwork:prerender')->daily();
 Schedule::command('library:enrich')->daily();

@@ -6,7 +6,6 @@ use App\Domain\Artwork\LibraryArtwork;
 use App\Domain\Artwork\LibraryItemArtwork;
 use App\Domain\Artwork\PlaylistArtwork;
 use App\Domain\Catalogue\CatalogueItems;
-use App\Domain\Catalogue\SpotifyAvailability;
 use App\Domain\Catalogue\WantedTracks;
 use App\Domain\Health\LibraryReports;
 use App\Domain\Library\AlbumKind;
@@ -26,10 +25,7 @@ use App\Domain\Library\RandomAlbum;
 use App\Domain\Library\RecentItems;
 use App\Domain\Library\SmartPlaylist\SmartPlaylistDescriber;
 use App\Domain\Library\SpotifyCatalog;
-use App\Domain\Library\SpotifyUri;
 use App\Http\Controllers\Controller;
-use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
-use App\Jobs\ImportSpotifyAlbumById;
 use App\Jobs\LookupSpotifyAvailability;
 use App\Models\Client;
 use App\Models\Device;
@@ -47,7 +43,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
  * Library browsing and favorites for client devices. Shapes are documented
@@ -342,24 +337,6 @@ class LibraryController extends Controller
         $this->refuseClients($request);
 
         return response()->json(CatalogueItems::one($catalogueAlbum, $this->deviceOf($request)) + ['canonical_id' => $catalogueAlbum->id]);
-    }
-
-    /** Adds an album Spotify has (and the library lacks) to the library: queued, the album appears linked a moment later. */
-    public function importCatalogueAlbum(Request $request, CatalogueAlbum $catalogueAlbum, SpotifyTokenService $spotify): JsonResponse
-    {
-        $this->refuseClients($request);
-
-        $answer = $catalogueAlbum->availability()->where('provider', SpotifyAvailability::PROVIDER)->where('status', 'available')->first();
-        $spotifyId = SpotifyUri::albumId($answer?->external_id);
-        if ($catalogueAlbum->album_id !== null || $spotifyId === null || !$spotify->isConnected()) {
-            return response()->json(['error' => 'not_importable', 'message' => $catalogueAlbum->album_id !== null
-                ? 'The library already has this album.'
-                : 'Only an album Spotify has can be added, with Spotify connected.'], 422);
-        }
-
-        ImportSpotifyAlbumById::dispatch($spotifyId);
-
-        return response()->json(['status' => 'queued'], 202);
     }
 
     /** Wish for a song (from the play history, a radio station or by hand): something to buy or rip. */
@@ -998,27 +975,6 @@ class LibraryController extends Controller
             'tracks' => $rows,
             'missing' => count(array_filter($rows, fn ($r) => $r['track_id'] === null)),
         ]);
-    }
-
-    /** Adds the album's missing tracks from Spotify (like the web "Fill out album" action). */
-    public function fillAlbumFromSpotify(Album $album, SpotifyTokenService $spotify, SpotifyLibraryImporter $importer): JsonResponse
-    {
-        if (!$spotify->isConnected()) {
-            return response()->json(['error' => 'spotify_unavailable', 'message' => 'Spotify is not connected.'], 422);
-        }
-
-        try {
-            $id = $importer->findAlbumId($album);
-            abort_if($id === null, 404, 'Spotify does not have this album.');
-            $before = $album->tracks()->count();
-            $importer->importAlbum($id, $album);
-        } catch (HttpException $e) {
-            throw $e;
-        } catch (\Throwable $e) {
-            return response()->json(['error' => 'driver_error', 'message' => 'Spotify did not answer: '.$e->getMessage()], 502);
-        }
-
-        return response()->json(['added' => $album->tracks()->count() - $before]);
     }
 
     /** @return array<string, mixed> */

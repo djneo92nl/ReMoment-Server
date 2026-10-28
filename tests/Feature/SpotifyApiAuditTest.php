@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Domain\Spotify\SpotifyLibraryApi;
 use App\Integrations\Spotify\MusicPlayerDriver;
-use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
 use App\Jobs\EnrichTrackSpotify;
 use App\Jobs\FetchSpotifyArtistImages;
 use App\Models\Device;
@@ -132,22 +131,6 @@ class SpotifyApiAuditTest extends TestCase
         ]);
 
         $this->assertSame('t1', $this->api()->playlistEntries('p1', 0, 50)['items'][0]['track']['id']);
-    }
-
-    public function test_playlist_import_keeps_a_playlist_whose_entries_are_hidden_and_does_not_fail(): void
-    {
-        $sdk = Mockery::mock(SpotifyWebAPI::class);
-        $sdk->shouldReceive('getMyPlaylists')->andReturn(['total' => 1, 'items' => [
-            ['id' => 'p1', 'name' => 'Followed', 'description' => null, 'images' => [], 'owner' => ['display_name' => 'Someone']],
-        ]]);
-        $this->app->instance(SpotifyTokenService::class, tap(Mockery::mock(SpotifyTokenService::class), function ($m) use ($sdk) {
-            $m->shouldReceive('makeApiClient')->andReturn($sdk);
-            $m->shouldReceive('getAccessToken')->andReturn('tok');
-        }));
-        Http::fake([self::API.'/playlists/*' => Http::response('', 403)]);
-
-        $this->assertSame(1, app(SpotifyLibraryImporter::class)->importPlaylists());
-        $this->assertDatabaseHas('playlists', ['external_id' => 'spotify:playlist:p1']);
     }
 
     public function test_artist_photos_fall_back_to_single_lookups_when_the_batch_endpoint_is_gone(): void

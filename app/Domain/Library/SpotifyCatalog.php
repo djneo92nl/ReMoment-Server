@@ -2,7 +2,6 @@
 
 namespace App\Domain\Library;
 
-use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
 use App\Services\SpotifyTokenService;
@@ -11,7 +10,7 @@ use Illuminate\Support\Facades\Cache;
 /**
  * What Spotify has beyond the local library, for the "More on Spotify" parts of the UI:
  * search results, an artist's albums and an album's tracks, reduced to plain arrays and
- * cached for an hour. Nothing is written here; adding goes through ImportSpotifyAlbumById.
+ * cached for an hour. Nothing is imported: the library is the local tracks and Spotify extends it live.
  */
 class SpotifyCatalog
 {
@@ -21,7 +20,6 @@ class SpotifyCatalog
 
     public function __construct(
         private SpotifyTokenService $spotify,
-        private SpotifyLibraryImporter $importer,
     ) {}
 
     public function available(): bool
@@ -109,7 +107,7 @@ class SpotifyCatalog
      */
     public function albumTracks(Album $album): ?array
     {
-        $spotifyAlbumId = $this->importer->findAlbumId($album);
+        $spotifyAlbumId = $this->findAlbumId($album);
 
         if ($spotifyAlbumId === null) {
             return null;
@@ -149,6 +147,39 @@ class SpotifyCatalog
 
             return $tracks;
         });
+    }
+
+    /** The Spotify id of a library album: stored URI, a Spotify track of it, else a search by name and artist. */
+    public function findAlbumId(Album $album): ?string
+    {
+        $stored = $album->metadata()->where('key', 'spotify_album_uri')->value('value');
+        if ($id = SpotifyUri::albumId($stored)) {
+            return $id;
+        }
+
+        $api = $this->spotify->makeApiClient();
+
+        $uri = $album->tracks()->where('source', 'spotify')->where('external_id', 'like', 'spotify:track:%')->value('external_id');
+        if ($uri) {
+            $id = $api->getTrack(SpotifyUri::trackId($uri))['album']['id'] ?? null;
+            if ($id) {
+                return $id;
+            }
+        }
+
+        $artist = $album->artist;
+        $results = $api->search('album:'.$album->name.' artist:'.$artist->name, 'album', ['limit' => 10]);
+
+        foreach ($results['albums']['items'] ?? [] as $candidate) {
+            $sameAlbum = Normalizer::album($candidate['name'] ?? null) === Normalizer::album($album->name);
+            $sameArtist = collect($candidate['artists'] ?? [])->contains(fn ($a) => Normalizer::artist($a['name'] ?? null) === Normalizer::artist($artist->name));
+
+            if ($sameAlbum && $sameArtist) {
+                return $candidate['id'];
+            }
+        }
+
+        return null;
     }
 
     /** Library album and artist matching a Spotify album, if any. */

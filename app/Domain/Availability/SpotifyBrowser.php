@@ -8,19 +8,14 @@ use App\Domain\Library\SpotifyCatalog;
 use App\Domain\Library\SpotifyImages;
 use App\Domain\Library\SpotifyUri;
 use App\Domain\Spotify\SpotifyLibraryApi;
-use App\Jobs\ImportSpotifyAlbumById;
-use App\Jobs\ImportSpotifyTrackById;
 use App\Services\Lastfm\LastfmInfoClient;
 use App\Services\SpotifyTokenService;
 use Illuminate\Support\Facades\Cache;
 
-/** Spotify as an external catalogue: the existing SpotifyCatalog reads, the existing import jobs for adding. */
+/** Spotify as an external catalogue: the existing SpotifyCatalog reads, nothing is imported. */
 final class SpotifyBrowser implements BrowsesExternalCatalogue
 {
     private const TTL = 300;
-
-    /** Albums one "add artist" queues at most, so a huge discography cannot flood the queue. */
-    public const MAX_ARTIST_ALBUMS = 100;
 
     public function __construct(private readonly SpotifyCatalog $catalog, private readonly SpotifyTokenService $spotify) {}
 
@@ -191,39 +186,6 @@ final class SpotifyBrowser implements BrowsesExternalCatalogue
         }
 
         return array_values($found);
-    }
-
-    public function add(string $type, string $id, ?array $albumIds = null): array
-    {
-        if ($type === 'track') {
-            ImportSpotifyTrackById::dispatch($id);
-
-            return ['albums' => 0, 'tracks' => 1];
-        }
-
-        if ($type === 'album') {
-            ImportSpotifyAlbumById::dispatch($id);
-
-            return ['albums' => 1, 'tracks' => 0];
-        }
-
-        $wanted = $albumIds;
-        if ($wanted === null) {
-            $wanted = [];
-            foreach ($this->catalog->albumsOfSpotifyArtist($id) as $album) {
-                // Albums the library already has are not asked for again.
-                if (SpotifyCatalog::localAlbum($album['name'], $album['artist']) === null) {
-                    $wanted[] = $album['id'];
-                }
-            }
-        }
-
-        $wanted = array_slice(array_values(array_unique($wanted)), 0, self::MAX_ARTIST_ALBUMS);
-        foreach ($wanted as $albumId) {
-            ImportSpotifyAlbumById::dispatch($albumId);
-        }
-
-        return ['albums' => count($wanted), 'tracks' => 0];
     }
 
     /** @param  array<string, mixed>  $data  a Spotify artist, album or track object */

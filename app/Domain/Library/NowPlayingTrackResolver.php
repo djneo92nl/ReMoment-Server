@@ -3,7 +3,6 @@
 namespace App\Domain\Library;
 
 use App\Domain\Media\NowPlaying;
-use App\Jobs\ImportSpotifyAlbum;
 use App\Models\Media\Album;
 use App\Models\Media\Track;
 
@@ -49,11 +48,6 @@ final class NowPlayingTrackResolver
             Enrichment::queue($track);
         }
 
-        // Add the rest of the album to the library.
-        if ($album !== null && ($spotifyId = SpotifyUri::trackId($track->external_id) ?? SpotifyUri::trackId($externalId)) !== null) {
-            ImportSpotifyAlbum::dispatch($album, $spotifyId);
-        }
-
         return [$track, $album];
     }
 
@@ -67,7 +61,7 @@ final class NowPlayingTrackResolver
 
     /**
      * Listeners report images as plain URL strings, the library stores (and the views read)
-     * them as `{url}` entries like the Spotify importer does.
+     * them as `{url}` entries as the library stores them.
      *
      * @param  array<int, mixed>  $images
      * @return array<int, array<string, mixed>>

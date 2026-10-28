@@ -375,23 +375,6 @@
                             <p class="px-3 py-2 text-sm text-gray-400 dark:text-gray-600">No match in the library.</p>
                         @endforelse
                     </div>
-
-                    @if($matchSpotify)
-                        <div>
-                            <p class="mb-1 text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600"><i class="fa-brands fa-spotify text-emerald-500 mr-1"></i>On Spotify</p>
-                            @foreach($matchSpotify as $candidate)
-                                <button wire:click="chooseSpotify('{{ $candidate['id'] }}')" wire:loading.attr="disabled" type="button"
-                                        class="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left hover:bg-gray-50 dark:hover:bg-stone-800 transition-colors disabled:opacity-60">
-                                    <i class="fa-brands fa-spotify text-emerald-500 w-4 text-xs"></i>
-                                    <span class="min-w-0 flex-1">
-                                        <span class="block text-sm text-gray-800 dark:text-gray-200 truncate">{{ $candidate['name'] }}</span>
-                                        <span class="block text-xs text-gray-400 dark:text-gray-600 truncate">{{ $candidate['artist'] }}{{ $candidate['album'] ? ' · '.$candidate['album'] : '' }}</span>
-                                    </span>
-                                    <span class="text-xs text-gray-900 dark:text-gray-100 underline">Add &amp; use</span>
-                                </button>
-                            @endforeach
-                        </div>
-                    @endif
                 </div>
             </div>
         </div>

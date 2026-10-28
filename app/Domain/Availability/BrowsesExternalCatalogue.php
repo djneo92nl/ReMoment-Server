@@ -45,14 +45,4 @@ interface BrowsesExternalCatalogue
      * @return list<ExternalItem>
      */
     public function popularTracks(string $artistId, string $artistName, int $limit = 10): array;
-
-    /**
-     * Puts the item in the library: queued jobs that create the records through LibraryIdentity (source = this provider).
-     * An artist adds the given album ids, else all its albums that the library lacks.
-     *
-     * @param  'artist'|'album'|'track'  $type
-     * @param  list<string>|null  $albumIds
-     * @return array{albums: int, tracks: int} how many imports were queued
-     */
-    public function add(string $type, string $id, ?array $albumIds = null): array;
 }

@@ -97,15 +97,9 @@
                 <button type="button" class="{{ $secondary }}" title="Add to playlist" data-test="album-add-to-playlist"
                         @click="$dispatch('add-to-playlist', {{ \Illuminate\Support\Js::from(['album_id' => $album->id, 'source' => $page->source, 'label' => $album->name]) }})"><i class="fa-solid fa-list-ul text-sm"></i>Add to playlist</button>
 
-                @php $canFill = $spotifyConnected; $canRemove = auth()->check() && $page->removable; @endphp
-                @if($canFill || $canRemove)
+                @php $canRemove = auth()->check() && $page->removable; @endphp
+                @if($canRemove)
                     <x-menu label="More" :button="$round">
-                        @if($canFill)
-                            <form method="POST" action="{{ route('albums.fill', $album) }}" x-data="{ busy: false }" @submit="busy = true">
-                                @csrf
-                                <x-menu.item type="submit" icon="plus" ::disabled="busy"><span x-text="busy ? 'Adding tracks…' : 'Fill out album from Spotify'"></span></x-menu.item>
-                            </form>
-                        @endif
                         @if($canRemove)
                             <form method="POST" action="{{ route('albums.destroy', $album) }}" onsubmit="return confirm('Remove this album and its tracks from the library? Your play history is kept.')">
                                 @csrf

@@ -10,7 +10,6 @@ use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\LibraryRemover;
 use App\Domain\Library\LibrarySources;
 use App\Http\Controllers\Concerns\FlashesLibraryPlayback;
-use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
 use App\Models\Device;
 use App\Models\Media\Album;
 use App\Models\Media\Playlist;
@@ -18,7 +17,6 @@ use App\Models\Media\Track;
 use App\Services\SpotifyTokenService;
 use App\Support\SelectedDevice;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 
 class AlbumController extends Controller
 {
@@ -96,32 +94,6 @@ class AlbumController extends Controller
         $source = $request->validate(['source' => ['nullable', 'in:files,dlna,spotify']])['source'] ?? null;
 
         return $this->flashPlayback(fn () => $library->playAlbum($device, $album, shuffle: $request->boolean('shuffle'), source: $source), $device, $album->name);
-    }
-
-    /** Adds the album's missing tracks from Spotify, whatever source the album came from. */
-    public function fill(Album $album, SpotifyTokenService $spotify, SpotifyLibraryImporter $importer)
-    {
-        if (!$spotify->isConnected()) {
-            return back()->with('error', 'Connect Spotify first.');
-        }
-
-        try {
-            $spotifyAlbumId = $importer->findAlbumId($album);
-
-            if ($spotifyAlbumId === null) {
-                return back()->with('error', "Could not find \"{$album->name}\" on Spotify.");
-            }
-
-            $before = $album->tracks()->count();
-            $importer->importAlbum($spotifyAlbumId, $album);
-            $added = $album->tracks()->count() - $before;
-        } catch (\Throwable $e) {
-            return back()->with('error', "Could not fill \"{$album->name}\" from Spotify: {$e->getMessage()}");
-        }
-
-        return back()->with('success', $added > 0
-            ? "Added {$added} ".Str::plural('track', $added)." to \"{$album->name}\" from Spotify."
-            : "\"{$album->name}\" is already complete.");
     }
 
     /** Removes an album that has no DLNA tracks (admin): its tracks, and plays turn into text plays. */

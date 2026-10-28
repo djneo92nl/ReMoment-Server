@@ -72,21 +72,6 @@ class ExternalCatalogueController extends Controller
         });
     }
 
-    /** Queues the import of an artist, album or track; the records appear in the library a moment later. */
-    public function add(Request $request, string $provider): JsonResponse
-    {
-        $data = $request->validate([
-            'type' => ['required', 'in:artist,album,track'],
-            'id' => ['required', 'string', 'regex:/^[A-Za-z0-9]{10,40}$/'],
-            'album_ids' => ['nullable', 'array', 'max:100'],
-            'album_ids.*' => ['string', 'regex:/^[A-Za-z0-9]{10,40}$/'],
-        ]);
-
-        return $this->guarded($request, $provider, fn (BrowsesExternalCatalogue $catalogue) => response()->json(
-            ['status' => 'queued', 'queued' => $catalogue->add($data['type'], $data['id'], $data['album_ids'] ?? null)], 202,
-        ));
-    }
-
     /** Runs a call on the provider's catalogue: 403 for a client device, 404 unknown provider, 422 not connected, 502 when it fails. */
     private function guarded(Request $request, string $provider, \Closure $call): JsonResponse|Response
     {

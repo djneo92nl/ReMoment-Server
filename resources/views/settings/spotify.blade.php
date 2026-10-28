@@ -116,9 +116,6 @@
                 <x-settings-row href="{{ route('settings.spotify-connect') }}"
                                  icon="fa-solid fa-tower-broadcast"
                                  label="Speaker Mappings">Map Connect speakers to devices</x-settings-row>
-                <x-settings-row href="{{ route('settings.spotify-library') }}"
-                                 icon="fa-solid fa-book"
-                                 label="Library Sync">Import saved tracks and playlists</x-settings-row>
             </x-settings-group>
         @endif
     </div>

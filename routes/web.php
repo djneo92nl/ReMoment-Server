@@ -66,7 +66,6 @@ Route::get('/albums', [AlbumController::class, 'index'])->name('albums.index');
 Route::get('/albums/{album}', [AlbumController::class, 'show'])->name('albums.show');
 Route::post('/devices/{device}/queue', [QueueController::class, 'store'])->name('devices.queue.add');
 Route::post('/albums/{album}/play/{device}', [AlbumController::class, 'play'])->name('albums.play');
-Route::post('/albums/{album}/fill', [AlbumController::class, 'fill'])->name('albums.fill');
 Route::post('/albums/{album}/favorite', [AlbumController::class, 'favorite'])->name('albums.favorite');
 Route::post('/tracks/{track}/favorite', [AlbumController::class, 'favoriteTrack'])->name('tracks.favorite');
 Route::post('/tracks/{track}/play/{device}', [DeviceController::class, 'playTrack'])->name('tracks.play');
@@ -146,10 +145,6 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/settings/spotify-connect', [SettingsController::class, 'spotifyConnect'])->name('settings.spotify-connect');
     Route::post('/settings/spotify-connect', [SettingsController::class, 'spotifyConnectSave'])->name('settings.spotify-connect.save');
-
-    Route::get('/settings/spotify/library', [SettingsController::class, 'spotifyLibrary'])->name('settings.spotify-library');
-    Route::post('/settings/spotify/library/sync-tracks', [SettingsController::class, 'spotifyLibrarySyncTracks'])->name('settings.spotify-library.sync-tracks');
-    Route::post('/settings/spotify/library/sync-playlists', [SettingsController::class, 'spotifyLibrarySyncPlaylists'])->name('settings.spotify-library.sync-playlists');
 
     Route::post('/settings/spotify/credentials', [SpotifyAuthController::class, 'saveCredentials'])->name('spotify.credentials');
     Route::get('/settings/spotify/authorize', [SpotifyAuthController::class, 'authorize'])->name('spotify.authorize');

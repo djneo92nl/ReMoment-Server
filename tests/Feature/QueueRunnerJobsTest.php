@@ -9,7 +9,6 @@ use App\Domain\Radio\NowPlayingProviders;
 use App\Jobs\EnrichAlbumLastfm;
 use App\Jobs\EnrichTrackSpotify;
 use App\Jobs\FetchSpotifyArtistImages;
-use App\Jobs\ImportSpotifyAlbumById;
 use App\Jobs\PollRadioTitle;
 use App\Jobs\ProcessArtwork;
 use App\Jobs\QueueHeartbeat;
@@ -31,7 +30,6 @@ class QueueRunnerJobsTest extends TestCase
     {
         $jobs = [
             new EnrichTrackSpotify(new \App\Models\Media\Track),
-            new ImportSpotifyAlbumById('abc'),
             new FetchSpotifyArtistImages([1]),
             new EnrichAlbumLastfm(new \App\Models\Media\Album),
         ];

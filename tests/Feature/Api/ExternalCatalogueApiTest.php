@@ -5,8 +5,6 @@ namespace Tests\Feature\Api;
 use App\Domain\Availability\ExternalCatalogues;
 use App\Domain\Device\State;
 use App\Domain\Library\LibrarySources;
-use App\Jobs\ImportSpotifyAlbumById;
-use App\Jobs\ImportSpotifyTrackById;
 use App\Mcp\Servers\ReMomentServer;
 use App\Mcp\Tools;
 use App\Models\Client;
@@ -126,25 +124,6 @@ class ExternalCatalogueApiTest extends TestCase
         $this->getJson('/api/library/external/spotify/search?q=band&type=album')->assertStatus(422)->assertJson(['error' => 'not_connected']);
     }
 
-    public function test_add_queues_the_import_of_a_track_an_album_or_an_artists_missing_albums(): void
-    {
-        Queue::fake();
-        $api = $this->api();
-        $api->shouldReceive('getArtistAlbums')->andReturn(['items' => [$this->spotifyAlbum(self::ALB, 'Have It'), $this->spotifyAlbum('album000000CD', 'Lack It')], 'next' => null]);
-        $artist = Artist::create(['name' => 'Band']);
-        Album::create(['artist_id' => $artist->id, 'name' => 'Have It', 'source' => 'files']);
-
-        $this->postJson('/api/library/external/spotify/add', ['type' => 'track', 'id' => self::TRK])->assertStatus(202)->assertJson(['status' => 'queued', 'queued' => ['albums' => 0, 'tracks' => 1]]);
-        $this->postJson('/api/library/external/spotify/add', ['type' => 'album', 'id' => self::ALB])->assertStatus(202)->assertJson(['queued' => ['albums' => 1]]);
-        $this->postJson('/api/library/external/spotify/add', ['type' => 'artist', 'id' => self::ART])->assertStatus(202)->assertJson(['queued' => ['albums' => 1]]);
-        $this->postJson('/api/library/external/spotify/add', ['type' => 'artist', 'id' => self::ART, 'album_ids' => [self::ALB, 'album000000CD']])->assertJson(['queued' => ['albums' => 2]]);
-
-        Queue::assertPushed(ImportSpotifyTrackById::class, fn ($job) => $job->spotifyTrackId === self::TRK);
-        Queue::assertPushed(ImportSpotifyAlbumById::class, fn ($job) => $job->spotifyAlbumId === 'album000000CD');
-        $this->postJson('/api/library/external/spotify/add', ['type' => 'album', 'id' => 'bad id!'])->assertStatus(422);
-        $this->postJson('/api/library/external/spotify/add', ['id' => self::ALB])->assertStatus(422);
-    }
-
     public function test_play_external_starts_the_album_artist_or_track_without_importing(): void
     {
         $api = $this->api();
@@ -180,7 +159,6 @@ class ExternalCatalogueApiTest extends TestCase
         $api->shouldReceive('search')->andReturn(['artists' => ['items' => [['id' => self::ART, 'name' => 'Band', 'images' => []]]]]);
 
         ReMomentServer::tool(Tools\External::class, ['action' => 'search', 'q' => 'band', 'type' => 'artist'])->assertOk()->assertSee('Band');
-        ReMomentServer::tool(Tools\External::class, ['action' => 'add', 'type' => 'track', 'id' => self::TRK])->assertOk()->assertSee('queued');
         ReMomentServer::tool(Tools\External::class, ['action' => 'search', 'q' => 'band'])->assertHasErrors(['search needs type']);
         ReMomentServer::tool(Tools\External::class, ['action' => 'play', 'type' => 'album', 'id' => self::ALB])->assertHasErrors(['play needs']);
     }

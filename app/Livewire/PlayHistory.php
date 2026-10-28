@@ -5,12 +5,10 @@ namespace App\Livewire;
 use App\Domain\Catalogue\WantedTracks;
 use App\Domain\Library\Normalizer;
 use App\Domain\Library\PlayedTrackAdder;
-use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
 use App\Models\Device;
 use App\Models\Media\Track;
 use App\Models\Media\WantedTrack;
 use App\Models\Play;
-use App\Services\SpotifyTokenService;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -37,9 +35,6 @@ class PlayHistory extends Component
 
     /** @var list<array> */
     public array $matchLocal = [];
-
-    /** @var list<array> */
-    public array $matchSpotify = [];
 
     public ?string $matchError = null;
 
@@ -87,7 +82,7 @@ class PlayHistory extends Component
 
     public function closeMatch(): void
     {
-        $this->reset('matchPlayId', 'matchName', 'matchArtist', 'matchLocal', 'matchSpotify', 'matchError');
+        $this->reset('matchPlayId', 'matchName', 'matchArtist', 'matchLocal', 'matchError');
     }
 
     public function updatedMatchName(): void
@@ -106,7 +101,6 @@ class PlayHistory extends Component
         $artist = trim($this->matchArtist);
         $this->matchError = null;
         $this->matchLocal = [];
-        $this->matchSpotify = [];
 
         if ($name === '') {
             return;
@@ -127,26 +121,6 @@ class PlayHistory extends Component
                 'album' => $t->album?->name,
                 'source' => $t->source,
             ])->all();
-
-        $spotify = app(SpotifyTokenService::class);
-        if (!$spotify->isConnected()) {
-            return;
-        }
-
-        try {
-            $results = $spotify->makeApiClient()->search(trim($name.' '.$artist), 'track', ['limit' => 8]);
-        } catch (\Throwable) {
-            $this->matchError = 'Spotify could not be reached.';
-
-            return;
-        }
-
-        $this->matchSpotify = array_map(fn ($t) => [
-            'id' => $t['id'],
-            'name' => $t['name'],
-            'artist' => $t['artists'][0]['name'] ?? null,
-            'album' => $t['album']['name'] ?? null,
-        ], $results['tracks']['items'] ?? []);
     }
 
     public function chooseLocal(int $trackId): void
@@ -155,16 +129,6 @@ class PlayHistory extends Component
 
         if ($track !== null) {
             $this->link($track);
-        }
-    }
-
-    /** Imports the Spotify track into the library, then links the play to it. */
-    public function chooseSpotify(string $spotifyTrackId, SpotifyLibraryImporter $importer): void
-    {
-        try {
-            $this->link($importer->importTrackById($spotifyTrackId));
-        } catch (\Throwable $e) {
-            $this->matchError = "Could not add the track from Spotify: {$e->getMessage()}";
         }
     }
 

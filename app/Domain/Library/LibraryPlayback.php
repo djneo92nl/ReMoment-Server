@@ -4,7 +4,6 @@ namespace App\Domain\Library;
 
 use App\Domain\Device\SpotifyRouting;
 use App\Integrations\Contracts\LibraryPlaybackInterface;
-use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
 use App\Models\Device;
 use App\Models\DeviceMeta;
 use App\Models\Media\Album;
@@ -208,7 +207,7 @@ class LibraryPlayback
         }
 
         try {
-            $albumId = app(SpotifyLibraryImporter::class)->findAlbumId($album);
+            $albumId = app(SpotifyCatalog::class)->findAlbumId($album);
         } catch (\Throwable $e) {
             throw new PlaybackFailedException('Spotify did not answer: '.$e->getMessage(), previous: $e);
         }

@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Domain\Catalogue\CatalogueLinker;
 use App\Domain\Catalogue\SpotifyAvailability;
 use App\Domain\Library\Enrichment;
-use App\Jobs\ImportSpotifyAlbumById;
 use App\Jobs\LookupSpotifyAvailability;
 use App\Models\Media\Album;
 use App\Models\Media\AlbumAvailability;
@@ -123,7 +122,7 @@ class CatalogueSpotifyAvailabilityTest extends TestCase
         Queue::assertPushed(LookupSpotifyAvailability::class, 1);
     }
 
-    public function test_the_answer_makes_the_entry_streamable_and_can_be_added(): void
+    public function test_the_answer_makes_the_entry_streamable(): void
     {
         Queue::fake();
         $this->spotifyHas([['a1', 'First Album', '1999']]);
@@ -134,22 +133,6 @@ class CatalogueSpotifyAvailabilityTest extends TestCase
         $this->assertSame('streamable', $item['state']);
         $this->assertNull($item['album_id']);
 
-        $this->postJson("/api/library/catalogue/{$row->id}/import")->assertStatus(202)->assertJson(['status' => 'queued']);
-        Queue::assertPushed(ImportSpotifyAlbumById::class, fn ($job) => $job->spotifyAlbumId === 'a1');
-    }
-
-    public function test_only_an_album_spotify_has_can_be_added(): void
-    {
-        Queue::fake();
-        $this->spotifyHas([]);
-        $unknown = $this->row('Nothing', 1999);
-        $linked = $this->row('Mine', 2000);
-        $album = Album::create(['artist_id' => $this->artist->id, 'name' => 'Mine', 'source' => 'files']);
-        CatalogueLinker::link($album);
-
-        $this->postJson("/api/library/catalogue/{$unknown->id}/import")->assertStatus(422)->assertJson(['error' => 'not_importable']);
-        $this->postJson("/api/library/catalogue/{$linked->id}/import")->assertStatus(422);
-        Queue::assertNothingPushed();
     }
 
     public function test_answers_move_to_the_album_when_it_is_imported(): void
@@ -179,6 +162,5 @@ class CatalogueSpotifyAvailabilityTest extends TestCase
         \Livewire\Livewire::test(\App\Livewire\Catalogue::class, ['artistId' => $this->artist->id])
             ->assertSee('Play on Spotify')->assertDontSee('Add to library')
             ->call('play', $row->id)->assertSee('Pick a player in the bar below first.');
-        Queue::assertNotPushed(ImportSpotifyAlbumById::class);
     }
 }

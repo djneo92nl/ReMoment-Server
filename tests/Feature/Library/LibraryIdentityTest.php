@@ -9,7 +9,6 @@ use App\Domain\Media\ArtistData;
 use App\Domain\Media\NowPlaying;
 use App\Domain\Media\TrackData;
 use App\Events\Device\NowPlayingUpdated;
-use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
 use App\Listeners\Device\StorePlaybackHistory;
 use App\Models\Device;
 use App\Models\DlnaServer;
@@ -22,8 +21,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
-use Mockery;
-use SpotifyWebAPI\SpotifyWebAPI;
 use Tests\Support\FakePlayerDriver;
 use Tests\Support\FakesSpotify;
 use Tests\TestCase;
@@ -142,62 +139,6 @@ class LibraryIdentityTest extends TestCase
         $this->assertSame(1, Track::count());
         $this->assertSame(['dlna:1', 'dlna:2'], DB::table('metadata')->where('key', 'dlna_url')->orderBy('source')->pluck('source')->all());
     }
-
-    // --- Spotify import ---
-
-    private function spotifyImport(array $savedTracks): void
-    {
-        $api = Mockery::mock(SpotifyWebAPI::class);
-        $api->shouldReceive('getMySavedTracks')->andReturn([
-            'items' => array_map(fn ($t) => ['track' => $t], $savedTracks),
-            'total' => count($savedTracks),
-        ]);
-
-        $this->connectSpotify($api);
-
-        app(SpotifyLibraryImporter::class)->importSavedTracks();
-    }
-
-    private function spotifyTrack(string $id, string $name, string $artist, string $album, int $ms): array
-    {
-        return [
-            'id' => $id, 'name' => $name, 'duration_ms' => $ms,
-            'artists' => [['name' => $artist]],
-            'album' => ['name' => $album, 'images' => [], 'release_date' => '1965-08-06'],
-        ];
-    }
-
-    public function test_spotify_import_reuses_records_from_the_dlna_scan(): void
-    {
-        $artist = Artist::create(['name' => 'Beatles', 'source' => 'dlna']);
-        $album = Album::create(['artist_id' => $artist->id, 'name' => 'Help!', 'source' => 'dlna', 'favorited_at' => now()]);
-        $dlna = Track::create(['artist_id' => $artist->id, 'album_id' => $album->id, 'name' => 'Help!', 'external_id' => '1:64$1', 'source' => 'dlna', 'duration' => 138]);
-
-        $this->spotifyImport([$this->spotifyTrack('help', 'Help! - Remastered 2009', 'The Beatles', 'Help! (Remastered)', 139000)]);
-        $this->spotifyImport([$this->spotifyTrack('help', 'Help! - Remastered 2009', 'The Beatles', 'Help! (Remastered)', 139000)]);
-
-        $this->assertSame(1, Artist::count());
-        $this->assertSame(1, Album::count());
-        $this->assertSame(1, Track::count());
-        $this->assertNotNull($album->fresh()->favorited_at);
-        $this->assertSame('spotify:track:help', LibraryPlayback::spotifyUri($dlna->fresh()));
-        $this->assertSame('dlna', $dlna->fresh()->source);
-        $this->assertSame('Help!', $dlna->fresh()->name, 'the existing name is kept');
-    }
-
-    public function test_spotify_import_keeps_live_albums_apart(): void
-    {
-        $this->spotifyImport([
-            $this->spotifyTrack('a', 'Yellow', 'Coldplay', 'Parachutes', 266000),
-            $this->spotifyTrack('b', 'Yellow - Live', 'Coldplay', 'Parachutes (Live)', 280000),
-        ]);
-
-        $this->assertSame(1, Artist::count());
-        $this->assertSame(2, Album::count());
-        $this->assertSame(2, Track::count());
-    }
-
-    // --- Play history ---
 
     private function device(): Device
     {

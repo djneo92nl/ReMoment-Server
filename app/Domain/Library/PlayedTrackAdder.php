@@ -6,10 +6,8 @@ use App\Domain\Media\AlbumData;
 use App\Domain\Media\ArtistData;
 use App\Domain\Media\NowPlaying;
 use App\Domain\Media\TrackData;
-use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
 use App\Models\Media\Track;
 use App\Models\Play;
-use App\Services\SpotifyTokenService;
 
 /**
  * Puts a track that is playing, or was played and only logged as text, into the library
@@ -50,15 +48,6 @@ class PlayedTrackAdder
         $stub = $stub?->isRadioStub() ? $stub : null;
 
         $stub?->update(['images' => null]); // the station's logo, so the real cover can take its place
-
-        // Without an id of its own (radio), look the track up on Spotify and put that in the library.
-        if ($externalId === null && ($spotifyId = self::findOnSpotify($artistName, $name)) !== null) {
-            $track = app(SpotifyLibraryImporter::class)->importTrackById($spotifyId);
-            self::replaceStub($stub, $track);
-            self::linkPlays($track, $name, $artistName);
-
-            return $track;
-        }
 
         [$track] = NowPlayingTrackResolver::resolve($nowPlaying);
 
@@ -115,33 +104,6 @@ class PlayedTrackAdder
 
         $stub->update(['images' => null]);
         app(LibraryMerger::class)->mergeTracks($track->id, [$stub->id]);
-    }
-
-    /** Spotify's id for a track whose artist and name match exactly, null without a connection or a match. */
-    private static function findOnSpotify(string $artistName, string $name): ?string
-    {
-        $spotify = app(SpotifyTokenService::class);
-
-        if (!$spotify->isConnected()) {
-            return null;
-        }
-
-        try {
-            $results = $spotify->makeApiClient()->search(trim($name.' '.$artistName), 'track', ['limit' => 10]);
-        } catch (\Throwable) {
-            return null;
-        }
-
-        foreach ($results['tracks']['items'] ?? [] as $candidate) {
-            $sameName = Normalizer::track($candidate['name'] ?? null) === Normalizer::track($name);
-            $sameArtist = collect($candidate['artists'] ?? [])->contains(fn ($a) => Normalizer::artist($a['name'] ?? null) === Normalizer::artist($artistName));
-
-            if ($sameName && $sameArtist && !empty($candidate['id'])) {
-                return $candidate['id'];
-            }
-        }
-
-        return null;
     }
 
     /** Points the plays that were logged as text for this track at the library track. */
