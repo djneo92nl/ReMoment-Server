@@ -24,10 +24,6 @@
                         <x-secondary-button type="button" size="md" wire:click="playExternal('album', '{{ $album->id }}', true)"><i class="fa-solid fa-shuffle"></i>Shuffle</x-secondary-button>
                         @if($album->libraryId)
                             <x-secondary-button size="md" :href="route('albums.show', $album->libraryId)"><i class="fa-solid fa-check"></i>In your library</x-secondary-button>
-                        @elseif($albumQueued)
-                            <span class="text-sm text-emerald-600 dark:text-emerald-400"><i class="fa-solid fa-check mr-1"></i>Adding…</span>
-                        @else
-                            <x-secondary-button type="button" size="md" wire:click="addAlbum" data-test="add-album"><i class="fa-solid fa-plus"></i>Add to library</x-secondary-button>
                         @endif
                     </div>
                     @if($notice)<p class="text-xs text-amber-600 dark:text-amber-400" role="status">{{ $notice }}</p>@endif
@@ -46,11 +42,12 @@
                         <p class="min-w-0 flex-1 truncate text-sm text-gray-900 dark:text-gray-100">{{ $track->title }}</p>
                         @if($track->libraryId)
                             <span class="flex-none text-xs text-gray-400 dark:text-gray-600">In library</span>
-                        @elseif(in_array($track->id, $queuedTracks, true) || $albumQueued)
-                            <span class="flex-none text-xs text-emerald-600 dark:text-emerald-400">Adding…</span>
-                        @else
-                            <button type="button" wire:click="addTrack('{{ $track->id }}')" class="flex-none text-xs font-medium text-gray-900 underline dark:text-gray-100">Add</button>
                         @endif
+                        <button type="button" wire:click="toggleWant(@js(['title' => $track->title, 'artist' => $track->artist ?? $album->artist, 'album' => $album->title, 'image' => $album->image]))" data-test="want-{{ $track->id }}"
+                                aria-label="{{ $wished[$track->id] ? 'Take off the wishlist' : 'Add to the wishlist' }}" title="{{ $wished[$track->id] ? 'On the wishlist' : 'Want to buy or rip this song' }}"
+                                class="flex h-8 w-8 flex-none items-center justify-center rounded-full text-sm transition-colors hover:bg-gray-100 dark:hover:bg-stone-800 {{ $wished[$track->id] ? 'text-amber-500' : 'text-gray-300 dark:text-stone-600' }}">
+                            <i class="fa-{{ $wished[$track->id] ? 'solid' : 'regular' }} fa-star"></i>
+                        </button>
                     </div>
                 @endforeach
             </div>

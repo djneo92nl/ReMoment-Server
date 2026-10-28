@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Jobs\ImportSpotifyTrackById;
 use App\Livewire\GlobalSearch;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -18,7 +17,7 @@ class GlobalSearchSpotifyTest extends TestCase
 {
     use FakesSpotify, RefreshDatabase;
 
-    public function test_tracks_show_with_play_and_add_and_play_needs_a_pinned_player(): void
+    public function test_tracks_show_with_play_and_want_and_play_needs_a_pinned_player(): void
     {
         Cache::flush();
         Queue::fake();
@@ -34,9 +33,11 @@ class GlobalSearchSpotifyTest extends TestCase
             ->assertSee('Faraway Song')->assertSee('Band')
             ->call('playExternal', 'track', 'track000000AB')
             ->assertSee('Pick a player in the bar below first.')
-            ->call('addTrack', 'track000000AB')
-            ->assertSee('Adding');
+            ->assertDontSee('Adding')
+            ->call('toggleWant', ['title' => 'Faraway Song', 'artist' => 'Band', 'album' => 'LP', 'image' => null])
+            ->assertSee('On the wishlist');
 
-        Queue::assertPushed(ImportSpotifyTrackById::class, fn ($job) => $job->spotifyTrackId === 'track000000AB');
+        $this->assertSame(['Faraway Song'], \App\Models\Media\WantedTrack::pluck('title')->all());
+        Queue::assertNothingPushed();
     }
 }

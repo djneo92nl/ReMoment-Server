@@ -8,18 +8,6 @@
     @elseif($rows === null)
         <p class="px-5 py-6 text-sm text-gray-400 dark:text-gray-600">This album isn't on Spotify.</p>
     @else
-        @if($missing > 0 || $message)
-            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-2.5 dark:border-stone-800/70">
-                <span class="text-xs text-gray-500">{{ $message ?? $missing.' '.Str::plural('track', $missing).' not in your library yet' }}</span>
-                @if($missing > 0 && !$message)
-                    <button wire:click="addAll" wire:loading.attr="disabled" type="button"
-                            class="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-600 transition-colors hover:bg-gray-200 disabled:opacity-60 dark:bg-stone-800 dark:text-gray-400 dark:hover:bg-stone-700">
-                        <span wire:loading.remove wire:target="addAll">Add {{ $missing }} to album</span>
-                        <span style="display:none" wire:loading wire:target="addAll">Adding…</span>
-                    </button>
-                @endif
-            </div>
-        @endif
         <div class="divide-y divide-gray-100 dark:divide-stone-800/70">
             @foreach($rows as $row)
                 <div class="group flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-gray-50 sm:px-5 dark:hover:bg-stone-800/30">
@@ -42,6 +30,11 @@
                             <i class="fa-solid fa-circle-check flex-none text-[11px] text-gray-400 dark:text-gray-600" title="In your library"></i>
                         @endif
                     </p>
+                    <button type="button" wire:click="toggleWant(@js(['title' => $row['name'], 'artist' => $album->artist?->name, 'album' => $album->name, 'image' => null]))" data-test="want-{{ $row['id'] }}"
+                            aria-label="{{ $wished[$row['id']] ? 'Take off the wishlist' : 'Add to the wishlist' }}" title="{{ $wished[$row['id']] ? 'On the wishlist' : 'Want to buy or rip this song' }}"
+                            class="flex h-8 w-8 flex-none items-center justify-center rounded-full text-sm transition-colors hover:bg-gray-100 dark:hover:bg-stone-800 {{ $wished[$row['id']] ? 'text-amber-500' : 'text-gray-300 dark:text-stone-600' }}">
+                        <i class="fa-{{ $wished[$row['id']] ? 'solid' : 'regular' }} fa-star"></i>
+                    </button>
                     <span class="w-10 flex-none text-right text-xs tabular-nums text-gray-400 dark:text-stone-500">{{ $row['duration'] ? \App\Domain\Helpers\TimeHelper::secondsToMinutes((int) $row['duration']) : '' }}</span>
                 </div>
             @endforeach

@@ -6,9 +6,8 @@ use App\Domain\Library\LibraryIdentity;
 use App\Domain\Library\Normalizer;
 use App\Domain\Library\SpotifyCatalog;
 use App\Domain\Library\SpotifyUri;
-use App\Jobs\ImportSpotifyAlbumById;
-use App\Jobs\ImportSpotifyTrackById;
 use App\Livewire\Concerns\PlaysExternal;
+use App\Livewire\Concerns\WantsStreamingTracks;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
 use App\Models\Media\Playlist;
@@ -17,15 +16,9 @@ use Livewire\Component;
 
 class GlobalSearch extends Component
 {
-    use PlaysExternal;
+    use PlaysExternal, WantsStreamingTracks;
 
     public string $query = '';
-
-    /** @var list<string> Spotify album ids queued for import from the results */
-    public array $queued = [];
-
-    /** @var list<string> Spotify track ids queued for import from the results */
-    public array $queuedTracks = [];
 
     public function render()
     {
@@ -48,32 +41,9 @@ class GlobalSearch extends Component
         return view('livewire.global-search', compact('artists', 'albums', 'tracks', 'playlists', 'spotify'));
     }
 
-    /** Adds a Spotify album from the results to the library (queued). */
-    public function addAlbum(string $spotifyAlbumId): void
-    {
-        ImportSpotifyAlbumById::dispatch($spotifyAlbumId);
-        $this->queued[] = $spotifyAlbumId;
-    }
-
-    /** Adds all albums and singles of a Spotify artist from the results to the library (queued). */
-    public function addArtist(string $spotifyArtistId): void
-    {
-        try {
-            $albums = app(SpotifyCatalog::class)->albumsOfSpotifyArtist($spotifyArtistId);
-        } catch (\Throwable) {
-            return;
-        }
-
-        foreach ($albums as $album) {
-            $this->addAlbum($album['id']);
-        }
-
-        $this->queued[] = $spotifyArtistId;
-    }
-
     /**
      * Spotify's artists and albums for the term, each with its library match (if any), so
-     * the dropdown can link what the library has and offer to add what it hasn't.
+     * the dropdown can link what the library has; the rest is played from Spotify (nothing is added to the library).
      *
      * @return array{artists: list<array>, albums: list<array>, tracks: list<array>}|null null when Spotify isn't connected or fails
      */
@@ -101,15 +71,11 @@ class GlobalSearch extends Component
         return [
             'artists' => array_map(fn ($a) => $a + ['local' => SpotifyCatalog::localArtist($a['name'])], $artists),
             'albums' => array_map(fn ($a) => $a + ['local' => SpotifyCatalog::localAlbum($a['name'], $a['artist'])], $results['albums']),
-            'tracks' => array_map(fn ($t) => $t + ['local' => LibraryIdentity::findByExternalId(SpotifyUri::track($t['id']), 'spotify')], $results['tracks'] ?? []),
+            'tracks' => array_map(fn ($t) => $t + [
+                'local' => LibraryIdentity::findByExternalId(SpotifyUri::track($t['id']), 'spotify'),
+                'wished' => \App\Domain\Catalogue\WantedTracks::isWished($t['artist'], $t['name']),
+            ], $results['tracks'] ?? []),
         ];
-    }
-
-    /** Adds a Spotify track from the results to the library (queued). */
-    public function addTrack(string $spotifyTrackId): void
-    {
-        ImportSpotifyTrackById::dispatch($spotifyTrackId);
-        $this->queuedTracks[] = $spotifyTrackId;
     }
 
     public function clear(): void

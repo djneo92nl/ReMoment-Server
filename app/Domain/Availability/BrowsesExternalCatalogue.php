@@ -26,6 +26,13 @@ interface BrowsesExternalCatalogue
     public function album(string $id): ?array;
 
     /**
+     * The artist's popular tracks on the service, most popular first (the service's own endpoint, or a stand-in).
+     *
+     * @return list<ExternalItem>
+     */
+    public function popularTracks(string $artistId, string $artistName, int $limit = 10): array;
+
+    /**
      * Puts the item in the library: queued jobs that create the records through LibraryIdentity (source = this provider).
      * An artist adds the given album ids, else all its albums that the library lacks.
      *

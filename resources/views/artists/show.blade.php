@@ -34,6 +34,14 @@
         <x-tabs :tabs="$tabs">
             <x-tabs.panel name="overview" class="space-y-8">
 
+                @if($source === 'spotify')
+                    {{-- The Spotify side is the service's own view: all its albums and the popular tracks, not the library's copies of them. --}}
+                    @if($spotifyArtistId)
+                        <livewire:external-artist :artist-id="$spotifyArtistId" embedded :key="'spotify-artist-'.$spotifyArtistId" />
+                    @else
+                        <p class="text-sm text-gray-400 dark:text-gray-600">Spotify does not know an artist called {{ $artist->name }}.</p>
+                    @endif
+                @else
                 @if($topTracks->isNotEmpty())
                     <section>
                         <h2 class="mb-3 text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">Popular</h2>
@@ -95,6 +103,7 @@
                         @endforeach
                     </x-shelf>
                 @endif
+                @endif
 
                 @if(\App\Models\Media\CatalogueAlbum::where('artist_id', $artist->id)->exists())
                     <livewire:catalogue :artist-id="$artist->id" :key="'catalogue-'.$artist->id" />
@@ -108,9 +117,6 @@
                     </x-shelf>
                 @endif
 
-                @if($spotifyConnected && $source === 'spotify')
-                    <livewire:artist-more-on-spotify :artist="$artist" :key="'spotify-more-'.$artist->id" />
-                @endif
             </x-tabs.panel>
 
             @isset($tabs['about'])

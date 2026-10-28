@@ -2,13 +2,10 @@
 
 namespace App\Livewire;
 
-use App\Domain\Library\Enrichment;
-use App\Domain\Library\LibraryIdentity;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\Normalizer;
 use App\Domain\Library\SpotifyCatalog;
-use App\Domain\Library\SpotifyUri;
-use App\Integrations\Spotify\Services\SpotifyLibraryImporter;
+use App\Livewire\Concerns\WantsStreamingTracks;
 use App\Models\Media\Album;
 use App\Support\SelectedDevice;
 use Livewire\Component;
@@ -20,6 +17,8 @@ use Livewire\Component;
  */
 class AlbumMoreOnSpotify extends Component
 {
+    use WantsStreamingTracks;
+
     public Album $album;
 
     public bool $loaded = false;
@@ -31,33 +30,6 @@ class AlbumMoreOnSpotify extends Component
     public function load(): void
     {
         $this->loaded = true;
-
-        $rows = $this->rows();
-
-        if (is_array($rows) && $this->recordPositions($rows) > 0) {
-            // The album page above was rendered without the numbers.
-            $this->redirect(route('albums.show', [$this->album, 'source' => 'spotify']));
-        }
-    }
-
-    public function addAll(SpotifyLibraryImporter $importer): void
-    {
-        try {
-            $spotifyAlbumId = $importer->findAlbumId($this->album);
-
-            if ($spotifyAlbumId === null) {
-                $this->message = 'Could not find this album on Spotify.';
-
-                return;
-            }
-
-            $before = $this->album->tracks()->count();
-            $importer->importAlbum($spotifyAlbumId, $this->album);
-            $added = $this->album->tracks()->count() - $before;
-            $this->message = $added > 0 ? "Added {$added} ".str('track')->plural($added).' from Spotify.' : 'Nothing to add.';
-        } catch (\Throwable $e) {
-            $this->message = "Could not add from Spotify: {$e->getMessage()}";
-        }
     }
 
     /**
@@ -87,42 +59,6 @@ class AlbumMoreOnSpotify extends Component
         return array_map(fn ($t) => $t + ['local' => $mine[Normalizer::track($t['name'])] ?? null], $tracks);
     }
 
-    /**
-     * Saves the Spotify position, and the Spotify id when the track has none (so it can be played), on
-     * library tracks that lack them; returns how many tracks changed.
-     */
-    private function recordPositions(array $rows): int
-    {
-        $changed = 0;
-
-        foreach ($rows as $row) {
-            $track = $row['local'];
-
-            if ($track === null) {
-                continue;
-            }
-
-            $touched = false;
-
-            if ($row['number'] > 0 && $track->metaValue('track_number') === null) {
-                Enrichment::save($track, 'track_number', (string) $row['number'], 'int', Enrichment::SPOTIFY);
-                $touched = true;
-            }
-
-            // Only when no other track already holds this id (a duplicate elsewhere in the library).
-            $uri = SpotifyUri::track($row['id']);
-            if (LibraryPlayback::spotifyUri($track) === null && LibraryIdentity::findByExternalId($uri, 'spotify') === null) {
-                LibraryIdentity::addExternalId($track, $uri, 'spotify');
-                $track->save();
-                $touched = true;
-            }
-
-            $changed += $touched ? 1 : 0;
-        }
-
-        return $changed;
-    }
-
     public function render()
     {
         $available = app(SpotifyCatalog::class)->available();
@@ -135,7 +71,7 @@ class AlbumMoreOnSpotify extends Component
             'pinned' => $pinned,
             // A play button only where the pinned player can play Spotify; without a pinned player it opens the player panel.
             'canPlay' => $pinned === null || LibraryPlayback::canPlaySpotify($pinned),
-            'missing' => is_array($rows) ? count(array_filter($rows, fn ($r) => $r['local'] === null)) : 0,
+            'wished' => collect(is_array($rows) ? $rows : [])->mapWithKeys(fn ($r) => [$r['id'] => \App\Domain\Catalogue\WantedTracks::isWished($this->album->artist?->name, $r['name'])])->all(),
         ]);
     }
 }

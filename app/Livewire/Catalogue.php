@@ -7,13 +7,12 @@ use App\Domain\Catalogue\SpotifyAvailability;
 use App\Domain\Catalogue\WantedTracks;
 use App\Domain\Library\LibrarySources;
 use App\Domain\Library\SpotifyUri;
-use App\Jobs\ImportSpotifyAlbumById;
 use App\Jobs\LookupSpotifyAvailability;
+use App\Livewire\Concerns\PlaysExternal;
 use App\Models\Device;
 use App\Models\Media\Artist;
 use App\Models\Media\CatalogueAlbum;
 use App\Models\Media\WantedTrack;
-use App\Services\SpotifyTokenService;
 use Livewire\Component;
 
 /**
@@ -23,6 +22,8 @@ use Livewire\Component;
  */
 class Catalogue extends Component
 {
+    use PlaysExternal;
+
     /** Set on an artist page; null shows the wishlist. */
     public ?int $artistId = null;
 
@@ -33,9 +34,6 @@ class Catalogue extends Component
 
     /** Entries shown before "Show all". */
     public int $limit = 12;
-
-    /** @var list<int> catalogue entries queued for import from here */
-    public array $queued = [];
 
     public function mount(): void
     {
@@ -77,16 +75,18 @@ class Catalogue extends Component
         }
     }
 
-    public function add(int $id): void
+    /** Plays an album that a streaming service has (the release-group's Spotify answer) without adding it to the library. */
+    public function play(int $id): void
     {
         $row = CatalogueAlbum::find($id);
         $answer = $row?->availability()->where('provider', SpotifyAvailability::PROVIDER)->where('status', 'available')->first();
-        $spotifyId = SpotifyUri::albumId($answer?->external_id);
+        $albumId = SpotifyUri::albumId($answer?->external_id);
 
-        if ($row !== null && $row->album_id === null && $spotifyId !== null && app(SpotifyTokenService::class)->isConnected()) {
-            ImportSpotifyAlbumById::dispatch($spotifyId);
-            $this->queued[] = $id;
+        if ($albumId === null) {
+            return;
         }
+
+        $this->playExternal('album', $albumId);
     }
 
     private function artist(): ?Artist
@@ -119,7 +119,6 @@ class Catalogue extends Component
             'counts' => ['all' => count($everything), 'missing' => count(array_filter($everything, fn ($i) => $i['album_id'] === null)), 'wanted' => count(array_filter($everything, fn ($i) => $i['wanted']))],
             'playsOn' => $playsOn,
             'hasRows' => $artist !== null && CatalogueAlbum::where('artist_id', $artist->id)->exists(),
-            'canImport' => app(SpotifyTokenService::class)->isConnected(),
             'songs' => $artist === null ? WantedTracks::wishlist() : [],
             'pending' => $artist !== null && $spotify->enabled() && $spotify->staleRows($artist)->isNotEmpty(),
             'artist' => $artist,

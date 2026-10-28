@@ -165,4 +165,20 @@ class CatalogueSpotifyAvailabilityTest extends TestCase
         $this->assertSame($album->id, $answer->album_id);
         $this->assertNull($answer->catalogue_album_id);
     }
+
+    public function test_a_streamable_entry_exposes_the_services_id_and_plays_without_importing(): void
+    {
+        Queue::fake();
+        $this->spotifyHas([['albumid00000AB', 'First Album', '1999']]);
+        $row = $this->row('First Album', 1999);
+        app(SpotifyAvailability::class)->lookupArtist($this->artist);
+
+        $item = $this->getJson("/api/library/catalogue/{$row->id}")->json();
+        $this->assertSame('spotify:album:albumid00000AB', $item['availability'][0]['external_id']);
+
+        \Livewire\Livewire::test(\App\Livewire\Catalogue::class, ['artistId' => $this->artist->id])
+            ->assertSee('Play on Spotify')->assertDontSee('Add to library')
+            ->call('play', $row->id)->assertSee('Pick a player in the bar below first.');
+        Queue::assertNotPushed(ImportSpotifyAlbumById::class);
+    }
 }

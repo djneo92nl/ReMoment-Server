@@ -60,13 +60,20 @@ class SpotifyCatalog
      */
     public function artistAlbums(Artist $artist): array
     {
-        $spotifyId = $artist->metaValue('spotify_id');
+        $spotifyId = $this->spotifyArtistId($artist);
+
+        return $spotifyId ? $this->albumsOfSpotifyArtist($spotifyId) : [];
+    }
+
+    /** The artist's Spotify id: stored as metadata, else found by exact name once and remembered. */
+    public function spotifyArtistId(Artist $artist): ?string
+    {
+        $spotifyId = $artist->metadata()->where('key', 'spotify_id')->value('value');
         if (!$spotifyId && ($spotifyId = $this->findArtistId($artist))) {
-            // Found by name: remember it, so the artist's Spotify page and the next lookups need no search.
             Enrichment::save($artist, 'spotify_id', $spotifyId, 'string', Enrichment::SPOTIFY);
         }
 
-        return $spotifyId ? $this->albumsOfSpotifyArtist($spotifyId) : [];
+        return $spotifyId ?: null;
     }
 
     /** @return list<array{id: string, name: string, artist: ?string, year: ?string, image: ?string}> */

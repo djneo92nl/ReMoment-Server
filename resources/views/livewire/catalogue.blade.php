@@ -92,6 +92,7 @@
                                     </p>
                                 @endif
 
+                                @if($notice)<p class="text-[11px] text-amber-600 dark:text-amber-400" role="status">{{ $notice }}</p>@endif
                                 <div class="flex flex-wrap gap-x-3 gap-y-1 pt-0.5">
                                     @if(!$item['album_id'] || !$item['fulfilled'])
                                         @if($item['wanted'])
@@ -100,12 +101,8 @@
                                             <button wire:click="want({{ $item['id'] }})" type="button" class="text-[11px] font-medium text-gray-900 underline dark:text-gray-100" title="Put on the wishlist: an album you want to buy or rip"><i class="fa-regular fa-star mr-1"></i>Want</button>
                                         @endif
                                     @endif
-                                    @if($streamOnly && $canImport)
-                                        @if(in_array($item['id'], $queued, true))
-                                            <span class="text-[11px] text-emerald-600 dark:text-emerald-400"><i class="fa-solid fa-check mr-1"></i>Adding…</span>
-                                        @else
-                                            <button wire:click="add({{ $item['id'] }})" type="button" class="text-[11px] font-medium text-gray-900 underline dark:text-gray-100"><i class="fa-solid fa-plus mr-1"></i>Add to library</button>
-                                        @endif
+                                    @if($streamOnly)
+                                        <button wire:click="play({{ $item['id'] }})" type="button" class="text-[11px] font-medium text-gray-900 underline dark:text-gray-100" data-test="play-{{ $item['id'] }}"><i class="fa-solid fa-play mr-1"></i>Play on Spotify</button>
                                     @endif
                                     @if($item['ignored'])
                                         <button wire:click="ignore({{ $item['id'] }}, false)" type="button" class="text-[11px] font-medium text-gray-500 underline">Show again</button>

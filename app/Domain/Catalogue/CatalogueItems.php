@@ -157,9 +157,11 @@ final class CatalogueItems
                 'wanted' => $row->wanted_at !== null,
                 'ignored' => $row->ignored_at !== null,
                 'fulfilled' => $row->fulfilled_at !== null,
-                'availability' => array_map(function (string $provider) use ($device) {
+                'availability' => array_map(function (string $provider) use ($device, $row, $answers) {
                     $library = LibrarySources::libraryOfSource($provider);
-                    $entry = ['provider' => $provider, 'library' => $library, 'status' => 'available'];
+                    $answer = $answers->first(fn ($a) => $a->provider === $provider && (($a->album_id !== null && $a->album_id === $row->album_id) || $a->catalogue_album_id === $row->id));
+                    // The service's own id (a lookup provider's answer), so a client can play it without the library having the album.
+                    $entry = ['provider' => $provider, 'library' => $library, 'status' => 'available', 'external_id' => $answer?->external_id];
                     if ($device !== null) {
                         $entry['playable'] = $library !== null && LibrarySources::playableOn($library, $device);
                     }

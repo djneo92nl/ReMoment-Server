@@ -90,14 +90,17 @@ class ArtistController extends Controller
         $source = AlbumPage::selectSource($sources, is_string($requested) ? $requested : $artist->metaValue('default_source'), LeadingSource::forRequest($request));
         $inSource = fn ($track) => $source === null || in_array($source, $track->sources(), true);
 
-        $albums = $artist->albums->filter(fn ($album) => $album->tracks->contains($inSource))->values();
-        $trackCount = $artist->tracks->filter($inSource)->count();
+        // The Spotify side shows what Spotify has (all its albums, the popular tracks), not the library's copies: the artist's Spotify id is all it needs.
+        $spotifyArtistId = $source === 'spotify' ? app(\App\Domain\Library\SpotifyCatalog::class)->spotifyArtistId($artist) : null;
+
+        $albums = $source === 'spotify' ? collect() : $artist->albums->filter(fn ($album) => $album->tracks->contains($inSource))->values();
+        $trackCount = $source === 'spotify' ? 0 : $artist->tracks->filter($inSource)->count();
 
         $totalPlays = $artist->plays()->count();
 
         $totalSeconds = Play::secondsListened(Play::whereHas('track', fn ($q) => $q->where('artist_id', $artist->id)));
 
-        $topTracks = $artist->tracks()
+        $topTracks = $source === 'spotify' ? collect() : $artist->tracks()
             ->whereHas('plays')
             ->when($source !== null, fn ($q) => LibrarySources::availableFrom($q, $source))
             ->withCount('plays')
@@ -127,6 +130,7 @@ class ArtistController extends Controller
             'recentPlays',
             'playableDevices',
             'spotifyConnected',
+            'spotifyArtistId',
         ));
     }
 

@@ -48,24 +48,23 @@ Wish and "not interested" are household-wide, guest accessible like favourites; 
 
 Each track row of `/history` (`Livewire\PlayHistory`, radio tracks included) has a heart and a star next to Match: the **heart** favorites the song (a play only logged as text, or a radio station's announcement, is first put in the library with `PlayedTrackAdder::addFromPlay`: Spotify match when connected, else the play's artist, title and album), the **star** wishes for it ("Want to buy or rip this song", `wanted_tracks`, filled star when it is on the wishlist) without adding it to the library. Wished songs show as a *Songs* list at the top of `/library/wishlist` and in the Wishlist shelf of `/library`.
 
-### Search: Spotify results
-
-The search box (`Livewire\GlobalSearch`) shows a *From Spotify* block under the library's own results (Spotify connected, 3 or more characters): artists, albums and tracks, each with **Play** (on the player pinned in this browser, through `LibraryPlayback::playExternal`; a note under the box when no player is pinned or it cannot play Spotify), and **Add** / **Add albums** (queued imports) or "In library". The same operations are the `external` API and MCP tool.
 
 ### New from your artists
 
 A shelf on `/library` (between the browse shelves and Wishlist; `<x-shelf>` of `<x-media-card>`s, up to 20): albums and EPs of your artists released in the last 90 days or still to come that the library lacks, each linking to the artist page (where the Discography card offers Want, Add or Play). Subtitle: artist and date, or "coming 12 Nov". Left out entirely when there is nothing.
 
-### Browsing a streaming service (Spotify)
-
-Pages for what a service has, also for artists the library lacks (`routes/web.php`, guest accessible, built on `ExternalCatalogues`):
-
-- **`/external/spotify/artists/{id}`** (`Livewire\ExternalArtist`): the artist's albums and singles as a grid of compact cards (cover and title open the album), with **Play** and **Add to library** per album, **Play / Shuffle** the artist, **Add all albums** (confirms; queues what the library lacks) and "In your library" when the library has the artist.
-- **`/external/spotify/albums/{id}`** (`Livewire\ExternalAlbum`): cover, title, artist, year, track count, **Play / Shuffle**, **Add to library** (or "In your library", linking to the album), and the track list with a play button and **Add** per track (or "In library").
-- Play goes to the player pinned in this browser (`PlaysExternal`: a note when none is pinned or it cannot play Spotify); nothing is added to the library by playing.
-- Entry points: the search box (names link to these pages), the artist page's *More on Spotify* (`/artists/{id}?source=spotify`: each card opens the album and can be played, and "Browse all on Spotify" opens the artist's page; the Spotify artist id is remembered as `spotify_id` metadata once found), and the Discography card's Add.
 
 ### Collection (`/library/collection`)
 
 `Livewire\PhysicalCollection`: the physical shelf. An *Add to the collection* card (a barcode finds releases on MusicBrainz, "Use this" fills the form; or type it by hand for tapes and bootlegs: artist, title, year, medium, where it is), filters (search, medium, ripped), and one row per item with the album link when the library has it, a *Ripped* badge, **Mark ripped** and **Remove**. A chip on `/library` links to it. Owning an item shows `Owned` on that album's release-group in the artist's Discography card and closes a wish.
+
+### Streaming extends the library (Spotify)
+
+The library is the local tracks. A streaming service **extends** it live: nothing of it is imported, so there is no "Add to library" and no favorite on a streaming track (favorites are local). What you can do with it is **play** and **want** (the wishlist, `wanted_tracks`, source `streaming`).
+
+- **Artist page, Spotify side** (`/artists/{id}?source=spotify`, the Spotify button; `Livewire\ExternalArtist` embedded): what Spotify has for the artist, laid out like the local page: *Play on Spotify / Shuffle*, **Popular** tracks (Last.fm's top tracks matched on Spotify when a Last.fm key is set, else Spotify's search for the artist's tracks; Spotify's own top-tracks endpoint is gone) with play and a star to want, and **every album and single** as cards (each opens the album, with a play button; "In library" when the library has it). The library's own list of Spotify-sourced albums is not shown. The Spotify artist id is found by exact name and remembered as `spotify_id` metadata.
+- **Album page, Spotify side** (`/albums/{id}?source=spotify`, `Livewire\AlbumMoreOnSpotify`): the album as Spotify has it, in order, so a local album that lacks tracks can still be played whole; tracks the library has are marked, each track has a play button and a star.
+- **`/external/spotify/artists/{id}` and `/albums/{id}`**: the same views for any artist or album, also ones the library lacks (reached from the search box). Album page: cover, Play / Shuffle, "In your library" when it is, the tracks with play and star.
+- **Search box** (`Livewire\GlobalSearch`): a *From Spotify* block under the library's results: artists, albums and tracks, each playable on the player pinned in this browser (`PlaysExternal`; a note when none is pinned), tracks with the star; names open the pages above.
+- **Discography card** (artist page): an entry only a service has shows **Play on Spotify** instead of an add button.
 

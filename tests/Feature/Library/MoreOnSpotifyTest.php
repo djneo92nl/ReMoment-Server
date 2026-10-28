@@ -2,9 +2,7 @@
 
 namespace Tests\Feature\Library;
 
-use App\Jobs\ImportSpotifyAlbumById;
 use App\Livewire\AlbumMoreOnSpotify;
-use App\Livewire\ArtistMoreOnSpotify;
 use App\Livewire\GlobalSearch;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
@@ -40,29 +38,7 @@ class MoreOnSpotifyTest extends TestCase
         return $album;
     }
 
-    public function test_artist_page_lists_only_spotify_albums_the_library_lacks_and_adds_them(): void
-    {
-        Queue::fake();
-        $album = $this->localAlbum();
-
-        $api = Mockery::mock(SpotifyWebAPI::class);
-        $api->shouldReceive('getArtistAlbums')->once()->andReturn(['items' => [
-            ['id' => 'a1', 'name' => 'Help! (Remastered 2009)', 'release_date' => '1965-08-06', 'artists' => [['name' => 'The Beatles']], 'images' => []],
-            ['id' => 'a2', 'name' => 'Abbey Road', 'release_date' => '1969-09-26', 'artists' => [['name' => 'The Beatles']], 'images' => []],
-        ], 'next' => null]);
-        $this->connectSpotify($api);
-
-        Livewire::test(ArtistMoreOnSpotify::class, ['artist' => $album->artist])
-            ->call('load')
-            ->assertSee('Abbey Road')
-            ->assertDontSee('Help!')
-            ->call('add', 'a2')
-            ->assertSee('Adding');
-
-        Queue::assertPushed(ImportSpotifyAlbumById::class, fn ($job) => $job->spotifyAlbumId === 'a2');
-    }
-
-    public function test_album_page_offers_the_tracks_the_album_lacks(): void
+    public function test_album_page_shows_spotifys_version_with_what_the_library_has_marked(): void
     {
         $album = $this->localAlbum();
         Metadata::create(['metadatable_type' => Album::class, 'metadatable_id' => $album->id, 'key' => 'spotify_album_uri', 'value' => 'spotify:album:sa1', 'type' => 'string', 'source' => 'spotify']);
@@ -77,11 +53,14 @@ class MoreOnSpotifyTest extends TestCase
         $this->connectSpotify($api);
 
         Livewire::test(AlbumMoreOnSpotify::class, ['album' => $album])
-            ->call('load') // records the Spotify id of the track we have and reloads the page once
             ->call('load')
             ->assertSee('Bonus Demo')
-            ->assertSee('Add 1 to album')
-            ->assertSee('In your library');
+            ->assertDontSee('to album')
+            ->assertSee('In your library')
+            ->call('toggleWant', ['title' => 'Bonus Demo', 'artist' => 'Beatles', 'album' => 'Help!'])
+            ->assertSee('On the wishlist');
+        $this->assertSame(['Bonus Demo'], \App\Models\Media\WantedTrack::pluck('title')->all());
+        $this->assertSame('streaming', \App\Models\Media\WantedTrack::first()->source);
     }
 
     public function test_global_search_shows_spotify_results_marking_what_is_in_the_library(): void
@@ -92,6 +71,7 @@ class MoreOnSpotifyTest extends TestCase
         $api = Mockery::mock(SpotifyWebAPI::class);
         $api->shouldReceive('search')->once()->andReturn([
             'artists' => ['items' => [['id' => 'sp-beatles', 'name' => 'The Beatles', 'images' => []]]],
+            'tracks' => ['items' => []],
             'albums' => ['items' => [
                 ['id' => 'a1', 'name' => 'Help!', 'release_date' => '1965', 'artists' => [['name' => 'The Beatles']], 'images' => []],
                 ['id' => 'a2', 'name' => 'Abbey Road', 'release_date' => '1969', 'artists' => [['name' => 'The Beatles']], 'images' => []],
@@ -104,10 +84,8 @@ class MoreOnSpotifyTest extends TestCase
             ->assertSee('From Spotify')
             ->assertSee('Abbey Road')
             ->assertSee('In library')
-            ->call('addAlbum', 'a2')
-            ->assertSee('Adding');
-
-        Queue::assertPushed(ImportSpotifyAlbumById::class, fn ($job) => $job->spotifyAlbumId === 'a2');
+            ->assertDontSee('Adding')
+            ->assertDontSee('Add albums');
     }
 
     public function test_global_search_without_spotify_is_unchanged(): void
@@ -118,10 +96,10 @@ class MoreOnSpotifyTest extends TestCase
         Livewire::test(GlobalSearch::class)->set('query', 'beatles')->assertSee('Beatles')->assertDontSee('From Spotify');
     }
 
-    public function test_the_spotify_list_keeps_album_order_and_records_the_position_of_tracks_we_have(): void
+    public function test_the_spotify_list_keeps_album_order_and_marks_the_tracks_we_have(): void
     {
         $album = $this->localAlbum();
-        $mine = Track::create(['artist_id' => $album->artist_id, 'album_id' => $album->id, 'name' => 'Stacys Mom', 'external_id' => 'spotify:track:3', 'source' => 'spotify']);
+        Track::create(['artist_id' => $album->artist_id, 'album_id' => $album->id, 'name' => 'Stacys Mom', 'external_id' => 'spotify:track:3', 'source' => 'spotify']);
         Metadata::create(['metadatable_type' => Album::class, 'metadatable_id' => $album->id, 'key' => 'spotify_album_uri', 'value' => 'spotify:album:sa1', 'type' => 'string', 'source' => 'spotify']);
 
         $api = Mockery::mock(SpotifyWebAPI::class);
@@ -132,13 +110,8 @@ class MoreOnSpotifyTest extends TestCase
         ], 'next' => null]);
         $this->connectSpotify($api);
 
-        $component = Livewire::test(AlbumMoreOnSpotify::class, ['album' => $album])
-            ->call('load')
-            ->assertRedirect(route('albums.show', [$album, 'source' => 'spotify'])); // positions were recorded: the page reloads once
-
-        $this->assertSame('3', $mine->fresh()->metaValue('track_number'));
-
-        $component->call('load')->assertNoRedirect()
+        Livewire::test(AlbumMoreOnSpotify::class, ['album' => $album])
+            ->call('load')->assertNoRedirect()
             ->assertSeeInOrder(['Mexican Wine', 'Bright Future In Sales', "Stacy's Mom", 'In your library']);
     }
 

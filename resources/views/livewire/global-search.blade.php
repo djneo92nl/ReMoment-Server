@@ -78,11 +78,6 @@
                                     class="flex-shrink-0 text-xs text-gray-900 dark:text-gray-100"><i class="fa-solid fa-play"></i></button>
                             @if($sArtist['local'])
                                 <a href="{{ route('artists.show', $sArtist['local']) }}" class="text-xs text-gray-900 dark:text-gray-100 underline flex-shrink-0">In library</a>
-                            @elseif(in_array($sArtist['id'], $queued, true))
-                                <span class="text-xs text-emerald-600 dark:text-emerald-400 flex-shrink-0">Adding…</span>
-                            @else
-                                <button type="button" wire:click="addArtist('{{ $sArtist['id'] }}')" @click.stop
-                                        class="text-xs text-gray-900 dark:text-gray-100 underline flex-shrink-0">Add albums</button>
                             @endif
                         </div>
                     @endforeach
@@ -97,11 +92,6 @@
                                     class="flex-shrink-0 text-xs text-gray-900 dark:text-gray-100"><i class="fa-solid fa-play"></i></button>
                             @if($sAlbum['local'])
                                 <a href="{{ route('albums.show', $sAlbum['local']) }}" class="text-xs text-gray-900 dark:text-gray-100 underline flex-shrink-0">In library</a>
-                            @elseif(in_array($sAlbum['id'], $queued, true))
-                                <span class="text-xs text-emerald-600 dark:text-emerald-400 flex-shrink-0">Adding…</span>
-                            @else
-                                <button type="button" wire:click="addAlbum('{{ $sAlbum['id'] }}')" @click.stop
-                                        class="text-xs text-gray-900 dark:text-gray-100 underline flex-shrink-0">Add</button>
                             @endif
                         </div>
                     @endforeach
@@ -116,12 +106,10 @@
                                     class="flex-shrink-0 text-xs text-gray-900 dark:text-gray-100"><i class="fa-solid fa-play"></i></button>
                             @if($sTrack['local'])
                                 <span class="text-xs text-gray-500 flex-shrink-0">In library</span>
-                            @elseif(in_array($sTrack['id'], $queuedTracks, true))
-                                <span class="text-xs text-emerald-600 dark:text-emerald-400 flex-shrink-0">Adding…</span>
-                            @else
-                                <button type="button" wire:click="addTrack('{{ $sTrack['id'] }}')" @click.stop
-                                        class="text-xs text-gray-900 dark:text-gray-100 underline flex-shrink-0">Add</button>
                             @endif
+                            <button type="button" wire:click="toggleWant(@js(['title' => $sTrack['name'], 'artist' => $sTrack['artist'], 'album' => $sTrack['album'], 'image' => $sTrack['image']]))" @click.stop data-test="want-{{ $sTrack['id'] }}"
+                                    aria-label="{{ $sTrack['wished'] ? 'Take off the wishlist' : 'Add to the wishlist' }}" title="{{ $sTrack['wished'] ? 'On the wishlist' : 'Want to buy or rip this song' }}"
+                                    class="flex-shrink-0 text-xs {{ $sTrack['wished'] ? 'text-amber-500' : 'text-gray-400 dark:text-stone-500' }}"><i class="fa-{{ $sTrack['wished'] ? 'solid' : 'regular' }} fa-star"></i></button>
                         </div>
                     @endforeach
                 @endif

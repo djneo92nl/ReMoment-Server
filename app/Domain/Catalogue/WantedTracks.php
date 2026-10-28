@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Log;
  */
 final class WantedTracks
 {
-    public const SOURCES = ['history', 'radio', 'manual'];
+    public const SOURCES = ['history', 'radio', 'manual', 'streaming'];
 
     public static function wish(string $artist, string $title, ?string $album = null, ?string $imageUrl = null, string $source = 'manual'): WantedTrack
     {
@@ -51,6 +51,12 @@ final class WantedTracks
     public static function unwish(WantedTrack $song): void
     {
         $song->delete();
+    }
+
+    /** Takes the song of this artist and title off the wishlist, however it was spelled. */
+    public static function unwishByName(string $artist, string $title): void
+    {
+        WantedTrack::where('artist_key', Normalizer::artist($artist))->where('title_key', Normalizer::track($title))->get()->each(fn (WantedTrack $s) => self::unwish($s));
     }
 
     /** Whether this artist and title is on the wishlist (and not closed). */
