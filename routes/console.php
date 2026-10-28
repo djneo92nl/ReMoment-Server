@@ -28,6 +28,10 @@ Schedule::command('radio:refresh')->weekly();
 Schedule::command('radio:fix-artwork')->weekly();
 Schedule::call(fn () => \App\Domain\Radio\RadioPlayLog::prune())->daily()->name('radio-plays-prune');
 
+// Discography of the library's artists from MusicBrainz (release-groups), a bounded batch per night, and the link/wish bookkeeping after it.
+Schedule::command('catalogue:sync')->dailyAt('02:30');
+Schedule::command('catalogue:reconcile')->dailyAt('05:00');
+
 // Audio analysis (loudness, fingerprints, BPM/key/mood) of the own files; a bounded batch on its own queue, off by default (ANALYSIS_ENABLED).
 Schedule::command('library:analyze')->dailyAt('02:00');
 

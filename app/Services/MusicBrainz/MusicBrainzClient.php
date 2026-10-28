@@ -57,6 +57,44 @@ class MusicBrainzClient
     }
 
     /**
+     * Every album and EP release-group of an artist without secondary types (live, compilation, soundtrack ...),
+     * paged 100 at a time, or null when MusicBrainz does not know the artist. A rate limit or outage throws.
+     * The type filter covers primary types only, so secondary types are filtered here.
+     *
+     * @return list<array{id: string, title: string, type: string, date: ?string, disambiguation: ?string}>|null
+     */
+    public function releaseGroups(string $artistMbid): ?array
+    {
+        $found = [];
+
+        for ($offset = 0; ; $offset += 100) {
+            $page = $this->get('release-group', ['artist' => $artistMbid, 'type' => 'album|ep', 'limit' => 100, 'offset' => $offset]);
+            if ($page === null) {
+                return $offset === 0 ? null : $found;
+            }
+
+            $groups = $page['release-groups'] ?? [];
+            foreach ($groups as $group) {
+                $type = strtolower((string) ($group['primary-type'] ?? ''));
+                if (!in_array($type, ['album', 'ep'], true) || !empty($group['secondary-types']) || empty($group['id']) || ($group['title'] ?? '') === '') {
+                    continue;
+                }
+                $found[] = [
+                    'id' => $group['id'],
+                    'title' => $group['title'],
+                    'type' => $type,
+                    'date' => ($group['first-release-date'] ?? '') !== '' ? $group['first-release-date'] : null,
+                    'disambiguation' => ($group['disambiguation'] ?? '') !== '' ? $group['disambiguation'] : null,
+                ];
+            }
+
+            if (count($groups) < 100) {
+                return $found;
+            }
+        }
+    }
+
+    /**
      * The URL relations of an artist or release group as a map (official, wikidata, wikipedia, discogs,
      * bandcamp, lastfm, spotify, twitter, ...); the first URL of each kind wins.
      *

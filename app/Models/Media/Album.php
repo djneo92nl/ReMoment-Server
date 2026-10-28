@@ -2,6 +2,7 @@
 
 namespace App\Models\Media;
 
+use App\Domain\Catalogue\CatalogueLinker;
 use App\Domain\Library\LibrarySources;
 use App\Domain\Library\Normalizer;
 use App\Models\Concerns\Favoritable;
@@ -51,6 +52,10 @@ class Album extends Model
                 $album->name = Normalizer::storedName($album->name);
             }
         });
+
+        // Tie the album to its MusicBrainz release-group (the discography) when it appears or is renamed.
+        static::created(fn (self $album) => CatalogueLinker::linkQuietly($album));
+        static::updated(fn (self $album) => $album->wasChanged('name') ? CatalogueLinker::linkQuietly($album) : null);
     }
 
     /** Adds `on_files` / `on_dlna` / `on_spotify`: whether any of the album's tracks is available from that source. */

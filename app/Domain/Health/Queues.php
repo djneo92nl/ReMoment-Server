@@ -19,6 +19,9 @@ final class Queues
     /** Jobs that run for minutes (SD-card export, uploads, transcodes): kept off the default workers so the heartbeat never waits for them. */
     public const HEAVY = 'heavy';
 
+    /** MusicBrainz discography syncs: short, rate limited jobs; served by the `heavy` worker so no extra process runs on a small board. */
+    public const CATALOGUE = 'catalogue';
+
     /** Queues that get a heartbeat job every minute: one per worker program. @return list<string> */
     public static function heartbeat(): array
     {
@@ -28,7 +31,7 @@ final class Queues
     /** All queues shown on the health page. @return list<string> */
     public static function all(): array
     {
-        return array_values(array_unique([self::HEALTH, self::DEFAULT, RunStorageTask::QUEUE, config('analysis.queue'), config('proxies.queue'), self::HEAVY, config('queue.connections.redis.queue', 'default')]));
+        return array_values(array_unique([self::HEALTH, self::DEFAULT, RunStorageTask::QUEUE, config('analysis.queue'), config('proxies.queue'), self::HEAVY, self::CATALOGUE, config('queue.connections.redis.queue', 'default')]));
     }
 
     /** Seconds the longest job of a queue may run (its worker's --timeout), plus a margin: a reserved job older than this means a hung worker. */

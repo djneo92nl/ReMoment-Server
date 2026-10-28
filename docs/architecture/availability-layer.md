@@ -1,6 +1,6 @@
 # Availability layer (design)
 
-Status: **design, nothing built.** Written 2026-10-28 for workstream 3 of [v1-roadmap.md](v1-roadmap.md). Implementation starts after stable IDs (14.2) have landed; the tables here feed the schema review (14.3, see [For the schema review](#for-the-schema-review-143)).
+Status: **design; PRs 2 and 3 are built** (tables, MusicBrainz discography sync, linker, `catalogue:sync` / `catalogue:reconcile`; see "Built so far" at the end). The rest is not. Written 2026-10-28 for workstream 3 of [v1-roadmap.md](v1-roadmap.md). Implementation starts after stable IDs (14.2) have landed; the tables here feed the schema review (14.3, see [For the schema review](#for-the-schema-review-143)).
 
 The problem in one paragraph: the library is a copy of what each source gave us. Nothing says which albums of an artist we lack, which of those a service could play, or lets the household wish for one. Spotify, Deezer/Tidal ([streaming-services.md](streaming-services.md)), the physical library (roadmap 6), media servers (15) and discovery (4) all need the same answer to "where can this album be had, and can device X play it", so they plug into one model as **providers**.
 
@@ -426,3 +426,9 @@ Parallel (MusicBrainz track 2 → 3 → 4 → 5 and browse track 1b run side by 
 8. Toggle for singles/live/compilations: confirm it stays out of 1.0, and that rows are not stored for those types (turning it on later means a resync, about 250 requests).
 9. ~~Order of 1b vs MusicBrainz~~ **Answered: MusicBrainz from the start**, two tracks in parallel (1b and 2-5). **Answered (2026-10-28): Spotify-only is enough for browse, play and add in 1b's first release, but not for discovery**: discovery and the discography (missing albums, wishlist, new releases) are provider-independent and come from MusicBrainz, so nothing in tables 2 to 5 may assume Spotify. Providers only add "playable here" to rows MusicBrainz already lists.
 10. `?availability=missing` only on discography/catalogue endpoints: confirm the narrowing.
+
+## Built so far (2026-10-28)
+
+PRs 2 and 3 of the build order, in one change: migration `2026_10_28_200000_create_catalogue_tables.php` (`catalogue_artists`, `catalogue_albums`, `album_availability`, as in this document), models `CatalogueAlbum` (name key and wish/ignore exclusivity in `saving`), `CatalogueArtist`, `AlbumAvailability`; `MusicBrainzClient::releaseGroups()` (pages of 100, album/EP, no secondary types); `App\Domain\Catalogue\ArtistCatalogueSync` and `CatalogueLinker`; job `SyncArtistCatalogue` on the `catalogue` queue (served by the `heavy` worker in both supervisor files, listed in `Queues::all()`, `catalogue.sync` alert after three failed artists); commands `catalogue:sync [--artist] [--limit=150] [--force] [--dry-run]` (02:30) and `catalogue:reconcile` (05:00); an `Album` model event links new or renamed albums. Tests: `tests/Feature/CatalogueSyncTest.php`.
+
+Differences from the text above: vanished release-groups are removed by comparing with the ids of the **current** sync (not "two syncs"), unless wished, ignored or linked; DLNA and own files count as owned, physical items join with workstream 6; artists without an mbid are only recorded as `no_mbid` (PR 4, the search-and-verify step, is not built); the browse response fields (`primary-type`, `secondary-types`) are assumed from the lookup form and must be confirmed with one real call.
