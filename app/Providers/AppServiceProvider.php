@@ -112,7 +112,7 @@ class AppServiceProvider extends ServiceProvider
      */
     private function bindLibraryIds(): void
     {
-        $plural = ['artist' => 'artists', 'album' => 'albums', 'track' => 'tracks', 'playlist' => 'playlists'];
+        $plural = ['artist' => 'artists', 'album' => 'albums', 'track' => 'tracks', 'playlist' => 'playlists', 'catalogue_album' => 'catalogue'];
 
         foreach (IdAliases::MODELS as $entity => $class) {
             Route::bind($entity, function (string $value) use ($entity, $class, $plural) {

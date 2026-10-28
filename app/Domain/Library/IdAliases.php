@@ -4,6 +4,7 @@ namespace App\Domain\Library;
 
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
+use App\Models\Media\CatalogueAlbum;
 use App\Models\Media\Playlist;
 use App\Models\Media\Track;
 use Illuminate\Http\Request;
@@ -27,6 +28,7 @@ final class IdAliases
         'album' => Album::class,
         'track' => Track::class,
         'playlist' => Playlist::class,
+        'catalogue_album' => CatalogueAlbum::class,
     ];
 
     /** @var array<string, int|null> "entity:id" => surviving id (null: not an alias) */

@@ -71,6 +71,9 @@ final class ArtistCatalogueSync
                 ->pluck('release_group_mbid', 'id')->reject(fn ($mbid) => isset($seen[$mbid]))->keys();
             foreach ($gone->chunk(500) as $ids) {
                 CatalogueAlbum::whereIn('id', $ids)->delete();
+                foreach ($ids as $id) {
+                    app(\App\Domain\Library\IdAliases::class)->forget('catalogue_album', $id);
+                }
             }
         });
 

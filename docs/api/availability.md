@@ -50,4 +50,6 @@ A wish closes by itself: when the linked library album gets an own file (scan, i
 - `?availability=` on `/library/albums` accepts `owned` and `streamable` only; **`missing` is a `422`**, because missing albums have no album row (use the discography). Without the parameter nothing changes, and a catalogue entry never appears in any existing list, count, shuffle or artwork list.
 - Errors: `403 forbidden` for a client token, `404` unknown id, `422` validation.
 
+Catalogue ids follow the stable-id rule of `docs/api/library.md`: after `library:merge-duplicates` folds two release-group rows into one, the old id still works on `GET`/`PUT /api/library/catalogue/{id}` and the response carries `canonical_id` (the surviving id; `id` in a CatalogueItem is always the surviving one). A really unknown id is `404`.
+
 MCP: the `catalogue` tool (`discography`, `wishlist`, `item`, `wish`, `unwish`, `ignore`, `unignore`). The PUT endpoints answer `403` for a client token, `404` unknown id, `422` without the boolean.

@@ -316,7 +316,7 @@ class LibraryController extends Controller
         $request->validate(['device_id' => ['nullable', 'integer', 'exists:devices,id']]);
         $this->refuseClients($request);
 
-        return response()->json(CatalogueItems::one($catalogueAlbum, $this->deviceOf($request)));
+        return response()->json(CatalogueItems::one($catalogueAlbum, $this->deviceOf($request)) + ['canonical_id' => $catalogueAlbum->id]);
     }
 
     /** Wish for an album you miss (household-wide); clears "not interested". */
@@ -328,7 +328,7 @@ class LibraryController extends Controller
         $catalogueAlbum->wanted_at = $request->boolean('wanted') ? ($catalogueAlbum->wanted_at ?? now()) : null;
         $catalogueAlbum->save();
 
-        return response()->json(['wanted' => $catalogueAlbum->wanted_at !== null]);
+        return response()->json(['wanted' => $catalogueAlbum->wanted_at !== null, 'canonical_id' => $catalogueAlbum->id]);
     }
 
     /** "I don't want this": hides the release-group from the discography and the wishlist; clears a wish. */
@@ -340,7 +340,7 @@ class LibraryController extends Controller
         $catalogueAlbum->ignored_at = $request->boolean('ignored') ? ($catalogueAlbum->ignored_at ?? now()) : null;
         $catalogueAlbum->save();
 
-        return response()->json(['ignored' => $catalogueAlbum->ignored_at !== null]);
+        return response()->json(['ignored' => $catalogueAlbum->ignored_at !== null, 'canonical_id' => $catalogueAlbum->id]);
     }
 
     private function deviceOf(Request $request): ?Device

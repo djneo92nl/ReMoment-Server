@@ -4,6 +4,7 @@ namespace App\Domain\Library;
 
 use App\Domain\Artwork\ArtworkCache;
 use App\Domain\Artwork\LibraryArtwork;
+use App\Domain\Catalogue\CatalogueMerge;
 use App\Domain\Storage\FileIndexer;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
@@ -125,11 +126,13 @@ final class LibraryMerger
             $this->mergeMetadata($loser, $survivor);
             $survivor->favorited_at = $this->earliest($survivor->favorited_at, $loser->favorited_at);
             $survivor->released_at ??= $loser->released_at;
+            CatalogueMerge::album($loser, $survivor);
             $loser->delete();
             app(IdAliases::class)->record('album', $loser->id, $survivor->id);
         }
 
         $survivor->save();
+        CatalogueMerge::albumMerged($survivor);
 
         return $losers->count();
     }
@@ -169,6 +172,7 @@ final class LibraryMerger
             Track::query()->where('artist_id', $loser->id)->update(['artist_id' => $survivor->id]);
             $this->mergeMetadata($loser, $survivor);
             $survivor->favorited_at = $this->earliest($survivor->favorited_at, $loser->favorited_at);
+            CatalogueMerge::artist($loser, $survivor);
             $loser->delete();
             app(IdAliases::class)->record('artist', $loser->id, $survivor->id);
         }
