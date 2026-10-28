@@ -2,6 +2,7 @@
 
 namespace App\Domain\Storage;
 
+use App\Domain\Catalogue\CatalogueLinker;
 use App\Domain\Library\Enrichment;
 use App\Domain\Library\LibraryIdentity;
 use App\Domain\Library\ReleaseDate;
@@ -108,6 +109,9 @@ class FileIndexer
             ['track_id' => $track->id, 'file_id' => $file->id],
             ['role' => TrackFile::ORIGINAL, 'is_primary' => true],
         );
+
+        // An own file makes the album owned: closes a wish on its release-group (docs/architecture/availability-layer.md).
+        CatalogueLinker::refreshOwnershipQuietly($album);
 
         return $track;
     }

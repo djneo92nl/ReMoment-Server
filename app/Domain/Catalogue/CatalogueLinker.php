@@ -69,6 +69,16 @@ final class CatalogueLinker
         return $count;
     }
 
+    /** For scans and imports, per track: one indexed query when the album has no release-group, and never an error for the caller. */
+    public static function refreshOwnershipQuietly(Album $album): void
+    {
+        try {
+            self::refreshOwnership($album);
+        } catch (\Throwable $e) {
+            Log::warning("Catalogue ownership of album {$album->id} failed: {$e->getMessage()}");
+        }
+    }
+
     /** Sets or clears `fulfilled_at` of the rows linked to an album, e.g. after a scan or an import added or removed files. */
     public static function refreshOwnership(Album $album): void
     {

@@ -319,6 +319,30 @@ class LibraryController extends Controller
         return response()->json(CatalogueItems::one($catalogueAlbum, $this->deviceOf($request)));
     }
 
+    /** Wish for an album you miss (household-wide); clears "not interested". */
+    public function wantCatalogueAlbum(Request $request, CatalogueAlbum $catalogueAlbum): JsonResponse
+    {
+        $request->validate(['wanted' => ['required', 'boolean']]);
+        $this->refuseClients($request);
+
+        $catalogueAlbum->wanted_at = $request->boolean('wanted') ? ($catalogueAlbum->wanted_at ?? now()) : null;
+        $catalogueAlbum->save();
+
+        return response()->json(['wanted' => $catalogueAlbum->wanted_at !== null]);
+    }
+
+    /** "I don't want this": hides the release-group from the discography and the wishlist; clears a wish. */
+    public function ignoreCatalogueAlbum(Request $request, CatalogueAlbum $catalogueAlbum): JsonResponse
+    {
+        $request->validate(['ignored' => ['required', 'boolean']]);
+        $this->refuseClients($request);
+
+        $catalogueAlbum->ignored_at = $request->boolean('ignored') ? ($catalogueAlbum->ignored_at ?? now()) : null;
+        $catalogueAlbum->save();
+
+        return response()->json(['ignored' => $catalogueAlbum->ignored_at !== null]);
+    }
+
     private function deviceOf(Request $request): ?Device
     {
         return $request->filled('device_id') ? Device::find($request->integer('device_id')) : null;

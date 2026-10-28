@@ -155,4 +155,71 @@ class CatalogueApiTest extends TestCase
         ReMomentServer::tool(Tools\Catalogue::class, ['action' => 'discography', 'artist_id' => $this->artist->id, 'availability' => 'missing'])->assertOk()->assertSee('Known');
         ReMomentServer::tool(Tools\Catalogue::class, ['action' => 'discography'])->assertHasErrors(['artist_id']);
     }
+
+    public function test_wish_and_ignore_toggle_and_exclude_each_other(): void
+    {
+        $row = $this->row('Wish me', 2010);
+
+        $this->putJson("/api/library/catalogue/{$row->id}/wanted", ['wanted' => true])->assertOk()->assertJson(['wanted' => true]);
+        $this->assertSame(['Wish me'], array_column($this->getJson('/api/library/wishlist')->json('data'), 'title'));
+
+        $this->putJson("/api/library/catalogue/{$row->id}/ignored", ['ignored' => true])->assertOk()->assertJson(['ignored' => true]);
+        $this->assertSame([], $this->getJson('/api/library/wishlist')->json('data'));
+        $this->assertNull($row->fresh()->wanted_at);
+
+        $this->putJson("/api/library/catalogue/{$row->id}/wanted", ['wanted' => true])->assertOk();
+        $this->assertNull($row->fresh()->ignored_at);
+
+        $this->putJson("/api/library/catalogue/{$row->id}/wanted", ['wanted' => false])->assertOk()->assertJson(['wanted' => false]);
+        $this->putJson("/api/library/catalogue/{$row->id}/wanted", [])->assertStatus(422);
+        $this->putJson('/api/library/catalogue/9999/wanted', ['wanted' => true])->assertNotFound();
+    }
+
+    public function test_a_second_wish_keeps_the_first_timestamp_and_clients_are_refused(): void
+    {
+        $row = $this->row('Wish me', 2010, ['wanted_at' => now()->subDay()]);
+        $first = $row->wanted_at->timestamp;
+        Client::create(['name' => 'Touch', 'type' => 'multi', 'status' => 'approved', 'api_token' => 'tok', 'registration_token' => 'reg']);
+
+        $this->putJson("/api/library/catalogue/{$row->id}/wanted", ['wanted' => true])->assertOk();
+        $this->assertSame($first, $row->fresh()->wanted_at->timestamp);
+
+        $this->putJson("/api/library/catalogue/{$row->id}/wanted?client=tok", ['wanted' => false])->assertForbidden();
+        $this->assertNotNull($row->fresh()->wanted_at);
+    }
+
+    public function test_an_own_file_closes_the_wish_and_removing_it_opens_it_again(): void
+    {
+        $row = $this->row('Wish me', 2010, ['wanted_at' => now()]);
+        $album = $this->album('Wish me', 'spotify');
+        CatalogueLinker::linkArtist($this->artist);
+        $this->assertNull($row->fresh()->fulfilled_at, 'saved in Spotify is not owned');
+        $this->assertCount(1, $this->getJson('/api/library/wishlist')->json('data'));
+
+        Track::create(['album_id' => $album->id, 'artist_id' => $this->artist->id, 'name' => 'F', 'source' => 'files', 'external_id' => 'local:file:7']);
+        CatalogueLinker::refreshOwnership($album);
+
+        $this->assertNotNull($row->fresh()->fulfilled_at);
+        $this->assertSame([], $this->getJson('/api/library/wishlist')->json('data'));
+        $this->assertTrue($this->getJson("/api/library/catalogue/{$row->id}")->json('fulfilled'));
+
+        Track::where('source', 'files')->delete();
+        $this->artisan('catalogue:reconcile')->assertSuccessful();
+        $this->assertNull($row->fresh()->fulfilled_at);
+        $this->assertCount(1, $this->getJson('/api/library/wishlist')->json('data'));
+    }
+
+    public function test_mcp_wish_and_ignore_actions(): void
+    {
+        $row = $this->row('Wish me', 2010);
+
+        ReMomentServer::tool(Tools\Catalogue::class, ['action' => 'wish', 'id' => $row->id])->assertOk();
+        $this->assertNotNull($row->fresh()->wanted_at);
+        ReMomentServer::tool(Tools\Catalogue::class, ['action' => 'ignore', 'id' => $row->id])->assertOk();
+        $this->assertNull($row->fresh()->wanted_at);
+        $this->assertNotNull($row->fresh()->ignored_at);
+        ReMomentServer::tool(Tools\Catalogue::class, ['action' => 'unignore', 'id' => $row->id])->assertOk();
+        $this->assertNull($row->fresh()->ignored_at);
+        ReMomentServer::tool(Tools\Catalogue::class, ['action' => 'wish'])->assertHasErrors(['needs an id']);
+    }
 }

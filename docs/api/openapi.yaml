@@ -1125,6 +1125,60 @@ paths:
               schema: { $ref: "#/components/schemas/CatalogueItem" }
         "403": { description: Forbidden for client devices }
         "404": { $ref: "#/components/responses/NotFound" }
+  /library/catalogue/{id}/wanted:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    put:
+      tags: [Library]
+      operationId: wantCatalogueAlbum
+      description: Household-wide wish for an album the library lacks; clears "ignored". Not available to client devices.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [wanted]
+              properties:
+                wanted: { type: boolean }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  wanted: { type: boolean }
+        "403": { description: Forbidden for client devices }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /library/catalogue/{id}/ignored:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    put:
+      tags: [Library]
+      operationId: ignoreCatalogueAlbum
+      description: '"I don''t want this": hides the release-group from the discography and the wishlist; clears a wish. Not available to client devices.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ignored]
+              properties:
+                ignored: { type: boolean }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ignored: { type: boolean }
+        "403": { description: Forbidden for client devices }
+        "404": { $ref: "#/components/responses/NotFound" }
   /library/artists/{artist}/favorite:
     parameters:
       - name: artist

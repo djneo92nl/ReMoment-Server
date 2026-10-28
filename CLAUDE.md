@@ -530,6 +530,8 @@ GET /api/library/wishlist?cursor=                                               
 GET /api/library/catalogue/{id}                                                                                → CatalogueItem
 GET /api/library/artists/{id}?include=discography                                                              → artist detail + discography
 GET /api/library/albums?availability=owned|streamable                                                          → narrowed list (`missing` is 422: missing albums have no album row)
+PUT /api/library/catalogue/{id}/wanted  { wanted }  → { wanted }      household-wide wish (clears ignored); closes by itself when the album gets an own file
+PUT /api/library/catalogue/{id}/ignored { ignored } → { ignored }    "I don't want this" (clears the wish)
 ```
 
 CatalogueItem `{ id, release_group_mbid, title, type: album|ep, year, artist, state: owned|streamable|known, album_id|null, wanted, ignored, fulfilled, availability: [{ provider, library, status, playable? }], artwork }`; MCP tool `catalogue`. Filled by `php artisan catalogue:sync` (nightly, queue `catalogue`).

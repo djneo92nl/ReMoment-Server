@@ -3,6 +3,7 @@
 namespace App\Services\Dlna;
 
 use App\Domain\Artwork\ArtworkCache;
+use App\Domain\Catalogue\CatalogueLinker;
 use App\Domain\Library\Enrichment;
 use App\Domain\Library\LibraryIdentity;
 use App\Jobs\ProcessArtwork;
@@ -129,6 +130,8 @@ class DlnaLibraryScanner
         Enrichment::save($track, 'dlna_url', $item['url'], 'url', 'dlna:'.$server->id);
 
         $this->storeTags($track, $item, $server);
+
+        CatalogueLinker::refreshOwnershipQuietly($album);
 
         if (!empty($item['released_at']) && $album->released_at === null) {
             $album->update(['released_at' => $item['released_at']]);

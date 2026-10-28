@@ -2,7 +2,7 @@
 
 Read endpoints of the availability layer ([design](../architecture/availability-layer.md)). Open like the rest of the API (no login), but **not for client devices**: a request with `?client={api_token}` answers `403 forbidden`, and `include=discography` is ignored for a client. Touch clients and the artwork pre-cache never see a release-group nobody owns.
 
-The wish and ignore endpoints, browse/play/add from external sources and the Spotify lookups are not built yet (design PRs 6 to 8).
+Browse/play/add from external sources and the Spotify lookups are not built yet (design PRs 8 and later).
 
 ## CatalogueItem
 
@@ -39,11 +39,15 @@ GET /api/library/wishlist?cursor=&device_id=                                    
 GET /api/library/catalogue/{id}?device_id=                                                                       → CatalogueItem
 GET /api/library/artists/{id}?include=discography[&device_id=]                                                   → the artist detail plus discography: [CatalogueItem]
 GET /api/library/albums?availability=owned|streamable                                                            → the usual AlbumItem list, narrowed
+PUT /api/library/catalogue/{id}/wanted   { "wanted": true }    → { "wanted": true }     household-wide wish; clears "ignored"; a second wish keeps the first timestamp
+PUT /api/library/catalogue/{id}/ignored  { "ignored": true }   → { "ignored": true }    "I don't want this": hidden from the discography and wishlist; clears the wish
 ```
+
+A wish closes by itself: when the linked library album gets an own file (scan, import) or is on a DLNA server, `fulfilled` becomes true and the entry leaves the wishlist; if the files go away it comes back (`catalogue:reconcile`, nightly, is the safety net). Saving the album in Spotify does **not** close it (streamable is not owned).
 
 - The discography is newest first (no year last), entries marked ignored left out unless `ignored=1`. `availability=missing` means "not in the library" (`album_id` is null), so it includes entries a service could stream.
 - The wishlist is wanted, not fulfilled, not ignored; most recently wished first; 50 per page.
 - `?availability=` on `/library/albums` accepts `owned` and `streamable` only; **`missing` is a `422`**, because missing albums have no album row (use the discography). Without the parameter nothing changes, and a catalogue entry never appears in any existing list, count, shuffle or artwork list.
 - Errors: `403 forbidden` for a client token, `404` unknown id, `422` validation.
 
-MCP: the `catalogue` tool (`discography`, `wishlist`, `item`).
+MCP: the `catalogue` tool (`discography`, `wishlist`, `item`, `wish`, `unwish`, `ignore`, `unignore`). The PUT endpoints answer `403` for a client token, `404` unknown id, `422` without the boolean.

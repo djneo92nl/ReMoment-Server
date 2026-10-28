@@ -8,10 +8,8 @@ use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
-use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
-#[Description('The MusicBrainz discography of the library: what an artist released (albums and EPs) and whether each is owned, streamable or only known (missing), and the household wishlist. action: discography (needs artist_id; optional availability owned|streamable|missing, wanted, ignored), wishlist (optional cursor), item (needs id, a catalogue entry). Pass device_id to see where each entry can play. Full shapes: docs/api/availability.md.')]
-#[IsReadOnly]
+#[Description('The MusicBrainz discography of the library: what an artist released (albums and EPs) and whether each is owned, streamable or only known (missing), and the household wishlist. action: discography (needs artist_id; optional availability owned|streamable|missing, wanted, ignored), wishlist (optional cursor), item (needs id, a catalogue entry), wish / unwish (needs id: put it on or take it off the household wishlist, something to buy or rip), ignore / unignore (needs id: "not interested", hides it). Pass device_id to see where each entry can play. Full shapes: docs/api/availability.md.')]
 class Catalogue extends Tool
 {
     use CallsApi;
@@ -19,9 +17,9 @@ class Catalogue extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'action' => $schema->string()->enum(['discography', 'wishlist', 'item'])->required(),
+            'action' => $schema->string()->enum(['discography', 'wishlist', 'item', 'wish', 'unwish', 'ignore', 'unignore'])->required(),
             'artist_id' => $schema->integer()->description('discography: the library artist'),
-            'id' => $schema->integer()->description('item: the catalogue entry id'),
+            'id' => $schema->integer()->description('item, wish, unwish, ignore, unignore: the catalogue entry id'),
             'availability' => $schema->string()->enum(['owned', 'streamable', 'missing'])->description('discography filter; missing = not in the library'),
             'wanted' => $schema->boolean()->description('discography: only wished entries'),
             'ignored' => $schema->boolean()->description('discography: include entries marked "not interested"'),
@@ -33,13 +31,22 @@ class Catalogue extends Tool
     public function handle(Request $request): Response
     {
         $data = $request->validate([
-            'action' => 'required|in:discography,wishlist,item',
+            'action' => 'required|in:discography,wishlist,item,wish,unwish,ignore,unignore',
             'artist_id' => 'nullable|integer', 'id' => 'nullable|integer',
             'availability' => 'nullable|in:owned,streamable,missing', 'wanted' => 'nullable|boolean', 'ignored' => 'nullable|boolean',
             'cursor' => 'nullable|string', 'device_id' => 'nullable|integer',
         ]);
 
         $common = $this->filled(['device_id' => $data['device_id'] ?? null]);
+
+        if (in_array($data['action'], ['wish', 'unwish', 'ignore', 'unignore'], true)) {
+            if (!isset($data['id'])) {
+                return Response::error('invalid (422): '.$data['action'].' needs an id.');
+            }
+            $flag = str_contains($data['action'], 'wish') ? 'wanted' : 'ignored';
+
+            return $this->api('PUT', 'library/catalogue/'.$data['id'].'/'.$flag, [$flag => !str_starts_with($data['action'], 'un')]);
+        }
 
         return match ($data['action']) {
             'wishlist' => $this->api('GET', 'library/wishlist', $common + $this->filled(['cursor' => $data['cursor'] ?? null])),
