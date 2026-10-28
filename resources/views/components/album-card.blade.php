@@ -35,7 +35,7 @@
             class="text-3xl"
         />
         <div class="absolute left-1.5 bottom-1.5">
-            <x-source-badges :files="(bool) ($album->on_files ?? false)" :dlna="(bool) ($album->on_dlna ?? false)" :spotify="(bool) ($album->on_spotify ?? false)" />
+            <x-source-badges :files="(bool) ($album->on_files ?? false)" :dlna="(bool) ($album->on_dlna ?? false)" />
         </div>
         @if($album->favorited_at)
             <x-fav-badge />
