@@ -35,7 +35,10 @@
                             <a href="{{ route('albums.show', [$album, 'source' => $key]) }}" data-test="source-{{ $key }}" @if($page->source === $key) aria-current="page" @endif
                                class="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition-colors {{ $page->source === $key ? 'bg-gray-100 text-gray-900 dark:bg-stone-800 dark:text-gray-100' : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-200' }}">
                                 <x-source-icon :source="$key" />{{ $name }}
-                                <span class="text-xs font-normal text-gray-400 dark:text-gray-600">{{ $page->allTracks->filter(fn ($t) => in_array($key, $t->sources(), true))->count() }}</span>
+                                {{-- A streaming service is not a library: it has no tracks of ours to count --}}
+                                @unless(isset(\App\Domain\Library\LibrarySources::STREAMING_SERVICES[$key]))
+                                    <span class="text-xs font-normal text-gray-400 dark:text-gray-600">{{ $page->allTracks->filter(fn ($t) => in_array($key, $t->sources(), true))->count() }}</span>
+                                @endunless
                             </a>
                         @endforeach
                     </nav>

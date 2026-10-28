@@ -60,7 +60,7 @@ final class SpotifyBrowser implements BrowsesExternalCatalogue
         }
 
         $album = $this->item('album', $info);
-        $tracks = array_map(fn (array $t) => $this->item('track', $t + ['album' => ['name' => $info['name'], 'images' => $info['images'] ?? []]]), $this->catalog->tracksOfSpotifyAlbum($id));
+        $tracks = array_map(fn (array $t) => $this->item('track', $t + ['artists' => $info['artists'] ?? [], 'album' => ['name' => $info['name'], 'images' => $info['images'] ?? []]]), $this->catalog->tracksOfSpotifyAlbum($id));
 
         return ['album' => $album, 'tracks' => $tracks];
     }
@@ -206,7 +206,10 @@ final class SpotifyBrowser implements BrowsesExternalCatalogue
             libraryId: match ($type) {
                 'artist' => SpotifyCatalog::localArtist((string) ($data['name'] ?? ''))?->id,
                 'album' => SpotifyCatalog::localAlbum((string) ($data['name'] ?? ''), $artistName)?->id,
-                default => LibraryIdentity::findByExternalId(SpotifyUri::track((string) $data['id']), 'spotify')?->id,
+                // The library's own copy: by Spotify id when it carries one, else by artist, album and title (local tracks have no Spotify id).
+                default => $artistName !== null && ($data['name'] ?? '') !== ''
+                    ? LibraryIdentity::lookupTrack($artistName, $data['album']['name'] ?? null, (string) $data['name'], SpotifyUri::track((string) $data['id']), 'spotify', isset($data['duration_ms']) ? intdiv((int) $data['duration_ms'], 1000) : (isset($data['duration']) ? (int) $data['duration'] : null))?->id
+                    : null,
             },
         );
     }

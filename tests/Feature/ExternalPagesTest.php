@@ -129,4 +129,33 @@ class ExternalPagesTest extends TestCase
         $this->get('/external/nope/albums/'.self::ALB)->assertOk()->assertSee('Nope is not connected');
         $this->get('/external/spotify/albums/short')->assertNotFound();
     }
+
+    public function test_local_tracks_are_marked_on_spotify_even_without_a_spotify_id(): void
+    {
+        $this->api();
+        $artist = Artist::create(['name' => 'Band', 'source' => 'files']);
+        $album = Album::create(['artist_id' => $artist->id, 'name' => 'First Album', 'source' => 'files']);
+        Track::create(['album_id' => $album->id, 'artist_id' => $artist->id, 'name' => 'The Big Hit', 'source' => 'files', 'external_id' => 'local:file:9']);
+        Track::create(['album_id' => $album->id, 'artist_id' => $artist->id, 'name' => 'Opening Song', 'source' => 'dlna', 'external_id' => '1:5']);
+
+        $popular = $this->get('/external/spotify/artists/'.self::ART)->assertOk()->getContent();
+        $this->assertMatchesRegularExpression('/The Big Hit.{0,300}In your library/s', $popular);
+
+        $page = $this->get('/external/spotify/albums/'.self::ALB)->assertOk()->getContent();
+        $this->assertMatchesRegularExpression('/Opening Song.{0,400}In library/s', $page);
+        $this->assertStringNotContainsString('Closing Song</p>'."\n".'                        <span class="flex-none text-xs text-gray-400 dark:text-gray-600">In library', $page);
+    }
+
+    public function test_the_album_source_switch_does_not_count_tracks_for_spotify(): void
+    {
+        $this->api();
+        $artist = Artist::create(['name' => 'Band', 'source' => 'dlna']);
+        $album = Album::create(['artist_id' => $artist->id, 'name' => 'LP', 'source' => 'dlna']);
+        Track::create(['album_id' => $album->id, 'artist_id' => $artist->id, 'name' => 'T', 'source' => 'dlna', 'external_id' => '1:1']);
+
+        $html = $this->get("/albums/{$album->id}")->assertOk()->getContent();
+
+        $this->assertMatchesRegularExpression('/DLNA\s*<span[^>]*>\s*1\s*<\/span>/', $html);
+        $this->assertDoesNotMatchRegularExpression('/Spotify\s*<span[^>]*>\s*\d+\s*<\/span>/', $html);
+    }
 }

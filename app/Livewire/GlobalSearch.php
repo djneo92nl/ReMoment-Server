@@ -72,7 +72,7 @@ class GlobalSearch extends Component
             'artists' => array_map(fn ($a) => $a + ['local' => SpotifyCatalog::localArtist($a['name'])], $artists),
             'albums' => array_map(fn ($a) => $a + ['local' => SpotifyCatalog::localAlbum($a['name'], $a['artist'])], $results['albums']),
             'tracks' => array_map(fn ($t) => $t + [
-                'local' => LibraryIdentity::findByExternalId(SpotifyUri::track($t['id']), 'spotify'),
+                'local' => $t['artist'] ? LibraryIdentity::lookupTrack($t['artist'], $t['album'], $t['name'], SpotifyUri::track($t['id']), 'spotify', null) : null,
                 'wished' => \App\Domain\Catalogue\WantedTracks::isWished($t['artist'], $t['name']),
             ], $results['tracks'] ?? []),
         ];
