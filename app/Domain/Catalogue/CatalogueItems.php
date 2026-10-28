@@ -3,6 +3,7 @@
 namespace App\Domain\Catalogue;
 
 use App\Domain\Artwork\LibraryItemArtwork;
+use App\Domain\Availability\Providers;
 use App\Domain\Library\LibrarySources;
 use App\Models\Device;
 use App\Models\Media\Album;
@@ -85,7 +86,7 @@ final class CatalogueItems
     public static function scopeAlbums(Builder $query, string $availability): Builder
     {
         $owned = function (Builder $q) {
-            foreach (CatalogueLinker::OWNED_SOURCES as $i => $source) {
+            foreach (Providers::ownedLibraries() as $i => $source) {
                 $q->{$i === 0 ? 'whereHas' : 'orWhereHas'}('tracks', fn ($t) => LibrarySources::availableFrom($t, $source));
             }
         };
@@ -94,7 +95,7 @@ final class CatalogueItems
             return $query->where($owned);
         }
 
-        $streaming = array_diff(LibrarySources::libraryIds(), CatalogueLinker::OWNED_SOURCES);
+        $streaming = Providers::streamingLibraries();
 
         return $query->whereNot($owned)->where(function (Builder $q) use ($streaming) {
             foreach ($streaming as $source) {
@@ -132,7 +133,7 @@ final class CatalogueItems
             }
             $providers = array_values(array_unique($providers));
 
-            $owned = (bool) array_intersect(array_map(fn ($p) => explode(':', $p, 2)[0], $providers), CatalogueLinker::OWNED_SOURCES);
+            $owned = Providers::anyOwned($providers);
             $state = $owned ? 'owned' : ($providers ? 'streamable' : 'known');
 
             return [

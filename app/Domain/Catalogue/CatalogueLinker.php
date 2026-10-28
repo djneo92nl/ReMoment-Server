@@ -2,6 +2,7 @@
 
 namespace App\Domain\Catalogue;
 
+use App\Domain\Availability\Providers;
 use App\Domain\Library\LibrarySources;
 use App\Domain\Library\Normalizer;
 use App\Models\Media\Album;
@@ -20,9 +21,6 @@ use Illuminate\Support\Facades\Log;
  */
 final class CatalogueLinker
 {
-    /** Providers whose albums count as owned (DLNA serves the household's own files). Physical items join with workstream 6. */
-    public const OWNED_SOURCES = ['files', 'dlna'];
-
     /** A year gap beyond which a name-only match among several is not trusted. */
     private const YEAR_TOLERANCE = 2;
 
@@ -92,7 +90,7 @@ final class CatalogueLinker
     /** Whether the album has a track from an owned provider. */
     public static function isOwned(Album $album): bool
     {
-        foreach (self::OWNED_SOURCES as $source) {
+        foreach (Providers::ownedLibraries() as $source) {
             if (LibrarySources::availableFrom(Track::query()->where('album_id', $album->id), $source)->exists()) {
                 return true;
             }

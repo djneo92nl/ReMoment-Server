@@ -452,3 +452,5 @@ New releases (workstream 4 on top of the catalogue): `App\Services\ListenBrainz\
 
 External pages (owner request: browse albums on a streaming service, not only add them): `Livewire\ExternalArtist` and `Livewire\ExternalAlbum` at `/external/{provider}/artists|albums/{id}` (the web side of the external catalogue API; no new endpoints), links from the search box and *More on Spotify*, a play button on those cards; described in `docs/frontend/library.md`. `SpotifyCatalog::artistAlbums` now stores the Spotify artist id it finds by name as `spotify_id` metadata.
 
+Provider registry (the original PR 1, small): `config/availability.php` `providers` (`files`, `dlna` and `physical` owned, `spotify` streamable; a provider has only its `ownership`, because its id is its `LibrarySources::LIBRARIES` key when it is a library) and `App\Domain\Availability\Providers` (`ownership()`, `isOwned()`, `anyOwned()`, `ownedLibraries()`, `streamingLibraries()`), replacing the `CatalogueLinker::OWNED_SOURCES` stand-in. A test asserts every library has a provider.
+

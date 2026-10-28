@@ -3,6 +3,7 @@
 namespace App\Domain\Catalogue;
 
 use App\Domain\Artwork\LibraryItemArtwork;
+use App\Domain\Availability\Providers;
 use App\Domain\Library\LibraryIdentity;
 use App\Domain\Library\LibrarySources;
 use App\Domain\Library\Normalizer;
@@ -86,7 +87,7 @@ final class WantedTracks
 
     public static function isOwned(Track $track): bool
     {
-        foreach (CatalogueLinker::OWNED_SOURCES as $source) {
+        foreach (Providers::ownedLibraries() as $source) {
             if (LibrarySources::availableFrom(Track::query()->whereKey($track->id), $source)->exists()) {
                 return true;
             }
