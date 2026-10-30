@@ -142,7 +142,7 @@ services:
     # (docs/architecture/spotify-stream.md). Icecast is published on ICECAST_PORT for the speakers; librespot
     # runs on the host network so Spotify's zeroconf discovery reaches the LAN, and reaches Icecast and the app on 127.0.0.1.
     icecast:
-        profiles: [spotify-stream, beolink-stream]
+        profiles: [spotify-stream, beolink-stream, radio-relay]
         build:
             context: './docker/icecast'
         image: 'remoment/icecast:latest'

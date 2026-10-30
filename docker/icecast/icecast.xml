@@ -1,7 +1,8 @@
 <icecast>
     <limits>
         <clients>20</clients>
-        <sources>2</sources>
+        <!-- Spotify, BeoLink and one per relayed radio station (RADIO_RELAY_MAX, default 4), with room to spare. -->
+        <sources>12</sources>
         <!-- A speaker that starts late still gets a few seconds of audio at once (smaller = less delay). -->
         <queue-size>131072</queue-size>
         <burst-size>32768</burst-size>

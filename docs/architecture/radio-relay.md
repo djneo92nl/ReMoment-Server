@@ -1,6 +1,6 @@
 # Radio relay (station → ffmpeg → Icecast → renderer)
 
-**Status: plan, not built** (workstream 17 of [v1-roadmap.md](v1-roadmap.md), written 2026-10-30). Nothing below exists in code yet; what *was* measured on hardware is marked **verified**.
+**Status: 17.1 (the relay core) built 2026-10-30; 17.2-17.4 are plan** (workstream 17 of [v1-roadmap.md](v1-roadmap.md)). What was measured on hardware or against live streams is marked **verified**; the rest is design. "Built so far" below lists what exists.
 
 A renderer that can only fetch a plain-HTTP MP3 from the local network should still play any station in the library. The server fetches the station (any scheme, any codec, any redirect), converts it once to MP3 and serves it from the local Icecast; the renderer is given that address instead of the station's own.
 
@@ -65,9 +65,26 @@ station URL ──(HTTPS, AAC, HLS, redirects, ICY)──▶ ffmpeg ──MP3 12
 | Status | a row on `/settings/health`, an alert (`Alerts::raise('radio_relay', $stationId, …)`, [alerts.md](alerts.md)) when a station's ffmpeg keeps failing, resolved when it recovers |
 | API | `POST /api/devices/{id}/radio/{station}` answers as today plus `"relay": true`; `GET /api/radio/relays` lists the running relays (station, since, listeners, state) |
 
+## Built so far (17.1, 2026-10-30)
+
+| What | Where |
+|---|---|
+| ffmpeg command, mount names (`relay-{id}.mp3`) | `App\Domain\Radio\Relay\RelayCommand` |
+| Icecast client: live mounts and listeners (`status-json.xsl`), titles (`admin/metadata`) | `IcecastStatus` |
+| Demand and addresses: `want`, `wanted`, `release`, `url`, `ensureLive` | `RadioRelay` (demand in the cache `radio:relay:wanted`) |
+| The manager: start on demand, idle stop, restart with a backoff (3, 10, 30, 60 s; a run of 30 s resets it), the limit | `RelayManager`, `RelayProcess` (contract), `FfmpegProcess` (real child, keeps only the last 2 KB of its output) |
+| The supervised command | `php artisan radio:relay [--station=ID ...]` (`--station` keeps stations relayed while it runs and works even with the relay off); idles while `RADIO_RELAY_ENABLED=false`; program `radio-relay` in both supervisor configs |
+| Config | `config/radio_relay.php` (`RADIO_RELAY_ENABLED`, `_BITRATE`, `_MAX`, `_IDLE_SECONDS`, `_LIVE_WAIT_SECONDS`, `_USER_AGENT`); Ansible `radio_relay_enabled`, `_bitrate`, `_max` |
+| Icecast | compose profile `radio-relay` (compose.yaml and docker-compose.prod.yml) on the existing `icecast` service; its source limit raised from 2 to 12 |
+| Tests | `tests/Feature/RadioRelayTest.php` (15: command, status parsing, demand, address, `ensureLive`, start, idle stop, restart backoff, limit, stop all), with a fake process |
+
+**Verified 2026-10-30** (dev stack on a Mac, Icecast 2.4.4 container, `radio:relay --station=2 --station=12 --station=5`): all three mounts went live within 14 s and each carried **MP3, 44.1 kHz, stereo, 128 kbit/s** when fetched by `curl` and read by ffprobe: 181.FM (plain HTTP MP3), **NTS 1** (HTTPS with a redirect to another HTTPS host) and **FIP** (AAC 192 kbit/s). So the streams the MCi900 cannot play directly are available to it as plain HTTP MP3.
+
+**Not yet verified:** a renderer playing a relay mount (17.2 does that, from the MCi900), ffmpeg's reconnect when an upstream drops, ICY titles through the mount, the idle stop and the limit against a real Icecast (they are tested with fakes), and any figure on a Pi. Icecast answers a `HEAD` request with 400, so nothing here uses `HEAD` on a mount (`ensureLive` reads `status-json.xsl`).
+
 ## Phases
 
-1. **17.1 Relay core.** `RelayCommand`, `RelayManager`, `radio:relay`, `IcecastStatus`, config, the compose profile and supervisor program. Tested with a fake process (the command line, restart with backoff, idle stop, the limit). Done when, from the command line, an HTTP MP3 station, an HTTPS-with-redirect station (NTS 1) and an AAC station (FIP) each become a live mount that `curl` and a media player can play.
+1. **17.1 Relay core (built 2026-10-30).** `RelayCommand`, `RelayManager`, `radio:relay`, `IcecastStatus`, config, the compose profile and supervisor program. Tested with a fake process (the command line, restart with backoff, idle stop, the limit). Done when, from the command line, an HTTP MP3 station, an HTTPS-with-redirect station (NTS 1) and an AAC station (FIP) each become a live mount that `curl` and a media player can play.
 2. **17.2 Decision and driver integration.** `RelayDecision`, `radio_relay` meta, `RadioRelay::ensureLive`, the generic UPnP driver's station playback uses it, `streamium:enable` sets `always`. Tested with fakes. Done when 181.FM, NTS 1 and FIP all play on the MCi900 from the web UI and the API, and a station the renderer can play by itself (an HTTP MP3 on a renderer with DNS) is still sent direct.
 3. **17.3 Titles and idle.** Titles pushed to Icecast, the listener keeps the demand alive while a station plays, idle stop verified with a real renderer, a badge on the playing card.
 4. **17.4 Operations.** Alerts, `/api/radio/relays`, the settings status, restart behaviour after a crash and after a container restart, a **Pi 3 measurement** (CPU and memory with one and with four relays; the limit default is set from it), docs (this page, [radio.md](radio.md), the device-drivers guide, CLAUDE.md, the OpenAPI field `relay`).

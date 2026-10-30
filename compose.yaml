@@ -130,8 +130,10 @@ services:
     # Opt-in Spotify stream: docker compose --profile spotify-stream up -d, then LIBRESPOT_ENABLED=true and
     # ICECAST_INTERNAL_URL=http://icecast:8000 (docs/architecture/spotify-stream.md). Docker Desktop does not pass mDNS,
     # so Spotify finds librespot only when the app runs on a Linux host (use docker-compose.prod.yml there).
+    # Also the Icecast of the radio relay: docker compose --profile radio-relay up -d, then RADIO_RELAY_ENABLED=true and
+    # ICECAST_INTERNAL_URL=http://icecast:8000 (docs/architecture/radio-relay.md); `radio:relay` runs the ffmpeg children.
     icecast:
-        profiles: [spotify-stream, beolink-stream]
+        profiles: [spotify-stream, beolink-stream, radio-relay]
         build:
             context: './docker/icecast'
         environment:
