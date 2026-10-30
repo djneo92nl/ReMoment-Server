@@ -6,6 +6,8 @@ use App\Domain\Artwork\ArtworkCache;
 use App\Domain\Artwork\SourceLogo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -34,7 +36,23 @@ class InfoApiTest extends TestCase
                 'ws_port' => 9001,
                 'ws_url' => 'ws://192.168.1.50:9001',
             ],
+            'features' => ['alerts' => true, 'deep_analysis' => false],
         ], Arr::except($response->json(), 'placeholder'));
+    }
+
+    public function test_deep_analysis_feature_follows_the_structure_service_health(): void
+    {
+        Cache::flush();
+        config(['analysis.structure_url' => 'http://structure:8091']);
+        $healthy = true;
+        Http::fake(['structure:8091/health' => function () use (&$healthy) {
+            return $healthy ? Http::response(['ok' => true, 'version' => 1, 'method' => 'novelty-v1']) : Http::response('', 503);
+        }]);
+        $this->getJson('/api/info')->assertJsonPath('features', ['alerts' => true, 'deep_analysis' => true]);
+
+        Cache::flush();
+        $healthy = false;
+        $this->getJson('/api/info')->assertJsonPath('features.deep_analysis', false);
     }
 
     public function test_websocket_address_follows_config_and_the_request_scheme(): void

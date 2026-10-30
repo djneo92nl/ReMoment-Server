@@ -49,6 +49,7 @@ class ReMomentServer extends Server
         Tools\LibraryMaintenance::class,
         Tools\RemoveLibraryItem::class,
         Tools\Storage::class,
+        Tools\DeepAnalysis::class,
         Tools\Alerts::class,
     ];
 }

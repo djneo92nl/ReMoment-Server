@@ -93,9 +93,9 @@ The Hugging Face model page for allin1 returned 401, so the weights terms are op
 
 ## Build plan (small PRs)
 
-1. **Sidecar:** `docker/structure` (or `POST /structure` in `docker/analysis` once the Python/numpy question is settled): the A2/A algorithm from `spikes/sections/m_librosa.py`, with a fixture test (synthetic piece with known cuts) and the contract above. Compose profile, arm64 build.
-2. **Stage:** `structure` stage and `file_analyses.sections`, versioned; exposes `sections` in the track detail and OpenAPI (field before client use, per 16 shared decisions).
-3. **On demand:** `AnalyzeTrackDeep` job (kind `sections`), the `POST/GET /api/library/tracks/{id}/deep-analysis` endpoints, `features.deep_analysis` only when a sidecar answers, admin only, estimate text ("about N seconds").
+1. **Sidecar (built, see [structure-service.md](structure-service.md)):** `docker/structure` (or `POST /structure` in `docker/analysis` once the Python/numpy question is settled): the A2/A algorithm from `spikes/sections/m_librosa.py`, with a fixture test (synthetic piece with known cuts) and the contract above. Compose profile, arm64 build.
+2. **Stage (built):** `structure` stage and `file_analyses.sections`, versioned; exposes `sections` in the track detail and OpenAPI (field before client use, per 16 shared decisions).
+3. **On demand (built, [../api/deep-analysis.md](../api/deep-analysis.md)):** `AnalyzeTrackDeep` job (kind `sections`), the `POST/GET /api/library/tracks/{id}/deep-analysis` endpoints, `features.deep_analysis` only when a sidecar answers, admin only, estimate text ("about N seconds").
 4. **UI:** the strip above the waveform on the track view, tap to seek, numbered or neutral colours, labels only when confidence is shown.
 5. **Later:** repetition letters in the UI; optionally the semantic model (allin1 / SongFormer) behind the same endpoint once the follow-up below says it is worth its footprint.
 

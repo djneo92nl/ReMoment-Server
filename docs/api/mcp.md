@@ -47,6 +47,7 @@ Device and library tools do not re-implement anything: `ApiBridge` dispatches an
 | `library_maintenance` | **ADMIN**: `scan_dlna` and `verify_files` (queued), `enrich`, `merge_duplicates` (`dry_run`, else `confirm`), `sync_genres`, `refresh_smart_playlists` |
 | `remove_library_item` | **ADMIN**, destructive: track, album or artist; `confirm` required, DLNA-available items are kept (tracks: `force`) |
 | `storage` | **ADMIN**: locations, test/scan a location (queued), import, reorganize (`dry_run`, else `confirm`), track files, verify a file |
+| `deep_analysis` | **ADMIN**: `request` (track_id, kinds, default `sections`) queues the sections of one track and answers `queued` / `already_done` / `not_available` with an estimate; `status` per kind (`none`/`queued`/`running`/`done`/`failed`); `remove` a stored result; see `docs/api/deep-analysis.md` |
 | `alerts` | `list` the server's alerts (stuck queue, silent scheduler, stale backup, unreachable storage, offline device, down listener; `state`, `since`, `limit`), open to everyone; `ack` an alert needs the admin token; see `docs/architecture/alerts.md` |
 
 Destructive actions answer `confirmation_required (422)` until `confirm=true`. Queued actions need the queue worker.

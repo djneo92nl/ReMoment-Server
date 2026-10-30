@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AdminAuthController;
 use App\Http\Controllers\Api\AlertController;
 use App\Http\Controllers\Api\BeolinkStreamController;
 use App\Http\Controllers\Api\ClientController;
+use App\Http\Controllers\Api\DeepAnalysisController;
 use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\DeviceSettingsController;
 use App\Http\Controllers\Api\ExternalCatalogueController;
@@ -178,6 +179,11 @@ Route::middleware('admin.token')->group(function () {
     Route::get('/admin/me', [AdminAuthController::class, 'me']);
     Route::delete('/admin/token', [AdminAuthController::class, 'logout']);
     Route::post('/admin/alerts/{alert}/ack', [AlertController::class, 'acknowledge']);
+
+    // Deep analysis of one track on request: sections (docs/api/deep-analysis.md)
+    Route::post('/library/tracks/{track}/deep-analysis', [DeepAnalysisController::class, 'store']);
+    Route::get('/library/tracks/{track}/deep-analysis', [DeepAnalysisController::class, 'show']);
+    Route::delete('/library/tracks/{track}/deep-analysis/{kind}', [DeepAnalysisController::class, 'destroy']);
 
     // Storage locations and the library's files (docs/architecture/file-storage.md)
     Route::get('/admin/storage/locations', [StorageController::class, 'locations']);

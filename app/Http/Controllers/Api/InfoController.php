@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Analysis\DeepAnalysis;
 use App\Domain\Artwork\NowPlayingArtwork;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
@@ -39,6 +40,12 @@ class InfoController extends Controller
             ],
             // Shown by clients whenever there is no artwork; rendered on the spot if missing.
             'placeholder' => NowPlayingArtwork::placeholder(),
+            // What this server can do beyond the base contract; only keys that are true today, a client treats a missing key as false.
+            'features' => [
+                'alerts' => true,
+                // The structure service answers its health check (cached for a minute): sections of a track on request.
+                'deep_analysis' => DeepAnalysis::anyAvailable(),
+            ],
         ]);
     }
 }
