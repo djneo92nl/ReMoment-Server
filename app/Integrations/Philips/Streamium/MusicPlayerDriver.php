@@ -122,12 +122,23 @@ class MusicPlayerDriver extends UpnpDriver implements PowerInterface, SourceActi
         $this->local() ? $this->remote()->command('/CTRL$PREV') : parent::previous();
     }
 
-    /** The radio presets, the unit's own list: `preset:{id}`. @return AvailableSource[] */
+    /**
+     * The unit's inputs, AUX and Disc, then its radio presets (`preset:{id}`, the unit's own list). The input
+     * the unit is on is read from its play screen. FM is not offered: it could not be selected on the hardware.
+     *
+     * @return AvailableSource[]
+     */
     public function getSources(): array
     {
-        $playing = $this->remote()->nowPlaying()['station'] ?? null;
+        $screen = $this->remote()->screen();
+        $station = $screen['source'] === 'radio' ? ($screen['item']['station'] ?? null) : null;
 
-        return array_map(fn (array $preset) => new AvailableSource(
+        $inputs = [
+            'aux' => new AvailableSource(sourceId: 'aux', friendlyName: 'AUX', sourceType: 'LINE_IN', category: 'music', inUse: false, borrowed: false, providerJid: null, providerName: null, active: $screen['source'] === 'aux'),
+            'disc' => new AvailableSource(sourceId: 'disc', friendlyName: 'Disc', sourceType: 'CD', category: 'music', inUse: false, borrowed: false, providerJid: null, providerName: null, active: $screen['source'] === 'disc'),
+        ];
+
+        $presets = array_map(fn (array $preset) => new AvailableSource(
             sourceId: "preset:{$preset['id']}",
             friendlyName: $preset['name'],
             sourceType: 'RADIO',
@@ -136,21 +147,28 @@ class MusicPlayerDriver extends UpnpDriver implements PowerInterface, SourceActi
             borrowed: false,
             providerJid: null,
             providerName: 'Internet radio',
-            active: $playing === null || !self::isLocal($this->device->id) ? null : $preset['name'] === $playing,
+            active: $station === null ? null : $preset['name'] === $station,
         ), $this->presets());
+
+        return [...array_values($inputs), ...$presets];
     }
 
     public function activateSource(string $sourceId): void
     {
-        $preset = preg_match('/^preset:(\d+)$/', $sourceId, $m)
-            ? collect($this->presets())->firstWhere('id', (int) $m[1])
-            : null;
+        if (isset(RemoteClient::INPUT_PAGES[$sourceId])) {
+            $this->remote()->selectInput($sourceId);
+        } else {
+            $preset = preg_match('/^preset:(\d+)$/', $sourceId, $m)
+                ? collect($this->presets())->firstWhere('id', (int) $m[1])
+                : null;
 
-        if ($preset === null) {
-            throw new \InvalidArgumentException("This player has no source {$sourceId}.");
+            if ($preset === null) {
+                throw new \InvalidArgumentException("This player has no source {$sourceId}.");
+            }
+
+            $this->remote()->playRadioPreset($preset['target']);
         }
 
-        $this->remote()->playRadioPreset($preset['target']);
         self::markLocal($this->device->id);
         Cache::forget("streamium:{$this->device->id}:asleep");
     }

@@ -82,12 +82,19 @@ class DeviceListener extends UpnpListener
                 return;
             }
 
-            $item = $status['playing'] || $status['paused'] ? $driver->remote()->nowPlaying() : null;
+            $screen = $status['playing'] || $status['paused'] ? $driver->remote()->screen() : ['source' => null, 'item' => null];
         } catch (\Throwable) {
             return; // The UPnP side already tells reachable from not.
         }
 
-        if ($item === null) {
+        // Radio has a title to show; AUX is only a source. A disc is not reported: an empty drive answers like a playing one.
+        $nowPlaying = match (true) {
+            $screen['item'] !== null && $screen['source'] === 'radio' => fn (string $state) => $this->radioNowPlaying($screen['item'], $state),
+            $screen['source'] === 'aux' => fn (string $state) => $this->auxNowPlaying($state),
+            default => null,
+        };
+
+        if ($nowPlaying === null) {
             $this->endLocal($deviceId);
 
             return;
@@ -95,13 +102,13 @@ class DeviceListener extends UpnpListener
 
         // A live radio stream has no pause: the player's pause button mutes it, so a muted stream is the paused one.
         $state = $status['paused'] || $status['muted'] ? 'paused' : 'playing';
-        $key = md5(json_encode([$item['title'], $item['station'], $state]));
+        $key = md5(json_encode([$screen['source'], $screen['item']['title'] ?? null, $screen['item']['station'] ?? null, $state]));
         MusicPlayerDriver::markLocal($id);
 
         if ($key !== $this->localKey) {
             event(new NowPlayingUpdated(
                 deviceId: $deviceId,
-                nowPlaying: $this->nowPlaying($item, $state),
+                nowPlaying: $nowPlaying($state),
                 sourceType: 'media',
                 timestamp: null,
             ));
@@ -126,7 +133,7 @@ class DeviceListener extends UpnpListener
     }
 
     /** @param array{title: string, station: string|null, art: string|null, volume: int, max_volume: int, elapsed: int} $item */
-    private function nowPlaying(array $item, string $state): NowPlaying
+    private function radioNowPlaying(array $item, string $state): NowPlaying
     {
         $station = $item['station'] ?? $item['title'];
         $song = Str::startsWith($item['title'], $station.' - ') ? Str::after($item['title'], $station.' - ') : $item['title'];
@@ -139,6 +146,17 @@ class DeviceListener extends UpnpListener
             platform: 'radio',
             radio: new Radio(name: $station, images: $images),
             source: new Source(name: 'Internet radio', category: 'radio', sourceType: 'RADIO', connector: 'streamium', playsLocally: true),
+        );
+    }
+
+    /** The AUX input: no track, only the source (the logo is the generated line-in one). */
+    private function auxNowPlaying(string $state): NowPlaying
+    {
+        return new NowPlaying(
+            state: $state,
+            type: 'music',
+            platform: 'media',
+            source: new Source(name: 'AUX', category: 'music', sourceType: 'LINE_IN', connector: 'streamium', playsLocally: true),
         );
     }
 }

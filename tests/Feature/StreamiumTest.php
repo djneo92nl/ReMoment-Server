@@ -51,6 +51,8 @@ class StreamiumTest extends TestCase
 
     private bool $radioPlaying = true;
 
+    private string $screen = 'nowplay.html';
+
     /** The web remote of a player playing radio (or not; set $status and $radioPlaying between calls), recording what was asked. */
     private function fakeRemote(array &$requests, string $status = self::STATUS_PLAYING, bool $playing = true): void
     {
@@ -63,7 +65,7 @@ class StreamiumTest extends TestCase
 
             return match (true) {
                 str_contains($url, '/ELAPSE') => Http::response($this->status),
-                str_contains($url, '/nowplay') => Http::response($this->radioPlaying ? $this->fixture('nowplay.html') : '<html><title>Home</title></html>'),
+                str_contains($url, '/nowplay') => Http::response($this->radioPlaying ? $this->fixture($this->screen) : '<html><title>Home</title></html>'),
                 str_contains($url, '/nav$03$02$001$0') => Http::response($this->fixture('presets.html')),
                 str_contains($url, '/HOMESTATUS') => Http::response("{'command':'NOTHING',\n'value':0}"),
                 str_contains($url, 'SOAP') || str_contains($url, '/UD/action') => $this->upnpIdle($r),
@@ -150,8 +152,11 @@ class StreamiumTest extends TestCase
 
         $sources = $driver->getSources();
 
-        $this->assertCount(10, $sources);
-        $this->assertSame(['preset:1', 'NPO Radio 1', 'radio'], [$sources[0]->sourceId, $sources[0]->friendlyName, $sources[0]->category]);
+        $this->assertCount(12, $sources);
+        $this->assertSame(['aux', 'disc', 'preset:1'], [$sources[0]->sourceId, $sources[1]->sourceId, $sources[2]->sourceId]);
+        $this->assertSame(['NPO Radio 1', 'radio'], [$sources[2]->friendlyName, $sources[2]->category]);
+        // The radio is what the screen shows: its station is the active one, the inputs are not.
+        $this->assertSame([false, false, true, false], [$sources[0]->active, $sources[1]->active, $sources[2]->active, $sources[3]->active]);
 
         $driver->activateSource('preset:3');
 
@@ -265,6 +270,69 @@ class StreamiumTest extends TestCase
 
         Event::assertNotDispatched(NowPlayingEnded::class);
         $this->assertSame(State::Playing, DeviceCache::getState($device->id));
+    }
+
+    public function test_the_play_screen_names_the_source_the_player_is_on(): void
+    {
+        $this->assertSame('radio', RemoteClient::parseScreen($this->fixture('nowplay.html'))['source']);
+
+        $aux = RemoteClient::parseScreen($this->fixture('aux.html'));
+        $this->assertSame(['aux', null], [$aux['source'], $aux['item']]);
+
+        // An empty drive's screen has the disc artwork and a -1 title: a source, but nothing playing.
+        $disc = RemoteClient::parseScreen($this->fixture('disc.html'));
+        $this->assertSame(['disc', null], [$disc['source'], $disc['item']]);
+
+        $this->assertSame(['source' => null, 'item' => null], RemoteClient::parseScreen('<html><title>Home</title></html>'));
+    }
+
+    public function test_the_inputs_are_selected_by_opening_their_page(): void
+    {
+        $requests = [];
+        $this->fakeRemote($requests);
+        $driver = $this->player()->driver;
+
+        $driver->activateSource('aux');
+        $driver->activateSource('disc');
+
+        $this->assertContains('GET http://10.0.0.80:8889/aux', $requests);
+        $this->assertContains('GET http://10.0.0.80:8889/dvd', $requests);
+        $this->assertTrue(MusicPlayerDriver::isLocal($driver->device->id));
+    }
+
+    public function test_the_aux_input_is_active_and_reported_as_the_playing_source(): void
+    {
+        Event::fake([NowPlayingUpdated::class, NowPlayingEnded::class]);
+        $requests = [];
+        $this->fakeRemote($requests);
+        $this->screen = 'aux.html';
+        $device = $this->player();
+
+        $sources = $device->driver->getSources();
+        $this->assertSame([true, false], [$sources[0]->active, $sources[1]->active]);
+
+        DeviceListener::forDevice($device)->poll((string) $device->id);
+
+        Event::assertDispatched(NowPlayingUpdated::class, fn ($e) => $e->nowPlaying->source?->name === 'AUX'
+            && $e->nowPlaying->source->sourceType === 'LINE_IN'
+            && $e->nowPlaying->track === null
+            && $e->nowPlaying->state === 'playing');
+        $this->assertSame(State::Playing, DeviceCache::getState($device->id));
+    }
+
+    public function test_an_empty_disc_drive_is_a_source_but_not_reported_as_playing(): void
+    {
+        Event::fake([NowPlayingUpdated::class]);
+        $requests = [];
+        $this->fakeRemote($requests);
+        $this->screen = 'disc.html';
+        $device = $this->player();
+
+        $this->assertTrue($device->driver->getSources()[1]->active);
+
+        DeviceListener::forDevice($device)->poll((string) $device->id);
+
+        Event::assertNotDispatched(NowPlayingUpdated::class);
     }
 
     public function test_a_player_the_server_put_to_standby_is_not_asked_what_it_plays(): void

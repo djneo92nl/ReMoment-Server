@@ -18,6 +18,12 @@ class RemoteClient
 
     private const CONNECT_TIMEOUT = 20;
 
+    /** The pages of the web remote's home menu that switch the unit to a local input (opening one is the switch). */
+    public const INPUT_PAGES = ['aux' => '/aux', 'disc' => '/dvd'];
+
+    /** The play screen's default artwork per source: what tells which source the unit is on. */
+    private const SOURCE_ARTWORK = ['Home_AUX_nowplaying.jpg' => 'aux', 'Disc.jpg' => 'disc', 'Internet_radio.jpg' => 'radio'];
+
     public function __construct(private readonly string $base, private readonly int $timeout = 4) {}
 
     public static function forDevice(Device $device): self
@@ -85,6 +91,25 @@ class RemoteClient
         return self::parsePlayItem($this->get('/nowplay'));
     }
 
+    /**
+     * The play screen: the source the unit is on (`aux`, `disc`, `radio`, null when it shows its menu or an unknown
+     * source) and, for a source with something to show (a radio stream), what plays.
+     *
+     * @return array{source: string|null, item: array{title: string, station: string|null, art: string|null, volume: int, max_volume: int, elapsed: int}|null}
+     */
+    public function screen(): array
+    {
+        return self::parseScreen($this->get('/nowplay'));
+    }
+
+    /** Switches the unit to a local input (`aux` or `disc`). */
+    public function selectInput(string $input): void
+    {
+        $page = self::INPUT_PAGES[$input] ?? throw new \InvalidArgumentException("The player has no input {$input}.");
+
+        $this->get($page, self::CONNECT_TIMEOUT);
+    }
+
     /** @return array<int, array{id: int, name: string, target: string}> the unit's ten radio presets */
     public function radioPresets(): array
     {
@@ -100,6 +125,22 @@ class RemoteClient
     private function get(string $path, ?int $timeout = null): string
     {
         return Http::timeout($timeout ?? $this->timeout)->get($this->base.$path)->body();
+    }
+
+    /** @return array{source: string|null, item: array{title: string, station: string|null, art: string|null, volume: int, max_volume: int, elapsed: int}|null} */
+    public static function parseScreen(string $html): array
+    {
+        return ['source' => self::parseSource($html), 'item' => self::parsePlayItem($html)];
+    }
+
+    /** The source named by the play screen's default artwork (`res/Home_AUX_nowplaying.jpg`, `res/Disc.jpg`, ...). */
+    public static function parseSource(string $html): ?string
+    {
+        if (!preg_match('/var playItem = \{(.*?)\};/s', $html, $block) || !preg_match("/'defaultAlbumArt':'res\/([^']+)'/", $block[1], $art)) {
+            return null;
+        }
+
+        return self::SOURCE_ARTWORK[$art[1]] ?? null;
     }
 
     /** @return array{elapsed: int, playing: bool, paused: bool, muted: bool, shuffle: int, repeat: int, volume: int}|null null for the change signal */
@@ -139,7 +180,8 @@ class RemoteClient
 
         $title = trim((string) $text('title'), " '");
 
-        if ($title === '') {
+        // The disc screen of an empty drive says -1.
+        if ($title === '' || $title === '-1') {
             return null;
         }
 
