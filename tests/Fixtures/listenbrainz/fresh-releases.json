@@ -1,0 +1,72 @@
+{
+  "payload": {
+    "releases": [
+      {
+        "artist_credit_name": "@",
+        "artist_mbids": [
+          "893b6621-4877-4671-8a7c-b9971f723837"
+        ],
+        "listen_count": 0,
+        "release_date": "2026-10-16",
+        "release_group_mbid": "49248d80-5673-43ff-8307-87873a7a3048",
+        "release_group_primary_type": "Album",
+        "release_mbid": "51f01e1b-2a5a-4b1e-9975-405ae13be1d7",
+        "release_name": "Autosmile",
+        "release_tags": []
+      },
+      {
+        "artist_credit_name": "$ir Abe",
+        "artist_mbids": [
+          "30b55f52-2197-47c6-8eb5-f3cbe54c3271"
+        ],
+        "listen_count": 0,
+        "release_date": "2026-10-16",
+        "release_group_mbid": "07786b06-3112-4451-8245-06d5e659be4c",
+        "release_group_primary_type": "EP",
+        "release_mbid": "42f4a76e-7148-4558-95af-45983cdba3b4",
+        "release_name": "BRAINDEAD",
+        "release_tags": []
+      },
+      {
+        "artist_credit_name": "A Suture Kit",
+        "artist_mbids": [
+          "5533879e-7cd1-4969-abe4-13b99f9abe54"
+        ],
+        "listen_count": 0,
+        "release_date": "2026-10-16",
+        "release_group_mbid": "d84dbebb-c438-4c2d-8174-a44d98e4d944",
+        "release_group_primary_type": "Album",
+        "release_group_secondary_type": "Live",
+        "release_mbid": "3b7dd9e8-2e71-4647-9ba8-5fe1238a2218",
+        "release_name": "LIVE IN FORT WORTH, TX",
+        "release_tags": []
+      },
+      {
+        "artist_credit_name": "1911ATNL",
+        "artist_mbids": [
+          "8d35367b-5854-488a-a078-15673bf59f6b"
+        ],
+        "listen_count": 0,
+        "release_date": "2026-10-16",
+        "release_group_mbid": "84821e4e-8e63-45e6-9dd3-b73eac790ac0",
+        "release_group_primary_type": "Single",
+        "release_mbid": "d7a50457-54fa-4928-b1b7-7de1f79f2fac",
+        "release_name": "20261015A",
+        "release_tags": []
+      },
+      {
+        "artist_credit_name": "A Secret Revealed",
+        "artist_mbids": [
+          "ee40bbbc-7df8-46d2-a203-eb2b3f2c7773"
+        ],
+        "listen_count": 0,
+        "release_date": "2026-10-16",
+        "release_group_mbid": "634351e2-54f3-4d25-bf07-94a15b3ddcd6",
+        "release_mbid": "c5becb8a-049d-4c05-9d41-e57d664e6f71",
+        "release_name": "the ruin i summoned forth",
+        "release_tags": []
+      }
+    ],
+    "total_count": 4711
+  }
+}

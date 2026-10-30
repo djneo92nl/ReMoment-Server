@@ -10,8 +10,8 @@ use App\Models\Media\Metadata;
 use App\Services\ListenBrainz\ListenBrainzClient;
 
 /**
- * New releases of the library's artists. ListenBrainz's fresh-releases feed (every artist, last and next 90 days at most) is only a
- * **trigger**: when a library artist has an album or EP release-group the catalogue does not hold yet, that artist's MusicBrainz
+ * New releases of the library's artists. ListenBrainz's fresh-releases feed (every artist, last and next 90 days at most; rows with a
+ * secondary type such as live or compilation are skipped) is only a **trigger**: when a library artist has an album or EP release-group the catalogue does not hold yet, that artist's MusicBrainz
  * discography is synced right away (the authority, with its secondary-type filter and the link to owned albums), instead of
  * waiting for its monthly turn. Nothing is stored from the feed itself.
  */
@@ -24,7 +24,7 @@ final class NewReleaseScan
      */
     public function run(int $days = 30, bool $dispatch = true): array
     {
-        $releases = array_filter($this->client->freshReleases($days), fn ($r) => in_array($r['type'], ['album', 'ep'], true));
+        $releases = array_filter($this->client->freshReleases($days), fn ($r) => in_array($r['type'], ['album', 'ep'], true) && $r['secondary_type'] === null);
         if ($releases === []) {
             return [];
         }

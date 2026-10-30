@@ -1,0 +1,66 @@
+{
+  "release-group-count": 20,
+  "release-group-offset": 0,
+  "release-groups": [
+    {
+      "first-release-date": "1994",
+      "primary-type": "Album",
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "id": "18ae3ddc-93bb-3f82-892f-92786573b904",
+      "secondary-types": [],
+      "disambiguation": "",
+      "title": "Dirty Three"
+    },
+    {
+      "disambiguation": "",
+      "title": "Live! At Meredith",
+      "secondary-types": [
+        "Live"
+      ],
+      "id": "37e101e6-79ae-3e78-8897-4eba78edd086",
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "first-release-date": "2005",
+      "primary-type": "Album"
+    },
+    {
+      "primary-type-id": "6d0c5bf6-7a33-3420-a519-44fc63eedebf",
+      "first-release-date": "1998",
+      "primary-type": "EP",
+      "disambiguation": "",
+      "title": "Sharks EP",
+      "secondary-types": [],
+      "id": "3cf08630-5c13-334b-b55d-5953e358bf5f"
+    },
+    {
+      "secondary-types": [
+        "Live"
+      ],
+      "id": "54ea6bcd-3978-3293-8eec-ccca72600c73",
+      "title": "Laundromat, Cincinatti, OH",
+      "disambiguation": "",
+      "primary-type": "Album",
+      "first-release-date": "",
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc"
+    },
+    {
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "primary-type": "Album",
+      "first-release-date": "2026-11-06",
+      "title": "Ulterior Motives",
+      "disambiguation": "",
+      "id": "cd5799bc-3b26-4ead-8b00-d779919e5af6",
+      "secondary-types": [
+        "Demo"
+      ]
+    },
+    {
+      "title": "A Strange Holiday",
+      "disambiguation": "",
+      "id": "fd539f79-819a-353b-8a26-37b69e449048",
+      "secondary-types": [],
+      "primary-type-id": "6d0c5bf6-7a33-3420-a519-44fc63eedebf",
+      "primary-type": "EP",
+      "first-release-date": "2003"
+    }
+  ]
+}

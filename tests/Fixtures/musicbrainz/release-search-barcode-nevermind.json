@@ -1,0 +1,74 @@
+{
+  "created": "2026-10-30T10:49:26.758Z",
+  "count": 11,
+  "offset": 0,
+  "releases": [
+    {
+      "id": "f922ec87-4758-421d-a839-3193455345ff",
+      "score": 100,
+      "status-id": "518ffc83-5cde-34df-8627-81bff5093d92",
+      "packaging-id": "f7101ce3-0384-39ce-9fde-fbbd0044d35f",
+      "artist-credit-id": "21861ceb-db10-3e6e-bab7-47a6e8a5492f",
+      "count": 1,
+      "title": "Nevermind",
+      "status": "Promotion",
+      "packaging": "Cardboard/Paper Sleeve",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "name": "Nirvana",
+          "artist": {
+            "id": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+            "name": "Nirvana",
+            "sort-name": "Nirvana",
+            "disambiguation": "1980s–1990s US grunge band"
+          }
+        }
+      ],
+      "release-group": {
+        "id": "1b022e01-4da6-387b-8658-8678046e4cef",
+        "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "title": "Nevermind",
+        "primary-type": "Album"
+      },
+      "date": "1991-09-24",
+      "country": "US",
+      "release-events": [
+        {
+          "date": "1991-09-24",
+          "area": {
+            "id": "489ce91b-6658-3307-9877-795b68554c98",
+            "name": "United States",
+            "sort-name": "United States",
+            "iso-3166-1-codes": [
+              "US"
+            ]
+          }
+        }
+      ],
+      "barcode": "720642442517",
+      "label-info": [
+        {
+          "catalog-number": "DGC-24425",
+          "label": {
+            "id": "68803e28-86fe-4a95-985f-8e493795ab31",
+            "name": "DGC Records"
+          }
+        }
+      ],
+      "track-count": 12,
+      "media": [
+        {
+          "id": "804a4f4c-711b-38d5-b4ff-9dd110b19736",
+          "format": "12\" Vinyl",
+          "disc-count": 0,
+          "track-count": 12
+        }
+      ]
+    }
+  ]
+}
