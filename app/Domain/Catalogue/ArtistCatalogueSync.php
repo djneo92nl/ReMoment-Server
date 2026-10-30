@@ -95,7 +95,7 @@ final class ArtistCatalogueSync
     /**
      * An artist without a MusicBrainz id: search by name and accept a candidate only when its name key equals ours,
      * its score is at least 95 and it is the only such candidate, then **verify** it: one of the library's albums by
-     * this artist must equal one of its release-groups (so a namesake is never taken). Only a verified id is saved.
+     * this artist must equal one of its release-groups (strictly, or as an edition of it: EditionKey) (so a namesake is never taken). Only a verified id is saved.
      *
      * @return array{0: ?string, 1: ?list<array<string, mixed>>} the id and the release-groups already fetched for it
      */
@@ -118,8 +118,7 @@ final class ArtistCatalogueSync
         $this->lookedUp = true;
         $mbid = $candidates[0]['id'];
         $groups = $this->mb->releaseGroups($mbid);
-        $owned = $artist->albums()->pluck('name_key')->filter()->all();
-        if ($groups === null || !array_intersect($owned, array_map(fn ($g) => Normalizer::album($g['title']), $groups))) {
+        if ($groups === null || !CatalogueLinker::verifies($artist, $groups)) {
             return [null, null];
         }
 
