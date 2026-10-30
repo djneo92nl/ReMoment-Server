@@ -50,6 +50,7 @@ docs/
     discovery-for-clients.md mDNS advertisement (_remoment._tcp via host Avahi) so clients find the server
     system-requirements.md  Hardware tiers for the full server (Pi minimum up to Essentia + ML), what runs, disk and network needs
     audio-analysis.md       Analysis of the own audio files: loudness, ReplayGain, Chromaprint/AcoustID, Essentia sidecar (BPM, key, mood), `analysis` queue, library:analyze, smart fields
+    track-sections-spike.md Spike for 16.2 (sections of a track): librosa novelty vs Essentia SBic vs structure models, cost, licences, recommendation, PR plan
     metadata-enrichment.md  Per-source enrichment jobs (MusicBrainz track/artist/album, Wikipedia, Cover Art Archive, lyrics, Spotify, Last.fm, TheAudioDB, Discogs), DLNA tags, canonical genres: markers, retries, rate limits, library:enrich
     artist-settings.md      Admin page per artist: photo/backdrop choice, MusicBrainz/Spotify/Last.fm mappings, details overrides, files, default source; the `manual` metadata source
     file-storage.md          Own music files: storage locations (local/S3), files + track_files tables, indexer, organizer, management, /stream, admin API
