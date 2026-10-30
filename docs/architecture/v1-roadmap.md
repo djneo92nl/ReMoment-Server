@@ -13,10 +13,10 @@ Effort: S = days, M = 1–2 weeks, L = several weeks. Feasibility notes come fro
 | 1b | Queue stability and management: are the runners stable, per-queue health, pause/cancel/prioritise jobs | M | 1 | partly built; review below | Must (stability), Should (management) |
 | 2 | TV control | M | | **mostly built**: V1 page, wake, number keys; remote keys (API, MCP, card) and the Philips key map; Philips power on, volume, Jointspace. **Left:** the V1 one-way command probe, other ASE BeoVision models, Philips HDMI switching (no API on this firmware, fallbacks documented) | Must |
 | 2a | Sub devices (devices connected to other devices: converter, Chromecast on a TV, changers) | M | 2 (first case) | design below | Should |
-| 3 | Availability layer (external libraries add to the collection) | L | | **design in progress** ([availability-layer.md](availability-layer.md), written 2026-10-28; implementation starts after 14.2 lands) | Must |
-| 4 | Discovery | M | 3 (partly) | to do | Should |
+| 3 | Availability layer (external libraries add to the collection) | L | | **mostly built (2026-10-28)**: catalogue tables, MusicBrainz discography sync and linker, read and wish APIs, web discography and wishlist, provider registry, Spotify browse and play; left: Deezer, Tidal and media-server providers, live checks of the MusicBrainz and ListenBrainz response shapes; see [availability-layer.md](availability-layer.md) "Built so far" | Must |
+| 4 | Discovery | M | 3 (partly) | **partly built**: new releases (ListenBrainz feed triggers the catalogue sync; API and shelf); rediscover shelves, similar tracks and the Discover hub to do | Should |
 | 5 | Deezer and Tidal | L | 3, hardware probes | design in [streaming-services.md](streaming-services.md) | Should |
-| 6 | Physical library (CDs, tapes, vinyl) | M | 3 | to do | Should |
+| 6 | Physical library (CDs, tapes, vinyl) | M | 3 | **started**: physical items by barcode or by hand, the `physical` availability provider, API, MCP, web; changer and tape control not | Should |
 | 7 | CD import (ripping) | M | 6 (links to items) | **started**: desktop ripper app (sign-in, upload) and the upload API exist; ripping itself to do | Can slip |
 | 8 | Additional features: scenes/automations, podcasts, audiobook resume, tag editor, PWA + alerts, playback history | M–L | varies | to do | Mixed (per item) |
 | 8a | Home Assistant: MQTT discovery and automations built in HA | M | 8 (scenes, alerts), 2a (TV events) | plan in [home-assistant.md](home-assistant.md) | Should |
@@ -27,7 +27,7 @@ Effort: S = days, M = 1–2 weeks, L = several weeks. Feasibility notes come fro
 | 10 | Manager: host service that controls the running instance (containers, processes, upgrade with rollback, host stats) and SMB shares (serve and mount) for the library and the drop directory; on every install target | L | 1b, 9a, backup | **decided, design draft** | Must |
 | 11 | WiiM (LinkPlay) driver: a dedicated driver on the public HTTP API, on top of the generic UPnP fallback | M | | to do | Should |
 | 13 | Export from the library: download a playlist, album or artist as a zip, transcoded to a chosen maximum quality, for an MP3 player or a car radio | M | 1b | to do | Should |
-| 14 | Foundations, decided early (phase 2): one alert and event model, stable IDs for clients, a schema review before the migration squash, a shared credentials layer, and an action-layer design spike | M | | **14.1 and 14.4 built**; 14.2 in progress; the rest to do | Must (14.1, 14.3), Should (14.2, 14.4, 14.5 spike) |
+| 14 | Foundations, decided early (phase 2): one alert and event model, stable IDs for clients, a schema review before the migration squash, a shared credentials layer, and an action-layer design spike | M | | **14.1, 14.2 and 14.4 built**; 14.3 (schema review) and 14.5 (spike) to do | Must (14.1, 14.3), Should (14.2, 14.4, 14.5 spike) |
 | 15 | Media servers: one abstraction for video (and later music) servers (Jellyfin built as a TV-only feature; Plex, Emby, Kodi follow the same contract), linked to the devices that can play them | M | 14.4, 2a | **started** (Jellyfin shelf); abstraction to do | Should |
 | 12 | Library and audio intelligence, what is left: mixes-well, loudness-normalised playback, tag and cover suggestions, concerts, related works, lyrics extras, listening insights, Essentia on arm64 | S–M each | 4 (similar tracks), 8.4 (tag editor) | plan below; the enrichment, analysis and health base is built | Mixed (per item); platform docs Must |
 
@@ -49,6 +49,13 @@ Built and committed since this plan was written (hashes are on `main`):
 | 14.4 Credentials | `ServiceCredentials` registry and one page, Settings › Services & keys (`/settings/services`), for Spotify, Last.fm, Discogs, AcoustID and TheAudioDB: encrypted secrets, masked, excluded from backups by the registry flag, base URL from settings (relay hook reserved, not built), `.env` fallback kept, a migration encrypts plaintext secret rows. Not tried against live services or in a browser; see [credentials.md](credentials.md) | `f6e1370` |
 | 2 TV (Philips, keys) | Remote keys: `GET/POST /api/devices/{id}/keys`, MCP, the remote card and the Philips key map; Philips probe results ([philips-tv.md](philips-tv.md): Jointspace 6.4.0, **no HDMI input API on this firmware**), power on through `/6/powerstate` with Wake-on-LAN as a fallback, volume and mute, reachable through Jointspace and Cast without a UPnP renderer, the TV app shown as now playing, brand icons for sources | `686d9c8`, `e6b0433`, `956614d`, `035bca6`, `3125b6b`, `44635c4`, `e853b4b`, `9ef5324` |
 | 15 Jellyfin (not in the plan) | A card with continue watching and next up on the Philips TV page, `GET /api/devices/{id}/jellyfin` and `POST .../jellyfin/play`, an MCP tool, titles of the Jellyfin app as now playing, the server key on the credentials page. **TV-only and Jellyfin-only today; unverified against a real server**; to become the media-server abstraction of workstream 15 | `82c88a0`, `f85dbea`, `aab4303` |
+| 14.2 Stable IDs | `id_aliases` written by `LibraryMerger` in the merge transaction; `canonical_id` on artist, album and playlist detail; play, queue and favorite accept an old id; web routes 301 | `707be85` |
+| 3 Catalogue | `catalogue_artists`, `catalogue_albums`, `album_availability`; MusicBrainz discography sync and linker (`catalogue:sync`, `catalogue:reconcile`); artist mbid search verified by an owned album; read API (discography, wishlist, `?availability=`); wish and ignore endpoints (a wish closes when the album is owned); catalogue rows survive merges; Spotify availability and add; web discography card, wishlist page and shelf; provider registry with ownership. MusicBrainz browse and search shapes **verified against live calls 2026-10-30** (the browse now sends `release-group-status=website-default`); merged-mbid redirect still unverified | `e12814f`, `55bf1ba`, `3916b50`, `602301e`, `152231b`, `2ba2972`, `0c4e07c`, `2a4dfed` |
+| 4 New releases | ListenBrainz fresh releases trigger the catalogue sync early; `GET /api/library/new-releases`, MCP, a "New from your artists" shelf. Verified 2026-10-30: no token needed, body `{payload:{releases}}`, rows have a secondary type the scan skips | `580e8a8` |
+| 6 Physical | `physical_items` (barcode via MusicBrainz or by hand; barcode lookup fields verified live 2026-10-30), the `physical` provider, API, MCP, web; see [physical.md](../api/physical.md) | `e838366` |
+| Not in the plan (2026-10-28) | Wished songs from play history and radio (`wanted_tracks`, `e91ab95`); browsing and playing Spotify live (external catalogue API, artist, album and playlist pages, Streaming scope shelves: `6cfd229`, `1b7b8fb`, `bdddf0a`, `d62fda9`, `7b2542b`, `dec552c`, `1c59ec1`) | see commits |
+| 3, 4, 6 Verified live (2026-10-30) | The MusicBrainz release-group browse, artist search and barcode lookup, the ListenBrainz fresh-releases feed (no token needed) and Spotify's artist-albums endpoint were called for real; the sync now asks MusicBrainz for `website-default` groups (417 become 41 for one artist), the new-release scan skips live and compilation rows and defaults to 30 days; real-response fixtures; a client-safety test. **Findings:** only 35% of the library's artists have a MusicBrainz id (the plan assumed 70%), the first full sync is about 1,000 requests (17-20 minutes), and the library's album names are releases with catalogue numbers, so the linker undercounts owned albums (8 of 85 for one artist) | `9f19854`, `e56d125`, `110fa11` |
+| **Direction change** | **Spotify is no longer a library.** The saved-tracks and playlist import, its settings page and the add, import and fill actions are gone; Spotify leaves `LibrarySources::LIBRARIES`; "Local" means own files only and DLNA is a streaming library that counts as owned; a purge migration (`drop_spotify_library_data`, `library:drop-spotify`) removes what the old import left. **Run `library:drop-spotify --dry-run` and `backup:run` before deploying**: favourites on removed items are lost, plays stay as text plays | `1900864`, `e7d2e4b`, `c9f52a4`, `25479fe`, `e8d9686`, `91b72a4` |
 | Not in the plan | Move playback and sync groups (fake multiroom); BeoLink stream (B&O multiroom as an Icecast stream for any speaker) | `5b12aec`, `d89bc44` |
 
 Still open on workstream 1: the hardware checklist (needs the device lab) and confirming the card fix over time. The health alerts are built through the alert model (14.1).
@@ -167,6 +174,8 @@ Done when: the converter and the Chromecast on the V1's HDMI 1 are each linked t
 
 ## 3. Availability layer (external libraries add to the collection)
 
+**Status (2026-10-28): mostly built**, in a day-long session that went well beyond the design document; see the progress table and "Built so far" in [availability-layer.md](availability-layer.md). **The model changed during the build:** Spotify is no longer imported into the library; the library is the local tracks (own files, and DLNA as a streaming library that counts as owned) and streaming services extend it **live** (browse, play, wish; no add or fill from Spotify). The four decisions below still hold; the answers to the design document's nine questions are in that document, not here. Left: Deezer and Tidal and media servers as providers (5, 15), a live check of the MusicBrainz browse and barcode response shapes, and the schema review (14.3).
+
 **Problem.** Spotify is a hosted copy of what the user saved. Albums the user lacks, new releases and what a service can play on which device are not visible, and Deezer and Tidal would repeat the pattern.
 
 **Design.** On top of `LibraryIdentity` (one record per artist, album and track) an album gets an **availability**: where it can be had.
@@ -197,9 +206,11 @@ Done when: an artist page shows owned, streamable and missing albums, a missing 
 
 ## 4. Discovery
 
+**Status (2026-10-28):** the **new releases** part is built (`580e8a8`): the ListenBrainz feed triggers the catalogue sync, `GET /api/library/new-releases` and a shelf; no token field yet. Missing albums come from workstream 3. Rediscover shelves, similar tracks and the Discover hub are not built.
+
 Free sources only; all through the enrichment framework (rate limits, retries, `library:enrich`).
 
-- **New releases.** ListenBrainz `GET /1/explore/fresh-releases/` (upcoming and recent releases with release-group MBIDs; days window up to 90) and the per-user variant, filtered to artists in the library. Whether the global endpoint needs a token and its rate limits are *unverified*; check the [ListenBrainz API docs](https://listenbrainz.readthedocs.io/en/latest/users/api/misc.html). New release-groups land as `known` catalogue albums (workstream 3) and show as a "New from your artists" shelf. **Built 2026-10-28** as a trigger for the MusicBrainz catalogue sync and a *New from your artists* shelf; see [availability-layer.md](availability-layer.md) (token need and response shape still unverified).
+- **New releases.** ListenBrainz `GET /1/explore/fresh-releases/` (upcoming and recent releases with release-group MBIDs; days window up to 90) and the per-user variant, filtered to artists in the library. Checked live 2026-10-30: the global endpoint needs no token and answers 30 calls per window (see the [ListenBrainz API docs](https://listenbrainz.readthedocs.io/en/latest/users/api/misc.html)). New release-groups land as `known` catalogue albums (workstream 3) and show as a "New from your artists" shelf. **Built 2026-10-28** as a trigger for the MusicBrainz catalogue sync and a *New from your artists* shelf; see [availability-layer.md](availability-layer.md) (token need and response shape verified 2026-10-30).
 - **Missing albums** per artist, from workstream 3.
 - **Rediscover.** Shelves from `plays`: "on this day", "not played in a year", "you used to play", forgotten favourites. No external calls.
 - **Similar tracks / radio** from the EffNet embeddings: plan and measurements in [similar-tracks.md](similar-tracks.md); build only if its measured query time holds on the minimum hardware, otherwise ship similar *artists* (Last.fm, MusicBrainz) only.
@@ -218,6 +229,8 @@ Per-device playback, not a broad library: see [streaming-services.md](streaming-
 Gate: if the probes show a service cannot start playback on any device the user has, ship it read-only and say so in the UI, rather than hide it.
 
 ## 6. Physical library (CDs, tapes, vinyl)
+
+**Status (2026-10-28): started** (`e838366`): `physical_items`, entry by barcode (MusicBrainz) or by hand, the `physical` availability provider that closes a wish, API, MCP and web ([physical.md](../api/physical.md)). Not built: locations as devices (changer links), CSV import and export, the link to the ripper (`ripped_at`, `file_id` exist as columns).
 
 **Goal.** Catalogue the physical collection, tie it to the same album records as everything else, and prepare for sub-device control (CD changers, tape decks).
 
@@ -509,7 +522,7 @@ Done when: the health checks that exist today (queue stuck, scheduler silent, ba
 
 **Status: built** (see [library-identity.md](library-identity.md), Stable ids; `canonical_id` on the detail responses). Merges made before it are not covered.
 
-**Status: in progress** (a session started 2026-10-28; nothing committed yet).
+**Status: built** (`707be85`; `id_aliases`, `canonical_id`, 301 on the web routes; merges made before it are not covered).
 
 **Problem.** `library:merge-duplicates` deletes the merged records, so a client that cached an album or artist id gets `404` (or `422` in a play body) until it re-reads the list (`CLAUDE.md`, Library). For a public API with firmware and apps in the wild that is a breaking behaviour.
 
@@ -518,6 +531,8 @@ Done when: the health checks that exist today (queue stuck, scheduler silent, ba
 Done when: after a merge the old id still plays and opens through the API and the web, the response names the canonical id, `docs/api/library.md` and `openapi.yaml` say so, and a test covers a merge chain.
 
 ### 14.3 Schema review before the migration squash *[Must; part of 9a]*
+
+**Status: to do, with more input than planned.** Tables and migrations that exist now and must be reviewed and consolidated: `id_aliases` (14.2), `alerts` (14.1), `catalogue_artists`, `catalogue_albums`, `album_availability` (3), `wanted_tracks`, `physical_items` (6), and the data migrations `encrypt_plaintext_service_secrets` (14.4) and `drop_spotify_library_data` (a purge, not a schema change: it must **not** run on a fresh install after the squash).
 
 **Problem.** The squash (9a) turns 52 migrations into one per table. Several workstreams add tables and columns afterwards, and each would otherwise bring a new "add field" migration right after the squash.
 
@@ -635,6 +650,11 @@ Done when: Jellyfin runs on the abstraction, a second server type is added by a 
 
 - Order (2026-10-28): 14.2 (stable IDs) is built first because it changes the library merge code and API; workstream 3 starts as a design document in parallel (docs only), and its implementation follows 14.2 and the schema review 14.3.
 
+- Direction (2026-10-28): **Spotify is not a library.** The library is the local tracks; streaming extends it live. The Spotify import, its settings page and the add, import and fill actions were removed; the earlier plan to treat a Spotify-saved album as an imported library album no longer applies. Local means own files only; DLNA is a streaming library that counts as owned. This replaces the wording of workstream 3 that had Spotify "become a provider" for saved albums and changes the Spotify audit (workstream 1) scope: the library import calls are gone.
+- Process (2026-10-28): a design-only session continued into implementation (about 30 commits, workstreams 3, 4 and 6) and pushed `main`; the roadmap, which still says "design", was updated afterwards.
+
+- Verification (2026-10-30): the availability layer was checked against the live services (see the progress table). Linker matching of release-style album names (catalogue numbers, regions) gets its own looser key; `Normalizer::album`, which drives library identity and merging, stays as it is. The first full sync runs over about a week (`--limit=150`).
+
 ## Open questions
 
 Workstream 2a: how a sub device reachable only through its host is shown (listed under 2a). New questions go here.
@@ -656,3 +676,7 @@ Workstream 13: (a) is loudness normalisation off by default, and does it wait fo
 Workstream 14: (a) acknowledge alerts from the apps or the admin web only; (b) should `id_aliases` also redirect web routes for guests, or only the API; (c) which providers `ServiceCredentials` must cover in 1.0 beyond the five; (d) how much of the action-layer spike can be built on the REST API as the single definition (the cheapest outcome).
 
 Workstream 15: (a) one server or several per install; (b) is Plex or Emby the proof driver (Emby is closest to Jellyfin; Plex is the one people have); (c) how a media server's history relates to the music `plays` history (separate video history, or one); (d) do the iOS app or the ESP clients already use the Jellyfin routes; (e) is a media server with music a library provider in the availability layer, and does that wait for 3.
+
+After 2026-10-28: (a) confirm the purge migration on a copy of production first (dry run, then a backup); (b) are the iOS app or the ESP clients using any of the removed routes (`fill-from-spotify`, Spotify as a library or as an artist source); (c) **done 2026-10-30**: the live MusicBrainz, ListenBrainz and Spotify calls were made and the code corrected (a merged MusicBrainz artist id is the one case still not verified); (d) the nine questions at the end of availability-layer.md: which are settled by the build; (e) `catalogue` queue: on the `heavy` worker or its own.
+
+Linker: (a) which edition words and catalogue-number patterns the linker's own key strips; (b) whether a looser match may ever mark an album owned without a track-count sanity check (Spotify `total_tracks` and MusicBrainz release data make one possible).
