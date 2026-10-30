@@ -94,6 +94,11 @@ analysis_mood_min_score: 0.7
 acoustid_api_key: '9qtx6EQ9hh'
 acoustid_min_score: 0.9
 
+# --- Structure service (deploy.yml) ----------------------------------------------
+# Sections of one track, computed on demand by the admin (docs/architecture/structure-service.md): a small
+# Python 3.12 + librosa container, 0.5-1 GB RAM while it works. Adds the `structure` compose profile and STRUCTURE_URL to .env.
+structure_enabled: false
+
 # --- Spotify stream (env.j2) -----------------------------------------------------
 # Spotify on any speaker: librespot (a Spotify Connect receiver) -> ffmpeg -> Icecast serves an MP3
 # stream that speakers without Spotify of their own can play, see docs/architecture/spotify-stream.md.

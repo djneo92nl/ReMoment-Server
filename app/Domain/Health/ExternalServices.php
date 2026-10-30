@@ -110,6 +110,7 @@ class ExternalServices
         $probes['fpcalc'] = ['fpcalc (Chromaprint)', 'Analysis', fn () => $this->analysisBinary(Tools::fpcalc(), 'Audio fingerprints')];
         $probes['acoustid'] = ['AcoustID', 'Analysis', fn () => $this->acoustId()];
         $probes['essentia'] = ['Essentia sidecar', 'Analysis', fn () => $this->essentia()];
+        $probes['structure'] = ['Structure service', 'Analysis', fn () => $this->structure()];
 
         foreach (StorageLocation::all() as $location) {
             $probes["storage_{$location->id}"] = ["Storage: {$location->name}", 'Storage', fn () => $this->storage($location)];
@@ -169,6 +170,19 @@ class ExternalServices
         return $ml === (bool) config('analysis.essentia_ml')
             ? ServiceCheck::ok('Essentia '.($response->json('essentia') ?? '').($ml ? ' with ML models' : ' (no ML models)'))
             : ServiceCheck::warning('Sidecar has ML models '.($ml ? 'on' : 'off').' but ANALYSIS_ESSENTIA_ML says '.(config('analysis.essentia_ml') ? 'on' : 'off'));
+    }
+
+    private function structure(): ServiceCheck
+    {
+        if (!config('analysis.structure_url')) {
+            return ServiceCheck::disabled('STRUCTURE_URL not set: no sections of a track (deep analysis)');
+        }
+
+        $response = $this->http()->get(rtrim(config('analysis.structure_url'), '/').'/health');
+
+        return $response->ok() && $response->json('ok')
+            ? ServiceCheck::ok('Structure service '.($response->json('method') ?? '').' v'.($response->json('version') ?? '?'))
+            : ServiceCheck::error("Structure service answered HTTP {$response->status()}");
     }
 
     private function http(): PendingRequest

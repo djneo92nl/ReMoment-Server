@@ -120,6 +120,24 @@ services:
             - remoment
         restart: unless-stopped
 
+    # Opt-in structure service (sections of one track, on demand): docker compose --profile structure up -d, then set
+    # STRUCTURE_URL=http://127.0.0.1:8091 (docs/architecture/structure-service.md). amd64 and arm64.
+    structure:
+        profiles: [structure]
+        build:
+            context: './docker/structure'
+        image: 'remoment/structure:latest'
+        # Runs only when someone asks for the sections of a track, but a track takes the CPU for a few seconds.
+        cpus: '${STRUCTURE_CPUS:-1.5}'
+        cpu_shares: 256
+        environment:
+            STRUCTURE_MAX_DURATION: '${STRUCTURE_MAX_DURATION:-1200}'
+        ports:
+            - '127.0.0.1:8091:8091'
+        networks:
+            - remoment
+        restart: unless-stopped
+
     # Opt-in Spotify stream: docker compose --profile spotify-stream up -d, then set LIBRESPOT_ENABLED=true
     # (docs/architecture/spotify-stream.md). Icecast is published on ICECAST_PORT for the speakers; librespot
     # runs on the host network so Spotify's zeroconf discovery reaches the LAN, and reaches Icecast and the app on 127.0.0.1.

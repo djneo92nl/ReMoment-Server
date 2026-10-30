@@ -61,4 +61,19 @@ class AnalysisHealthTest extends TestCase
         $this->assertSame('error', $results['acoustid']['status']);
         $this->assertSame('warning', $results['essentia']['status'], 'the sidecar has no ML models but the app expects them');
     }
+
+    public function test_structure_probe_is_disabled_without_a_url_and_checks_the_service_with_one(): void
+    {
+        Cache::flush();
+        config(['analysis.structure_url' => null]);
+        $this->assertSame('disabled', (new ExternalServices)->refresh(['structure'])['structure']['status']);
+
+        config(['analysis.structure_url' => 'http://structure:8091']);
+        Http::fake(['structure:8091/health' => Http::sequence()
+            ->push(['ok' => true, 'version' => 1, 'method' => 'novelty-v1'])
+            ->push('', 503)]);
+
+        $this->assertSame('ok', (new ExternalServices)->refresh(['structure'])['structure']['status']);
+        $this->assertSame('error', (new ExternalServices)->refresh(['structure'])['structure']['status']);
+    }
 }

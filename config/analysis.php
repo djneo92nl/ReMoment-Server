@@ -78,4 +78,21 @@ return [
 
     'essentia_timeout' => (int) env('ANALYSIS_ESSENTIA_TIMEOUT', 600),
 
+    /*
+    | The structure service (docker/structure, compose profile "structure"): sections of ONE track, on demand
+    | only (AnalyzeTrackDeep), never part of the nightly run. Unset = deep analysis is not available.
+    | docs/architecture/structure-service.md.
+    */
+    'structure_url' => env('STRUCTURE_URL'),
+
+    /** Seconds a request to the structure service may take (a track needs 1-10 s on a desktop, more on a Pi). */
+    'structure_timeout' => (int) env('STRUCTURE_TIMEOUT', 240),
+
+    /** Sample rate of the WAV sent to the service (it resamples to its own rate anyway). */
+    'structure_decode_rate' => (int) env('STRUCTURE_DECODE_RATE', 22050),
+
+    /** Estimate shown before a sections run: seconds per second of audio, plus a fixed part. Measured on an Apple M5 Pro; a Pi is several times slower. */
+    'structure_seconds_per_second' => (float) env('STRUCTURE_SECONDS_PER_SECOND', 0.012),
+    'structure_seconds_fixed' => (float) env('STRUCTURE_SECONDS_FIXED', 2),
+
 ];

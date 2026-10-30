@@ -114,6 +114,19 @@ services:
         networks:
             - sail
 
+    # Opt-in structure service (sections of one track, on demand): docker compose --profile structure up -d --build structure,
+    # then STRUCTURE_URL=http://structure:8091 (docs/architecture/structure-service.md). Multi-arch: runs natively on arm64.
+    structure:
+        profiles: [structure]
+        build:
+            context: './docker/structure'
+        ports:
+            - '${STRUCTURE_PORT:-8091}:8091'
+        environment:
+            STRUCTURE_MAX_DURATION: '${STRUCTURE_MAX_DURATION:-1200}'
+        networks:
+            - sail
+
     # Opt-in Spotify stream: docker compose --profile spotify-stream up -d, then LIBRESPOT_ENABLED=true and
     # ICECAST_INTERNAL_URL=http://icecast:8000 (docs/architecture/spotify-stream.md). Docker Desktop does not pass mDNS,
     # so Spotify finds librespot only when the app runs on a Linux host (use docker-compose.prod.yml there).
