@@ -203,9 +203,44 @@ Existing id sources: `spotify_album_uri` stays the Spotify id for real albums (d
 
 1. **By id:** the album's `release_group_mbid` metadata (written by `EnrichAlbumMusicBrainz`) equals a row's `release_group_mbid`. Confidence high, `link_method=mbid`.
 2. **By name:** same artist, equal `name_key`. If one candidate: link. If several (self-titled albums: Weezer's Blue, Green and White albums all key to `weezer`): pick the one whose `first_release_year` is closest to `albums.released_at`, only when it is the unique closest within 2 years; else **do not link** (stays missing, flagged for a manual link).
-3. **Year tolerance is a tie-break, not a gate:** an owned reissue often carries the reissue year (a 2011 remaster of a 1973 album), so a year mismatch alone never blocks an exact `name_key` match.
-4. **Track-count sanity** applies to *service* matches (Spotify/Deezer: `total_tracks` against the owned or MusicBrainz track count within ±max(3, 30%), since deluxe editions are longer), not to the local link, because a release-group has no track count.
-5. Fuzzy (non-equal key) matches are **never** made automatically. Low-confidence = not stored.
+3. **By edition** (`link_method=edition`, see [Edition matching](#edition-matching)): the library holds releases, so an equal `EditionKey` plus the sanity checks.
+4. **Year tolerance is a tie-break, not a gate, for name matches:** an owned reissue often carries the reissue year (a 2011 remaster of a 1973 album), so a year mismatch alone never blocks an exact `name_key` match. Edition matches do use the year as a gate (below).
+5. **Track-count sanity** applies to *service* matches (Spotify/Deezer: `total_tracks` against the owned or MusicBrainz track count within ±max(3, 30%), since deluxe editions are longer) and, with what the library knows, to edition matches (below), not to the exact local link, because a release-group has no track count.
+6. Nothing looser than an equal edition key is ever matched. Low-confidence = not stored.
+
+Matching is done per artist, best first (`CatalogueLinker::relink`): release-group id, then exact name, then edition, so the order of the albums never decides. A release-group links to **one** album (`catalogue_albums.album_id`); the other editions of it stay unlinked and unowned-looking on their own, but the group counts as owned. An exact match takes a group over from an edition match, and an owned edition takes it over from an unowned (e.g. streaming-only) one; an album links to at most one group.
+
+### Edition matching
+
+`App\Domain\Catalogue\EditionKey::of($title)` is a looser key used **only** by the catalogue (linker, artist verification), computed on the fly for both the library album and the release-group title; it is never stored and never written to `name_key`. `Normalizer::album` and `Normalizer::VERSION` are untouched (identity and `library:merge-duplicates` need pressings kept apart; a test asserts the keys do not change). It works on the raw title (brackets are gone once Normalizer made a key) and then calls `Normalizer::album` on what is left. Stripped, repeatedly from the end:
+
+1. a trailing bracketed **catalogue number**: letters, digits, spaces and `. - /`, at least two digits, no alphabetic token longer than 6 letters or like `part`/`vol` (`(82876 512002)`, `[BMK 96143]`, `(7243 8 84361 2 0)`); a bare year `(2011)` is not one;
+2. a bracket group or ` - tail` made only of **edition words** (and fillers, years);
+3. a bare trailing run of edition words, only when it contains an **anchor** (`edition`, `version`, `exclusive`, `ep`, a region, a retailer, `CD1`/`Disc 2`), so `Something Special` stays whole while `… Special Norwegian Edition` goes; at least one word always stays; a title that is only edition words falls back to `Normalizer::album`.
+
+Word lists, all in `config/availability.php` › `edition_matching` (tunable): regions (UK, US, EU, JP, Japan, Japanese, German, European, Australian, Canadian, Norwegian …), editions (special, deluxe, expanded, remastered, anniversary, limited, collector's, bonus, digipak, import, exclusive, edition, version …), retailers (Best Buy, Target, Walmart …), formats (EP, CD, LP …), fillers. Never listed, so they keep their own key: live, acoustic, remix, unplugged, demo, instrumental, mono, and numbers (`Vol 2`, `Volume 1`).
+
+**Sanity checks** (`CatalogueLinker::plausible`, edition matches and verification only):
+
+- **Year:** both known → within `year_tolerance` (2) of the release-group's first release (a pressing or reissue may be a little later). A remaster 20 years on is not matched by edition (it usually matches exactly: Normalizer strips `Remastered 2011`). Chosen 2 as the owner specified; widen it in config if real data shows reissues missed. Several candidates (self-titled): unique closest year within the tolerance, else none.
+- **Tracks** (what the library has; a release-group has no track count): a 1-3 track release never links to an *album*-type group (it is a single); an *ep*-type group never to a release of more than 10 tracks; an album with **no tracks yet** is not linked loosely (a scan creates the album before its tracks): `catalogue:reconcile` (nightly) does it.
+- A singles-only release (`Everlong UK CD1`) has no album group to match, so it stays unlinked; if an album of the same name exists the track check keeps it off.
+
+**Verification** (step 2 of the sync, an artist found by search): an owned album equals a release-group by `name_key` or by `EditionKey` with the same sanity checks, so a library of releases verifies, while a compilation-only library (no shared title) is still refused.
+
+**Backfill:** `php artisan catalogue:reconcile [--artist=ID …] [--dry-run]` re-links already synced rows (links only unlinked albums plus takeovers above; idempotent; prints "N album(s) linked, M link(s) made or moved"; `--dry-run` rolls everything back; `--artist` also prints a per-artist table).
+
+**Before/after on the owner's dev database (2026-10-30, 5 artists of the dry run):**
+
+| Artist | Library albums | Groups | Linked before | Linked after | Missing after |
+|---|---|---|---|---|---|
+| Foo Fighters | 85 | 19 | 8 | 10 (2 by edition: *Five Songs and a Cover*, *Next Year*) | 9 |
+| The Lonely Island | 2 | 3 | 2 | 2 | 1 |
+| The Script | 1 | 12 | 0 | 0 | 12 |
+| The Beatles | 13 | 34 | 10 | 10 | 24 |
+| JON VINYL | 1 | 0 | 0 | 0 | 0 (not retried: needs MusicBrainz) |
+
+The gain is smaller than the 85-album count suggests: of the 75 unlinked Foo Fighters albums, about 60 are further pressings of groups that already link (expected, one link per group) or singles with no album group; the 9 groups still missing really are missing (*Let It Die*, *Sonic Highways*, *Hail Satin* …). The real ownership error was only the two EPs. Remaining risks: an edition word list that misses a region (the album then stays unlinked: safe), a reissue more than 2 years later (unlinked: safe), a different work whose title differs only by a listed word (`Foo Fighters Japan` vs a group named `Foo Fighters`: the same work) and a short partial rip of an album (1-3 tracks, refused). Not verified: other libraries than this one, and an MB `ep`-type group named like a single.
 
 When a link is made, `fulfilled_at` is set if the album has an owned provider (`Availability::isOwned`), and any `album_availability` rows on the catalogue row move to the album.
 
@@ -505,5 +540,5 @@ Seconds are request time only; the queue limiter spaces jobs 1/s. Of 68 stored g
 - **Q4 (wish needs an mbid):** keep it required for albums. The search-and-verify step gives most real artists an mbid (and the sync saves it), and wishing a *song* already works by title (`wanted_tracks`). Revisit after the first full sync: count artists left at `no_mbid`/`unverified` that have owned own-file albums.
 - **Q6 (refresh policy):** keep 30/90 days. The ListenBrainz trigger is cheap (one call a day, 2 MB for 14 days, 5 MB for 30) and now ignores live and compilation rows, so new releases of an artist are found within a day without a faster policy. Do not raise `--days` over 30 on a Pi 1 GB: 90 days needs about 75 MB of PHP memory.
 - **Q8 (singles/live/compilations toggle):** stays out. The raw browse is the same pages minus the unofficial ones; a resync for a toggle would cost the first-sync numbers above (about 300 requests for the artists with an mbid).
-- **Linker/verification (new):** the library's release-style names cap the "owned" count. Decide with the owner whether the linker should accept `title (…catalogue number…)`, `title EU`, `title Japan` as editions of one album (strip a trailing parenthesised catalogue number and a region word in `Normalizer::album`, version-bumped), before the owned/missing numbers are shown to anyone.
+- **Linker/verification (done 2026-10-30):** built as a catalogue-only `EditionKey`, not in `Normalizer::album` (identity untouched); see [Edition matching](#edition-matching).
 - **Spotify total_tracks:** the artist-albums listing has it; the track-count sanity check of PR 8 (skipped as "not available") can be built.
