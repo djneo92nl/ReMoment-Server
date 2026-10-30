@@ -10,6 +10,7 @@ use App\Domain\Device\RepeatMode;
 use App\Domain\Device\Settings\DeviceInfo;
 use App\Domain\Radio\StreamTitles;
 use App\Domain\Spotify\LibrespotStream;
+use App\Domain\Storage\Proxies;
 use App\Domain\Storage\StreamUrl;
 use App\Events\Device\PlaybackModesUpdated;
 use App\Integrations\Common\DeviceQueue;
@@ -448,7 +449,7 @@ class MusicPlayerDriver implements DeviceInfoInterface, LibraryPlaybackInterface
         $queue = DeviceQueue::for($this->device->id);
         $id = $queue->peekNext();
         $track = $id ? Track::with(['artist', 'album'])->find($id) : null;
-        $url = $track ? $this->urlFor($track) : null;
+        $url = $track ? $this->playUrl($track) : null;
 
         if (!$track || !$url) {
             return;
@@ -511,7 +512,7 @@ class MusicPlayerDriver implements DeviceInfoInterface, LibraryPlaybackInterface
     private function playCurrent(DeviceQueue $queue): void
     {
         $track = Track::with(['artist', 'album'])->find($queue->current());
-        $url = $track ? $this->urlFor($track) : null;
+        $url = $track ? $this->playUrl($track) : null;
 
         if (!$track || !$url) {
             throw new \RuntimeException('The queue has no playable track.');
@@ -534,7 +535,10 @@ class MusicPlayerDriver implements DeviceInfoInterface, LibraryPlaybackInterface
         Cache::put(self::playingKey($this->device->id), ['track_id' => $track->id, 'uri' => $url], now()->addDay());
     }
 
-    /** The URL the renderer gets: our own stream with the file's extension, any other (a DLNA server's) as it is. */
+    /**
+     * The URL the renderer gets: our own stream with the file's extension, any other (a DLNA server's) as it is.
+     * A renderer with limits (`upnp_limits`, see StreamProfile) gets a proxy for a file above them.
+     */
     private function urlFor(Track $track): ?string
     {
         $url = $track->getDlnaUrl();
@@ -543,7 +547,31 @@ class MusicPlayerDriver implements DeviceInfoInterface, LibraryPlaybackInterface
             return $url;
         }
 
+        if ($profile = StreamProfile::for($this->device, $track)) {
+            return StreamProfile::url($id, $profile);
+        }
+
+        return $this->originalUrl($id, $track);
+    }
+
+    private function originalUrl(int $id, Track $track): string
+    {
         return StreamUrl::withExtension($id, $track->trackFiles()->with('file')->get()->pluck('file.extension')->filter()->first());
+    }
+
+    /**
+     * The URL for a track the renderer is about to play: a proxy it needs is made first (the stream controller
+     * sends the original while one is still being made), and the original is the fallback when it cannot be made.
+     */
+    private function playUrl(Track $track): ?string
+    {
+        $url = $this->urlFor($track);
+
+        if ($url === null || ($profile = StreamProfile::profileOf($url)) === null || StreamProfile::prepare($track, $profile)) {
+            return $url;
+        }
+
+        return $this->originalUrl(StreamUrl::trackId($url), $track);
     }
 
     private function didl(Track $track, string $url): string
@@ -557,7 +585,7 @@ class MusicPlayerDriver implements DeviceInfoInterface, LibraryPlaybackInterface
             album: $track->album?->name,
             art: $cover ? (StreamUrl::storage($cover) ?? $cover) : null,
             duration: $track->duration,
-            mime: DidlLite::mimeFor($url, $track),
+            mime: ($profile = StreamProfile::profileOf($url)) ? (Proxies::mime($profile) ?? DidlLite::mimeFor($url, $track)) : DidlLite::mimeFor($url, $track),
         );
     }
 

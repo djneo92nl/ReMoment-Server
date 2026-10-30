@@ -44,6 +44,19 @@ return [
             'extension' => 'mp3',
             'args' => ['-vn', '-map_metadata', '-1', '-ac', '2', '-ar', '44100', '-c:a', 'libmp3lame', '-b:a', '128k'],
         ],
+        // Lossless, 16-bit / 44.1 kHz stereo: for renderers that decode FLAC only up to CD quality (a Philips Streamium),
+        // chosen by Upnp\StreamProfile for a file above the limits of the device.
+        'flac-16' => [
+            'mime' => 'audio/flac',
+            'extension' => 'flac',
+            'args' => ['-vn', '-map_metadata', '-1', '-ac', '2', '-ar', '44100', '-sample_fmt', 's16', '-c:a', 'flac'],
+        ],
+        // Stereo, 44.1 kHz, 320 kbit/s: for renderers that cannot decode the lossy codec of a file (AAC on a Streamium).
+        'mp3-high' => [
+            'mime' => 'audio/mpeg',
+            'extension' => 'mp3',
+            'args' => ['-vn', '-map_metadata', '-1', '-ac', '2', '-ar', '44100', '-c:a', 'libmp3lame', '-b:a', '320k'],
+        ],
     ],
 
 ];

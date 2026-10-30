@@ -4,6 +4,7 @@ namespace App\Integrations\Philips\Streamium\Console;
 
 use App\Integrations\Philips\Streamium\MusicPlayerDriver;
 use App\Integrations\Philips\Streamium\RemoteClient;
+use App\Integrations\Upnp\StreamProfile;
 use App\Models\Device;
 use App\Models\DeviceMeta;
 use Illuminate\Console\Command;
@@ -35,7 +36,11 @@ class EnableStreamium extends Command
         DeviceMeta::updateOrCreate(['device_id' => $device->id, 'key' => 'streamium_remote_url'], ['value' => $url]);
         $device->update(['device_driver' => MusicPlayerDriver::class, 'device_driver_name' => 'Streamium']);
 
-        $this->info("{$device->device_name} now uses the Streamium driver (power toggle, radio presets, radio now playing). Restart the listeners (device:listen) to pick it up.");
+        // What the unit decodes (the quality test of /settings/developer on an MCi900): lossless only up to 16-bit and 48 kHz, no AAC.
+        // Files beyond that are sent as a proxy (see Upnp\StreamProfile).
+        StreamProfile::setLimits($device, ['max_bit_depth' => 16, 'max_sample_rate' => 48000, 'deny_codecs' => ['aac']]);
+
+        $this->info("{$device->device_name} now uses the Streamium driver (power toggle, inputs, radio presets, radio now playing; hi-res files and AAC are played from a proxy). Restart the listeners (device:listen) to pick it up.");
 
         return self::SUCCESS;
     }
