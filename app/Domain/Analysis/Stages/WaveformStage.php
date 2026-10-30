@@ -91,11 +91,11 @@ class WaveformStage implements DecodedStage
     /** Share of the local loudness subtracted: `deviation_max` at or below `deviation_plr_low`, 0 at or above `deviation_plr_high`, linear between. */
     public static function strength(float $plr): float
     {
-        $low = (float) config('analysis.deviation_plr_low');
-        $high = (float) config('analysis.deviation_plr_high');
+        $low = (float) config('analysis.deviation_plr_low', 8);
+        $high = (float) config('analysis.deviation_plr_high', 14);
         $t = $high > $low ? ($high - $plr) / ($high - $low) : ($plr <= $low ? 1.0 : 0.0);
 
-        return (float) config('analysis.deviation_max') * max(0.0, min(1.0, $t));
+        return (float) config('analysis.deviation_max', 0.7) * max(0.0, min(1.0, $t));
     }
 
     /**
@@ -120,7 +120,7 @@ class WaveformStage implements DecodedStage
         $curve = $db;
 
         if ($strength > 0 && $n > 2) {
-            $half = max(1, (int) round((float) config('analysis.deviation_window_seconds') / max($secondsPerBucket, 0.001) / 2));
+            $half = max(1, (int) round((float) config('analysis.deviation_window_seconds', 4) / max($secondsPerBucket, 0.001) / 2));
             $prefix = [0.0];
             foreach ($db as $v) {
                 $prefix[] = end($prefix) + $v;
@@ -136,9 +136,9 @@ class WaveformStage implements DecodedStage
         sort($sorted);
         $ceiling = self::percentile($sorted, 99);
         $floor = self::percentile($sorted, 5);
-        $floor = min($floor, $ceiling - (float) config('analysis.contrast_min_span'));
-        $floor = max($floor, $ceiling - (float) config('analysis.contrast_max_span'));
-        $span = $ceiling - $floor;
+        $floor = min($floor, $ceiling - (float) config('analysis.contrast_min_span', 6));
+        $floor = max($floor, $ceiling - (float) config('analysis.contrast_max_span', 30));
+        $span = max(1.0, $ceiling - $floor);
 
         return array_map(fn (float $v) => (int) round(max(0.0, min(1.0, ($v - $floor) / $span)) * 100), $curve);
     }
