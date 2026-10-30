@@ -3,11 +3,14 @@
 namespace App\Integrations\Upnp;
 
 use App\Domain\Artwork\LibraryItemArtwork;
+use App\Domain\Artwork\RadioStationArtwork;
 use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\PlaybackModes;
 use App\Domain\Device\QueueItem;
 use App\Domain\Device\RepeatMode;
 use App\Domain\Device\Settings\DeviceInfo;
+use App\Domain\Radio\Relay\RadioRelay;
+use App\Domain\Radio\Relay\RelayDecision;
 use App\Domain\Radio\StreamTitles;
 use App\Domain\Spotify\LibrespotStream;
 use App\Domain\Storage\Proxies;
@@ -42,6 +45,7 @@ use App\Models\Media\Track;
 use App\Models\RadioStation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Any UPnP/DLNA MediaRenderer without a driver of its own. The renderer plays the one URL it is given;
@@ -237,15 +241,38 @@ class MusicPlayerDriver implements DeviceInfoInterface, LibraryPlaybackInterface
         return $station->streamUrl() !== null;
     }
 
-    /** The stream goes to the renderer as it is; our listener adds the station and, from the ICY title, the song. */
+    /**
+     * The stream goes to the renderer as it is, or through the radio relay when this renderer cannot play it itself
+     * (see RelayDecision); our listener adds the station and, from the ICY title, the song.
+     */
     public function playRadioStation(RadioStation $station): void
     {
-        $url = $station->streamUrl() ?? throw new UnsupportedOperationException('This station has no stream URL.');
+        $direct = $station->streamUrl() ?? throw new UnsupportedOperationException('This station has no stream URL.');
+        $url = $this->radioUrl($station, $direct);
 
-        $this->playStreamUrl($url, $station->name, ($cover = LibraryItemArtwork::proxy($station->image_url, 320)) ? (StreamUrl::storage($cover) ?? $cover) : null);
+        // The station's logo (its image, else the one its stream reported, else the generic radio logo) as the art the renderer shows.
+        $cover = RadioStationArtwork::resolve($station)['proxy_320'] ?? null;
+
+        $this->playStreamUrl($url, $station->name, $cover ? (StreamUrl::storage($cover) ?? $cover) : null);
 
         Cache::put(self::radioKey($this->device->id), ['station_id' => $station->id, 'uri' => $url], now()->addDay());
         StreamTitles::touch($station);
+    }
+
+    /** The address the renderer gets: the relay's when it needs the relay and the relay has the station live, else the station's own. */
+    private function radioUrl(RadioStation $station, string $direct): string
+    {
+        if (!RelayDecision::needed($this->device, $station)) {
+            return $direct;
+        }
+
+        if (RadioRelay::ensureLive($station)) {
+            return RadioRelay::url($station);
+        }
+
+        Log::warning("Radio relay: {$station->name} did not come up for device {$this->device->id}; playing it direct.");
+
+        return $direct;
     }
 
     /** @return array{station_id: int, uri: string}|null the station the server started on this renderer */

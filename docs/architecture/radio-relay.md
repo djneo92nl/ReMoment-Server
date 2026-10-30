@@ -1,6 +1,6 @@
 # Radio relay (station → ffmpeg → Icecast → renderer)
 
-**Status: 17.1 (the relay core) built 2026-10-30; 17.2-17.4 are plan** (workstream 17 of [v1-roadmap.md](v1-roadmap.md)). What was measured on hardware or against live streams is marked **verified**; the rest is design. "Built so far" below lists what exists.
+**Status: 17.1 (the relay core) and 17.2 (decision and driver) built 2026-10-30; 17.3-17.4 are plan** (workstream 17 of [v1-roadmap.md](v1-roadmap.md)). What was measured on hardware or against live streams is marked **verified**; the rest is design. "Built so far" below lists what exists.
 
 A renderer that can only fetch a plain-HTTP MP3 from the local network should still play any station in the library. The server fetches the station (any scheme, any codec, any redirect), converts it once to MP3 and serves it from the local Icecast; the renderer is given that address instead of the station's own.
 
@@ -43,9 +43,9 @@ station URL ──(HTTPS, AAC, HLS, redirects, ICY)──▶ ffmpeg ──MP3 12
 4. **A supervised manager, not queue jobs.** `php artisan radio:relay` runs next to `device:listen` (a supervisor program in the app container, which already has ffmpeg for [proxies](own-player.md)). It owns the ffmpeg children (Symfony `Process`), restarts one that dies with a backoff, and reads what is wanted from the cache. A queue job per stream would occupy a worker for hours.
 5. **Demand through the cache.** `RadioRelay::want($station, $device)` stores `radio:relay:want:{station}` (last request time, device ids); the manager polls it every second. The UPnP driver calls it when it plays a station, and the device listener refreshes it while that station plays (the same idea as `StreamTitles::touch()`).
 6. **Whether a relay is needed is decided per device and station** (`RelayDecision`):
-   - device meta `radio_relay`: `auto` (default), `always` or `never`;
-   - `auto` relays when the station's final URL (after redirects) is HTTPS, when its codec is one the device denies (`upnp_limits.deny_codecs`, the same limits that choose proxies for library files, see [upnp-renderer.md](upnp-renderer.md)), when the address is a playlist or HLS, or when the device cannot resolve names (`upnp_limits.no_dns`);
-   - `streamium:enable` sets `always` for the MCi900 (it cannot resolve names, so every station by name fails).
+   - device meta `radio_relay`: `auto` (the default), `always` or `never`;
+   - `auto` relays only what the device's limits (`upnp_limits`, the same field that chooses [proxies](upnp-renderer.md) for library files) say it cannot play: `no_dns` (it cannot resolve a name, so every station by name; an IP-address station still goes direct), `no_tls` (the station ends up on HTTPS, after redirects), `no_playlists` (a `.pls`, `.m3u` or HLS address) and `deny_codecs` (a codec it cannot decode); the station's real address, codec and type are probed once and remembered (`StationProbe`, six hours). **A device without limits is never relayed in `auto`: what plays direct today keeps playing direct.**
+   - `streamium:enable` sets `always` for the MCi900 (`--radio-relay=` changes it) and the limits `deny_codecs: [aac]` and `no_tls: true` next to the proxy limits; it does not set `no_dns`, because that may be fixed on the unit, and `always` covers it meanwhile.
 7. **The relay address is built like every stream address:** `StreamUrl::base()` host (so `STREAM_BASE_URL` applies; an IP for a renderer without DNS) on `ICECAST_PORT`, mount `relay-{station id}.mp3` (flat name, no slash: Icecast mount names with a directory are allowed but a flat one is the safer assumption on old players).
 8. **Wait for the mount before telling the renderer.** The mount appears once ffmpeg has connected upstream and pushed its first frames (a few seconds). The driver asks `RadioRelay::ensureLive($station, 15)` (polls Icecast's `status-json.xsl`) and falls back to the station's own address when it never appears, as `StreamProfile::playUrl()` falls back to the original for a proxy that cannot be made.
 9. **Titles.** `StreamTitles` already follows the station's own ICY/NTS titles for the now playing and history, independent of any device ([radio.md](radio.md)); the relay does not change that. The manager also pushes each new title to the mount's Icecast metadata (`/admin/metadata?mode=updinfo`, as the Spotify hook does), so a renderer that shows ICY titles shows them. Whether the MCi900 does is **unverified**.
@@ -82,10 +82,32 @@ station URL ──(HTTPS, AAC, HLS, redirects, ICY)──▶ ffmpeg ──MP3 12
 
 **Not yet verified:** a renderer playing a relay mount (17.2 does that, from the MCi900), ffmpeg's reconnect when an upstream drops, ICY titles through the mount, the idle stop and the limit against a real Icecast (they are tested with fakes), and any figure on a Pi. Icecast answers a `HEAD` request with 400, so nothing here uses `HEAD` on a mount (`ensureLive` reads `status-json.xsl`).
 
+### 17.2 (2026-10-30)
+
+| What | Where |
+|---|---|
+| What a station really serves: final address after redirects, scheme, codec, playlist or not | `StationProbe` (ranged headers-only GET, cached six hours; a dead station is described by its stored address) |
+| The per-device decision | `RelayDecision` (`radio_relay` meta, `upnp_limits` rules as above) |
+| The driver | `Upnp\MusicPlayerDriver::playRadioStation()` asks `RelayDecision`, then `RadioRelay::ensureLive()`; on a relay that never comes up it plays the station's own address and logs a warning. It stores the address it **played** as the radio key, so the listener still recognises the station by what the renderer reports |
+| Keeping it alive | the UPnP listener asks the relay for the station again every poll while the renderer plays the relay address |
+| Station art | the stream's metadata carries the station logo (`RadioStationArtwork`: its image, else the one its stream reported, else the generic radio logo), rebased onto the address the renderer reaches; before this a station without an image had none |
+| Opt-in for the Streamium | `streamium:enable [--radio-relay=always\|auto\|never]` |
+| Tests | `tests/Feature/RadioRelayDecisionTest.php` (probe and codec rules, the decision matrix, a relayed play with its stored address and demand, fallback, direct, AAC, the logo) |
+
+**Verified 2026-10-30 on the MCi900** (the relay manager running, the driver called from the command line with the relay settings passed in): **181.FM Energy 98** (plain HTTP MP3, which the unit could not play by name), **NTS 1** (HTTPS with a redirect) and **FIP** (AAC) each **play** on the unit from `http://192.168.1.113:8002/relay-{id}.mp3`: transport `PLAYING`, position advancing 0:02 → 0:17 and on, Icecast showing the unit as a listener. The mount was live 1.7 to 10.7 s after the request. The metadata the unit holds carries the station title and the logo.
+
+**Found on the way:**
+- **Port 8000 can be taken on a developer's Mac.** A local PHP development server owned IPv4 port 8000 while Docker held it only on IPv6: `curl localhost:8000` (IPv6) reached Icecast, but the renderer, on IPv4, reached the PHP server and got a 404, with no request in Icecast's log at all. Set `ICECAST_PORT` to a free port (the verified run used 8002); the same applies to the Spotify stream's default.
+- **Pause is a no-op on a relay.** A relayed station is a live stream; the unit's own pause only stops its buffer.
+- **The unit showed no image for a relayed station** whose item had only a title, the art and the class (a library track item, which also has artist, album and a duration, does show its cover). The art address itself is fine (200, JPEG) and is in the metadata the unit holds. Being tried on 2026-10-30: artist and album in the item; the result is not recorded yet.
+- **No per-song art on this unit.** The unit takes art from the metadata of the item it loads, and has no `SetNextAVTransportURI`; reloading the item to change the art would restart the stream. The station logo is therefore all it can show for radio. (ReMoment's own screens can show a cover per song if a lookup by title is added; that is an idea, not planned here.)
+
+**Not yet verified:** ICY titles on the unit's display, ffmpeg's reconnect when an upstream drops, the listener's keep-alive against a real renderer over a long listen, and a Pi.
+
 ## Phases
 
 1. **17.1 Relay core (built 2026-10-30).** `RelayCommand`, `RelayManager`, `radio:relay`, `IcecastStatus`, config, the compose profile and supervisor program. Tested with a fake process (the command line, restart with backoff, idle stop, the limit). Done when, from the command line, an HTTP MP3 station, an HTTPS-with-redirect station (NTS 1) and an AAC station (FIP) each become a live mount that `curl` and a media player can play.
-2. **17.2 Decision and driver integration.** `RelayDecision`, `radio_relay` meta, `RadioRelay::ensureLive`, the generic UPnP driver's station playback uses it, `streamium:enable` sets `always`. Tested with fakes. Done when 181.FM, NTS 1 and FIP all play on the MCi900 from the web UI and the API, and a station the renderer can play by itself (an HTTP MP3 on a renderer with DNS) is still sent direct.
+2. **17.2 Decision and driver integration (built 2026-10-30).** `RelayDecision`, `radio_relay` meta, `RadioRelay::ensureLive`, the generic UPnP driver's station playback uses it, `streamium:enable` sets `always`. Tested with fakes. Done when 181.FM, NTS 1 and FIP all play on the MCi900 from the web UI and the API, and a station the renderer can play by itself (an HTTP MP3 on a renderer with DNS) is still sent direct.
 3. **17.3 Titles and idle.** Titles pushed to Icecast, the listener keeps the demand alive while a station plays, idle stop verified with a real renderer, a badge on the playing card.
 4. **17.4 Operations.** Alerts, `/api/radio/relays`, the settings status, restart behaviour after a crash and after a container restart, a **Pi 3 measurement** (CPU and memory with one and with four relays; the limit default is set from it), docs (this page, [radio.md](radio.md), the device-drivers guide, CLAUDE.md, the OpenAPI field `relay`).
 

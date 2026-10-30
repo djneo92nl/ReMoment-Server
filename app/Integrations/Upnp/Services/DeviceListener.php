@@ -12,6 +12,7 @@ use App\Domain\Media\NowPlaying;
 use App\Domain\Media\Radio;
 use App\Domain\Media\TrackData;
 use App\Domain\Radio\IcyReader;
+use App\Domain\Radio\Relay\RadioRelay;
 use App\Domain\Radio\StreamTitles;
 use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
@@ -343,6 +344,11 @@ class DeviceListener implements DeviceListenerInterface
         }
 
         StreamTitles::touch($station);
+
+        // A station played through the relay keeps being asked for while it plays.
+        if ($ours['uri'] === RadioRelay::url($station)) {
+            RadioRelay::want($station);
+        }
 
         $images = $station->image_url ? [$station->image_url] : [];
         $title = StreamTitles::get($station->id);

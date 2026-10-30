@@ -31,7 +31,7 @@ Effort: S = days, M = 1–2 weeks, L = several weeks. Feasibility notes come fro
 | 15 | Media servers: one abstraction for video (and later music) servers (Jellyfin built as a TV-only feature; Plex, Emby, Kodi follow the same contract), linked to the devices that can play them | M | 14.4, 2a | **started** (Jellyfin shelf); abstraction to do | Should |
 | 16 | Track structure and waveform views: a waveform with real contrast, the sections of a track, mood over time, per-stem lanes, similarity by section | M–L | 12.1 (embeddings), 12.10 | 16.1 and 16.2 built (service, stage, API, UI); 16.3-16.5 to do | Should (16.1, 16.2), Can slip (16.3-16.5); 16.2-16.4 run on demand per track |
 | 12 | Library and audio intelligence, what is left: mixes-well, loudness-normalised playback, tag and cover suggestions, concerts, related works, lyrics extras, listening insights, Essentia on arm64 | S–M each | 4 (similar tracks), 8.4 (tag editor) | plan below; the enrichment, analysis and health base is built | Mixed (per item); platform docs Must |
-| 17 | Radio relay: stations a renderer cannot play itself (HTTPS, AAC, playlists, no DNS) are converted by the server (ffmpeg → Icecast, on demand, MP3) and played from there | M | | **17.1 built** (relay core, live-checked on three stations); 17.2-17.4 plan, see [radio-relay.md](radio-relay.md) | Should |
+| 17 | Radio relay: stations a renderer cannot play itself (HTTPS, AAC, playlists, no DNS) are converted by the server (ffmpeg → Icecast, on demand, MP3) and played from there | M | | **17.1 and 17.2 built** (relay core; per-device decision and the UPnP driver; 181.FM, NTS 1 and FIP play on the MCi900); 17.3-17.4 plan, see [radio-relay.md](radio-relay.md) | Should |
 
 ## Progress (as of 2026-10-27)
 
@@ -646,7 +646,7 @@ Split a track into vocals, drums, bass and other with **Demucs** and use it for 
 
 ## 17. Radio relay
 
-Status: **17.1 built 2026-10-30, the rest plan; Should.** Added 2026-10-30 after trying radio from ReMoment on the Philips MCi900, which could not play the stations the library has: by name it stopped (it cannot resolve names, although the same stream by IP address played at once), NTS is HTTPS with a redirect (no TLS on a 2008 firmware) and FIP is AAC (not decodable). Design and measurements: [radio-relay.md](radio-relay.md).
+Status: **17.1 and 17.2 built 2026-10-30, the rest plan; Should.** Added 2026-10-30 after trying radio from ReMoment on the Philips MCi900, which could not play the stations the library has: by name it stopped (it cannot resolve names, although the same stream by IP address played at once), NTS is HTTPS with a redirect (no TLS on a 2008 firmware) and FIP is AAC (not decodable). Design and measurements: [radio-relay.md](radio-relay.md).
 
 **Idea.** The server fetches the station, converts it once to MP3 (44.1 kHz, 128 kbit/s) with ffmpeg, pushes it to the existing Icecast, and gives the renderer the local address (`STREAM_BASE_URL` host, so an IP for a renderer without DNS). On demand, one ffmpeg per station however many speakers listen, the audio never through PHP, a supervised manager (`radio:relay`) instead of queue jobs. Sonos and B&O keep their native radio.
 

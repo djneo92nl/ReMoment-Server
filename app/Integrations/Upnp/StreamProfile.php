@@ -26,7 +26,7 @@ final class StreamProfile
 
     private const LOSSLESS = ['flac', 'alac', 'wav', 'aiff', 'wavpack', 'ape', 'tta'];
 
-    /** @return array{max_bit_depth?: int, max_sample_rate?: int, deny_codecs?: string[]}|null */
+    /** @return array{max_bit_depth?: int, max_sample_rate?: int, deny_codecs?: string[], no_tls?: bool, no_dns?: bool, no_playlists?: bool}|null the radio relay reads `no_tls`, `no_dns`, `no_playlists` and `deny_codecs` too (RelayDecision) */
     public static function limits(Device $device): ?array
     {
         $raw = DeviceMeta::where('device_id', $device->id)->where('key', self::KEY)->value('value');
@@ -35,7 +35,7 @@ final class StreamProfile
         return is_array($limits) && $limits !== [] ? $limits : null;
     }
 
-    /** @param array{max_bit_depth?: int, max_sample_rate?: int, deny_codecs?: string[]} $limits */
+    /** @param array{max_bit_depth?: int, max_sample_rate?: int, deny_codecs?: string[], no_tls?: bool, no_dns?: bool, no_playlists?: bool} $limits */
     public static function setLimits(Device $device, array $limits): void
     {
         DeviceMeta::updateOrCreate(['device_id' => $device->id, 'key' => self::KEY], ['value' => json_encode($limits)]);

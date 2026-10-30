@@ -202,6 +202,7 @@ class UpnpStreamProfileTest extends TestCase
 
         $this->artisan('streamium:enable', ['device' => $device->id])->assertSuccessful();
 
-        $this->assertSame(['max_bit_depth' => 16, 'max_sample_rate' => 48000, 'deny_codecs' => ['aac']], StreamProfile::limits($device));
+        $this->assertSame(['max_bit_depth' => 16, 'max_sample_rate' => 48000, 'deny_codecs' => ['aac'], 'no_tls' => true], StreamProfile::limits($device));
+        $this->assertSame('always', \App\Domain\Radio\Relay\RelayDecision::mode($device), 'its radio goes through the relay');
     }
 }
