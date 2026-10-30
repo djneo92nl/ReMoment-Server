@@ -237,6 +237,8 @@ class Track extends Model
     /** What the album page and the library API show about a track beyond its name and duration. */
     public function details(): array
     {
+        $sections = $this->sections();
+
         return [
             'genres' => $this->genres(),
             'quality' => $this->audioQuality(),
@@ -247,7 +249,27 @@ class Track extends Model
             'listeners' => $this->metaInt('lastfm_listeners'),
             'playcount' => $this->metaInt('lastfm_playcount'),
             'analysis' => $this->sound(),
+            'sections' => $sections['sections'] ?? null,
+            'sections_reason' => $sections['reason'] ?? null,
         ];
+    }
+
+    /**
+     * The sections of the track's own audio file when someone asked for them (deep analysis, `structure` stage), else
+     * null: `sections` is [{start, end, label, confidence}] in seconds (empty with a `reason` when none were found).
+     *
+     * @return array{sections: list<array{start: float, end: float, label: ?string, confidence: float}>, reason: ?string, method: string}|null
+     */
+    public function sections(): ?array
+    {
+        $a = $this->relationLoaded('analysis') ? $this->analysis : $this->analysis()->first();
+        $stored = $a?->sections;
+
+        if (!is_array($stored) || !isset($stored['items'])) {
+            return null;
+        }
+
+        return ['sections' => $stored['items'], 'reason' => $stored['reason'] ?? null, 'method' => $stored['method'] ?? 'novelty-v1'];
     }
 
     /**

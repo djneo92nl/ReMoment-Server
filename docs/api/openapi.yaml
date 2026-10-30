@@ -1722,6 +1722,77 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/FavoriteBody" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /library/tracks/{track}/deep-analysis:
+    parameters:
+      - { name: track, in: path, required: true, schema: { type: integer }, description: "Library track id (a merged id resolves to the survivor). The track needs an own audio file on this server." }
+    post:
+      tags: [Library]
+      summary: Ask for a deep analysis of one track (sections), computed in the background
+      description: "Admin only. Queues what is not stored yet for the current file and stage version; a stored result is `already_done`, a missing or unhealthy structure service `not_available` (409). Poll GET for the state. See docs/api/deep-analysis.md."
+      operationId: requestDeepAnalysis
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kinds]
+              properties:
+                kinds: { type: array, minItems: 1, items: { $ref: "#/components/schemas/DeepAnalysisKind" } }
+      responses:
+        "200": { description: "`already_done`", content: { application/json: { schema: { $ref: "#/components/schemas/DeepAnalysisRequest" } } } }
+        "202": { description: "`queued`", content: { application/json: { schema: { $ref: "#/components/schemas/DeepAnalysisRequest" } } } }
+        "409": { description: "`not_available`: STRUCTURE_URL unset or the service failed its health check", content: { application/json: { schema: { $ref: "#/components/schemas/DeepAnalysisRequest" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "`unknown_kind`, `no_file` (the track has no own file), or a validation error", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+    get:
+      tags: [Library]
+      summary: State of the deep analysis of one track, per kind
+      operationId: getDeepAnalysis
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [track_id, available, kinds]
+                properties:
+                  track_id: { type: integer, description: The surviving track id }
+                  available: { type: boolean, description: "A deep analysis can be requested now (same as features.deep_analysis)" }
+                  kinds:
+                    type: object
+                    properties:
+                      sections: { $ref: "#/components/schemas/DeepAnalysisState" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "`no_file`", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /library/tracks/{track}/deep-analysis/{kind}:
+    delete:
+      tags: [Library]
+      summary: Remove the stored result of one kind
+      description: "Does not follow a merged id: a stale id answers 404."
+      operationId: removeDeepAnalysis
+      security: [{ adminToken: [] }]
+      parameters:
+        - { name: track, in: path, required: true, schema: { type: integer } }
+        - { name: kind, in: path, required: true, schema: { $ref: "#/components/schemas/DeepAnalysisKind" } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [ok] }
+                  removed: { type: boolean, description: False when nothing was stored }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "`unknown_kind` or `no_file`", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
   /library/editable-playlists:
     get:
       tags: [Library]
@@ -2723,7 +2794,48 @@ components:
         placeholder:
           allOf: [{ $ref: "#/components/schemas/Artwork" }]
           nullable: true
+        features:
+          type: object
+          description: "What this server can do beyond the base contract. Only keys that are true today are listed as true; treat a missing key as false."
+          properties:
+            alerts: { type: boolean, description: "GET /api/alerts exists" }
+            deep_analysis: { type: boolean, description: "The structure service answers its health check (cached for a minute): POST /library/tracks/{id}/deep-analysis can queue sections" }
 
+    DeepAnalysisKind:
+      type: string
+      enum: [sections]
+      description: "Only `sections` exists; `mood` and `stems` are planned (workstream 16). An unknown kind is a 422."
+    DeepAnalysisRequest:
+      type: object
+      required: [status, queued, estimate]
+      properties:
+        status: { type: string, enum: [queued, already_done, not_available] }
+        queued: { type: array, items: { $ref: "#/components/schemas/DeepAnalysisKind" }, description: "Kinds that are queued or already running" }
+        estimate:
+          type: object
+          description: "An ESTIMATE from the track length, measured on a fast machine; a small PC is slower."
+          properties:
+            sections_seconds: { type: integer }
+    DeepAnalysisState:
+      type: object
+      required: [state, finished_at, version, message, stale]
+      properties:
+        state: { type: string, enum: [none, queued, running, done, failed] }
+        finished_at: { type: string, format: date-time, nullable: true, description: "When the stored result was made, or when the last run failed" }
+        version: { type: string, nullable: true, description: "Stage version of the stored result" }
+        message: { type: string, nullable: true, description: "Why the last run failed (shown while state is failed)" }
+        stale: { type: boolean, description: "A stored result exists from an older stage version; state is then none until it is requested again" }
+    TrackSections:
+      type: array
+      description: "The sections of a track in seconds, from the structure service. Empty when it found none (see sections_reason)."
+      items:
+        type: object
+        required: [start, end, label, confidence]
+        properties:
+          start: { type: number }
+          end: { type: number }
+          label: { type: string, nullable: true, description: "A repetition letter: the same letter = sounds like that other part. Never verse/chorus." }
+          confidence: { type: number, description: "Cosine similarity to the best same-letter section, 0 when the letter is unique; not calibrated" }
     State:
       type: string
       enum: [playing, standby, paused, unreachable]
@@ -2879,6 +2991,10 @@ components:
           allOf: [{ $ref: "#/components/schemas/Artwork" }]
           description: Absent while a new cover is still being processed; show the placeholder
         modes: { $ref: "#/components/schemas/Modes" }
+        sections:
+          allOf: [{ $ref: "#/components/schemas/TrackSections" }]
+          description: Present only when the admin asked for the sections of the playing track (deep analysis).
+        sections_reason: { type: string, enum: [too_short, no_structure], description: "Present with an empty `sections`" }
 
     Artwork:
       type: object
@@ -3203,7 +3319,10 @@ components:
               duration: { type: integer, nullable: true }
               playable: { type: boolean }
               favorite: { type: boolean }
-              details: { type: object, additionalProperties: true }
+              details:
+                type: object
+                additionalProperties: true
+                description: "genres, quality, credits, analysis … and `sections` (TrackSections, null until requested) with `sections_reason`; see docs/api/library.md"
     PlaylistDetail:
       type: object
       properties:

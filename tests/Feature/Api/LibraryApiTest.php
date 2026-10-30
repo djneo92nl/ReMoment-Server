@@ -365,8 +365,8 @@ class LibraryApiTest extends TestCase
                 ],
                 'playable' => true,
                 'tracks' => [
-                    ['id' => $one->id, 'name' => 'Intro', 'duration' => 200, 'playable' => true, 'favorite' => false, 'details' => ['genres' => [], 'quality' => null, 'credits' => [], 'isrc' => null, 'explicit' => null, 'popularity' => null, 'listeners' => null, 'playcount' => null, 'analysis' => null]],
-                    ['id' => $two->id, 'name' => 'Apocalypse Please', 'duration' => 200, 'playable' => false, 'favorite' => false, 'details' => ['genres' => [], 'quality' => null, 'credits' => [], 'isrc' => null, 'explicit' => null, 'popularity' => null, 'listeners' => null, 'playcount' => null, 'analysis' => null]],
+                    ['id' => $one->id, 'name' => 'Intro', 'duration' => 200, 'playable' => true, 'favorite' => false, 'details' => ['genres' => [], 'quality' => null, 'credits' => [], 'isrc' => null, 'explicit' => null, 'popularity' => null, 'listeners' => null, 'playcount' => null, 'analysis' => null, 'sections' => null, 'sections_reason' => null]],
+                    ['id' => $two->id, 'name' => 'Apocalypse Please', 'duration' => 200, 'playable' => false, 'favorite' => false, 'details' => ['genres' => [], 'quality' => null, 'credits' => [], 'isrc' => null, 'explicit' => null, 'popularity' => null, 'listeners' => null, 'playcount' => null, 'analysis' => null, 'sections' => null, 'sections_reason' => null]],
                 ],
             ]);
 

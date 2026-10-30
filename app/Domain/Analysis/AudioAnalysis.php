@@ -7,6 +7,7 @@ use App\Domain\Analysis\Stages\EssentiaStage;
 use App\Domain\Analysis\Stages\FingerprintStage;
 use App\Domain\Analysis\Stages\LoudnessStage;
 use App\Domain\Analysis\Stages\QualityStage;
+use App\Domain\Analysis\Stages\StructureStage;
 use App\Domain\Analysis\Stages\WaveformStage;
 use App\Domain\Library\Enrichment;
 use App\Jobs\AnalyzeAudioFile;
@@ -29,7 +30,8 @@ class AudioAnalysis
     }
 
     /**
-     * Every stage in run order; the fingerprint comes before the lookup that needs it.
+     * The scheduled stages in run order (the fingerprint comes before the lookup that needs it): everything the
+     * nightly run, the backlog and /settings/analysis know. On-demand stages are NOT in here, see `onDemandStages()`.
      *
      * @return array<string, AnalysisStage>
      */
@@ -38,6 +40,18 @@ class AudioAnalysis
         $stages = [new LoudnessStage, new WaveformStage, new QualityStage, new FingerprintStage, new AcoustIdStage, new EssentiaStage];
 
         return array_combine(array_map(fn (AnalysisStage $s) => $s->key(), $stages), $stages);
+    }
+
+    /**
+     * Stages computed only when asked for one track (`DeepAnalysis`); never queued by the backlog, never counted as work to do.
+     *
+     * @return array<string, OnDemandStage>
+     */
+    public static function onDemandStages(): array
+    {
+        $stages = [new StructureStage];
+
+        return array_combine(array_map(fn (OnDemandStage $s) => $s->key(), $stages), $stages);
     }
 
     /** @return array<string, AnalysisStage> the stages this install can run, optionally only one */
