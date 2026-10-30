@@ -29,6 +29,7 @@ Effort: S = days, M = 1–2 weeks, L = several weeks. Feasibility notes come fro
 | 13 | Export from the library: download a playlist, album or artist as a zip, transcoded to a chosen maximum quality, for an MP3 player or a car radio | M | 1b | to do | Should |
 | 14 | Foundations, decided early (phase 2): one alert and event model, stable IDs for clients, a schema review before the migration squash, a shared credentials layer, and an action-layer design spike | M | | **14.1, 14.2 and 14.4 built**; 14.3 (schema review) and 14.5 (spike) to do | Must (14.1, 14.3), Should (14.2, 14.4, 14.5 spike) |
 | 15 | Media servers: one abstraction for video (and later music) servers (Jellyfin built as a TV-only feature; Plex, Emby, Kodi follow the same contract), linked to the devices that can play them | M | 14.4, 2a | **started** (Jellyfin shelf); abstraction to do | Should |
+| 16 | Track structure and waveform views: a waveform with real contrast, the sections of a track, mood over time, per-stem lanes, similarity by section | M–L | 12.1 (embeddings), 12.10 | to do | Should (16.1, 16.2), Can slip (16.3-16.5); 16.2-16.4 run on demand per track |
 | 12 | Library and audio intelligence, what is left: mixes-well, loudness-normalised playback, tag and cover suggestions, concerts, related works, lyrics extras, listening insights, Essentia on arm64 | S–M each | 4 (similar tracks), 8.4 (tag editor) | plan below; the enrichment, analysis and health base is built | Mixed (per item); platform docs Must |
 
 ## Progress (as of 2026-10-27)
@@ -583,6 +584,62 @@ Status: **started, abstraction to do.** Added 2026-10-28. Jellyfin was built fir
 
 Done when: Jellyfin runs on the abstraction, a second server type is added by a driver class, a declaration and a probe, and nothing else; the TV card shows shelves from any server linked to that device; the same `POST .../media/play` starts an item on a Philips TV and on at least one other target; and the Jellyfin-only routes are gone.
 
+## 16. Track structure and waveform views
+
+Status: **plan**, added 2026-10-30 from a design discussion (Claude web) about music analytics. A mockup of the track view is in [images/track-view-mockup.png](images/track-view-mockup.png): a **section strip** on top of the master waveform, one lane per stem (vocals, drums, bass, other) below it, tapping a section highlights it in every lane. **The section data in that mockup is made up**; the real boundaries have to come from the analysis below.
+
+![Track view mockup: sections over the master waveform and one lane per stem](images/track-view-mockup.png)
+
+**What exists:** `WaveformStage` (`app/Domain/Analysis/Stages/WaveformStage.php`, version `1`) decodes to 4 kHz mono and stores `config('analysis.waveform_points')` (default 400) **peak** values 0-100, scaled to the file's own loudest sample; the API serves them as `now_playing.waveform` (on `GET /devices/{id}`), and the sticky player bar and `/receiver` draw them. The analysis already stores integrated loudness, loudness range and true peak (`LoudnessStage`), and Essentia's BPM, key, danceability and, with the ML build, mood tags, arousal and valence, voice vs instrumental and the EffNet embedding step (the sidecar computes the embedding and throws it away; 12.1). Stages are versioned, so bumping a stage's version re-runs only that stage ([audio-analysis.md](audio-analysis.md)).
+
+### 16.1 A waveform with contrast *[Should; small]*
+
+**Problem.** A heavily compressed ("brickwalled") track is almost all at the ceiling, so its peak waveform is a flat block. The example track measures about -4.5 LUFS with a peak-to-loudness ratio (PLR) of 4.4 dB: the waveform is *accurate* but carries no information. A peak waveform scaled to the loudest sample cannot show it.
+
+**Design** (the three fixes from the discussion, combined):
+1. **RMS per bucket instead of the peak.** Peaks are clipped to the ceiling almost everywhere; the RMS of each bucket still moves with the music.
+2. **Per-track contrast stretch.** Convert the bucket RMS values to dB and map the 5th to 99th percentile of the track to 0-1 (or a dB scale with a floor about 30 dB below the top), instead of a linear scale to the loudest sample.
+3. **Deviation from the local loudness** (a slow moving average, a few seconds wide) as an optional layer, so drops and builds stand out even when everything sits near the top. The strength can follow the track's PLR (a brickwalled track gets more stretch, a dynamic one almost none).
+- **Storage and compatibility:** `WaveformStage` version `2` stores the contrast-mapped RMS values as `waveform` (still a list of 0-100 integers, so the player bar, `/receiver`, the iOS app and `docs/api` clients keep working unchanged) and the raw peaks as `waveform_peak` for views that want them (clipping markers, the section and stem lanes below). The version bump re-runs only the waveform stage; the decode is the cheap one (4 kHz mono).
+- **Tests:** synthetic PCM for a flat loud block with small variations (the contrast mapping makes them visible), a dynamic track (looks about as before), silence, very short files, and fixed percentiles.
+
+Done when: a brickwalled track's waveform shows its structure, a dynamic track looks about as it did, and `docs/api/*` and `openapi.yaml` say what `waveform` now means (normalised per track, not relative to the loudest sample).
+
+### 16.2 Sections of a track *[Should; research first, then build]*
+
+**Goal.** See the sections of a track (intro, verse, chorus, break, outro) as a coloured strip above the waveform, tap one to seek, and have the same boundaries in every other lane (mood, stems) and in later features (search by section, mixes-well).
+
+**Two steps, so the cheap one ships first:**
+- **Boundaries** from audio novelty (a self-similarity or novelty curve over MFCC/chroma-like features, peak-picked with a minimum section length of several seconds, aligned to the beat grid when a BPM exists). Cheap, no labels, always safe to show as unlabelled segments.
+- **Labels** by repetition: segments that sound alike get the same letter (A B A B C B), the loudest repeating one is the chorus candidate, a short segment at the start and end are intro and outro. These are **guesses with a confidence value**, shown as such; no claim that a section "is" a verse.
+- **Tools to evaluate (unverified, nothing chosen):** Essentia has a generic segmenter but **no verse/chorus classifier**; a Python sidecar library for structure analysis (novelty plus clustering); or a trained structure model such as the All-In-One music structure analyzer (beats, downbeats and functional labels, but it depends on Demucs and PyTorch and has its own licence and weights terms). Decide after a spike on a few real tracks of the owner's library: how good are the boundaries, how long does one track take on a mini PC, what does it cost in RAM.
+- **Storage:** `file_analyses.sections` JSON `[{start, end, label, confidence}]` (seconds), a new stage (`structure`) with its own version, in the **sidecar** (Python), run **on demand for one track** (see "On demand" below), never across the whole library. **API:** `sections` on the track detail and on `now_playing` when the playing track is in the library with an analysed file. **UI:** the strip and the tap-to-seek on the track view and, later, `/receiver`.
+
+Done when: a spike report with boundaries from a sample of real tracks judged by ear, a chosen method and its cost per track, and the `structure` stage, API field and strip built for at least boundaries.
+
+### 16.3 Mood over time *[Can slip]*
+
+Run the mood classifiers **per segment instead of per track** and draw a coloured strip (calm to aggressive) under the waveform: it shows how a song evolves. Essentia's EffNet models work on short patches of audio and average them; the per-patch predictions probably exist inside the sidecar and are thrown away today, so this may be nearly free to keep (*unverified*: check `docker/analysis/app.py`). Store a small curve (one arousal/valence pair per few seconds, a few hundred bytes) in `file_analyses`, return it as `mood_curve`, colour it with the same palette as the existing mood tags. Per section (16.2) it gives "this chorus is more intense than the verse". Needs the ML build; like sections and stems it runs **on demand** for one track (see "On demand" below).
+
+### 16.4 Stems: per-stem lanes *[Can slip; Full profile only]*
+
+Split a track into vocals, drums, bass and other with **Demucs** and use it for **"where are the vocals"** lanes under the waveform (as in the mockup), **instrumental-section detection**, and, as a bonus, a **karaoke** play (an instrumental mix).
+- **Cheap first:** compute only the **per-stem loudness curve** (one value per second per stem, a few KB per track) and discard the stem audio. That is enough for the lanes and for instrumental detection.
+- **Cost (unverified, measure):** Demucs on a CPU takes minutes per track and several GB of RAM; PyTorch is needed in the sidecar. So it runs **only when someone asks for a track** (the on-demand request below), on a machine with the sidecar (a mini PC or LXC with 6 GB or more, or a sidecar on another machine), on its own queue (`stems`, one at a time, `nice`). Check the Demucs and model licences before shipping them in an image.
+- **Karaoke** needs the stem audio: generate on demand, cache like the proxies (`config/proxies.php`, pruned by size), and offer it as a stream profile; never keep stems for the whole library (about four times the audio size).
+
+### 16.5 Similarity by section *[Can slip; part of 12.1]*
+
+"More like this" from the stored EffNet embeddings is workstream 12.1 ([similar-tracks.md](similar-tracks.md); the sqlite-vec measurements). Searching by a **section** instead of a whole track means one embedding per section (about 6-10 per track, so storage and index size grow by that factor): measure on the real library before committing, and build it only after 12.1 works.
+
+### Shared decisions
+
+- **Where it runs:** the cheap part (16.1) in the app container on every profile, **automatically** with the rest of the cheap analysis. 16.2-16.4 in the analysis sidecar, **on demand only**. The sidecar is a separate service reached by `ANALYSIS_ESSENTIA_URL`, so a Pi install can point it at a sidecar on another machine; without one the request answers "not available here". Nothing runs on a Pi 2 or Pi 3 by itself. The Essentia arm64 problem (12.10) applies to the sidecar for all of them.
+- **On demand (decided 2026-10-30): sections, mood over time and stems are requested per track,** not computed for the library. A **"Deep analysis" button** on the track view (and the API below) asks for one or more of `sections`, `mood` and `stems` for that track; each kind shows an estimate (about how long, and for stems the RAM) before it starts. A queued job (`AnalyzeTrackDeep`, queue `analysis` for sections and mood, `stems` for stems, one at a time) runs it and the result is **stored** with the file's analysis, so it is computed once and shown from then on; a request for something already stored does nothing unless the stage version moved on or the file changed. Progress is live like other jobs, and the admin can remove a result (stems: the lanes data only). **Admin only** (a heavy operation, like the export, 13). An optional batch for chosen scopes (a playlist, the favourites, an album) is possible later; **nothing nightly across the library by default**.
+- **API:** `POST /api/library/tracks/{id}/deep-analysis { kinds: ["sections","mood","stems"] }` → `{ status, queued, estimate }`; `GET` on the same path reports per kind `none | queued | running | done | failed`, and the data is on the track detail (`sections`, `mood_curve`, `stems`) once done. OpenAPI, MCP, `features` key `deep_analysis` (present only when a sidecar answers).
+- **One track view** (album and track pages, later `/receiver`): section strip, master waveform, optional mood strip and stem lanes, each lane shown only when its data exists. Livewire for the page; the drawing is client-side canvas or SVG as the player bar's waveform is today (thin glue, no JS framework).
+- **Contract:** every new field (`waveform_peak`, `sections`, `mood_curve`, `stems`) goes in `openapi.yaml` and the track detail before a client uses it (8b), and appears in `GET /api/info` `features`.
+
 ## Not in 1.0
 
 - 1.1 or later, wanted: an SMB share and a USB target for finished exports (workstream 13); more export formats (AAC, Opus).
@@ -656,6 +713,8 @@ Done when: Jellyfin runs on the abstraction, a second server type is added by a 
 
 - Verification (2026-10-30): the availability layer was checked against the live services (see the progress table). Linker matching of release-style album names (catalogue numbers, regions) gets its own looser key; `Normalizer::album`, which drives library identity and merging, stays as it is. The first full sync runs over about a week (`--limit=150`).
 
+- Track views (2026-10-30, on demand decided): workstream 16: a waveform with real contrast (RMS, percentile stretch, local deviation; stage version 2), sections of a track (boundaries first, labels as confidence-marked guesses), mood over time, per-stem lanes with Demucs (loudness curves first) and similarity by section after 12.1. **Sections, mood and stems are requested per track on demand, not run across the library**; only the waveform contrast (16.1) is automatic. The mockup's section data is made up.
+
 ## Open questions
 
 Workstream 2a: how a sub device reachable only through its host is shown (listed under 2a). New questions go here.
@@ -681,3 +740,5 @@ Workstream 15: (a) one server or several per install; (b) is Plex or Emby the pr
 After 2026-10-28: (a) confirm the purge migration on a copy of production first (dry run, then a backup); (b) are the iOS app or the ESP clients using any of the removed routes (`fill-from-spotify`, Spotify as a library or as an artist source); (c) **done 2026-10-30**: the live MusicBrainz, ListenBrainz and Spotify calls were made and the code corrected (a merged MusicBrainz artist id is the one case still not verified); (d) the nine questions at the end of availability-layer.md: which are settled by the build; (e) `catalogue` queue: on the `heavy` worker or its own.
 
 Linker: (a) which edition words and catalogue-number patterns the linker's own key strips; (b) whether a looser match may ever mark an album owned without a track-count sanity check (Spotify `total_tracks` and MusicBrainz release data make one possible).
+
+Workstream 16: (a) 16.1: strength of the contrast stretch and whether to keep raw peaks in the same stage or a second one; (b) 16.2: which structure method after the spike, and whether labels ship at all or only boundaries; (c) 16.3: do the sidecar's EffNet models keep their per-patch predictions; (d) 16.4: Demucs and model licences, cost per track on the owner's hardware, and whether karaoke is wanted; (e) the on-demand request: admin only (decided), where the estimate comes from, and whether a batch for a playlist or the favourites is wanted later.
