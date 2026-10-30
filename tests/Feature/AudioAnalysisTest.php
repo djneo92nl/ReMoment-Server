@@ -523,10 +523,12 @@ class AudioAnalysisTest extends TestCase
 
         AnalyzeAudioFile::dispatchSync($file);
 
-        $this->assertSame([1, 2, 50, 100], $file->analysis()->first()->waveform);
-        $this->assertSame([1, 2, 50, 100], $track->fresh()->waveform());
+        $stored = $file->analysis()->first();
+        $this->assertSame([1, 2, 50, 100], $stored->waveform_peak);
+        $this->assertCount(4, $stored->waveform);
+        $this->assertSame($stored->waveform, $track->fresh()->waveform());
         $this->getJson("/api/library/tracks/{$track->id}/waveform")->assertOk()
-            ->assertJsonPath('points', [1, 2, 50, 100])->assertJsonPath('duration', 200);
+            ->assertJsonPath('points', $stored->waveform)->assertJsonPath('duration', 200);
 
         $this->get("/albums/{$track->album_id}")->assertOk()->assertSee('aria-label="Waveform"', false)->assertSee('Waveform');
     }

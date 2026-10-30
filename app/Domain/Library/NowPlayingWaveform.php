@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Cache;
 class NowPlayingWaveform
 {
     /**
-     * The waveform (peaks 0-100) of the playing track when the library has its own audio file analysed, else null.
+     * The waveform (0-100, per-track contrast-normalised RMS) of the playing track when the library has its own audio file analysed, else null.
      * Looked up through the library like play history does; remembered briefly so a refresh costs no queries.
      *
      * @return list<int>|null

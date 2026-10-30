@@ -29,7 +29,7 @@ Effort: S = days, M = 1–2 weeks, L = several weeks. Feasibility notes come fro
 | 13 | Export from the library: download a playlist, album or artist as a zip, transcoded to a chosen maximum quality, for an MP3 player or a car radio | M | 1b | to do | Should |
 | 14 | Foundations, decided early (phase 2): one alert and event model, stable IDs for clients, a schema review before the migration squash, a shared credentials layer, and an action-layer design spike | M | | **14.1, 14.2 and 14.4 built**; 14.3 (schema review) and 14.5 (spike) to do | Must (14.1, 14.3), Should (14.2, 14.4, 14.5 spike) |
 | 15 | Media servers: one abstraction for video (and later music) servers (Jellyfin built as a TV-only feature; Plex, Emby, Kodi follow the same contract), linked to the devices that can play them | M | 14.4, 2a | **started** (Jellyfin shelf); abstraction to do | Should |
-| 16 | Track structure and waveform views: a waveform with real contrast, the sections of a track, mood over time, per-stem lanes, similarity by section | M–L | 12.1 (embeddings), 12.10 | to do | Should (16.1, 16.2), Can slip (16.3-16.5); 16.2-16.4 run on demand per track |
+| 16 | Track structure and waveform views: a waveform with real contrast, the sections of a track, mood over time, per-stem lanes, similarity by section | M–L | 12.1 (embeddings), 12.10 | 16.1 built | Should (16.1, 16.2), Can slip (16.3-16.5); 16.2-16.4 run on demand per track |
 | 12 | Library and audio intelligence, what is left: mixes-well, loudness-normalised playback, tag and cover suggestions, concerts, related works, lyrics extras, listening insights, Essentia on arm64 | S–M each | 4 (similar tracks), 8.4 (tag editor) | plan below; the enrichment, analysis and health base is built | Mixed (per item); platform docs Must |
 
 ## Progress (as of 2026-10-27)
@@ -592,7 +592,7 @@ Status: **plan**, added 2026-10-30 from a design discussion (Claude web) about m
 
 **What exists:** `WaveformStage` (`app/Domain/Analysis/Stages/WaveformStage.php`, version `1`) decodes to 4 kHz mono and stores `config('analysis.waveform_points')` (default 400) **peak** values 0-100, scaled to the file's own loudest sample; the API serves them as `now_playing.waveform` (on `GET /devices/{id}`), and the sticky player bar and `/receiver` draw them. The analysis already stores integrated loudness, loudness range and true peak (`LoudnessStage`), and Essentia's BPM, key, danceability and, with the ML build, mood tags, arousal and valence, voice vs instrumental and the EffNet embedding step (the sidecar computes the embedding and throws it away; 12.1). Stages are versioned, so bumping a stage's version re-runs only that stage ([audio-analysis.md](audio-analysis.md)).
 
-### 16.1 A waveform with contrast *[Should; small]*
+### 16.1 A waveform with contrast *[Should; small; built 2026-10-30]*
 
 **Problem.** A heavily compressed ("brickwalled") track is almost all at the ceiling, so its peak waveform is a flat block. The example track measures about -4.5 LUFS with a peak-to-loudness ratio (PLR) of 4.4 dB: the waveform is *accurate* but carries no information. A peak waveform scaled to the loudest sample cannot show it.
 

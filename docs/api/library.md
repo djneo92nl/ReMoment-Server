@@ -392,3 +392,7 @@ A device lists `library_playback` in `capabilities` when either path exists for 
 ## Discography and wishlist
 
 `GET /api/library/artists/{id}?include=discography`, `/artists/{id}/discography`, `/wishlist`, `/catalogue/{id}` and `?availability=owned|streamable` on `/albums` are described in [availability.md](availability.md). They are opt-in and closed to client devices; the responses above are unchanged without them.
+
+## Waveform
+
+`GET /api/library/tracks/{id}/waveform` → `{ points: [int], duration }` (404 until the track's own file is analysed), and `now_playing.waveform` on `GET /api/devices/{id}`: a list of integers 0-100, evenly spread over the track, drawn as bar heights. Since waveform stage version 2 they are the **RMS of each part, stretched per track** (the quietest typical part is near 0, the loud typical part 100), not peaks relative to the loudest sample, so a heavily compressed track shows structure; heights are not comparable between tracks. Clients need no change. See `docs/architecture/audio-analysis.md`.

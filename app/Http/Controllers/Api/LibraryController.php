@@ -455,7 +455,7 @@ class LibraryController extends Controller
         ]);
     }
 
-    /** The waveform of a track's own audio file: peak values 0–100, evenly spread over its length. */
+    /** The waveform of a track's own audio file: values 0–100 (RMS stretched per track, not relative to the loudest sample), evenly spread over its length. */
     public function waveform(Track $track): JsonResponse
     {
         $points = $track->waveform();

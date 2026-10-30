@@ -28,7 +28,7 @@ class AnalysisProgress
 
     public const DESCRIPTIONS = [
         'loudness' => 'Loudness (LUFS), loudness range, true peak; proves the file decodes',
-        'waveform' => 'Peaks for the waveform and progress bar',
+        'waveform' => 'Waveform (RMS with contrast) for the progress bar',
         'quality' => 'Spectral cutoff, clipping, mono, phase, silence, bit depth',
         'fingerprint' => 'Chromaprint fingerprint of the first two minutes',
         'acoustid' => 'Looks the fingerprint up: MusicBrainz recording id',

@@ -291,7 +291,7 @@ class Track extends Model
         ];
     }
 
-    /** @return list<int>|null peak values 0–100 of the track's own audio file, null until it is analysed */
+    /** @return list<int>|null values 0–100 (contrast-normalised RMS, see WaveformStage) of the track's own audio file, null until it is analysed */
     public function waveform(): ?array
     {
         $a = $this->relationLoaded('analysis') ? $this->analysis : $this->analysis()->first();

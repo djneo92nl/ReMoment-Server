@@ -13,7 +13,7 @@ class FileAnalysis extends Model
         'loudness_lufs', 'loudness_range', 'true_peak', 'replaygain_track_gain', 'replaygain_album_gain',
         'fingerprint', 'fingerprint_duration', 'acoustid_id', 'acoustid_recording_mbid', 'acoustid_score',
         'bpm', 'key', 'mode', 'key_strength', 'danceability', 'arousal', 'valence', 'instrumental',
-        'mood_tags', 'genre_tags', 'waveform',
+        'mood_tags', 'genre_tags', 'waveform', 'waveform_peak',
         'spectral_cutoff_hz', 'lossless_suspect', 'measured_bit_depth', 'clipped_samples', 'clipping_suspect', 'is_mono',
         'phase_issue', 'lead_silence_ms', 'trail_silence_ms', 'decode_warnings',
     ];
@@ -25,7 +25,7 @@ class FileAnalysis extends Model
         'replaygain_track_gain' => 'float', 'replaygain_album_gain' => 'float',
         'acoustid_score' => 'float', 'bpm' => 'float', 'key_strength' => 'float', 'danceability' => 'float',
         'arousal' => 'float', 'valence' => 'float', 'instrumental' => 'float',
-        'mood_tags' => 'array', 'genre_tags' => 'array', 'waveform' => 'array', 'stages' => 'array', 'errors' => 'array',
+        'mood_tags' => 'array', 'genre_tags' => 'array', 'waveform' => 'array', 'waveform_peak' => 'array', 'stages' => 'array', 'errors' => 'array',
         'lossless_suspect' => 'float', 'clipping_suspect' => 'boolean', 'is_mono' => 'boolean', 'phase_issue' => 'boolean',
         'decode_warnings' => 'array', 'analyzed_at' => 'datetime',
     ];

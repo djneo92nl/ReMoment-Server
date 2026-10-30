@@ -8,7 +8,7 @@ Off by default (`ANALYSIS_ENABLED=true` turns it on). It is CPU heavy, so it run
 
 | Tier | Where | What | Needs |
 |------|-------|------|-------|
-| 0 | the app container | loudness (LUFS, loudness range, true peak) with `ffmpeg`'s `ebur128` filter, which also proves the file decodes; waveform peaks; quality (spectral cutoff and a transcode verdict, clipping, mono / phase, silence, decoder warnings: see *Quality* below); ReplayGain read from the tags; Chromaprint fingerprint (`fpcalc`); AcoustID lookup | `ffmpeg` and `fpcalc` (`libchromaprint-tools`, in `docker/8.4/Dockerfile`); `ACOUSTID_API_KEY` for the lookup (without one the fingerprint is stored, nothing is looked up) |
+| 0 | the app container | loudness (LUFS, loudness range, true peak) with `ffmpeg`'s `ebur128` filter, which also proves the file decodes; waveform (RMS with per-track contrast, plus raw peaks); quality (spectral cutoff and a transcode verdict, clipping, mono / phase, silence, decoder warnings: see *Quality* below); ReplayGain read from the tags; Chromaprint fingerprint (`fpcalc`); AcoustID lookup | `ffmpeg` and `fpcalc` (`libchromaprint-tools`, in `docker/8.4/Dockerfile`); `ACOUSTID_API_KEY` for the lookup (without one the fingerprint is stored, nothing is looked up) |
 | 1 | the `analysis` sidecar (`docker/analysis`, compose profile `analysis`) | Essentia: BPM, key, mode, danceability; with the ML build also mood, arousal/valence, voice vs instrumental, genre | `ANALYSIS_ESSENTIA_URL` |
 
 A Pi 2/3 runs tier 0 only (its app image has the tools; the sidecar is optional and `essentia-tensorflow` is not available on 32-bit ARM). `ffprobe` is not used: getID3 already stores codec, bitrate, sample rate, bit depth and channels on `files` and in the track metadata.
@@ -26,6 +26,7 @@ A Pi 2/3 runs tier 0 only (its app image has the tools; the sidecar is optional 
 | `ANALYSIS_ESSENTIA_URL` | – | `http://analysis:8090` (dev compose) or `http://127.0.0.1:8090` (prod, host networking) |
 | `ANALYSIS_ESSENTIA_ML` | `false` | the sidecar runs the TensorFlow models; files analysed without them are analysed again |
 | `FFMPEG_BINARY`, `FPCALC_BINARY` | `ffmpeg`, `fpcalc` | |
+| `contrast_min_span`, `contrast_max_span`, `deviation_*` (config only) | `6`, `30`, window 4 s, max 0.7, PLR 8 to 14 dB | waveform contrast mapping, see *Waveform* |
 
 ## How it works (`App\Domain\Analysis`)
 
@@ -34,6 +35,16 @@ A Pi 2/3 runs tier 0 only (its app image has the tools; the sidecar is optional 
 - **Job:** `AnalyzeAudioFile` (unique per file, queue `analysis`, `tries` 1) opens the file once with `FileStore::withLocalPath()` (the real path locally, one download from remote storage), runs the stages still needed, and saves after each. A failing stage records its error (`errors.<stage>`: message, attempts, version) and does not stop the others; the backlog retries it until `analysis.max_attempts` (3) at the same version.
 - **Backlog:** `AudioAnalysis::pending()` lists present, primary, original files with something left to do, newest first. `php artisan library:analyze [--limit=] [--stage=] [--file=ID [--now]] [--dry-run]` queues it; scheduled nightly at 02:00; `LocalLibraryScanner` queues a small batch after a scan.
 - **Essentia stage:** the app decodes to a mono 44.1 kHz WAV with ffmpeg (a branch of the shared decode, see *Reducing CPU load*) and posts it to `POST /analyze` of the sidecar, so the sidecar needs no access to the music and remote files work. Features the sidecar did not compute (no ML models) are left out of the result instead of blanked.
+
+## Waveform (`WaveformStage`, version `2`)
+
+The file is decoded to 4 kHz mono s16 (a branch of the shared decode) and cut into `analysis.waveform_points` equal buckets (400; fewer for a file with fewer samples). Two lists are stored in `file_analyses`:
+
+- **`waveform`** (what the API, player bar, `/receiver` and album page read: integers 0-100, so clients need no change). Per bucket the **RMS**, in dB; optionally minus a share of the **local loudness**; then stretched per track: the **99th percentile** of the track's values is 100, the **5th** is 0, clamped. The floor is never closer than `contrast_min_span` (6 dB) to the ceiling, so a constant tone stays one flat value (100) instead of being blown up into noise, and never further than `contrast_max_span` (30 dB), so one near-silent bucket does not squash the rest. A silent file (ceiling below -90 dB) is all 0. This replaces version 1's peak values scaled to the loudest sample, which on a brickwalled track (about -4.5 LUFS, PLR 4.4 dB) was a flat block. Because it is normalised per track, heights are **not comparable between tracks**.
+- **`waveform_peak`**: version 1's values, each bucket's loudest sample relative to the loudest of the file, 0-100. Internal for now (no API exposes it); meant for clipping markers and the section and stem views of workstream 16.
+- **Deviation layer.** Subtracting a moving average (`deviation_window_seconds`, 4 s, so about 7 buckets of a 4-minute track) times a strength from the dB curve makes drops and builds stand out even when everything sits near the top. The strength follows the **PLR** (true peak minus integrated LUFS, both from `LoudnessStage`, which runs first): `deviation_max` (0.7) at a PLR of `deviation_plr_low` (8 dB) or less, 0 at `deviation_plr_high` (14 dB) or more, linear between. Without loudness data the layer is skipped. 0.7 rather than 1: a full subtraction would lose that a whole verse is quieter than the chorus.
+- **Cost:** about 0.02 s of PHP for a 4-minute file (one bucket unpacked at a time, memory is the 2 MB PCM string); the decode is the same one the other stages share.
+- **Re-run:** the version bump makes the backlog pick up every analysed file for this stage only. `php artisan library:analyze --stage=waveform --limit=500` (repeat or let the nightly run do it); `/settings/analysis` counts them as "to redo" until done.
 
 ## Quality (`QualityStage`)
 

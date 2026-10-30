@@ -35,8 +35,21 @@ return [
     /** Failed attempts of one stage (same version) before the backlog stops retrying it. */
     'max_attempts' => 3,
 
-    /** Peak values stored per track for drawing its waveform. */
+    /** Values stored per track for drawing its waveform. */
     'waveform_points' => (int) env('ANALYSIS_WAVEFORM_POINTS', 400),
+
+    /*
+    | Waveform contrast (WaveformStage): bucket RMS in dB is stretched per track from its 5th to its 99th
+    | percentile; the span between them stays within these many dB. The local-loudness deviation (moving
+    | average of this many seconds, times a share) is strongest (`deviation_max`) at a peak-to-loudness
+    | ratio (true peak minus LUFS) of `deviation_plr_low` dB or less and 0 from `deviation_plr_high` up.
+    */
+    'contrast_min_span' => 6.0,
+    'contrast_max_span' => 30.0,
+    'deviation_window_seconds' => 4.0,
+    'deviation_max' => 0.7,
+    'deviation_plr_low' => 8.0,
+    'deviation_plr_high' => 14.0,
 
     'ffmpeg' => env('FFMPEG_BINARY', 'ffmpeg'),
 
