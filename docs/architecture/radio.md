@@ -25,3 +25,6 @@ Servers come from DNS (`all.api.radio-browser.info`, cached a day) with a fixed 
 
 ## NTS episodes (`/radio/nts`, `Livewire\NtsBrowser`)
 Shows (24 per page) → episodes → official tracklist. `NtsClient::shows/episodes/tracklist` (cached 1 h). A tracklist row has `offset` (seconds into the show; NTS' own estimate when it has no exact one) and no artist for "Unknown Artist"; tracks the library has link to their album. Archives live on Mixcloud/SoundCloud, so they are links, not playable here. Tracklists appear some hours after the broadcast and not for every show.
+
+## Stations a renderer cannot play itself
+A station over HTTPS, in AAC, behind a playlist or HLS address, or a renderer that cannot resolve names, fails on old renderers (measured on the Philips MCi900, 2026-10-30). The plan to relay such stations through the server (ffmpeg into Icecast, MP3) is [radio-relay.md](radio-relay.md) (workstream 17); not built.

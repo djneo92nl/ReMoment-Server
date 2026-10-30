@@ -31,6 +31,7 @@ Effort: S = days, M = 1–2 weeks, L = several weeks. Feasibility notes come fro
 | 15 | Media servers: one abstraction for video (and later music) servers (Jellyfin built as a TV-only feature; Plex, Emby, Kodi follow the same contract), linked to the devices that can play them | M | 14.4, 2a | **started** (Jellyfin shelf); abstraction to do | Should |
 | 16 | Track structure and waveform views: a waveform with real contrast, the sections of a track, mood over time, per-stem lanes, similarity by section | M–L | 12.1 (embeddings), 12.10 | 16.1 and 16.2 built (service, stage, API, UI); 16.3-16.5 to do | Should (16.1, 16.2), Can slip (16.3-16.5); 16.2-16.4 run on demand per track |
 | 12 | Library and audio intelligence, what is left: mixes-well, loudness-normalised playback, tag and cover suggestions, concerts, related works, lyrics extras, listening insights, Essentia on arm64 | S–M each | 4 (similar tracks), 8.4 (tag editor) | plan below; the enrichment, analysis and health base is built | Mixed (per item); platform docs Must |
+| 17 | Radio relay: stations a renderer cannot play itself (HTTPS, AAC, playlists, no DNS) are converted by the server (ffmpeg → Icecast, on demand, MP3) and played from there | M | | **plan** (2026-10-30), see [radio-relay.md](radio-relay.md); nothing built | Should |
 
 ## Progress (as of 2026-10-27)
 
@@ -643,6 +644,16 @@ Split a track into vocals, drums, bass and other with **Demucs** and use it for 
 - **One track view** (album and track pages, later `/receiver`): section strip, master waveform, optional mood strip and stem lanes, each lane shown only when its data exists. Livewire for the page; the drawing is client-side canvas or SVG as the player bar's waveform is today (thin glue, no JS framework).
 - **Contract:** every new field (`waveform_peak`, `sections`, `mood_curve`, `stems`) goes in `openapi.yaml` and the track detail before a client uses it (8b), and appears in `GET /api/info` `features`.
 
+## 17. Radio relay
+
+Status: **plan, Should.** Added 2026-10-30 after trying radio from ReMoment on the Philips MCi900, which could not play the stations the library has: by name it stopped (it cannot resolve names, although the same stream by IP address played at once), NTS is HTTPS with a redirect (no TLS on a 2008 firmware) and FIP is AAC (not decodable). Design and measurements: [radio-relay.md](radio-relay.md).
+
+**Idea.** The server fetches the station, converts it once to MP3 (44.1 kHz, 128 kbit/s) with ffmpeg, pushes it to the existing Icecast, and gives the renderer the local address (`STREAM_BASE_URL` host, so an IP for a renderer without DNS). On demand, one ffmpeg per station however many speakers listen, the audio never through PHP, a supervised manager (`radio:relay`) instead of queue jobs. Sonos and B&O keep their native radio.
+
+**Build order.** 17.1 relay core (`RelayCommand`, `RelayManager`, `radio:relay`, Icecast status client, config, compose profile); 17.2 the per-device decision (`radio_relay` auto / always / never, from scheme, codec, playlists and the device's limits) and the UPnP driver using it, with `streamium:enable` setting `always`; 17.3 titles and idle stop; 17.4 operations (alerts, `/api/radio/relays`, a Pi 3 measurement, docs).
+
+Done when: 181.FM, NTS 1 and FIP all play on the MCi900 from the web UI and the API; a station a renderer can play itself still goes direct; with a real Pi 3, the CPU of one and four relays is measured and the default limit set from it.
+
 ## Not in 1.0
 
 - 1.1 or later, wanted: an SMB share and a USB target for finished exports (workstream 13); more export formats (AAC, Opus).
@@ -666,6 +677,7 @@ Split a track into vocals, drums, bass and other with **Demucs** and use it for 
 | An undocumented field changes under a client | The OpenAPI contract test (8b item 3); the app reads only what is documented |
 | Essentia has no aarch64 wheel, so the analysis sidecar is x86-only unless built from source | Correct the docs (12.10); tier 0 analysis is architecture-independent; decide between x86-only for Full, a source build in the image, or another extractor |
 | Loudness-normalised playback fights a device's own volume events | Opt-in per device, clamped offset, probe on the lab before offering it (12.3) |
+| A radio relay costs too much CPU on a Pi, or ffmpeg's reconnect does not survive a dropping station | Relay only when a renderer needs it (`auto`), on demand with an idle stop, a concurrency limit set from a Pi 3 measurement, an alert when a station keeps failing (17.4) |
 
 ## Decisions log
 
@@ -687,6 +699,7 @@ Split a track into vocals, drums, bass and other with **Demucs** and use it for 
 - Accessibility (2026-10-26): keyboard, screen-reader basics and contrast are a Should; `/receiver` is also a TV display, so it gets a 10-foot, remote-friendly layout; no scan has been run yet (workstream 9b).
 - Hosted service (2026-10-26): a paid remote relay and a service that removes the need for user keys are wanted **after 1.0**; for 1.0 users bring their own keys (Spotify, Last.fm, Discogs, AcoustID, TheAudioDB) and the code is built so a relay can replace them (9b item 8). Essentia models remain a first-start download with their license shown.
 - Hardware: the lab has a Pi 2 and a Pi 3; the production library is about 800 albums (fixture size).
+- Radio relay (2026-10-30): a station a renderer cannot play itself is converted by the server (ffmpeg into the existing Icecast, MP3, on demand, one ffmpeg per station, a supervised manager) and played from there; the audio never passes through PHP; decided per device and station, `always` for the Streamium (workstream 17).
 
 - Progress (2026-10-27): the card fix, Spotify audit and credentials card, and backup/restore are built (see Progress). Backup secrets: excluded by default, `--with-secrets` opts in; archives sit on the app's disk by default and must be copied off the machine (workstream 1).
 - CD ripper (2026-10-27): built as a Tauri desktop app that uses the admin token and the upload API; supersedes "standalone script" and "registers like a client device" (workstream 7).
