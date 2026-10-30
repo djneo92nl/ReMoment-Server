@@ -606,7 +606,7 @@ Status: **plan**, added 2026-10-30 from a design discussion (Claude web) about m
 
 Done when: a brickwalled track's waveform shows its structure, a dynamic track looks about as it did, and `docs/api/*` and `openapi.yaml` say what `waveform` now means (normalised per track, not relative to the loudest sample).
 
-### 16.2 Sections of a track *[Should; spike done 2026-10-30, see [track-sections-spike.md](track-sections-spike.md); backend built (service, stage, on-demand job and API, MCP), see [structure-service.md](structure-service.md) and [../api/deep-analysis.md](../api/deep-analysis.md); the strip waits for the track view]*
+### 16.2 Sections of a track *[Should; spike done 2026-10-30, see [track-sections-spike.md](track-sections-spike.md); backend built (service, stage, on-demand job and API, MCP), see [structure-service.md](structure-service.md) and [../api/deep-analysis.md](../api/deep-analysis.md); the strip is built in the player bar and the album page's Track details, see [../frontend/section-strip.md](../frontend/section-strip.md)]*
 
 **Goal.** See the sections of a track (intro, verse, chorus, break, outro) as a coloured strip above the waveform, tap one to seek, and have the same boundaries in every other lane (mood, stems) and in later features (search by section, mixes-well).
 

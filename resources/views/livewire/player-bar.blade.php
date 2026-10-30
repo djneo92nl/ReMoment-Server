@@ -137,13 +137,19 @@
                         <span style="opacity:.75;min-width:2.2rem;text-align:right" x-text="elapsed">{{ \App\Domain\Helpers\TimeHelper::secondsToMinutes($position) }}</span>
                         @if($waveform)
                             <div @if($seekable) @click.stop="seekTo($event)" @endif
-                                 style="flex:1;position:relative;height:2rem;{{ $seekable ? 'cursor:pointer' : '' }}">
-                                <x-waveform :points="$waveform" :height="32" :opacity="0.35" style="position:absolute;inset:0;width:100%;height:100%;color:#fff" />
-                                {{-- the played part: the same waveform in the accent, clipped to the progress --}}
-                                <div style="position:absolute;inset:0;color:{{ $accent }};clip-path:inset(0 {{ 100 - min(100, (int) ($position / $duration * 100)) }}% 0 0)"
-                                     :style="{ clipPath: 'inset(0 ' + (100 - pct) + '% 0 0)' }">
-                                    <x-waveform :points="$waveform" :height="32" :opacity="1" style="width:100%;height:100%;display:block" />
+                                 style="flex:1;position:relative;{{ $seekable ? 'cursor:pointer' : '' }}">
+                                <div style="position:relative;height:{{ $sections ? '1.7rem' : '2rem' }}">
+                                    <x-waveform :points="$waveform" :height="32" :opacity="0.35" style="position:absolute;inset:0;width:100%;height:100%;color:#fff" />
+                                    {{-- the played part: the same waveform in the accent, clipped to the progress --}}
+                                    <div style="position:absolute;inset:0;color:{{ $accent }};clip-path:inset(0 {{ 100 - min(100, (int) ($position / $duration * 100)) }}% 0 0)"
+                                         :style="{ clipPath: 'inset(0 ' + (100 - pct) + '% 0 0)' }">
+                                        <x-waveform :points="$waveform" :height="32" :opacity="1" style="width:100%;height:100%;display:block" />
+                                    </div>
                                 </div>
+                                {{-- sections of the track (when the admin analysed them): a click on a block seeks to its start --}}
+                                @if($sections)
+                                    <x-section-strip :sections="$sections" :duration="$duration" :height="6" :seek="$seekable" style="display:flex;gap:1px;width:100%;height:6px;margin-top:.15rem;color:#fff" />
+                                @endif
                             </div>
                         @else
                             <div @if($seekable) @click.stop="seekTo($event)" @endif

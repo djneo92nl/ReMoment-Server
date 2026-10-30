@@ -178,6 +178,10 @@
                                         <dt class="text-gray-400 dark:text-gray-600">Waveform</dt>
                                         <dd class="text-gray-500 dark:text-gray-400" style="max-width:32rem"><x-waveform :points="$waveform" /></dd>
                                     @endif
+                                    @if($waveform && in_array('files', $track->sources(), true))
+                                        <dt class="text-gray-400 dark:text-gray-600">Sections</dt>
+                                        <dd style="max-width:32rem"><livewire:track-sections lazy :track-id="$track->id" :key="'sections-'.$track->id" /></dd>
+                                    @endif
                                     @if($quality)
                                         <dt class="text-gray-400 dark:text-gray-600">Quality</dt>
                                         <dd class="text-gray-700 dark:text-gray-300">{{ $quality }}</dd>

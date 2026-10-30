@@ -12,6 +12,7 @@ use App\Domain\Device\DeviceCapabilities;
 use App\Domain\Device\RepeatMode;
 use App\Domain\Device\SpotifyRouting;
 use App\Domain\Device\State;
+use App\Domain\Library\NowPlayingSections;
 use App\Domain\Library\NowPlayingWaveform;
 use App\Events\Device\PlaybackModesUpdated;
 use App\Integrations\Contracts\LikeInterface;
@@ -191,6 +192,7 @@ class PlayerBar extends Component
             'nowPlaying' => $nowPlaying,
             'artwork' => $nowPlaying ? NowPlayingArtwork::resolve($nowPlaying) : null,
             'waveform' => $nowPlaying ? NowPlayingWaveform::for($nowPlaying) : null,
+            'sections' => $nowPlaying ? (NowPlayingSections::for($nowPlaying)['sections'] ?? null) ?: null : null,
             'capabilities' => $capabilities,
             'modes' => $modes,
             'volume' => $this->volume($device, $capabilities, $state),

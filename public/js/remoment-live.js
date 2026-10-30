@@ -174,6 +174,10 @@
                 this.pos = Math.round(fraction * duration);
                 this.$wire.seek(this.pos);
             },
+            seekToSeconds(seconds) {
+                this.pos = Math.max(0, Math.min(duration, Math.round(seconds)));
+                this.$wire.seek(this.pos);
+            },
         }));
     });
 })();
