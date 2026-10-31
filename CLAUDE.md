@@ -19,7 +19,7 @@ docs/
   api/
     client-devices.md       Client device registration flow, all endpoints, firmware guide
     jellyfin.md             Jellyfin on a Philips TV: continue watching / next up and play in the Jellyfin app (GET /api/devices/{id}/jellyfin, POST .../jellyfin/play)
-    deep-analysis.md        Deep analysis of one track on request (admin token): POST/GET/DELETE /api/library/tracks/{id}/deep-analysis, kind `sections`, states, where the result shows
+    deep-analysis.md        Deep analysis of one track on request (admin token): POST/GET/DELETE /api/library/tracks/{id}/deep-analysis, kinds `sections` and `stems`, states, where the result shows
     library.md              Library browse (artists, albums, playlists), favorites, play album/artist/playlist on a device (DLNA or Spotify), playlist artwork
     source-controls.md      Per-source controls (change disc, FM presets) from control profiles: GET/POST /api/devices/{id}/controls, resolution, transports
     physical.md             Physical collection (CDs, records, tapes): items by barcode or by hand, MusicBrainz barcode lookup, `physical` availability provider, wishes closed by owning it
@@ -55,6 +55,8 @@ docs/
     metadata-enrichment.md  Per-source enrichment jobs (MusicBrainz track/artist/album, Wikipedia, Cover Art Archive, lyrics, Spotify, Last.fm, TheAudioDB, Discogs), DLNA tags, canonical genres: markers, retries, rate limits, library:enrich
     artist-settings.md      Admin page per artist: photo/backdrop choice, MusicBrainz/Spotify/Last.fm mappings, details overrides, files, default source; the `manual` metadata source
     structure-service.md    Structure service (workstream 16.2): docker/structure, librosa novelty sections of one track on demand, contract, RAM/time measured, compose profile `structure`
+    stems-service.md        Stems service (workstream 16.4): docker/stems, Demucs htdemucs in 60 s windows, per-stem loudness curves + vocal ratio + instrumental ranges of one track on demand, contract, own `stems` queue/worker, measured numbers, weights licence unclear, compose profile `stems`
+    track-stems-spike.md    Spike for 16.4: htdemucs vs htdemucs_ft vs Spleeter on nine tracks, RAM (windowing), licences of code and weights, the owner's verdicts, recommendation
     file-storage.md          Own music files: storage locations (local/S3), files + track_files tables, indexer, organizer, management, /stream, admin API
     radio.md                Radio: station-level now playing (providers: ICY, NTS), poll chain lifecycle, NTS import
     lastfm.md                Scrobbling, now-playing, auth flow, artist enrichment, backfill
@@ -77,6 +79,7 @@ docs/
     receiver.md             /receiver view: JS globals, DOM structure, browser targets
     player-bar.md           Sticky bottom player: pinned device cookie, <x-play-button> default play target
     components.md           Shared Blade components (x-card, x-page-header, x-alert, x-badge, x-empty-state, x-table, x-shelf, nav ...) and their props; rules in DESIGN.md at the repo root
+    stem-lanes.md           Stem lanes (16.4): a lane per stem under the sections in the album page's Track details, own-scale curves, instrumental band, TrackStems states
     library.md              /library hub: LibraryHome data, shelves, shuffle, favourites, tinted cards (ArtworkTint)
 ```
 
@@ -169,7 +172,7 @@ Base URL: `/api` — no authentication required.
 
 ### Server Info
 
-**`GET /api/info`** — bootstrap info for client devices: `{ name, version, api_version, base_url, api_base_url, artwork_base_url, mqtt: { host, port, ws_port, ws_url, topic_prefix }, placeholder }`. `placeholder` is a full artwork object (`kind: "source"`, the music-note logo, rendered on the spot if missing) for clients to show whenever there is no artwork, e.g. while a cover is first processed. `features` is `{ alerts: true, deep_analysis: bool }` (only keys true today; `deep_analysis` while the structure service answers its health check). Addresses are as the client reached the server; `mqtt.host` is `MQTT_PUBLIC_HOST` or the request host (never the Docker-internal `MQTT_HOST`); `mqtt.ws_port`/`ws_url` are the WebSocket listener (`MQTT_PUBLIC_WS_PORT`, default 9001; `MQTT_WS_URL` overrides the URL). See `docs/api/server-info.md`.
+**`GET /api/info`** — bootstrap info for client devices: `{ name, version, api_version, base_url, api_base_url, artwork_base_url, mqtt: { host, port, ws_port, ws_url, topic_prefix }, placeholder }`. `placeholder` is a full artwork object (`kind: "source"`, the music-note logo, rendered on the spot if missing) for clients to show whenever there is no artwork, e.g. while a cover is first processed. `features` is `{ alerts: true, deep_analysis: bool, deep_analysis_kinds?: ["sections", "stems"] }` (only keys true today; `deep_analysis` while a deep-analysis service answers its health check, `deep_analysis_kinds` lists the kinds that can run now, present only when not empty). Addresses are as the client reached the server; `mqtt.host` is `MQTT_PUBLIC_HOST` or the request host (never the Docker-internal `MQTT_HOST`); `mqtt.ws_port`/`ws_url` are the WebSocket listener (`MQTT_PUBLIC_WS_PORT`, default 9001; `MQTT_WS_URL` overrides the URL). See `docs/api/server-info.md`.
 
 ### Alerts
 

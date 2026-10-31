@@ -181,6 +181,8 @@
                                     @if($waveform && in_array('files', $track->sources(), true))
                                         <dt class="text-gray-400 dark:text-gray-600">Sections</dt>
                                         <dd style="max-width:32rem"><livewire:track-sections lazy :track-id="$track->id" :key="'sections-'.$track->id" /></dd>
+                                        <dt class="text-gray-400 dark:text-gray-600">Stems</dt>
+                                        <dd style="max-width:32rem"><livewire:track-stems lazy :track-id="$track->id" :key="'stems-'.$track->id" /></dd>
                                     @endif
                                     @if($quality)
                                         <dt class="text-gray-400 dark:text-gray-600">Quality</dt>
