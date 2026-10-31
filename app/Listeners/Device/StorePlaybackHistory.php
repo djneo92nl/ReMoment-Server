@@ -10,6 +10,7 @@ use App\Domain\Library\LibrarySettings;
 use App\Domain\Library\Normalizer;
 use App\Domain\Library\NowPlayingTrackResolver;
 use App\Domain\Library\SpotifyUri;
+use App\Domain\Profile\Profile;
 use App\Events\Device\NowPlayingUpdated;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Jobs\ScrobbleToLastfm;
@@ -33,6 +34,15 @@ class StorePlaybackHistory implements ShouldQueue
     public function __construct()
     {
         //
+    }
+
+    /**
+     * The queue this listener runs on. Control gives the play history a queue of its own with exactly one worker, so
+     * SQLite has a single writer for it (docs/architecture/profiles.md); the other profiles keep the default queue.
+     */
+    public function viaQueue(): ?string
+    {
+        return Profile::historyQueue();
     }
 
     /**

@@ -17,7 +17,8 @@
 
         <livewire:client-manager />
 
-        {{-- SD card artwork export, one zip per background size (docs/architecture/sd-card-export.md) --}}
+        {{-- SD card artwork export, one zip per background size (docs/architecture/sd-card-export.md); the covers are library covers, so not in Control --}}
+        @if(\App\Domain\Profile\Profile::allows('library'))
         <x-card class="px-8 py-6">
             <div class="flex items-start justify-between gap-6">
                 <div>
@@ -77,5 +78,6 @@
                 @endforeach
             </div>
         </x-card>
+        @endif
     </div>
 </x-app-layout>

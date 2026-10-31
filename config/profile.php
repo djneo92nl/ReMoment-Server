@@ -98,7 +98,7 @@ return [
         'dlna' => ['settings/dlna', 'settings/dlna/*'],
         'library' => [
             'library', 'library/*', 'artists', 'artists/*', 'albums', 'albums/*', 'genres', 'genres/*', 'playlists', 'playlists/*',
-            'tracks/*', 'external/*', 'spotify/tracks/*', 'settings/library', 'settings/library/*',
+            'tracks/*', 'external/*', 'spotify/tracks/*', 'settings/library', 'settings/library/*', 'settings/clients/artwork-export', 'settings/clients/artwork-export/*',
             'api/library/*', 'api/devices/*/library/*',
         ],
     ],

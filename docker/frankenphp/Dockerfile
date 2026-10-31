@@ -44,6 +44,7 @@ RUN groupadd --force -g $WWWGROUP sail \
 COPY frankenphp/Caddyfile /etc/caddy/Caddyfile
 COPY frankenphp/php.ini /usr/local/etc/php/conf.d/99-remoment.ini
 COPY 8.4/start-container /usr/local/bin/start-container
+COPY 8.4/profile-env.sh /usr/local/bin/profile-env.sh
 RUN chmod +x /usr/local/bin/start-container
 
 EXPOSE 80/tcp

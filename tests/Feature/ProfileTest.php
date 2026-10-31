@@ -95,7 +95,7 @@ class ProfileTest extends TestCase
         $this->assertSame('history', Profile::historyQueue());
 
         $this->profile('standard');
-        $this->assertSame('default', Profile::historyQueue());
+        $this->assertNull(Profile::historyQueue());
     }
 
     public function test_info_reports_the_profile(): void

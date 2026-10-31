@@ -1,13 +1,19 @@
 {{-- The main navigation: the single list behind both the desktop sidebar and the mobile drawer. --}}
 @php
     $on = fn (string ...$patterns) => request()->routeIs(...$patterns);
-    $libraryActive = $on('library.*', 'artists.*', 'albums.*', 'genres.*', 'radio.*', 'playlists.*');
+    $hasLibrary = \App\Domain\Profile\Profile::allows('library');
+    $libraryActive = $hasLibrary && $on('library.*', 'artists.*', 'albums.*', 'genres.*', 'radio.*', 'playlists.*');
     $settingsActive = $on('settings.*');
 @endphp
 <nav class="flex-1 px-4 py-6" aria-label="Main">
     <ul class="space-y-1">
         <li><x-nav-item :href="route('devices.index')" icon="tv" :active="$on('devices.*')">Devices</x-nav-item></li>
         <li><x-nav-item :href="route('history.index')" icon="clock-rotate-left" :active="$on('history.*')">History</x-nav-item></li>
+        @unless($hasLibrary)
+            {{-- Control has no library: radio is its own entry --}}
+            <li><x-nav-item :href="route('radio.index')" icon="radio" :active="$on('radio.*')">Radio</x-nav-item></li>
+        @endunless
+        @if($hasLibrary)
         <li>
             <x-nav-item :href="route('library.index')" icon="microphone-lines" :active="$libraryActive">Library</x-nav-item>
             @if($libraryActive)
@@ -20,6 +26,7 @@
                 </ul>
             @endif
         </li>
+        @endif
         <li><x-nav-item :href="route('multiroom.index')" icon="layer-group" :active="$on('multiroom.*')">Multiroom</x-nav-item></li>
         {{-- Its own tab: this browser plays the sound while the tab stays open --}}
         <li><x-nav-item :href="route('player')" icon="headphones" target="_blank" rel="noopener">Web player</x-nav-item></li>

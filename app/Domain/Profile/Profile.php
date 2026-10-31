@@ -105,11 +105,11 @@ final class Profile
 
     /**
      * The queue the play history is written on. Control runs one worker on its own queue so SQLite has a single
-     * writer for it; Standard and Full keep the default queue, as before.
+     * writer for it; Standard and Full keep the connection's default queue (null), as before.
      */
-    public static function historyQueue(): string
+    public static function historyQueue(): ?string
     {
-        return self::is(self::CONTROL) ? (string) config('profile.history_queue') : 'default';
+        return self::is(self::CONTROL) ? (string) config('profile.history_queue') : null;
     }
 
     /** Supervised programs the active profile starts, keyed by program name (see config profile.workers). @return array<string, bool> */

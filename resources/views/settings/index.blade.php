@@ -26,12 +26,14 @@
             </x-settings-row>
         </x-settings-group>
 
+        @if(\App\Domain\Profile\Profile::allows('file_storage'))
         <x-settings-group title="Music library">
             <x-settings-row href="{{ route('settings.storage') }}" icon="fa-solid fa-hard-drive"
                              label="Files & Import">
                 Browse, import, {{ $storageLocationCount }} {{ $storageLocationCount === 1 ? 'location' : 'locations' }}
                 &middot; leads: {{ ['files' => 'Local files', 'dlna' => 'DLNA', 'spotify' => 'Spotify', 'all' => 'everything'][\App\Domain\Library\LeadingSource::leading()] }}
             </x-settings-row>
+            @if(\App\Domain\Profile\Profile::allows('analysis'))
             <x-settings-row href="{{ route('settings.analysis') }}" icon="fa-solid fa-wave-square"
                              label="Audio analysis">
                 Stages, progress and problems &middot; {{ config('analysis.enabled') ? 'on' : 'off' }}
@@ -48,13 +50,17 @@
                     </span>
                 @endif
             </x-settings-row>
+            @endif
         </x-settings-group>
+        @endif
 
         <x-settings-group title="Other sources & services">
+            @if(\App\Domain\Profile\Profile::allows('dlna'))
             <x-settings-row href="{{ route('settings.dlna') }}" icon="fa-solid fa-server"
                              label="DLNA">
                 {{ $dlnaServerCount }} {{ $dlnaServerCount === 1 ? 'server' : 'servers' }}
             </x-settings-row>
+            @endif
             <x-settings-row href="{{ route('settings.services') }}" icon="fa-solid fa-key"
                              label="Services & keys">
                 @php($missingServices = collect(\App\Domain\Credentials\ServiceCredentials::all())->keys()->reject(fn ($id) => \App\Domain\Credentials\ServiceCredentials::configured($id))->count())

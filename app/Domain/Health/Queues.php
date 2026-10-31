@@ -2,6 +2,7 @@
 
 namespace App\Domain\Health;
 
+use App\Domain\Profile\Profile;
 use App\Jobs\RunStorageTask;
 use Illuminate\Support\Facades\Queue;
 
@@ -28,16 +29,32 @@ final class Queues
         return (string) config('analysis.stems_queue');
     }
 
-    /** Queues that get a heartbeat job every minute: one per worker program. @return list<string> */
+    /**
+     * Queues that get a heartbeat job every minute: one per worker program the active profile starts (Control has no
+     * storage, heavy, analysis or stems worker, so a heartbeat for them would sit unread and raise a false alert;
+     * it has the single-writer `history` worker instead).
+     *
+     * @return list<string>
+     */
     public static function heartbeat(): array
     {
-        return [self::HEALTH, RunStorageTask::QUEUE, config('analysis.queue'), self::HEAVY, self::stems()];
+        $queues = [self::HEALTH, RunStorageTask::QUEUE, config('analysis.queue'), self::HEAVY, self::stems()];
+        if (Profile::is(Profile::CONTROL)) {
+            $queues[] = Profile::historyQueue();
+        }
+
+        return array_values(array_filter($queues, Profile::runsQueue(...)));
     }
 
     /** All queues shown on the health page. @return list<string> */
     public static function all(): array
     {
-        return array_values(array_unique([self::HEALTH, self::DEFAULT, RunStorageTask::QUEUE, config('analysis.queue'), self::stems(), config('proxies.queue'), self::HEAVY, self::CATALOGUE, config('queue.connections.redis.queue', 'default')]));
+        $queues = [self::HEALTH, self::DEFAULT, RunStorageTask::QUEUE, config('analysis.queue'), self::stems(), config('proxies.queue'), self::HEAVY, self::CATALOGUE, config('queue.connections.redis.queue', 'default')];
+        if (Profile::is(Profile::CONTROL)) {
+            $queues[] = Profile::historyQueue();
+        }
+
+        return array_values(array_unique(array_filter($queues, Profile::runsQueue(...))));
     }
 
     /** Seconds the longest job of a queue may run (its worker's --timeout), plus a margin: a reserved job older than this means a hung worker. */

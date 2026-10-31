@@ -9,6 +9,7 @@ use App\Domain\Device\State;
 use App\Domain\Health\ExternalServices;
 use App\Domain\Health\Heartbeat;
 use App\Domain\Health\QueueInspector;
+use App\Domain\Profile\Profile;
 use App\Models\Device;
 use App\Models\StorageLocation;
 use Illuminate\Support\Facades\Cache;
@@ -88,6 +89,11 @@ final class AlertChecks
     /** storage.unreachable per location (the probe of /settings/health), at most every storage_check_minutes. */
     public function storage(): void
     {
+        // No storage locations without own files (Control).
+        if (!Profile::allows('file_storage')) {
+            return;
+        }
+
         if (!Cache::add('alerts:storage-checked', true, now()->addMinutes((int) config('alerts.storage_check_minutes')))) {
             return;
         }

@@ -22,5 +22,12 @@ if [ $# -gt 0 ]; then
         exec gosu $WWWUSER "$@"
     fi
 else
+    # PROFILE (control | standard | full) decides which supervisor programs start (docs/architecture/profiles.md).
+    for f in /var/www/html/docker/8.4/profile-env.sh /usr/local/bin/profile-env.sh; do
+        [ -f "$f" ] && . "$f" && break
+    done
+    # Without the script (an old checkout) every program starts, as before profiles existed.
+    : "${START_HISTORY_QUEUE:=false}" "${START_STORAGE_QUEUE:=true}" "${START_HEAVY_QUEUE:=true}" "${START_ANALYSIS_QUEUE:=true}" "${START_STEMS_QUEUE:=true}"
+    export START_HISTORY_QUEUE START_STORAGE_QUEUE START_HEAVY_QUEUE START_ANALYSIS_QUEUE START_STEMS_QUEUE
     exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
 fi
