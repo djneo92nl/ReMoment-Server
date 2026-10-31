@@ -1727,8 +1727,8 @@ paths:
       - { name: track, in: path, required: true, schema: { type: integer }, description: "Library track id (a merged id resolves to the survivor). The track needs an own audio file on this server." }
     post:
       tags: [Library]
-      summary: Ask for a deep analysis of one track (sections), computed in the background
-      description: "Admin only. Queues what is not stored yet for the current file and stage version; a stored result is `already_done`, a missing or unhealthy structure service `not_available` (409). Poll GET for the state. See docs/api/deep-analysis.md."
+      summary: Ask for a deep analysis of one track (sections, stems), computed in the background
+      description: "Admin only. Queues what is not stored yet for the current file and stage version; a stored result is `already_done`, a missing or unhealthy service of a requested kind (structure service for sections, stems service for stems) `not_available` (409). Poll GET for the state. See docs/api/deep-analysis.md."
       operationId: requestDeepAnalysis
       security: [{ adminToken: [] }]
       requestBody:
@@ -1743,7 +1743,7 @@ paths:
       responses:
         "200": { description: "`already_done`", content: { application/json: { schema: { $ref: "#/components/schemas/DeepAnalysisRequest" } } } }
         "202": { description: "`queued`", content: { application/json: { schema: { $ref: "#/components/schemas/DeepAnalysisRequest" } } } }
-        "409": { description: "`not_available`: STRUCTURE_URL unset or the service failed its health check", content: { application/json: { schema: { $ref: "#/components/schemas/DeepAnalysisRequest" } } } }
+        "409": { description: "`not_available`: STRUCTURE_URL / STEMS_URL unset or the service failed its health check", content: { application/json: { schema: { $ref: "#/components/schemas/DeepAnalysisRequest" } } } }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { description: "`unknown_kind`, `no_file` (the track has no own file), or a validation error", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
@@ -1767,6 +1767,7 @@ paths:
                     type: object
                     properties:
                       sections: { $ref: "#/components/schemas/DeepAnalysisState" }
+                      stems: { $ref: "#/components/schemas/DeepAnalysisState" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { description: "`no_file`", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
@@ -2799,12 +2800,13 @@ components:
           description: "What this server can do beyond the base contract. Only keys that are true today are listed as true; treat a missing key as false."
           properties:
             alerts: { type: boolean, description: "GET /api/alerts exists" }
-            deep_analysis: { type: boolean, description: "The structure service answers its health check (cached for a minute): POST /library/tracks/{id}/deep-analysis can queue sections" }
+            deep_analysis: { type: boolean, description: "A deep-analysis service answers its health check (cached for a minute): POST /library/tracks/{id}/deep-analysis can queue something" }
+            deep_analysis_kinds: { type: array, items: { $ref: "#/components/schemas/DeepAnalysisKind" }, description: "The kinds that can run now (sections: structure service; stems: stems service). Present only when not empty." }
 
     DeepAnalysisKind:
       type: string
-      enum: [sections]
-      description: "Only `sections` exists; `mood` and `stems` are planned (workstream 16). An unknown kind is a 422."
+      enum: [sections, stems]
+      description: "`sections` (where the music changes) and `stems` (loudness lanes of vocals, drums, bass, other, and instrumental ranges); `mood` is planned (workstream 16). An unknown kind is a 422."
     DeepAnalysisRequest:
       type: object
       required: [status, queued, estimate]
@@ -2816,6 +2818,8 @@ components:
           description: "An ESTIMATE from the track length, measured on a fast machine; a small PC is slower."
           properties:
             sections_seconds: { type: integer }
+            stems_seconds: { type: integer, description: "5 s + 0.5 s per second of audio by default; 1.5-2.5 s per second on a small PC" }
+            stems_ram_mb: { type: integer, description: "RAM the stems service needs while it works" }
     DeepAnalysisState:
       type: object
       required: [state, finished_at, version, message, stale]
@@ -2825,6 +2829,7 @@ components:
         version: { type: string, nullable: true, description: "Stage version of the stored result" }
         message: { type: string, nullable: true, description: "Why the last run failed (shown while state is failed)" }
         stale: { type: boolean, description: "A stored result exists from an older stage version; state is then none until it is requested again" }
+        available: { type: boolean, description: "This kind's service is configured and healthy right now" }
     TrackSections:
       type: array
       description: "The sections of a track in seconds, from the structure service. Empty when it found none (see sections_reason)."
@@ -2836,6 +2841,26 @@ components:
           end: { type: number }
           label: { type: string, nullable: true, description: "A repetition letter: the same letter = sounds like that other part. Never verse/chorus." }
           confidence: { type: number, description: "Cosine similarity to the best same-letter section, 0 when the letter is unique; not calibrated" }
+    TrackStems:
+      type: object
+      description: "Per-stem loudness curves of a track, from the stems service (Demucs). Each lane is integer dB (RMS of the stem over one frame, relative to full scale, clamped to -80..0), one value per 1/rate_hz seconds from the start of the file. Draw each lane on its own scale."
+      required: [method, rate_hz, vocals, drums, bass, other]
+      properties:
+        method: { type: string, example: htdemucs }
+        rate_hz: { type: integer, example: 2 }
+        vocals: { type: array, items: { type: integer, minimum: -80, maximum: 0 } }
+        drums: { type: array, items: { type: integer, minimum: -80, maximum: 0 } }
+        bass: { type: array, items: { type: integer, minimum: -80, maximum: 0 } }
+        other: { type: array, items: { type: integer, minimum: -80, maximum: 0 } }
+    InstrumentalRanges:
+      type: array
+      description: "Where the vocals lane stays more than 20 dB under the track's own vocal level for at least 8 s (seconds from the start of the file)."
+      items:
+        type: object
+        required: [start, end]
+        properties:
+          start: { type: number }
+          end: { type: number }
     State:
       type: string
       enum: [playing, standby, paused, unreachable]
@@ -2995,6 +3020,9 @@ components:
           allOf: [{ $ref: "#/components/schemas/TrackSections" }]
           description: Present only when the admin asked for the sections of the playing track (deep analysis).
         sections_reason: { type: string, enum: [too_short, no_structure], description: "Present with an empty `sections`" }
+        stems: { $ref: "#/components/schemas/TrackStems" }
+        vocal_ratio: { type: number, minimum: 0, maximum: 1, description: "Share of the track that is not instrumental. Present with `stems`." }
+        instrumental: { $ref: "#/components/schemas/InstrumentalRanges" }
 
     Artwork:
       type: object
@@ -3322,7 +3350,7 @@ components:
               details:
                 type: object
                 additionalProperties: true
-                description: "genres, quality, credits, analysis … and `sections` (TrackSections, null until requested) with `sections_reason`; see docs/api/library.md"
+                description: "genres, quality, credits, analysis … `sections` (TrackSections, null until requested) with `sections_reason`, and `stems` (TrackStems, null until requested) with `vocal_ratio` and `instrumental`; see docs/api/library.md"
     PlaylistDetail:
       type: object
       properties:
