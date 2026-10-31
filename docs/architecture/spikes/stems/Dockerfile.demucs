@@ -1,0 +1,7 @@
+# Throw-away Demucs spike image (16.4). Not for the tracked tree.
+FROM python:3.12-slim
+ENV PYTHONUNBUFFERED=1 OMP_NUM_THREADS=4
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir torch==2.5.1 numpy
+RUN pip install --no-cache-dir --no-deps demucs==4.1.0 && pip install --no-cache-dir einops huggingface-hub julius pyyaml safetensors tqdm && pip list 2>/dev/null | grep -i -E "^(torch|demucs|numpy|einops|huggingface|julius|safetensors)"
+WORKDIR /work
