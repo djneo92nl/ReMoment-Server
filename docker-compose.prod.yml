@@ -1,3 +1,8 @@
+# Profiles (docs/architecture/profiles.md): PROFILE=control|standard|full in .env picks what the app runs; COMPOSE_PROFILES in
+# .env (written by ansible/templates/env.j2) picks the containers: `db` (MariaDB, Standard and Full), `search` (Meilisearch,
+# Full, optional and unused by the app today), `analysis`, `structure`, `stems` (Full) and the opt-in stream profiles.
+# Control needs only app, redis and mosquitto, and keeps SQLite in the `remoment-sqlite` volume (never a bind mount).
+# Hand-started installs that used MariaDB before profiles: add `db` to COMPOSE_PROFILES (`docker compose --profile db up -d`).
 services:
     app:
         # Host networking: SSDP/mDNS multicast (Sonos, B&O, DLNA discovery) does not
@@ -16,6 +21,8 @@ services:
             SUPERVISOR_PHP_USER: 'sail'
             APP_PORT: '${APP_PORT:-80}'
             QUEUE_WORKERS: '${QUEUE_WORKERS:-1}'
+            # control | standard | full: which supervisor programs start (docker/8.4/profile-env.sh) and what the app runs.
+            PROFILE: '${PROFILE:-standard}'
             # FrankenPHP PHP threads serving requests concurrently (docker/frankenphp/Caddyfile).
             FRANKENPHP_THREADS: '${FRANKENPHP_THREADS:-4}'
             XDEBUG_MODE: 'off'
@@ -25,12 +32,15 @@ services:
             # Own music files: add both paths as local storage locations (/settings/storage).
             - '${MUSIC_DIR:-/srv/music}:${MUSIC_DIR:-/srv/music}'
             - '${LIBRARY_DIR:-/srv/library}:${LIBRARY_DIR:-/srv/library}'
+            # Control's SQLite file (DB_DATABASE=/data/sqlite/database.sqlite): a named volume, because SQLite's locking
+            # does not survive a bind mount (docs/architecture/database.md). Unused by Standard and Full.
+            - 'remoment-sqlite:/data/sqlite'
         depends_on:
             mariadb:
                 condition: service_healthy
+                # Not started in Control (compose profile `db`).
+                required: false
             redis:
-                condition: service_healthy
-            meilisearch:
                 condition: service_healthy
         # Supervisor waits up to 3660 s for the storage worker to finish its job (stopwaitsecs in supervisord.prod.conf); Docker's 10 s default would SIGKILL it first.
         stop_grace_period: 3700s
@@ -38,6 +48,7 @@ services:
 
     # The app runs on the host network, so MariaDB is published on loopback only.
     mariadb:
+        profiles: [db]
         image: 'mariadb:11.4'
         environment:
             MARIADB_ROOT_PASSWORD: '${DB_PASSWORD}'
@@ -71,7 +82,10 @@ services:
             timeout: 5s
         restart: unless-stopped
 
+    # Optional and unused: nothing in the app talks to Meilisearch (no Scout; search is MariaDB). Full may start it
+    # with COMPOSE_PROFILES=...,search; it costs hundreds of MB, so no other profile does.
     meilisearch:
+        profiles: [search]
         image: 'getmeili/meilisearch:latest'
         environment:
             MEILI_NO_ANALYTICS: 'true'
@@ -231,6 +245,7 @@ networks:
         driver: bridge
 
 volumes:
+    remoment-sqlite:
     remoment-mariadb:
     remoment-librespot-cache:
     remoment-analysis-models:

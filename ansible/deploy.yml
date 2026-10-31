@@ -109,7 +109,8 @@
                 docker compose -f docker-compose.prod.yml exec -T -u sail app
                 php artisan db:import-sqlite database/database.sqlite --force
             chdir: "{{ app_dir }}"
-        when: old_sqlite.stat.exists and old_sqlite.stat.size > 0 and not sqlite_marker.stat.exists
+        # Not in Control: its database is SQLite, there is nothing to copy into.
+        when: profile | default('standard') != 'control' and old_sqlite.stat.exists and old_sqlite.stat.size > 0 and not sqlite_marker.stat.exists
         register: sqlite_import
         changed_when: true
 

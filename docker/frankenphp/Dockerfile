@@ -37,7 +37,7 @@ RUN setcap cap_net_bind_service=+ep /usr/local/bin/frankenphp
 
 RUN groupadd --force -g $WWWGROUP sail \
     && useradd -ms /bin/bash --no-user-group -g $WWWGROUP -u 1337 sail \
-    && mkdir -p /data/caddy /config/caddy /.composer \
+    && mkdir -p /data/caddy /data/sqlite /config/caddy /.composer \
     && chown -R sail:sail /data /config \
     && git config --global --add safe.directory /var/www/html
 

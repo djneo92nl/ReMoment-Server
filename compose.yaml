@@ -19,6 +19,8 @@ services:
             XDEBUG_CONFIG: '${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}'
             IGNITION_LOCAL_SITES_PATH: '${PWD}'
             SUPERVISOR_PHP_ALT_PORT: '${APP_PORT_ALT:-8080}'
+            # control | standard | full: which supervisor programs start (docker/8.4/profile-env.sh).
+            PROFILE: '${PROFILE:-standard}'
         volumes:
             - '.:/var/www/html'
             - './docker/8.4/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf'
@@ -28,8 +30,6 @@ services:
             mariadb:
                 condition: service_healthy
             redis:
-                condition: service_started
-            meilisearch:
                 condition: service_started
     # The database lives in a named volume, never a macOS bind mount: SQLite's file locking does not survive
     # the host/VM boundary (docs/architecture/database.md).
@@ -66,7 +66,10 @@ services:
                 - ping
             retries: 3
             timeout: 5s
+    # Optional and unused: nothing in the app talks to Meilisearch (no Scout; search is MariaDB). Start it with
+    # `docker compose --profile search up -d` if you want it.
     meilisearch:
+        profiles: [search]
         image: 'getmeili/meilisearch:latest'
         ports:
             - '${FORWARD_MEILISEARCH_PORT:-7700}:7700'
