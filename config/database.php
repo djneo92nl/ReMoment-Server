@@ -37,10 +37,16 @@ return [
             'database' => env('DB_DATABASE', database_path('database.sqlite')),
             'prefix' => '',
             'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
-            'busy_timeout' => null,
-            'journal_mode' => null,
-            'synchronous' => null,
-            'transaction_mode' => 'DEFERRED',
+            // Control keeps its data here (docs/architecture/profiles.md): WAL lets readers and the one writer work at the same
+            // time and busy_timeout (ms) makes a writer wait for the lock instead of failing with `database is locked`.
+            // WAL needs a native or named volume, never a bind mount (docs/architecture/database.md); in-memory (tests) ignores both.
+            'busy_timeout' => env('DB_BUSY_TIMEOUT', 10000),
+            'journal_mode' => env('DB_JOURNAL_MODE', 'WAL'),
+            'synchronous' => env('DB_SYNCHRONOUS', 'NORMAL'),
+            // IMMEDIATE takes the write lock when a transaction begins. With DEFERRED a transaction that reads and then writes fails
+            // at once with `database is locked` when another writer committed in between (busy_timeout cannot help there): measured by
+            // `php artisan profile:stress-sqlite` on the play-history style read-then-write transaction.
+            'transaction_mode' => env('DB_TRANSACTION_MODE', 'IMMEDIATE'),
         ],
 
         'mysql' => [

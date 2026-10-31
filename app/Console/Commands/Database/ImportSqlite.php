@@ -2,10 +2,9 @@
 
 namespace App\Console\Commands\Database;
 
+use App\Domain\Database\SqliteImporter;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-use Throwable;
 
 class ImportSqlite extends Command
 {
@@ -33,15 +32,9 @@ class ImportSqlite extends Command
             return self::FAILURE;
         }
 
-        config(['database.connections.sqlite_import' => [
-            'driver' => 'sqlite', 'database' => $path, 'prefix' => '', 'foreign_key_constraints' => false,
-        ]]);
-        $source = DB::connection('sqlite_import');
+        $source = SqliteImporter::open($path);
         $target = DB::connection();
-
-        $tables = $source->table('sqlite_master')->where('type', 'table')->where('name', 'not like', 'sqlite_%')
-            ->orderBy('name')->pluck('name')->reject(fn ($t) => in_array($t, self::SKIP, true))
-            ->filter(fn ($t) => Schema::hasTable($t))->values();
+        $tables = SqliteImporter::tables($source, $target);
 
         foreach ($tables as $table) {
             if ($target->table($table)->exists() && !$this->option('force')) {
@@ -51,65 +44,10 @@ class ImportSqlite extends Command
             }
         }
 
-        $target->statement('SET FOREIGN_KEY_CHECKS=0');
-        $report = [];
-        $failed = 0;
+        $result = (new SqliteImporter(fn ($line) => $this->line($line), fn ($line) => $this->warn($line)))
+            ->copy($source, $target, $tables, (int) $this->option('chunk'));
+        $failed = $result['failed'];
 
-        foreach ($tables as $table) {
-            $target->table($table)->truncate();
-            $columns = array_values(array_intersect(Schema::getColumnListing($table), $source->getSchemaBuilder()->getColumnListing($table)));
-            $copied = 0;
-            $skipped = 0;
-            $buffer = [];
-
-            $flush = function () use (&$buffer, &$copied, &$skipped, $target, $table) {
-                if (!$buffer) {
-                    return;
-                }
-                try {
-                    $target->table($table)->insert($buffer);
-                    $copied += count($buffer);
-                } catch (Throwable) {
-                    foreach ($buffer as $row) {
-                        try {
-                            $target->table($table)->insert($row);
-                            $copied++;
-                        } catch (Throwable $e) {
-                            // SQLite never enforced column lengths (a credits list stored as an artist name):
-                            // keep the row, shortened, rather than orphaning what points at it.
-                            $short = array_map(fn ($v) => is_string($v) && mb_strlen($v) > 255 ? mb_substr($v, 0, 255) : $v, $row);
-                            try {
-                                if ($short === $row) {
-                                    throw $e;
-                                }
-                                $target->table($table)->insert($short);
-                                $copied++;
-                                $this->warn("  {$table}: id ".($row['id'] ?? '?').' had a value over 255 characters, shortened');
-                            } catch (Throwable $e) {
-                                $skipped++;
-                                $this->warn("  {$table}: skipped a row (".mb_substr($e->getMessage(), 0, 160).')');
-                            }
-                        }
-                    }
-                }
-                $buffer = [];
-            };
-
-            foreach ($source->table($table)->select($columns)->cursor() as $row) {
-                $buffer[] = (array) $row;
-                if (count($buffer) >= (int) $this->option('chunk')) {
-                    $flush();
-                }
-            }
-            $flush();
-
-            $total = $source->table($table)->count();
-            $failed += $skipped;
-            $report[] = [$table, $total, $target->table($table)->count(), $skipped];
-            $this->line(sprintf('%-22s %8d -> %8d%s', $table, $total, $target->table($table)->count(), $skipped ? "  ({$skipped} skipped)" : ''));
-        }
-
-        $target->statement('SET FOREIGN_KEY_CHECKS=1');
         $this->newLine();
         $failed
             ? $this->warn("Done with {$failed} skipped rows: see the warnings above.")

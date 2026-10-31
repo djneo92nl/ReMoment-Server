@@ -124,6 +124,11 @@ return [
     'history_queue' => 'history',
 
     /*
+    | Tables whose row counts `profile:upgrade` compares between SQLite and MariaDB after the copy.
+    */
+    'upgrade_verify_tables' => ['users', 'settings', 'devices', 'device_meta', 'device_sources', 'clients', 'client_device', 'plays', 'radio_stations', 'alerts', 'admin_tokens', 'multiroom_presets', 'tracks', 'albums', 'artists'],
+
+    /*
     | The sidecar compose profiles each profile may enable (docker-compose.prod.yml). Ansible turns them on from
     | `analysis_enabled`, `structure_enabled` and `stems_enabled`, never for a profile that lacks the feature.
     */

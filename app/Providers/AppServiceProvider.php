@@ -59,6 +59,11 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->bindLibraryIds();
 
+        // A SQLite file on a bind mount or network share corrupts (Control profile): say so in the log, once a day.
+        if (config('database.default') === 'sqlite' && !$this->app->runningUnitTests()) {
+            \App\Domain\Profile\SqliteGuard::logOnce();
+        }
+
         // MusicBrainz asks for at most one request per second; shared by every enrichment worker.
         RateLimiter::for('musicbrainz', fn () => Limit::perSecond(1));
         // ListenBrainz asks for at most one call a second.
