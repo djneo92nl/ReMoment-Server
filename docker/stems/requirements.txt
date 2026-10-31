@@ -1,0 +1,13 @@
+# Stems service (docs/architecture/stems-service.md). Pins as measured in the spike (docs/architecture/track-stems-spike.md).
+# torch is installed by the Dockerfile (CPU build: from PyPI on arm64, from the PyTorch CPU index on amd64, where PyPI's wheel is the CUDA one).
+# demucs is installed with --no-deps (Dockerfile): its `sphn` dependency has no aarch64 wheel and is unused here (audio goes through ffmpeg).
+numpy==2.5.4
+einops==0.8.2
+julius==0.2.8
+safetensors==0.8.0
+huggingface_hub==2.4.0
+PyYAML==6.0.3
+tqdm==4.70.1
+fastapi==0.162.0
+uvicorn==0.54.0
+python-multipart==0.0.32

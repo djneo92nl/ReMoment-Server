@@ -99,6 +99,13 @@ acoustid_min_score: 0.9
 # Python 3.12 + librosa container, 0.5-1 GB RAM while it works. Adds the `structure` compose profile and STRUCTURE_URL to .env.
 structure_enabled: false
 
+# --- Stems service (env.j2) ------------------------------------------------------
+# Per-stem loudness lanes (vocals, drums, bass, other) and instrumental ranges of one track, computed on demand by the
+# admin (docs/architecture/stems-service.md): Demucs on the CPU, about 1.5 GB RAM and minutes of CPU per track, a 1.6 GB
+# image, weights downloaded at first use (their licence is unclear, see docs/architecture/track-stems-spike.md).
+# Off by default; true adds the `stems` compose profile and STEMS_URL to .env.
+stems_enabled: false
+
 # --- Spotify stream (env.j2) -----------------------------------------------------
 # Spotify on any speaker: librespot (a Spotify Connect receiver) -> ffmpeg -> Icecast serves an MP3
 # stream that speakers without Spotify of their own can play, see docs/architecture/spotify-stream.md.

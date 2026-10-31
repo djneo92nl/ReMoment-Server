@@ -127,6 +127,23 @@ services:
         networks:
             - sail
 
+    # Opt-in stems service (per-stem loudness lanes of one track, on demand): docker compose --profile stems up -d --build stems,
+    # then STEMS_URL=http://stems:8092 (docs/architecture/stems-service.md). Needs about 1.5 GB RAM while it works; the model
+    # weights (84 MB) download from Hugging Face at first use into the volume. Multi-arch: runs natively on arm64.
+    stems:
+        profiles: [stems]
+        build:
+            context: './docker/stems'
+        ports:
+            - '${STEMS_PORT:-8092}:8092'
+        environment:
+            STEMS_MAX_DURATION: '${STEMS_MAX_DURATION:-1200}'
+        mem_limit: '${STEMS_MEM_LIMIT:-3g}'
+        volumes:
+            - 'sail-stems-models:/models'
+        networks:
+            - sail
+
     # Opt-in Spotify stream: docker compose --profile spotify-stream up -d, then LIBRESPOT_ENABLED=true and
     # ICECAST_INTERNAL_URL=http://icecast:8000 (docs/architecture/spotify-stream.md). Docker Desktop does not pass mDNS,
     # so Spotify finds librespot only when the app runs on a Linux host (use docker-compose.prod.yml there).
@@ -200,6 +217,7 @@ volumes:
         driver: local
     sail-librespot-cache:
     sail-analysis-models:
+    sail-stems-models:
     sail-redis:
         driver: local
     sail-meilisearch:

@@ -138,6 +138,28 @@ services:
             - remoment
         restart: unless-stopped
 
+    # Opt-in stems service (per-stem loudness lanes of one track, on demand): docker compose --profile stems up -d, then set
+    # STEMS_URL=http://127.0.0.1:8092 (docs/architecture/stems-service.md). About 1.5 GB RAM and all the CPU it may use for
+    # minutes per track; the model weights download at first use into the volume. arm64 verified, amd64 unverified.
+    stems:
+        profiles: [stems]
+        build:
+            context: './docker/stems'
+        image: 'remoment/stems:latest'
+        cpus: '${STEMS_CPUS:-2}'
+        cpu_shares: 256
+        mem_limit: '${STEMS_MEM_LIMIT:-3g}'
+        environment:
+            STEMS_MAX_DURATION: '${STEMS_MAX_DURATION:-1200}'
+            STEMS_THREADS: '${STEMS_THREADS:-2}'
+        volumes:
+            - 'remoment-stems-models:/models'
+        ports:
+            - '127.0.0.1:8092:8092'
+        networks:
+            - remoment
+        restart: unless-stopped
+
     # Opt-in Spotify stream: docker compose --profile spotify-stream up -d, then set LIBRESPOT_ENABLED=true
     # (docs/architecture/spotify-stream.md). Icecast is published on ICECAST_PORT for the speakers; librespot
     # runs on the host network so Spotify's zeroconf discovery reaches the LAN, and reaches Icecast and the app on 127.0.0.1.
@@ -212,6 +234,7 @@ volumes:
     remoment-mariadb:
     remoment-librespot-cache:
     remoment-analysis-models:
+    remoment-stems-models:
     remoment-redis:
     remoment-meilisearch:
     remoment-mosquitto-data:
