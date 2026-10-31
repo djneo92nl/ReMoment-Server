@@ -8,6 +8,10 @@ Guides a fresh install (zero devices) through the three things a working system 
 2. **Client devices** — explains the self-registration flow (see `docs/api/client-devices.md`) and links to `/settings/clients` for approval. Complete once `Client::count() > 0`, or explicitly skipped.
 3. **Set up your library** — links to `/settings/dlna` and `/settings/spotify`, with a footnote link to `/settings/lastfm` for scrobbling (not a gated step). Complete once a DLNA server exists or Spotify is connected, or explicitly skipped.
 
+## Profile
+
+Above the steps sits the **profile** section (`App\Livewire\ProfilePicker`, also on `/settings/profile`): three cards, Control, Standard and Full, each with what it runs, the hardware it suits, what it needs and its database, all from `config/profile.php` (see [profiles.md](profiles.md)). The card of the profile that runs (`PROFILE` in the environment) is marked *Running*. A click on *Choose* stores the Setting `profile_chosen`; it is an intent only: **the environment wins**. When the choice differs, the page says what to change (`PROFILE` in `.env`, `profile:upgrade` for Control to Standard/Full, `COMPOSE_PROFILES`, a container restart) and that a lower profile is not supported. The profile is not one of the counted steps. A profile without a library (Control) has no library step, so the progress reads "of 2 steps"; the step list is `devicesDone`, `clientsDone` and, when `Profile::allows('library')`, `libraryDone`.
+
 ## Wiring
 
 - `App\Livewire\SetupWizard` (`resources/views/livewire/setup-wizard.blade.php`) computes step status on every render from the same counts/services `SettingsController::index()` already uses (`Device::count()`, `Client::count()`, `DlnaServer::count()`, `SpotifyTokenService::isConnected()`).

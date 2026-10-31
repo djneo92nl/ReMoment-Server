@@ -102,6 +102,8 @@ Suggested order: 1 and 2 in parallel, with 1a (profiles) right behind 1 because 
 - **Web server on a Pi 2.** FrankenPHP (classic mode) is in place and its official image includes armv7, but it has only been verified on arm64 (see 9a, web server and [frankenphp.md](frankenphp.md)); the Pi 2 still needs a measured run.
 - **Pi 2 is 32-bit armv7.** Every image in the Control stack (app, Redis, Mosquitto) needs an armv7 build; *unverified*. If one is missing, the Control floor is the Pi 3 (arm64).
 
+**Status (2026-11-01): built, not verified on hardware.** `PROFILE` drives one gate table (`config/profile.php`, [profiles.md](profiles.md)): scheduled tasks, supervised programs, routes (422 `not_available_in_profile` / a notice page), navigation, queue heartbeats and `features.profile` in `/api/info`; compose profiles `db` and `search` (Meilisearch is unused), Ansible per profile; SQLite for Control with WAL, `busy_timeout`, `IMMEDIATE` transactions, a single history writer and `profile:stress-sqlite`; `profile:upgrade` (Control to Standard); the wizard's profile step. Open: the 24-hour test, a Pi 2 and Pi 3 run, armv7 images.
+
 Done when: the wizard offers the three profiles, each starts only what it should, a Pi 2 and a Pi 3 meet the budget of 9b for their profile, and moving Control to Standard keeps the data.
 
 ## 1b. Queue stability and management

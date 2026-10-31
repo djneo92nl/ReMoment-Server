@@ -32,6 +32,7 @@ docs/
     openapi.yaml            OpenAPI 3 contract for native clients (info, devices, playback, radio, multiroom, library, clients); update it when an endpoint's shape changes
     device-settings.md      Sound adjustment (bass/treble/loudness), Bluetooth pairing, device name: endpoints, shapes, per-platform support
   architecture/
+    profiles.md             Profiles (workstream 1a): Control / Standard / Full, `PROFILE`, the gate table in config/profile.php, how scheduler, workers, routes, nav and containers are gated, SQLite for Control and its conditions, `profile:stress-sqlite`, `profile:upgrade`, what is unverified
     client-devices.md       DB schema, model, controller, admin UI internals
     backup-restore.md       backup:run / backup:restore: archive contents, secrets excluded by default, fresh-install restore, SQLite and SD-card note, upgrade flow
     availability-layer.md   Availability layer design (workstream 3): providers, catalogue_albums/album_availability, MusicBrainz discography sync, wishlist, API/UI, build order (plan, not built)
@@ -89,6 +90,10 @@ When adding a significant feature, add a matching doc in the relevant subfolder 
 
 `/mcp` (`app/Mcp/`, `laravel/mcp`, `routes/ai.php`) lets an AI agent control devices and manage the library. Open like the REST API; the tools marked ADMIN (maintenance, removal, storage) are listed only with the admin bearer token (no new accounts). Device/library tools go through `App\Mcp\ApiBridge`, an in-process call of the REST API, so the API stays the single implementation: when you add an endpoint, add or extend a tool in `app/Mcp/Tools/` and the table in `docs/api/mcp.md`. Playlist create/edit/delete lives in `App\Domain\Library\PlaylistEditor` (web UI and MCP share it). See `docs/api/mcp.md`.
 
+## Profiles
+
+`PROFILE=control|standard|full` in `.env` (default `standard`) decides what runs; read it only through `App\Domain\Profile\Profile` (`allows('library')`), gate tables in `config/profile.php`. Control (Pi, device control, SQLite in a named volume) has no library, catalogue or analysis: scheduled tasks use `->when(fn () => Profile::allows(...))`, supervisor programs read `START_*` from `docker/8.4/profile-env.sh`, gated URLs answer `422 not_available_in_profile` (API) or redirect to `/not-in-profile` (web), `GET /api/info` has `features.profile`. A new scheduled task, worker, route group or nav entry of a feature must be gated (a test fails for an ungated task). See `docs/architecture/profiles.md`.
+
 ## Common Commands
 
 ```bash
@@ -107,6 +112,10 @@ php artisan test tests/Path/To/TestFile.php
 
 # Code style
 ./vendor/bin/pint
+
+# Profiles: stress the Control write load on a temp SQLite file (the 24-hour gate: --minutes=1440), and move Control to Standard (SQLite to MariaDB; backup first, edits no .env); see docs/architecture/profiles.md
+php artisan profile:stress-sqlite [--minutes=1] [--listeners=6] [--workers=2] [--web=2] [--intensity=1] [--json]
+php artisan profile:upgrade [--to-profile=standard|full] [--database=remoment] [--dry-run] [--force]
 
 # Backup (database + safe settings + manifest, no secrets unless --with-secrets; scheduled nightly, keeps BACKUP_KEEP) and restore on a fresh `migrate`; see docs/architecture/backup-restore.md
 php artisan backup:run [--path=] [--keep=N] [--no-db] [--with-secrets]
@@ -172,7 +181,7 @@ Base URL: `/api` — no authentication required.
 
 ### Server Info
 
-**`GET /api/info`** — bootstrap info for client devices: `{ name, version, api_version, base_url, api_base_url, artwork_base_url, mqtt: { host, port, ws_port, ws_url, topic_prefix }, placeholder }`. `placeholder` is a full artwork object (`kind: "source"`, the music-note logo, rendered on the spot if missing) for clients to show whenever there is no artwork, e.g. while a cover is first processed. `features` is `{ alerts: true, deep_analysis: bool, deep_analysis_kinds?: ["sections", "stems"] }` (only keys true today; `deep_analysis` while a deep-analysis service answers its health check, `deep_analysis_kinds` lists the kinds that can run now, present only when not empty). Addresses are as the client reached the server; `mqtt.host` is `MQTT_PUBLIC_HOST` or the request host (never the Docker-internal `MQTT_HOST`); `mqtt.ws_port`/`ws_url` are the WebSocket listener (`MQTT_PUBLIC_WS_PORT`, default 9001; `MQTT_WS_URL` overrides the URL). See `docs/api/server-info.md`.
+**`GET /api/info`** — bootstrap info for client devices: `{ name, version, api_version, base_url, api_base_url, artwork_base_url, mqtt: { host, port, ws_port, ws_url, topic_prefix }, placeholder }`. `placeholder` is a full artwork object (`kind: "source"`, the music-note logo, rendered on the spot if missing) for clients to show whenever there is no artwork, e.g. while a cover is first processed. `features` is `{ alerts: true, profile: "control"|"standard"|"full", deep_analysis: bool, deep_analysis_kinds?: ["sections", "stems"] }` (only keys true today; `deep_analysis` while a deep-analysis service answers its health check, `deep_analysis_kinds` lists the kinds that can run now, present only when not empty). Addresses are as the client reached the server; `mqtt.host` is `MQTT_PUBLIC_HOST` or the request host (never the Docker-internal `MQTT_HOST`); `mqtt.ws_port`/`ws_url` are the WebSocket listener (`MQTT_PUBLIC_WS_PORT`, default 9001; `MQTT_WS_URL` overrides the URL). See `docs/api/server-info.md`.
 
 ### Alerts
 
