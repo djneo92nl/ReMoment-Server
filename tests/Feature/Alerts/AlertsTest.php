@@ -273,6 +273,8 @@ class AlertsTest extends TestCase
 
     public function test_a_failing_check_does_not_stop_the_others(): void
     {
+        // An empty directory of its own: the real storage/app/backups may hold tonight's backup, which would resolve backup.stale.
+        config(['backup.path' => sys_get_temp_dir().'/alerts-no-backups-'.uniqid()]);
         $this->mock(\App\Domain\Health\ExternalServices::class)->shouldReceive('probeStorage')->andThrow(new \RuntimeException('x'));
         \App\Models\StorageLocation::create(['name' => 'Music', 'driver' => 'local', 'config' => ['root' => '/nope']]);
 
