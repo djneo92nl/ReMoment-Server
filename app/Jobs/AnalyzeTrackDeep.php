@@ -16,8 +16,8 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * One deep-analysis kind (`DeepAnalysis::KINDS`, now `sections`) for one file, on the `analysis` queue; asked for by the
- * admin for one track, never queued in bulk. The `queued`/`running` markers are cleared however it ends (the marker
+ * One deep-analysis kind (`DeepAnalysis::KINDS`: `sections`, `stems`) for one file, on the kind's own queue (`analysis`,
+ * `stems`); asked for by the admin for one track, never queued in bulk. The `queued`/`running` markers are cleared however it ends (the marker
  * TTLs cover a worker that dies); a failure is recorded as the stage's error so the API can show its message, and
  * asking again retries.
  */
@@ -35,9 +35,10 @@ class AnalyzeTrackDeep implements ShouldBeUnique, ShouldQueue
 
     public function __construct(public readonly File $file, public readonly string $kind)
     {
-        // The service's own timeout plus decoding the file; below the worker's --timeout and queue `retry_after`.
-        $this->timeout = (int) config('analysis.structure_timeout') + 60;
-        $this->onQueue(config('analysis.queue'));
+        // The stage's service timeout plus decoding the file; below its worker's --timeout and queue `retry_after`.
+        $stage = DeepAnalysis::stage($kind);
+        $this->timeout = $stage->jobTimeout();
+        $this->onQueue($stage->queue());
     }
 
     public function uniqueId(): string

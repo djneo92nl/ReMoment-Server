@@ -8,7 +8,7 @@ use App\Models\Media\Track;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
-/** Deep analysis of one track on request (sections now); admin token. See docs/api/deep-analysis.md. */
+/** Deep analysis of one track on request (sections, stems); admin token. See docs/api/deep-analysis.md. */
 class DeepAnalysisController extends Controller
 {
     public function store(Request $request, Track $track): JsonResponse
@@ -23,7 +23,11 @@ class DeepAnalysisController extends Controller
         }
 
         $result = DeepAnalysis::request($file, $data['kinds']);
-        $estimate = ['sections_seconds' => DeepAnalysis::estimateSeconds('sections', $track->duration)];
+        $estimate = [];
+        foreach (DeepAnalysis::kinds() as $kind) {
+            $estimate["{$kind}_seconds"] = DeepAnalysis::estimateSeconds($kind, $track->duration);
+        }
+        $estimate['stems_ram_mb'] = (int) DeepAnalysis::stage('stems')->estimateRamMb();
 
         return response()->json($result + ['estimate' => $estimate], match ($result['status']) {
             'queued' => 202,
@@ -41,7 +45,7 @@ class DeepAnalysisController extends Controller
         $analysis = $file->analysis()->first();
         $kinds = [];
         foreach (DeepAnalysis::kinds() as $kind) {
-            $kinds[$kind] = DeepAnalysis::state($file, $analysis, $kind);
+            $kinds[$kind] = DeepAnalysis::state($file, $analysis, $kind) + ['available' => DeepAnalysis::available($kind)];
         }
 
         return response()->json(['track_id' => $track->id, 'available' => DeepAnalysis::anyAvailable(), 'kinds' => $kinds]);

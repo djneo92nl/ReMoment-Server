@@ -13,7 +13,8 @@ use Illuminate\Support\Facades\Http;
 /**
  * Deep analysis of ONE track on request (workstream 16): per-track results that are too slow or too rare to compute
  * for the whole library, so they are admin-triggered, stored, and never part of the nightly run. Each KIND is backed by
- * an `OnDemandStage`; `mood` and `stems` get a row in KINDS when they exist. See docs/api/deep-analysis.md.
+ * an `OnDemandStage` that says where its result is stored, which service computes it and on which queue it runs;
+ * `mood` gets a row in KINDS when it exists. See docs/api/deep-analysis.md.
  *
  * States per kind and file: `none`, `queued`, `running` (cache markers set by the endpoint and the job, with a TTL so a
  * dead worker never leaves one behind), `done` (stored, current file, current stage version), `failed` (last run at this
@@ -22,7 +23,7 @@ use Illuminate\Support\Facades\Http;
 final class DeepAnalysis
 {
     /** kind => the on-demand stage that computes it. */
-    public const KINDS = ['sections' => 'structure'];
+    public const KINDS = ['sections' => 'structure', 'stems' => 'stems'];
 
     /** How long a `queued` marker lasts: the analysis queue can be busy with the nightly run for hours. */
     private const QUEUED_TTL = 43200;
@@ -52,13 +53,14 @@ final class DeepAnalysis
     /** Whether this kind can run now: its service is configured and answers its health check (remembered for a minute). */
     public static function available(string $kind): bool
     {
-        $url = config('analysis.structure_url');
+        $stage = self::stage($kind);
+        $url = $stage->serviceUrl();
 
-        if ($kind !== 'sections' || !$url || !self::stage($kind)->enabled()) {
+        if (!$url || !$stage->enabled()) {
             return false;
         }
 
-        return Cache::remember('deep:structure-health', 60, function () use ($url) {
+        return Cache::remember("deep:health:{$stage->key()}:".md5($url), 60, function () use ($url) {
             try {
                 $response = Http::timeout(3)->get(rtrim($url, '/').'/health');
 
@@ -69,16 +71,22 @@ final class DeepAnalysis
         });
     }
 
+    /** The kinds that can run now: `features.deep_analysis_kinds` of GET /api/info. @return list<string> */
+    public static function availableKinds(): array
+    {
+        return array_values(array_filter(self::kinds(), self::available(...)));
+    }
+
     /** True when any kind can run: `features.deep_analysis` of GET /api/info. */
     public static function anyAvailable(): bool
     {
-        return (bool) array_filter(self::kinds(), self::available(...));
+        return self::availableKinds() !== [];
     }
 
     /** Seconds a kind is expected to take for this track, from its length: an estimate, measured on a fast machine. */
     public static function estimateSeconds(string $kind, ?int $trackSeconds): int
     {
-        return (int) ceil((float) config('analysis.structure_seconds_fixed') + (float) config('analysis.structure_seconds_per_second') * max(0, (int) $trackSeconds));
+        return self::stage($kind)->estimateSeconds($trackSeconds);
     }
 
     /** @return array{state: string, finished_at: ?string, version: ?string, message: ?string, stale: bool} */
@@ -167,9 +175,7 @@ final class DeepAnalysis
         }
 
         $analysis->forgetStage($stage->key());
-        if ($kind === 'sections') {
-            $analysis->sections = null;
-        }
+        $analysis->{$stage->column()} = null;
         $analysis->save();
 
         return true;

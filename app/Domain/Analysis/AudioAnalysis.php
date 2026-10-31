@@ -7,6 +7,7 @@ use App\Domain\Analysis\Stages\EssentiaStage;
 use App\Domain\Analysis\Stages\FingerprintStage;
 use App\Domain\Analysis\Stages\LoudnessStage;
 use App\Domain\Analysis\Stages\QualityStage;
+use App\Domain\Analysis\Stages\StemsStage;
 use App\Domain\Analysis\Stages\StructureStage;
 use App\Domain\Analysis\Stages\WaveformStage;
 use App\Domain\Library\Enrichment;
@@ -49,7 +50,7 @@ class AudioAnalysis
      */
     public static function onDemandStages(): array
     {
-        $stages = [new StructureStage];
+        $stages = [new StructureStage, new StemsStage];
 
         return array_combine(array_map(fn (OnDemandStage $s) => $s->key(), $stages), $stages);
     }

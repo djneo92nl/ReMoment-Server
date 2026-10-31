@@ -95,4 +95,24 @@ return [
     'structure_seconds_per_second' => (float) env('STRUCTURE_SECONDS_PER_SECOND', 0.012),
     'structure_seconds_fixed' => (float) env('STRUCTURE_SECONDS_FIXED', 2),
 
+    /*
+    | The stems service (docker/stems, compose profile "stems"): per-stem loudness lanes and instrumental ranges of ONE
+    | track, on demand only (AnalyzeTrackDeep on its own `stems` queue), never part of the nightly run. Unset = the
+    | `stems` kind is not available. docs/architecture/stems-service.md.
+    */
+    'stems_url' => env('STEMS_URL'),
+
+    /** The queue and its single worker (docker/8.4/supervisord*.conf: one at a time, nice 15). */
+    'stems_queue' => env('STEMS_QUEUE', 'stems'),
+
+    /** Seconds a request to the stems service may take: the 20 minute duration limit at about 2.5 s per second of audio on a small PC. Keep the job timeout (this + 60) under the stems worker's --timeout=3300 and the queue's retry_after. */
+    'stems_timeout' => (int) env('STEMS_TIMEOUT', 3000),
+
+    /** Estimate shown before a stems run: seconds per second of audio, plus a fixed part. Measured on 4 threads of an Apple M5 Pro (0.45); a small PC is 3-5 times slower. */
+    'stems_seconds_per_second' => (float) env('STEMS_SECONDS_PER_SECOND', 0.5),
+    'stems_seconds_fixed' => (float) env('STEMS_SECONDS_FIXED', 5),
+
+    /** What the service needs while it works (measured: flat 1.5 GB in 60 s windows), shown with the estimate. */
+    'stems_ram_mb' => (int) env('STEMS_RAM_MB', 1500),
+
 ];

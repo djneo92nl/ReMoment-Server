@@ -39,6 +39,37 @@ class StructureStage implements DecodedStage, OnDemandStage
         return (bool) config('analysis.structure_url') && Tools::available(Tools::ffmpeg());
     }
 
+    public function column(): string
+    {
+        return 'sections';
+    }
+
+    public function serviceUrl(): ?string
+    {
+        return config('analysis.structure_url') ?: null;
+    }
+
+    public function queue(): string
+    {
+        return config('analysis.queue');
+    }
+
+    public function jobTimeout(): int
+    {
+        // The service's own timeout plus decoding the file; below the worker's --timeout and queue `retry_after`.
+        return (int) config('analysis.structure_timeout') + 60;
+    }
+
+    public function estimateSeconds(?int $trackSeconds): int
+    {
+        return (int) ceil((float) config('analysis.structure_seconds_fixed') + (float) config('analysis.structure_seconds_per_second') * max(0, (int) $trackSeconds));
+    }
+
+    public function estimateRamMb(): ?int
+    {
+        return null;
+    }
+
     public function run(File $file, string $localPath, FileAnalysis $analysis): array
     {
         return DecodePass::runAlone($this, $file, $localPath, $analysis);

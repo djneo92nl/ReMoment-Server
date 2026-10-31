@@ -8,6 +8,7 @@ use App\Domain\Device\DeviceCache;
 use App\Domain\Device\RemoteKey;
 use App\Domain\Device\State;
 use App\Domain\Library\NowPlayingSections;
+use App\Domain\Library\NowPlayingStems;
 use App\Domain\Library\NowPlayingWaveform;
 use App\Integrations\Contracts\RemoteControlInterface;
 use App\Models\Media\Track;
@@ -43,6 +44,10 @@ class DeviceDetailResource extends JsonResource
                     if ($sections['reason'] !== null) {
                         $nowPlaying['sections_reason'] = $sections['reason'];
                     }
+                }
+
+                if (($stems = NowPlayingStems::for($cachedNowPlaying)) !== null) {
+                    $nowPlaying += $stems;
                 }
 
                 $track = $this->resolveTrack($cachedNowPlaying);

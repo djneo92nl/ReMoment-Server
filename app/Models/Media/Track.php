@@ -238,6 +238,7 @@ class Track extends Model
     public function details(): array
     {
         $sections = $this->sections();
+        $stems = $this->stems();
 
         return [
             'genres' => $this->genres(),
@@ -251,6 +252,9 @@ class Track extends Model
             'analysis' => $this->sound(),
             'sections' => $sections['sections'] ?? null,
             'sections_reason' => $sections['reason'] ?? null,
+            'stems' => $stems['stems'] ?? null,
+            'vocal_ratio' => $stems['vocal_ratio'] ?? null,
+            'instrumental' => $stems['instrumental'] ?? null,
         ];
     }
 
@@ -270,6 +274,29 @@ class Track extends Model
         }
 
         return ['sections' => $stored['items'], 'reason' => $stored['reason'] ?? null, 'method' => $stored['method'] ?? 'novelty-v1'];
+    }
+
+    /**
+     * The stems of the track's own audio file when someone asked for them (deep analysis, `stems` stage), else null:
+     * `stems` is { method, rate_hz, vocals, drums, bass, other } (each lane integer dB per 1 / rate_hz seconds),
+     * `vocal_ratio` 0-1 and `instrumental` [{start, end}] in seconds.
+     *
+     * @return array{stems: array<string, mixed>, vocal_ratio: float, instrumental: list<array{start: float, end: float}>}|null
+     */
+    public function stems(): ?array
+    {
+        $a = $this->relationLoaded('analysis') ? $this->analysis : $this->analysis()->first();
+        $stored = $a?->stems;
+
+        if (!is_array($stored) || !isset($stored['lanes']) || !is_array($stored['lanes'])) {
+            return null;
+        }
+
+        return [
+            'stems' => ['method' => $stored['method'] ?? 'htdemucs', 'rate_hz' => $stored['rate_hz'] ?? 2] + $stored['lanes'],
+            'vocal_ratio' => (float) ($stored['vocal_ratio'] ?? 0),
+            'instrumental' => $stored['instrumental'] ?? [],
+        ];
     }
 
     /**

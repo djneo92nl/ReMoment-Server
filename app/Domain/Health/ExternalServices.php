@@ -111,6 +111,7 @@ class ExternalServices
         $probes['acoustid'] = ['AcoustID', 'Analysis', fn () => $this->acoustId()];
         $probes['essentia'] = ['Essentia sidecar', 'Analysis', fn () => $this->essentia()];
         $probes['structure'] = ['Structure service', 'Analysis', fn () => $this->structure()];
+        $probes['stems'] = ['Stems service', 'Analysis', fn () => $this->stems()];
 
         foreach (StorageLocation::all() as $location) {
             $probes["storage_{$location->id}"] = ["Storage: {$location->name}", 'Storage', fn () => $this->storage($location)];
@@ -183,6 +184,28 @@ class ExternalServices
         return $response->ok() && $response->json('ok')
             ? ServiceCheck::ok('Structure service '.($response->json('method') ?? '').' v'.($response->json('version') ?? '?'))
             : ServiceCheck::error("Structure service answered HTTP {$response->status()}");
+    }
+
+    private function stems(): ServiceCheck
+    {
+        if (!config('analysis.stems_url')) {
+            return ServiceCheck::disabled('STEMS_URL not set: no stem lanes of a track (deep analysis)');
+        }
+
+        $response = $this->http()->get(rtrim(config('analysis.stems_url'), '/').'/health');
+
+        if (!$response->ok()) {
+            return ServiceCheck::error("Stems service answered HTTP {$response->status()}");
+        }
+
+        if ($response->json('ok')) {
+            return ServiceCheck::ok('Stems service '.($response->json('method') ?? '').' v'.($response->json('version') ?? '?'));
+        }
+
+        // Up but without a model: still loading, or the weights could not be downloaded (offline, full volume).
+        return $response->json('error')
+            ? ServiceCheck::error('Stems service has no model: '.$response->json('error'))
+            : ServiceCheck::warning('Stems service is loading its model');
     }
 
     private function http(): PendingRequest

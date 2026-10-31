@@ -22,16 +22,22 @@ final class Queues
     /** MusicBrainz discography syncs: short, rate limited jobs; served by the `heavy` worker so no extra process runs on a small board. */
     public const CATALOGUE = 'catalogue';
 
+    /** Stems of one track (Demucs, minutes of CPU): a worker of its own, one job at a time, so it never holds up the analysis queue. */
+    public static function stems(): string
+    {
+        return (string) config('analysis.stems_queue');
+    }
+
     /** Queues that get a heartbeat job every minute: one per worker program. @return list<string> */
     public static function heartbeat(): array
     {
-        return [self::HEALTH, RunStorageTask::QUEUE, config('analysis.queue'), self::HEAVY];
+        return [self::HEALTH, RunStorageTask::QUEUE, config('analysis.queue'), self::HEAVY, self::stems()];
     }
 
     /** All queues shown on the health page. @return list<string> */
     public static function all(): array
     {
-        return array_values(array_unique([self::HEALTH, self::DEFAULT, RunStorageTask::QUEUE, config('analysis.queue'), config('proxies.queue'), self::HEAVY, self::CATALOGUE, config('queue.connections.redis.queue', 'default')]));
+        return array_values(array_unique([self::HEALTH, self::DEFAULT, RunStorageTask::QUEUE, config('analysis.queue'), self::stems(), config('proxies.queue'), self::HEAVY, self::CATALOGUE, config('queue.connections.redis.queue', 'default')]));
     }
 
     /** Seconds the longest job of a queue may run (its worker's --timeout), plus a margin: a reserved job older than this means a hung worker. */
@@ -39,6 +45,7 @@ final class Queues
     {
         return match ($queue) {
             RunStorageTask::QUEUE => 3600 + 100,
+            self::stems() => 3300 + 100,
             default => 900 + 100,
         };
     }

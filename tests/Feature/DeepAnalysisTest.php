@@ -291,7 +291,7 @@ class DeepAnalysisTest extends TestCase
 
         $this->postJson("/api/library/tracks/{$track->id}/deep-analysis", ['kinds' => ['sections']], $this->auth())
             ->assertStatus(202)
-            ->assertExactJson(['status' => 'queued', 'queued' => ['sections'], 'estimate' => ['sections_seconds' => 5]]);
+            ->assertExactJson(['status' => 'queued', 'queued' => ['sections'], 'estimate' => ['sections_seconds' => 5, 'stems_seconds' => 105, 'stems_ram_mb' => 1500]]);
 
         Queue::assertPushedOn('analysis', AnalyzeTrackDeep::class, fn ($job) => $job->file->is($file) && $job->kind === 'sections');
         $this->getJson("/api/library/tracks/{$track->id}/deep-analysis", $this->auth())
@@ -355,10 +355,10 @@ class DeepAnalysisTest extends TestCase
         [, $track] = $this->localTrack();
         $url = "/api/library/tracks/{$track->id}/deep-analysis";
 
-        $this->postJson($url, ['kinds' => ['stems']], $this->auth())->assertStatus(422)->assertJsonPath('error', 'unknown_kind');
+        $this->postJson($url, ['kinds' => ['mood']], $this->auth())->assertStatus(422)->assertJsonPath('error', 'unknown_kind');
         $this->postJson($url, ['kinds' => ['sections', 'mood']], $this->auth())->assertStatus(422)->assertJsonPath('error', 'unknown_kind');
         $this->postJson($url, [], $this->auth())->assertStatus(422);
-        $this->deleteJson("{$url}/stems", [], $this->auth())->assertStatus(422)->assertJsonPath('error', 'unknown_kind');
+        $this->deleteJson("{$url}/mood", [], $this->auth())->assertStatus(422)->assertJsonPath('error', 'unknown_kind');
 
         $streaming = Track::create(['artist_id' => $track->artist_id, 'album_id' => $track->album_id, 'name' => 'Stream', 'duration' => 100, 'source' => 'spotify', 'external_id' => 'spotify:track:x']);
         foreach ([fn () => $this->postJson("/api/library/tracks/{$streaming->id}/deep-analysis", ['kinds' => ['sections']], $this->auth()), fn () => $this->getJson("/api/library/tracks/{$streaming->id}/deep-analysis", $this->auth())] as $call) {
@@ -431,7 +431,7 @@ class DeepAnalysisTest extends TestCase
             ->assertOk()->assertSee('queued')->assertSee('sections_seconds');
         ReMomentServer::tool(McpTools\DeepAnalysis::class, ['action' => 'status', 'track_id' => $track->id])
             ->assertOk()->assertSee('queued');
-        ReMomentServer::tool(McpTools\DeepAnalysis::class, ['action' => 'request', 'track_id' => $track->id, 'kinds' => ['stems']])
+        ReMomentServer::tool(McpTools\DeepAnalysis::class, ['action' => 'request', 'track_id' => $track->id, 'kinds' => ['mood']])
             ->assertHasErrors(['unknown_kind']);
         ReMomentServer::tool(McpTools\DeepAnalysis::class, ['action' => 'remove', 'track_id' => $track->id])->assertOk();
         Queue::assertPushed(AnalyzeTrackDeep::class, 1);

@@ -48,7 +48,7 @@ class InfoApiTest extends TestCase
         Http::fake(['structure:8091/health' => function () use (&$healthy) {
             return $healthy ? Http::response(['ok' => true, 'version' => 1, 'method' => 'novelty-v1']) : Http::response('', 503);
         }]);
-        $this->getJson('/api/info')->assertJsonPath('features', ['alerts' => true, 'deep_analysis' => true]);
+        $this->getJson('/api/info')->assertJsonPath('features', ['alerts' => true, 'deep_analysis' => true, 'deep_analysis_kinds' => ['sections']]);
 
         Cache::flush();
         $healthy = false;

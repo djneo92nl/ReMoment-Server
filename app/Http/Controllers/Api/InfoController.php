@@ -23,6 +23,8 @@ class InfoController extends Controller
         $mqttHost = config('mqtt.public_host') ?: $request->getHost();
         $wsPort = (int) config('mqtt.public_ws_port');
 
+        $deepKinds = DeepAnalysis::availableKinds();
+
         return response()->json([
             'name' => config('app.name'),
             'version' => (string) config('app.version'),
@@ -43,9 +45,10 @@ class InfoController extends Controller
             // What this server can do beyond the base contract; only keys that are true today, a client treats a missing key as false.
             'features' => [
                 'alerts' => true,
-                // The structure service answers its health check (cached for a minute): sections of a track on request.
-                'deep_analysis' => DeepAnalysis::anyAvailable(),
-            ],
+                // A deep-analysis service answers its health check (cached for a minute): sections or stems of a track on request;
+                // deep_analysis_kinds says which.
+                'deep_analysis' => $deepKinds !== [],
+            ] + ($deepKinds !== [] ? ['deep_analysis_kinds' => $deepKinds] : []),
         ]);
     }
 }

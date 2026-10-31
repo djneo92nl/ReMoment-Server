@@ -10,7 +10,7 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
-#[Description('ADMIN (needs the admin token). Deep analysis of ONE track on request (docs/api/deep-analysis.md): request (track_id, kinds, default ["sections"]) queues what is not stored yet and answers status queued | already_done | not_available with a time estimate; status (track_id) says per kind none | queued | running | done | failed; remove (track_id, kind) deletes a stored result. Kind `sections` finds where the music changes (the structure service). The result shows in the track details (`sections`). Goes through the admin REST API, so its answers and errors are the same.')]
+#[Description('ADMIN (needs the admin token). Deep analysis of ONE track on request (docs/api/deep-analysis.md): request (track_id, kinds, default ["sections"]) queues what is not stored yet and answers status queued | already_done | not_available with a time estimate; status (track_id) says per kind none | queued | running | done | failed; remove (track_id, kind) deletes a stored result. Kind `sections` finds where the music changes (the structure service); kind `stems` separates vocals, drums, bass and other (Demucs, minutes of CPU, about 1.5 GB RAM, on its own queue) and stores a loudness lane per stem, the vocal ratio and the instrumental ranges. The result shows in the track details (`sections`; `stems`, `vocal_ratio`, `instrumental`). Goes through the admin REST API, so its answers and errors are the same.')]
 class DeepAnalysis extends Tool
 {
     use CallsApi;
@@ -21,8 +21,8 @@ class DeepAnalysis extends Tool
         return [
             'action' => $schema->string()->enum(['request', 'status', 'remove'])->required(),
             'track_id' => $schema->integer()->description('Library track id')->required(),
-            'kinds' => $schema->array()->items($schema->string())->description('request: kinds to compute, default ["sections"]'),
-            'kind' => $schema->string()->description('remove: the kind to delete, default "sections"'),
+            'kinds' => $schema->array()->items($schema->string())->description('request: kinds to compute, `sections` and/or `stems`, default ["sections"]'),
+            'kind' => $schema->string()->description('remove: the kind to delete (`sections` or `stems`), default "sections"'),
         ];
     }
 
