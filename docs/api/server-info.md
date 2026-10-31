@@ -23,7 +23,7 @@ Unauthenticated, like the rest of the API. Controller: `app/Http/Controllers/Api
     "ws_port": 9001,
     "ws_url": "ws://192.168.1.100:9001"
   },
-  "features": { "alerts": true, "deep_analysis": true, "deep_analysis_kinds": ["sections", "stems"] },
+  "features": { "alerts": true, "profile": "full", "deep_analysis": true, "deep_analysis_kinds": ["sections", "stems"] },
   "placeholder": {
     "kind": "source",
     "proxy_512": "http://remoment.local/storage/artwork/6910ad50fb63f947ac24032558d3b570/512.jpg",
@@ -51,7 +51,7 @@ Unauthenticated, like the rest of the API. Controller: `app/Http/Controllers/Api
 | `mqtt.ws_port` | `MQTT_PUBLIC_WS_PORT`, default `9001` | The broker's WebSocket listener, for clients that speak MQTT over WebSocket (browsers, iOS apps) |
 | `mqtt.ws_url` | `MQTT_WS_URL`, else `ws://{mqtt.host}:{ws_port}` (`wss://` when the request was HTTPS) | Ready-to-use WebSocket URL. Set `MQTT_WS_URL` when the broker sits behind a reverse proxy |
 | `mqtt.topic_prefix` | constant | Device topics are `{topic_prefix}/{device_id}/{data,progress,state,volume,modes}` |
-| `features` | `InfoController` | What this server can do beyond the base contract, **only keys that are true today**: `alerts` (`GET /api/alerts` exists, always true), `deep_analysis` (a deep-analysis service answers its health check, cached for a minute: something can be requested for a track) and `deep_analysis_kinds` (which kinds can run now: `sections` needs the structure service, `stems` the stems service; present only when not empty; see [deep-analysis.md](deep-analysis.md)). A client treats a missing key as false, so keys can be added without bumping `api_version` |
+| `features` | `InfoController` | What this server can do beyond the base contract, **only keys that are true today** (except `profile`, a string): `alerts` (`GET /api/alerts` exists, always true), `profile` (always present: `control`, `standard` or `full`, the profile the server runs; Control has no library, catalogue or analysis, and those endpoints answer `422 not_available_in_profile` with `{ error, message, profile, feature, required_profile }`; see [profiles.md](../architecture/profiles.md)), `deep_analysis` (a deep-analysis service answers its health check, cached for a minute: something can be requested for a track) and `deep_analysis_kinds` (which kinds can run now: `sections` needs the structure service, `stems` the stems service; present only when not empty; see [deep-analysis.md](deep-analysis.md)). A client treats a missing key as false, so keys can be added without bumping `api_version` |
 | `placeholder` | `NowPlayingArtwork::placeholder()` | Artwork object (same shape as `now_playing.artwork`, `kind: "source"`) of the generic music-note logo. Show it whenever there is no artwork, including the first play of a cover that is still being processed. Rendered on the spot if not cached, so it is always present (`null` only if rendering itself fails). Its hash is the same on every server; cache `proxy_320` (and your screen's background, see below) like any cover |
 
 ### Why the MQTT host isn't `MQTT_HOST`

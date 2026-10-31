@@ -74,6 +74,11 @@ final class DeepAnalysis
     /** The kinds that can run now: `features.deep_analysis_kinds` of GET /api/info. @return list<string> */
     public static function availableKinds(): array
     {
+        // Deep analysis is a Full feature: no sidecar runs in the other profiles, so don't even probe for one.
+        if (!\App\Domain\Profile\Profile::allows('deep_analysis')) {
+            return [];
+        }
+
         return array_values(array_filter(self::kinds(), self::available(...)));
     }
 

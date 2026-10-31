@@ -38,6 +38,8 @@
         <env name="DISCOGS_TOKEN" value=""/>
         <env name="ACOUSTID_API_KEY" value=""/>
         <env name="ANALYSIS_ENABLED" value="false"/>
+        <!-- The suite runs every feature; tests of a smaller profile set config('profile.current'). -->
+        <env name="PROFILE" value="full"/>
         <env name="ANALYSIS_ESSENTIA_URL" value=""/>
         <env name="ANALYSIS_ESSENTIA_ML" value="false"/>
         <env name="ANALYSIS_MOOD_MIN_SCORE" value="0.7"/>

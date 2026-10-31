@@ -2800,6 +2800,7 @@ components:
           description: "What this server can do beyond the base contract. Only keys that are true today are listed as true; treat a missing key as false."
           properties:
             alerts: { type: boolean, description: "GET /api/alerts exists" }
+            profile: { type: string, enum: [control, standard, full], description: "The profile this server runs. Control has no library, catalogue or analysis: those endpoints answer 422 not_available_in_profile (see docs/architecture/profiles.md)" }
             deep_analysis: { type: boolean, description: "A deep-analysis service answers its health check (cached for a minute): POST /library/tracks/{id}/deep-analysis can queue something" }
             deep_analysis_kinds: { type: array, items: { $ref: "#/components/schemas/DeepAnalysisKind" }, description: "The kinds that can run now (sections: structure service; stems: stems service). Present only when not empty." }
 

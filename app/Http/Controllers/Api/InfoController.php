@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Domain\Analysis\DeepAnalysis;
 use App\Domain\Artwork\NowPlayingArtwork;
+use App\Domain\Profile\Profile;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -45,10 +46,13 @@ class InfoController extends Controller
             // What this server can do beyond the base contract; only keys that are true today, a client treats a missing key as false.
             'features' => [
                 'alerts' => true,
+                // The profile this server runs: control | standard | full (docs/architecture/profiles.md).
+                'profile' => Profile::current(),
                 // A deep-analysis service answers its health check (cached for a minute): sections or stems of a track on request;
                 // deep_analysis_kinds says which.
                 'deep_analysis' => $deepKinds !== [],
-            ] + ($deepKinds !== [] ? ['deep_analysis_kinds' => $deepKinds] : []),
+            ]
+            + ($deepKinds !== [] ? ['deep_analysis_kinds' => $deepKinds] : []),
         ]);
     }
 }
