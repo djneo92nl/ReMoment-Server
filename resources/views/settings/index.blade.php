@@ -117,6 +117,10 @@
                     </span>
                 @endif
             </x-settings-row>
+            <x-settings-row href="{{ route('settings.profile') }}" icon="fa-solid fa-layer-group"
+                             label="Profile">
+                {{ \App\Domain\Profile\Profile::label() }} &middot; what this server runs
+            </x-settings-row>
             <x-settings-row href="{{ route('settings.mqtt') }}" icon="fa-solid fa-tower-broadcast"
                              label="MQTT">
                 {{ config('mqtt.host') }}

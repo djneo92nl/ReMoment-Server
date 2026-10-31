@@ -1,12 +1,18 @@
 <div class="space-y-6">
 
     <div class="flex items-center justify-between px-1">
-        <p class="text-sm font-medium text-gray-500">{{ $doneCount }} of 3 steps done</p>
+        <p class="text-sm font-medium text-gray-500">{{ $doneCount }} of {{ $totalSteps }} steps done</p>
         <div class="flex gap-1.5">
-            @for ($i = 0; $i < 3; $i++)
+            @for ($i = 0; $i < $totalSteps; $i++)
                 <span class="w-8 h-1.5 rounded-full {{ $i < $doneCount ? 'bg-emerald-500' : 'bg-gray-200 dark:bg-stone-800' }}"></span>
             @endfor
         </div>
+    </div>
+
+    {{-- What this server runs: not counted as a step, it is decided when the containers start --}}
+    <div class="space-y-3">
+        <h2 class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-600 px-1">Profile</h2>
+        <livewire:profile-picker />
     </div>
 
     {{-- Step 1: Devices --}}
@@ -72,7 +78,8 @@
         </div>
     </x-settings-group>
 
-    {{-- Step 3: Library --}}
+    {{-- Step 3: Library (not in Control) --}}
+    @if($hasLibrary)
     <x-settings-group>
         <div class="p-5 md:p-6">
             <div class="flex items-start gap-4">
@@ -118,6 +125,7 @@
             </div>
         </div>
     </x-settings-group>
+    @endif
 
     <div class="flex justify-end pt-2">
         <x-primary-button size="xl" type="button" wire:click="finish">

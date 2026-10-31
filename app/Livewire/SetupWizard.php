@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Domain\Profile\Profile;
 use App\Models\Client;
 use App\Models\Device;
 use App\Models\DlnaServer;
@@ -41,7 +42,11 @@ class SetupWizard extends Component
         $clientsDone = $clientCount > 0 || Setting::get('setup_step_clients_skipped') !== null;
         $libraryDone = $dlnaServerCount > 0 || $spotifyConnected || Setting::get('setup_step_library_skipped') !== null;
 
-        $doneCount = collect([$devicesDone, $clientsDone, $libraryDone])->filter()->count();
+        // Control has no library, so its wizard has no library step (docs/architecture/profiles.md).
+        $hasLibrary = Profile::allows('library');
+        $steps = $hasLibrary ? [$devicesDone, $clientsDone, $libraryDone] : [$devicesDone, $clientsDone];
+        $totalSteps = count($steps);
+        $doneCount = collect($steps)->filter()->count();
 
         return view('livewire.setup-wizard', [
             'deviceCount' => $deviceCount,
@@ -54,7 +59,9 @@ class SetupWizard extends Component
             'clientsDone' => $clientsDone,
             'libraryDone' => $libraryDone,
             'doneCount' => $doneCount,
-            'allDone' => $doneCount === 3,
+            'totalSteps' => $totalSteps,
+            'hasLibrary' => $hasLibrary,
+            'allDone' => $doneCount === $totalSteps,
         ]);
     }
 }

@@ -12,6 +12,9 @@
         <x-empty-state icon="layer-group" :title="$title" :text="$text">
             <div class="flex flex-wrap justify-center gap-3">
                 <x-primary-button size="md" href="{{ route('devices.index') }}">Back to devices</x-primary-button>
+                @auth
+                    <x-secondary-button size="md" href="{{ route('settings.profile') }}">About profiles</x-secondary-button>
+                @endauth
             </div>
         </x-empty-state>
     </div>
