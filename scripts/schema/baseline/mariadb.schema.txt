@@ -1,0 +1,690 @@
+# driver: mariadb 11.4
+# default collation: utf8mb4_uca1400_ai_ci
+
+TABLE admin_tokens [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col created_at timestamp NULL default=NULL
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col last_used_at timestamp NULL default=NULL
+  col last_used_ip varchar(45) NULL default=NULL collate=utf8mb4_unicode_ci
+  col name varchar(100) NULL default=NULL collate=utf8mb4_unicode_ci
+  col token varchar(64) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx admin_tokens_token_unique UNIQUE BTREE (token)
+
+TABLE albums [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col artist_id bigint(20) unsigned NOT NULL default=-
+  col colors longtext NULL default=NULL collate=utf8mb4_bin
+  col created_at timestamp NULL default=NULL
+  col favorited_at timestamp NULL default=NULL
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col images longtext NULL default=NULL collate=utf8mb4_bin
+  col name varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col name_key varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col released_at date NULL default=NULL
+  col source varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx albums_artist_id_name_key_index INDEX BTREE (artist_id,name_key)
+  idx albums_artist_id_name_source_unique UNIQUE BTREE (artist_id,name,source)
+  idx albums_favorited_at_index INDEX BTREE (favorited_at)
+  fk albums_artist_id_foreign (artist_id) -> artists(id) ON DELETE CASCADE ON UPDATE RESTRICT
+  check colors json_valid(`colors`)
+  check images json_valid(`images`)
+
+TABLE album_availability [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col album_id bigint(20) unsigned NULL default=NULL
+  col catalogue_album_id bigint(20) unsigned NULL default=NULL
+  col checked_at timestamp NOT NULL default=-
+  col confidence tinyint(3) unsigned NOT NULL default=0
+  col created_at timestamp NULL default=NULL
+  col external_id varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col match varchar(12) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col provider varchar(48) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col status varchar(12) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx album_availability_album_id_provider_unique UNIQUE BTREE (album_id,provider)
+  idx album_availability_catalogue_album_id_provider_unique UNIQUE BTREE (catalogue_album_id,provider)
+  idx album_availability_provider_checked_at_index INDEX BTREE (provider,checked_at)
+  fk album_availability_album_id_foreign (album_id) -> albums(id) ON DELETE CASCADE ON UPDATE RESTRICT
+  fk album_availability_catalogue_album_id_foreign (catalogue_album_id) -> catalogue_albums(id) ON DELETE CASCADE ON UPDATE RESTRICT
+
+TABLE alerts [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col acknowledged_at timestamp NULL default=NULL
+  col active_key varchar(200) NULL default=NULL collate=utf8mb4_unicode_ci
+  col created_at timestamp NULL default=NULL
+  col data longtext NULL default=NULL collate=utf8mb4_bin
+  col device_id bigint(20) unsigned NULL default=NULL
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col key varchar(128) NOT NULL default='' collate=utf8mb4_unicode_ci
+  col kind varchar(64) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col message text NOT NULL default=- collate=utf8mb4_unicode_ci
+  col raised_at timestamp NOT NULL default=-
+  col resolved_at timestamp NULL default=NULL
+  col severity varchar(16) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col title varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx alerts_active_key_unique UNIQUE BTREE (active_key)
+  idx alerts_device_id_foreign INDEX BTREE (device_id)
+  idx alerts_kind_key_index INDEX BTREE (kind,key)
+  idx alerts_resolved_at_index INDEX BTREE (resolved_at)
+  fk alerts_device_id_foreign (device_id) -> devices(id) ON DELETE SET NULL ON UPDATE RESTRICT
+  check data json_valid(`data`)
+
+TABLE artists [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col created_at timestamp NULL default=NULL
+  col favorited_at timestamp NULL default=NULL
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col name varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col name_key varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col source varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx artists_favorited_at_index INDEX BTREE (favorited_at)
+  idx artists_name_key_index INDEX BTREE (name_key)
+  idx artists_name_source_unique UNIQUE BTREE (name,source)
+
+TABLE cache [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col expiration int(11) NOT NULL default=-
+  col key varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col value mediumtext NOT NULL default=- collate=utf8mb4_unicode_ci
+  idx PRIMARY UNIQUE BTREE (key)
+
+TABLE cache_locks [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col expiration int(11) NOT NULL default=-
+  col key varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col owner varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  idx PRIMARY UNIQUE BTREE (key)
+
+TABLE catalogue_albums [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col album_id bigint(20) unsigned NULL default=NULL
+  col artist_id bigint(20) unsigned NOT NULL default=-
+  col created_at timestamp NULL default=NULL
+  col disambiguation varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col first_release_date varchar(10) NULL default=NULL collate=utf8mb4_unicode_ci
+  col first_release_year smallint(5) unsigned NULL default=NULL
+  col fulfilled_at timestamp NULL default=NULL
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col ignored_at timestamp NULL default=NULL
+  col linked_at timestamp NULL default=NULL
+  col link_method varchar(12) NULL default=NULL collate=utf8mb4_unicode_ci
+  col name_key varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col release_group_mbid char(36) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col seen_at timestamp NOT NULL default=-
+  col title varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col type varchar(8) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col updated_at timestamp NULL default=NULL
+  col wanted_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx catalogue_albums_album_id_foreign INDEX BTREE (album_id)
+  idx catalogue_albums_artist_id_first_release_year_index INDEX BTREE (artist_id,first_release_year)
+  idx catalogue_albums_artist_id_name_key_index INDEX BTREE (artist_id,name_key)
+  idx catalogue_albums_artist_id_release_group_mbid_unique UNIQUE BTREE (artist_id,release_group_mbid)
+  idx catalogue_albums_wanted_at_index INDEX BTREE (wanted_at)
+  fk catalogue_albums_album_id_foreign (album_id) -> albums(id) ON DELETE SET NULL ON UPDATE RESTRICT
+  fk catalogue_albums_artist_id_foreign (artist_id) -> artists(id) ON DELETE CASCADE ON UPDATE RESTRICT
+
+TABLE catalogue_artists [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col artist_id bigint(20) unsigned NOT NULL default=-
+  col attempts tinyint(3) unsigned NOT NULL default=0
+  col mbid char(36) NULL default=NULL collate=utf8mb4_unicode_ci
+  col next_sync_at timestamp NULL default=NULL
+  col release_group_count smallint(5) unsigned NULL default=NULL
+  col status varchar(12) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col synced_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (artist_id)
+  idx catalogue_artists_next_sync_at_index INDEX BTREE (next_sync_at)
+  fk catalogue_artists_artist_id_foreign (artist_id) -> artists(id) ON DELETE CASCADE ON UPDATE RESTRICT
+
+TABLE clients [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col api_token varchar(64) NULL default=NULL collate=utf8mb4_unicode_ci
+  col approved_at timestamp NULL default=NULL
+  col battery_charging tinyint(1) NULL default=NULL
+  col battery_percent tinyint(3) unsigned NULL default=NULL
+  col build_number int(10) unsigned NULL default=NULL
+  col created_at timestamp NULL default=NULL
+  col firmware_version varchar(50) NULL default=NULL collate=utf8mb4_unicode_ci
+  col hardware_id varchar(100) NULL default=NULL collate=utf8mb4_unicode_ci
+  col hidden_sources longtext NULL default=NULL collate=utf8mb4_bin
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col ip_address varchar(45) NULL default=NULL collate=utf8mb4_unicode_ci
+  col last_seen_at timestamp NULL default=NULL
+  col metadata longtext NULL default=NULL collate=utf8mb4_bin
+  col name varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col pairing_code varchar(8) NULL default=NULL collate=utf8mb4_unicode_ci
+  col registration_token varchar(64) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col status enum('pending','approved') NOT NULL default='pending' collate=utf8mb4_unicode_ci
+  col type enum('single','multi') NOT NULL default='single' collate=utf8mb4_unicode_ci
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx clients_api_token_unique UNIQUE BTREE (api_token)
+  idx clients_hardware_id_unique UNIQUE BTREE (hardware_id)
+  idx clients_pairing_code_unique UNIQUE BTREE (pairing_code)
+  idx clients_registration_token_unique UNIQUE BTREE (registration_token)
+  check hidden_sources json_valid(`hidden_sources`)
+  check metadata json_valid(`metadata`)
+
+TABLE client_device [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col client_id bigint(20) unsigned NOT NULL default=-
+  col device_id bigint(20) unsigned NOT NULL default=-
+  col sort_order smallint(5) unsigned NOT NULL default=0
+  idx PRIMARY UNIQUE BTREE (client_id,device_id)
+  idx client_device_device_id_foreign INDEX BTREE (device_id)
+  fk client_device_client_id_foreign (client_id) -> clients(id) ON DELETE CASCADE ON UPDATE RESTRICT
+  fk client_device_device_id_foreign (device_id) -> devices(id) ON DELETE CASCADE ON UPDATE RESTRICT
+
+TABLE devices [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col created_at timestamp NULL default=NULL
+  col device_brand_name varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col device_driver varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col device_driver_name varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col device_name varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col device_product_type varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col hidden tinyint(1) NOT NULL default=0
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col ip_address varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col last_seen datetime NULL default=NULL
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+
+TABLE device_meta [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col created_at timestamp NULL default=NULL
+  col device_id bigint(20) unsigned NOT NULL default=-
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col key varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col updated_at timestamp NULL default=NULL
+  col value varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  idx PRIMARY UNIQUE BTREE (id)
+  idx device_meta_device_id_foreign INDEX BTREE (device_id)
+  idx device_meta_key_value_index INDEX BTREE (key,value)
+  fk device_meta_device_id_foreign (device_id) -> devices(id) ON DELETE CASCADE ON UPDATE RESTRICT
+
+TABLE device_sources [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col borrowed tinyint(1) NOT NULL default=0
+  col category varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col created_at timestamp NULL default=NULL
+  col device_id bigint(20) unsigned NOT NULL default=-
+  col friendly_name varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col hidden tinyint(1) NOT NULL default=0
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col in_use tinyint(1) NOT NULL default=1
+  col provider_jid varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col provider_name varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col sort_order smallint(5) unsigned NOT NULL default=0
+  col source_id varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col source_type varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx device_sources_device_id_source_id_unique UNIQUE BTREE (device_id,source_id)
+  fk device_sources_device_id_foreign (device_id) -> devices(id) ON DELETE CASCADE ON UPDATE RESTRICT
+
+TABLE discovered_devices [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col created_at timestamp NULL default=NULL
+  col device_brand_name varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col device_driver varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col device_driver_name varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col device_name varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col device_product_type varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col ignored_at timestamp NULL default=NULL
+  col ip_address varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col last_seen_at timestamp NULL default=NULL
+  col meta longtext NULL default=NULL collate=utf8mb4_bin
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx discovered_devices_ip_address_unique UNIQUE BTREE (ip_address)
+  check meta json_valid(`meta`)
+
+TABLE dlna_servers [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col control_url varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col created_at timestamp NULL default=NULL
+  col friendly_name varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col ip varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col last_scanned_at timestamp NULL default=NULL
+  col port smallint(5) unsigned NOT NULL default=-
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx dlna_servers_ip_port_unique UNIQUE BTREE (ip,port)
+
+TABLE failed_jobs [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col connection text NOT NULL default=- collate=utf8mb4_unicode_ci
+  col exception longtext NOT NULL default=- collate=utf8mb4_unicode_ci
+  col failed_at timestamp NOT NULL default=current_timestamp()
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col payload longtext NOT NULL default=- collate=utf8mb4_unicode_ci
+  col queue text NOT NULL default=- collate=utf8mb4_unicode_ci
+  col uuid varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  idx PRIMARY UNIQUE BTREE (id)
+  idx failed_jobs_uuid_unique UNIQUE BTREE (uuid)
+
+TABLE files [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col bitrate int(10) unsigned NULL default=NULL
+  col bit_depth smallint(5) unsigned NULL default=NULL
+  col channels smallint(5) unsigned NULL default=NULL
+  col codec varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col created_at timestamp NULL default=NULL
+  col duration int(10) unsigned NULL default=NULL
+  col extension varchar(16) NULL default=NULL collate=utf8mb4_unicode_ci
+  col hash varchar(64) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col hidden_at timestamp NULL default=NULL
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col mime_type varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col mtime bigint(20) unsigned NOT NULL default=-
+  col path varchar(1024) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col path_hash varchar(64) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col sample_rate int(10) unsigned NULL default=NULL
+  col size bigint(20) unsigned NOT NULL default=-
+  col status varchar(255) NOT NULL default='present' collate=utf8mb4_unicode_ci
+  col storage_location_id bigint(20) unsigned NOT NULL default=-
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx files_hash_index INDEX BTREE (hash)
+  idx files_hidden_at_index INDEX BTREE (hidden_at)
+  idx files_storage_location_id_path_hash_unique UNIQUE BTREE (storage_location_id,path_hash)
+  fk files_storage_location_id_foreign (storage_location_id) -> storage_locations(id) ON DELETE CASCADE ON UPDATE RESTRICT
+
+TABLE file_analyses [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col acoustid_id varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col acoustid_recording_mbid varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col acoustid_score double NULL default=NULL
+  col analyzed_at timestamp NULL default=NULL
+  col arousal double NULL default=NULL
+  col bpm double NULL default=NULL
+  col clipped_samples int(10) unsigned NULL default=NULL
+  col clipping_suspect tinyint(1) NULL default=NULL
+  col content_hash varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col created_at timestamp NULL default=NULL
+  col danceability double NULL default=NULL
+  col decode_warnings longtext NULL default=NULL collate=utf8mb4_bin
+  col errors longtext NULL default=NULL collate=utf8mb4_bin
+  col file_id bigint(20) unsigned NOT NULL default=-
+  col fingerprint text NULL default=NULL collate=utf8mb4_unicode_ci
+  col fingerprint_duration int(10) unsigned NULL default=NULL
+  col genre_tags longtext NULL default=NULL collate=utf8mb4_bin
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col instrumental double NULL default=NULL
+  col is_mono tinyint(1) NULL default=NULL
+  col key varchar(3) NULL default=NULL collate=utf8mb4_unicode_ci
+  col key_strength double NULL default=NULL
+  col lead_silence_ms int(10) unsigned NULL default=NULL
+  col lossless_suspect double NULL default=NULL
+  col loudness_lufs double NULL default=NULL
+  col loudness_range double NULL default=NULL
+  col measured_bit_depth smallint(5) unsigned NULL default=NULL
+  col mode varchar(5) NULL default=NULL collate=utf8mb4_unicode_ci
+  col mood_tags longtext NULL default=NULL collate=utf8mb4_bin
+  col phase_issue tinyint(1) NULL default=NULL
+  col replaygain_album_gain double NULL default=NULL
+  col replaygain_track_gain double NULL default=NULL
+  col sections longtext NULL default=NULL collate=utf8mb4_bin
+  col spectral_cutoff_hz int(10) unsigned NULL default=NULL
+  col stages longtext NULL default=NULL collate=utf8mb4_bin
+  col stems longtext NULL default=NULL collate=utf8mb4_bin
+  col trail_silence_ms int(10) unsigned NULL default=NULL
+  col true_peak double NULL default=NULL
+  col updated_at timestamp NULL default=NULL
+  col valence double NULL default=NULL
+  col waveform longtext NULL default=NULL collate=utf8mb4_bin
+  col waveform_peak longtext NULL default=NULL collate=utf8mb4_bin
+  idx PRIMARY UNIQUE BTREE (id)
+  idx file_analyses_acoustid_recording_mbid_index INDEX BTREE (acoustid_recording_mbid)
+  idx file_analyses_analyzed_at_index INDEX BTREE (analyzed_at)
+  idx file_analyses_bpm_index INDEX BTREE (bpm)
+  idx file_analyses_file_id_unique UNIQUE BTREE (file_id)
+  fk file_analyses_file_id_foreign (file_id) -> files(id) ON DELETE CASCADE ON UPDATE RESTRICT
+  check decode_warnings json_valid(`decode_warnings`)
+  check errors json_valid(`errors`)
+  check genre_tags json_valid(`genre_tags`)
+  check mood_tags json_valid(`mood_tags`)
+  check sections json_valid(`sections`)
+  check stages json_valid(`stages`)
+  check stems json_valid(`stems`)
+  check waveform json_valid(`waveform`)
+  check waveform_peak json_valid(`waveform_peak`)
+
+TABLE genreables [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col genreable_id bigint(20) unsigned NOT NULL default=-
+  col genreable_type varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col genre_id bigint(20) unsigned NOT NULL default=-
+  col position smallint(5) unsigned NOT NULL default=0
+  col source varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  idx genreables_genre_id_genreable_type_genreable_id_unique UNIQUE BTREE (genre_id,genreable_type,genreable_id)
+  idx genreables_genreable_type_genreable_id_index INDEX BTREE (genreable_type,genreable_id)
+  fk genreables_genre_id_foreign (genre_id) -> genres(id) ON DELETE CASCADE ON UPDATE RESTRICT
+
+TABLE genres [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col created_at timestamp NULL default=NULL
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col name varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col name_key varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col slug varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx genres_name_key_unique UNIQUE BTREE (name_key)
+  idx genres_slug_unique UNIQUE BTREE (slug)
+
+TABLE id_aliases [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col entity varchar(16) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col merged_at timestamp NOT NULL default=current_timestamp()
+  col new_id bigint(20) unsigned NOT NULL default=-
+  col old_id bigint(20) unsigned NOT NULL default=-
+  idx PRIMARY UNIQUE BTREE (id)
+  idx id_aliases_entity_new_id_index INDEX BTREE (entity,new_id)
+  idx id_aliases_entity_old_id_unique UNIQUE BTREE (entity,old_id)
+
+TABLE jobs [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col attempts tinyint(3) unsigned NOT NULL default=-
+  col available_at int(10) unsigned NOT NULL default=-
+  col created_at int(10) unsigned NOT NULL default=-
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col payload longtext NOT NULL default=- collate=utf8mb4_unicode_ci
+  col queue varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col reserved_at int(10) unsigned NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx jobs_queue_index INDEX BTREE (queue)
+
+TABLE job_batches [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col cancelled_at int(11) NULL default=NULL
+  col created_at int(11) NOT NULL default=-
+  col failed_jobs int(11) NOT NULL default=-
+  col failed_job_ids longtext NOT NULL default=- collate=utf8mb4_unicode_ci
+  col finished_at int(11) NULL default=NULL
+  col id varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col name varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col options mediumtext NULL default=NULL collate=utf8mb4_unicode_ci
+  col pending_jobs int(11) NOT NULL default=-
+  col total_jobs int(11) NOT NULL default=-
+  idx PRIMARY UNIQUE BTREE (id)
+
+TABLE metadata [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col created_at timestamp NULL default=NULL
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col key varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col metadatable_id bigint(20) unsigned NOT NULL default=-
+  col metadatable_type varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col parent_id bigint(20) unsigned NULL default=NULL
+  col source varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col type varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col updated_at timestamp NULL default=NULL
+  col value text NULL default=NULL collate=utf8mb4_unicode_ci
+  idx PRIMARY UNIQUE BTREE (id)
+  idx metadata_key_index INDEX BTREE (key)
+  idx metadata_metadatable_type_metadatable_id_index INDEX BTREE (metadatable_type,metadatable_id)
+  idx metadata_parent_id_foreign INDEX BTREE (parent_id)
+  fk metadata_parent_id_foreign (parent_id) -> metadata(id) ON DELETE CASCADE ON UPDATE RESTRICT
+
+TABLE migrations [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col batch int(11) NOT NULL default=-
+  col id int(10) unsigned NOT NULL default=- extra=auto_increment
+  col migration varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  idx PRIMARY UNIQUE BTREE (id)
+
+TABLE multiroom_presets [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col created_at timestamp NULL default=NULL
+  col device_ids longtext NOT NULL default=- collate=utf8mb4_bin
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col name varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  check device_ids json_valid(`device_ids`)
+
+TABLE password_reset_tokens [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col created_at timestamp NULL default=NULL
+  col email varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col token varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  idx PRIMARY UNIQUE BTREE (email)
+
+TABLE physical_items [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col acquired_on date NULL default=NULL
+  col album_id bigint(20) unsigned NULL default=NULL
+  col artist varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col artist_key varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col barcode varchar(32) NULL default=NULL collate=utf8mb4_unicode_ci
+  col catalogue_number varchar(64) NULL default=NULL collate=utf8mb4_unicode_ci
+  col condition varchar(32) NULL default=NULL collate=utf8mb4_unicode_ci
+  col created_at timestamp NULL default=NULL
+  col file_id bigint(20) unsigned NULL default=NULL
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col location varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col medium varchar(12) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col notes text NULL default=NULL collate=utf8mb4_unicode_ci
+  col release_group_mbid char(36) NULL default=NULL collate=utf8mb4_unicode_ci
+  col release_mbid char(36) NULL default=NULL collate=utf8mb4_unicode_ci
+  col ripped_at timestamp NULL default=NULL
+  col title varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col title_key varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col updated_at timestamp NULL default=NULL
+  col year smallint(5) unsigned NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx physical_items_album_id_index INDEX BTREE (album_id)
+  idx physical_items_artist_key_title_key_index INDEX BTREE (artist_key,title_key)
+  idx physical_items_barcode_index INDEX BTREE (barcode)
+  idx physical_items_file_id_foreign INDEX BTREE (file_id)
+  idx physical_items_medium_index INDEX BTREE (medium)
+  idx physical_items_release_group_mbid_index INDEX BTREE (release_group_mbid)
+  fk physical_items_album_id_foreign (album_id) -> albums(id) ON DELETE SET NULL ON UPDATE RESTRICT
+  fk physical_items_file_id_foreign (file_id) -> files(id) ON DELETE SET NULL ON UPDATE RESTRICT
+
+TABLE playlists [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col created_at timestamp NULL default=NULL
+  col description text NULL default=NULL collate=utf8mb4_unicode_ci
+  col external_id varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col images longtext NULL default=NULL collate=utf8mb4_bin
+  col last_played_at timestamp NULL default=NULL
+  col name varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col refreshed_at timestamp NULL default=NULL
+  col rules longtext NULL default=NULL collate=utf8mb4_bin
+  col source varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx playlists_external_id_source_unique UNIQUE BTREE (external_id,source)
+  idx playlists_last_played_at_index INDEX BTREE (last_played_at)
+  check images json_valid(`images`)
+  check rules json_valid(`rules`)
+
+TABLE playlist_track [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col created_at timestamp NULL default=NULL
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col playlist_id bigint(20) unsigned NOT NULL default=-
+  col position int(10) unsigned NOT NULL default=0
+  col track_id bigint(20) unsigned NOT NULL default=-
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx playlist_track_playlist_id_position_index INDEX BTREE (playlist_id,position)
+  idx playlist_track_playlist_id_track_id_unique UNIQUE BTREE (playlist_id,track_id)
+  idx playlist_track_track_id_foreign INDEX BTREE (track_id)
+  fk playlist_track_playlist_id_foreign (playlist_id) -> playlists(id) ON DELETE CASCADE ON UPDATE RESTRICT
+  fk playlist_track_track_id_foreign (track_id) -> tracks(id) ON DELETE CASCADE ON UPDATE RESTRICT
+
+TABLE plays [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col album_name varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col artist_name varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col created_at timestamp NULL default=NULL
+  col device_id bigint(20) unsigned NOT NULL default=-
+  col duration int(10) unsigned NULL default=NULL
+  col ended_at timestamp NULL default=NULL
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col image_url text NULL default=NULL collate=utf8mb4_unicode_ci
+  col played_at timestamp NOT NULL default=-
+  col radio_name varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col radio_station_id bigint(20) unsigned NULL default=NULL
+  col skipped tinyint(1) NOT NULL default=0
+  col source_name varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col source_type varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col track_id bigint(20) unsigned NULL default=NULL
+  col track_name varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx plays_device_id_played_at_index INDEX BTREE (device_id,played_at)
+  idx plays_radio_station_id_foreign INDEX BTREE (radio_station_id)
+  idx plays_source_type_index INDEX BTREE (source_type)
+  idx plays_track_id_index INDEX BTREE (track_id)
+  fk plays_device_id_foreign (device_id) -> devices(id) ON DELETE CASCADE ON UPDATE RESTRICT
+  fk plays_radio_station_id_foreign (radio_station_id) -> radio_stations(id) ON DELETE SET NULL ON UPDATE RESTRICT
+  fk plays_track_id_foreign (track_id) -> tracks(id) ON DELETE SET NULL ON UPDATE RESTRICT
+
+TABLE radio_plays [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col artist varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col radio_station_id bigint(20) unsigned NOT NULL default=-
+  col source varchar(20) NOT NULL default='icy' collate=utf8mb4_unicode_ci
+  col started_at timestamp NOT NULL default=-
+  col title varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  idx PRIMARY UNIQUE BTREE (id)
+  idx radio_plays_radio_station_id_started_at_index INDEX BTREE (radio_station_id,started_at)
+  fk radio_plays_radio_station_id_foreign (radio_station_id) -> radio_stations(id) ON DELETE CASCADE ON UPDATE RESTRICT
+
+TABLE radio_stations [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col created_at timestamp NULL default=NULL
+  col favorited_at timestamp NULL default=NULL
+  col genre varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col image_url varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col last_played_at timestamp NULL default=NULL
+  col name varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx radio_stations_favorited_at_index INDEX BTREE (favorited_at)
+  idx radio_stations_last_played_at_index INDEX BTREE (last_played_at)
+
+TABLE radio_station_meta [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col key varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col radio_station_id bigint(20) unsigned NOT NULL default=-
+  col value varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  idx PRIMARY UNIQUE BTREE (id)
+  idx radio_station_meta_radio_station_id_key_unique UNIQUE BTREE (radio_station_id,key)
+  fk radio_station_meta_radio_station_id_foreign (radio_station_id) -> radio_stations(id) ON DELETE CASCADE ON UPDATE RESTRICT
+
+TABLE sessions [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col id varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col ip_address varchar(45) NULL default=NULL collate=utf8mb4_unicode_ci
+  col last_activity int(11) NOT NULL default=-
+  col payload longtext NOT NULL default=- collate=utf8mb4_unicode_ci
+  col user_agent text NULL default=NULL collate=utf8mb4_unicode_ci
+  col user_id bigint(20) unsigned NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx sessions_last_activity_index INDEX BTREE (last_activity)
+  idx sessions_user_id_index INDEX BTREE (user_id)
+
+TABLE settings [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col created_at timestamp NULL default=NULL
+  col key varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col updated_at timestamp NULL default=NULL
+  col value text NULL default=NULL collate=utf8mb4_unicode_ci
+  idx PRIMARY UNIQUE BTREE (key)
+
+TABLE storage_locations [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col config text NOT NULL default=- collate=utf8mb4_unicode_ci
+  col created_at timestamp NULL default=NULL
+  col driver varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col last_scanned_at timestamp NULL default=NULL
+  col name varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col role varchar(255) NOT NULL default='library' collate=utf8mb4_unicode_ci
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx storage_locations_name_unique UNIQUE BTREE (name)
+
+TABLE sync_groups [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col created_at timestamp NULL default=NULL
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col leader_device_id bigint(20) unsigned NOT NULL default=-
+  col name varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx sync_groups_leader_device_id_unique UNIQUE BTREE (leader_device_id)
+  fk sync_groups_leader_device_id_foreign (leader_device_id) -> devices(id) ON DELETE CASCADE ON UPDATE RESTRICT
+
+TABLE sync_group_members [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col created_at timestamp NULL default=NULL
+  col device_id bigint(20) unsigned NOT NULL default=-
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col offset_ms int(11) NOT NULL default=0
+  col sync_group_id bigint(20) unsigned NOT NULL default=-
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx sync_group_members_device_id_unique UNIQUE BTREE (device_id)
+  idx sync_group_members_sync_group_id_foreign INDEX BTREE (sync_group_id)
+  fk sync_group_members_device_id_foreign (device_id) -> devices(id) ON DELETE CASCADE ON UPDATE RESTRICT
+  fk sync_group_members_sync_group_id_foreign (sync_group_id) -> sync_groups(id) ON DELETE CASCADE ON UPDATE RESTRICT
+
+TABLE tracks [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col album_id bigint(20) unsigned NULL default=NULL
+  col artist_id bigint(20) unsigned NULL default=NULL
+  col created_at timestamp NULL default=NULL
+  col duration int(11) NULL default=NULL
+  col external_id varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col favorited_at timestamp NULL default=NULL
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col images longtext NULL default=NULL collate=utf8mb4_bin
+  col name varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col name_key varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col source varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx tracks_album_id_index INDEX BTREE (album_id)
+  idx tracks_album_id_name_key_index INDEX BTREE (album_id,name_key)
+  idx tracks_artist_id_index INDEX BTREE (artist_id)
+  idx tracks_artist_id_name_key_index INDEX BTREE (artist_id,name_key)
+  idx tracks_external_id_source_unique UNIQUE BTREE (external_id,source)
+  idx tracks_favorited_at_index INDEX BTREE (favorited_at)
+  fk tracks_album_id_foreign (album_id) -> albums(id) ON DELETE CASCADE ON UPDATE RESTRICT
+  fk tracks_artist_id_foreign (artist_id) -> artists(id) ON DELETE CASCADE ON UPDATE RESTRICT
+  check images json_valid(`images`)
+
+TABLE track_files [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col created_at timestamp NULL default=NULL
+  col derived_from_file_id bigint(20) unsigned NULL default=NULL
+  col file_id bigint(20) unsigned NOT NULL default=-
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col is_primary tinyint(1) NOT NULL default=0
+  col profile varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col role varchar(255) NOT NULL default='original' collate=utf8mb4_unicode_ci
+  col track_id bigint(20) unsigned NOT NULL default=-
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx track_files_derived_from_file_id_foreign INDEX BTREE (derived_from_file_id)
+  idx track_files_file_id_foreign INDEX BTREE (file_id)
+  idx track_files_track_id_file_id_unique UNIQUE BTREE (track_id,file_id)
+  fk track_files_derived_from_file_id_foreign (derived_from_file_id) -> files(id) ON DELETE SET NULL ON UPDATE RESTRICT
+  fk track_files_file_id_foreign (file_id) -> files(id) ON DELETE CASCADE ON UPDATE RESTRICT
+  fk track_files_track_id_foreign (track_id) -> tracks(id) ON DELETE CASCADE ON UPDATE RESTRICT
+
+TABLE users [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col created_at timestamp NULL default=NULL
+  col email varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col email_verified_at timestamp NULL default=NULL
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col name varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col password varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col remember_token varchar(100) NULL default=NULL collate=utf8mb4_unicode_ci
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx users_email_unique UNIQUE BTREE (email)
+
+TABLE wanted_tracks [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col album varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col artist varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col artist_key varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col created_at timestamp NULL default=NULL
+  col fulfilled_at timestamp NULL default=NULL
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col image_url text NULL default=NULL collate=utf8mb4_unicode_ci
+  col source varchar(12) NOT NULL default='manual' collate=utf8mb4_unicode_ci
+  col title varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col title_key varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col track_id bigint(20) unsigned NULL default=NULL
+  col updated_at timestamp NULL default=NULL
+  col wanted_at timestamp NOT NULL default=-
+  idx PRIMARY UNIQUE BTREE (id)
+  idx wanted_tracks_artist_key_title_key_unique UNIQUE BTREE (artist_key,title_key)
+  idx wanted_tracks_track_id_index INDEX BTREE (track_id)
+  idx wanted_tracks_wanted_at_index INDEX BTREE (wanted_at)
+  fk wanted_tracks_track_id_foreign (track_id) -> tracks(id) ON DELETE SET NULL ON UPDATE RESTRICT

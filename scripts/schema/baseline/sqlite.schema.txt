@@ -1,0 +1,625 @@
+# driver: sqlite
+
+TABLE admin_tokens [autoincrement]
+  col created_at datetime NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col last_used_at datetime NULL default=-
+  col last_used_ip varchar NULL default=-
+  col name varchar NULL default=-
+  col token varchar NOT NULL default=-
+  col updated_at datetime NULL default=-
+  idx admin_tokens_token_unique UNIQUE (token)
+
+TABLE album_availability [autoincrement]
+  col album_id integer NULL default=-
+  col catalogue_album_id integer NULL default=-
+  col checked_at datetime NOT NULL default=-
+  col confidence integer NOT NULL default='0'
+  col created_at datetime NULL default=-
+  col external_id varchar NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col match varchar NOT NULL default=-
+  col provider varchar NOT NULL default=-
+  col status varchar NOT NULL default=-
+  col updated_at datetime NULL default=-
+  idx album_availability_album_id_provider_unique UNIQUE (album_id,provider)
+  idx album_availability_catalogue_album_id_provider_unique UNIQUE (catalogue_album_id,provider)
+  idx album_availability_provider_checked_at_index INDEX (provider,checked_at)
+  fk (album_id) -> albums(id) ON DELETE CASCADE ON UPDATE NO ACTION
+  fk (catalogue_album_id) -> catalogue_albums(id) ON DELETE CASCADE ON UPDATE NO ACTION
+
+TABLE albums [autoincrement]
+  col artist_id integer NOT NULL default=-
+  col colors text NULL default=-
+  col created_at datetime NULL default=-
+  col favorited_at datetime NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col images text NULL default=-
+  col name varchar NOT NULL default=-
+  col name_key varchar NULL default=-
+  col released_at date NULL default=-
+  col source varchar NULL default=-
+  col updated_at datetime NULL default=-
+  idx albums_artist_id_name_key_index INDEX (artist_id,name_key)
+  idx albums_artist_id_name_source_unique UNIQUE (artist_id,name,source)
+  idx albums_favorited_at_index INDEX (favorited_at)
+  fk (artist_id) -> artists(id) ON DELETE CASCADE ON UPDATE NO ACTION
+
+TABLE alerts [autoincrement]
+  col acknowledged_at datetime NULL default=-
+  col active_key varchar NULL default=-
+  col created_at datetime NULL default=-
+  col data text NULL default=-
+  col device_id integer NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col key varchar NOT NULL default=''
+  col kind varchar NOT NULL default=-
+  col message text NOT NULL default=-
+  col raised_at datetime NOT NULL default=-
+  col resolved_at datetime NULL default=-
+  col severity varchar NOT NULL default=-
+  col title varchar NOT NULL default=-
+  col updated_at datetime NULL default=-
+  idx alerts_active_key_unique UNIQUE (active_key)
+  idx alerts_kind_key_index INDEX (kind,key)
+  idx alerts_resolved_at_index INDEX (resolved_at)
+  fk (device_id) -> devices(id) ON DELETE SET NULL ON UPDATE NO ACTION
+
+TABLE artists [autoincrement]
+  col created_at datetime NULL default=-
+  col favorited_at datetime NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col name varchar NOT NULL default=-
+  col name_key varchar NULL default=-
+  col source varchar NULL default=-
+  col updated_at datetime NULL default=-
+  idx artists_favorited_at_index INDEX (favorited_at)
+  idx artists_name_key_index INDEX (name_key)
+  idx artists_name_source_unique UNIQUE (name,source)
+
+TABLE cache
+  col expiration integer NOT NULL default=-
+  col key varchar NOT NULL default=- pk=1
+  col value text NOT NULL default=-
+  idx auto(pk) UNIQUE (key)
+
+TABLE cache_locks
+  col expiration integer NOT NULL default=-
+  col key varchar NOT NULL default=- pk=1
+  col owner varchar NOT NULL default=-
+  idx auto(pk) UNIQUE (key)
+
+TABLE catalogue_albums [autoincrement]
+  col album_id integer NULL default=-
+  col artist_id integer NOT NULL default=-
+  col created_at datetime NULL default=-
+  col disambiguation varchar NULL default=-
+  col first_release_date varchar NULL default=-
+  col first_release_year integer NULL default=-
+  col fulfilled_at datetime NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col ignored_at datetime NULL default=-
+  col link_method varchar NULL default=-
+  col linked_at datetime NULL default=-
+  col name_key varchar NOT NULL default=-
+  col release_group_mbid varchar NOT NULL default=-
+  col seen_at datetime NOT NULL default=-
+  col title varchar NOT NULL default=-
+  col type varchar NOT NULL default=-
+  col updated_at datetime NULL default=-
+  col wanted_at datetime NULL default=-
+  idx catalogue_albums_artist_id_first_release_year_index INDEX (artist_id,first_release_year)
+  idx catalogue_albums_artist_id_name_key_index INDEX (artist_id,name_key)
+  idx catalogue_albums_artist_id_release_group_mbid_unique UNIQUE (artist_id,release_group_mbid)
+  idx catalogue_albums_wanted_at_index INDEX (wanted_at)
+  fk (album_id) -> albums(id) ON DELETE SET NULL ON UPDATE NO ACTION
+  fk (artist_id) -> artists(id) ON DELETE CASCADE ON UPDATE NO ACTION
+
+TABLE catalogue_artists
+  col artist_id integer NOT NULL default=- pk=1
+  col attempts integer NOT NULL default='0'
+  col mbid varchar NULL default=-
+  col next_sync_at datetime NULL default=-
+  col release_group_count integer NULL default=-
+  col status varchar NOT NULL default=-
+  col synced_at datetime NULL default=-
+  idx catalogue_artists_next_sync_at_index INDEX (next_sync_at)
+  fk (artist_id) -> artists(id) ON DELETE CASCADE ON UPDATE NO ACTION
+
+TABLE client_device
+  col client_id integer NOT NULL default=- pk=1
+  col device_id integer NOT NULL default=- pk=2
+  col sort_order integer NOT NULL default='0'
+  idx auto(pk) UNIQUE (client_id,device_id)
+  fk (client_id) -> clients(id) ON DELETE CASCADE ON UPDATE NO ACTION
+  fk (device_id) -> devices(id) ON DELETE CASCADE ON UPDATE NO ACTION
+
+TABLE clients [autoincrement]
+  col api_token varchar NULL default=-
+  col approved_at datetime NULL default=-
+  col battery_charging tinyint(1) NULL default=-
+  col battery_percent integer NULL default=-
+  col build_number integer NULL default=-
+  col created_at datetime NULL default=-
+  col firmware_version varchar NULL default=-
+  col hardware_id varchar NULL default=-
+  col hidden_sources text NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col ip_address varchar NULL default=-
+  col last_seen_at datetime NULL default=-
+  col metadata text NULL default=-
+  col name varchar NULL default=-
+  col pairing_code varchar NULL default=-
+  col registration_token varchar NOT NULL default=-
+  col status varchar NOT NULL default='pending'
+  col type varchar NOT NULL default='single'
+  col updated_at datetime NULL default=-
+  idx clients_api_token_unique UNIQUE (api_token)
+  idx clients_hardware_id_unique UNIQUE (hardware_id)
+  idx clients_pairing_code_unique UNIQUE (pairing_code)
+  idx clients_registration_token_unique UNIQUE (registration_token)
+  check status in ('pending', 'approved')
+  check type in ('single', 'multi')
+
+TABLE device_meta [autoincrement]
+  col created_at datetime NULL default=-
+  col device_id integer NOT NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col key varchar NOT NULL default=-
+  col updated_at datetime NULL default=-
+  col value varchar NULL default=-
+  idx device_meta_key_value_index INDEX (key,value)
+  fk (device_id) -> devices(id) ON DELETE CASCADE ON UPDATE NO ACTION
+
+TABLE device_sources [autoincrement]
+  col borrowed tinyint(1) NOT NULL default='0'
+  col category varchar NOT NULL default=-
+  col created_at datetime NULL default=-
+  col device_id integer NOT NULL default=-
+  col friendly_name varchar NOT NULL default=-
+  col hidden tinyint(1) NOT NULL default='0'
+  col id integer NOT NULL default=- pk=1
+  col in_use tinyint(1) NOT NULL default='1'
+  col provider_jid varchar NULL default=-
+  col provider_name varchar NULL default=-
+  col sort_order integer NOT NULL default='0'
+  col source_id varchar NOT NULL default=-
+  col source_type varchar NOT NULL default=-
+  col updated_at datetime NULL default=-
+  idx device_sources_device_id_source_id_unique UNIQUE (device_id,source_id)
+  fk (device_id) -> devices(id) ON DELETE CASCADE ON UPDATE NO ACTION
+
+TABLE devices [autoincrement]
+  col created_at datetime NULL default=-
+  col device_brand_name varchar NULL default=-
+  col device_driver varchar NULL default=-
+  col device_driver_name varchar NULL default=-
+  col device_name varchar NOT NULL default=-
+  col device_product_type varchar NULL default=-
+  col hidden tinyint(1) NOT NULL default='0'
+  col id integer NOT NULL default=- pk=1
+  col ip_address varchar NULL default=-
+  col last_seen datetime NULL default=-
+  col updated_at datetime NULL default=-
+
+TABLE discovered_devices [autoincrement]
+  col created_at datetime NULL default=-
+  col device_brand_name varchar NOT NULL default=-
+  col device_driver varchar NOT NULL default=-
+  col device_driver_name varchar NOT NULL default=-
+  col device_name varchar NOT NULL default=-
+  col device_product_type varchar NOT NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col ignored_at datetime NULL default=-
+  col ip_address varchar NOT NULL default=-
+  col last_seen_at datetime NULL default=-
+  col meta text NULL default=-
+  col updated_at datetime NULL default=-
+  idx discovered_devices_ip_address_unique UNIQUE (ip_address)
+
+TABLE dlna_servers [autoincrement]
+  col control_url varchar NOT NULL default=-
+  col created_at datetime NULL default=-
+  col friendly_name varchar NOT NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col ip varchar NOT NULL default=-
+  col last_scanned_at datetime NULL default=-
+  col port integer NOT NULL default=-
+  col updated_at datetime NULL default=-
+  idx dlna_servers_ip_port_unique UNIQUE (ip,port)
+
+TABLE failed_jobs [autoincrement]
+  col connection text NOT NULL default=-
+  col exception text NOT NULL default=-
+  col failed_at datetime NOT NULL default=CURRENT_TIMESTAMP
+  col id integer NOT NULL default=- pk=1
+  col payload text NOT NULL default=-
+  col queue text NOT NULL default=-
+  col uuid varchar NOT NULL default=-
+  idx failed_jobs_uuid_unique UNIQUE (uuid)
+
+TABLE file_analyses [autoincrement]
+  col acoustid_id varchar NULL default=-
+  col acoustid_recording_mbid varchar NULL default=-
+  col acoustid_score float NULL default=-
+  col analyzed_at datetime NULL default=-
+  col arousal float NULL default=-
+  col bpm float NULL default=-
+  col clipped_samples integer NULL default=-
+  col clipping_suspect tinyint(1) NULL default=-
+  col content_hash varchar NULL default=-
+  col created_at datetime NULL default=-
+  col danceability float NULL default=-
+  col decode_warnings text NULL default=-
+  col errors text NULL default=-
+  col file_id integer NOT NULL default=-
+  col fingerprint text NULL default=-
+  col fingerprint_duration integer NULL default=-
+  col genre_tags text NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col instrumental float NULL default=-
+  col is_mono tinyint(1) NULL default=-
+  col key varchar NULL default=-
+  col key_strength float NULL default=-
+  col lead_silence_ms integer NULL default=-
+  col lossless_suspect float NULL default=-
+  col loudness_lufs float NULL default=-
+  col loudness_range float NULL default=-
+  col measured_bit_depth integer NULL default=-
+  col mode varchar NULL default=-
+  col mood_tags text NULL default=-
+  col phase_issue tinyint(1) NULL default=-
+  col replaygain_album_gain float NULL default=-
+  col replaygain_track_gain float NULL default=-
+  col sections text NULL default=-
+  col spectral_cutoff_hz integer NULL default=-
+  col stages text NULL default=-
+  col stems text NULL default=-
+  col trail_silence_ms integer NULL default=-
+  col true_peak float NULL default=-
+  col updated_at datetime NULL default=-
+  col valence float NULL default=-
+  col waveform text NULL default=-
+  col waveform_peak text NULL default=-
+  idx file_analyses_acoustid_recording_mbid_index INDEX (acoustid_recording_mbid)
+  idx file_analyses_analyzed_at_index INDEX (analyzed_at)
+  idx file_analyses_bpm_index INDEX (bpm)
+  idx file_analyses_file_id_unique UNIQUE (file_id)
+  fk (file_id) -> files(id) ON DELETE CASCADE ON UPDATE NO ACTION
+
+TABLE files [autoincrement]
+  col bit_depth integer NULL default=-
+  col bitrate integer NULL default=-
+  col channels integer NULL default=-
+  col codec varchar NULL default=-
+  col created_at datetime NULL default=-
+  col duration integer NULL default=-
+  col extension varchar NULL default=-
+  col hash varchar NOT NULL default=-
+  col hidden_at datetime NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col mime_type varchar NULL default=-
+  col mtime integer NOT NULL default=-
+  col path varchar NOT NULL default=-
+  col path_hash varchar NOT NULL default=-
+  col sample_rate integer NULL default=-
+  col size integer NOT NULL default=-
+  col status varchar NOT NULL default='present'
+  col storage_location_id integer NOT NULL default=-
+  col updated_at datetime NULL default=-
+  idx files_hash_index INDEX (hash)
+  idx files_hidden_at_index INDEX (hidden_at)
+  idx files_storage_location_id_path_hash_unique UNIQUE (storage_location_id,path_hash)
+  fk (storage_location_id) -> storage_locations(id) ON DELETE CASCADE ON UPDATE NO ACTION
+
+TABLE genreables
+  col genre_id integer NOT NULL default=-
+  col genreable_id integer NOT NULL default=-
+  col genreable_type varchar NOT NULL default=-
+  col position integer NOT NULL default='0'
+  col source varchar NULL default=-
+  idx genreables_genre_id_genreable_type_genreable_id_unique UNIQUE (genre_id,genreable_type,genreable_id)
+  idx genreables_genreable_type_genreable_id_index INDEX (genreable_type,genreable_id)
+  fk (genre_id) -> genres(id) ON DELETE CASCADE ON UPDATE NO ACTION
+
+TABLE genres [autoincrement]
+  col created_at datetime NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col name varchar NOT NULL default=-
+  col name_key varchar NOT NULL default=-
+  col slug varchar NOT NULL default=-
+  col updated_at datetime NULL default=-
+  idx genres_name_key_unique UNIQUE (name_key)
+  idx genres_slug_unique UNIQUE (slug)
+
+TABLE id_aliases [autoincrement]
+  col entity varchar NOT NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col merged_at datetime NOT NULL default=CURRENT_TIMESTAMP
+  col new_id integer NOT NULL default=-
+  col old_id integer NOT NULL default=-
+  idx id_aliases_entity_new_id_index INDEX (entity,new_id)
+  idx id_aliases_entity_old_id_unique UNIQUE (entity,old_id)
+
+TABLE job_batches
+  col cancelled_at integer NULL default=-
+  col created_at integer NOT NULL default=-
+  col failed_job_ids text NOT NULL default=-
+  col failed_jobs integer NOT NULL default=-
+  col finished_at integer NULL default=-
+  col id varchar NOT NULL default=- pk=1
+  col name varchar NOT NULL default=-
+  col options text NULL default=-
+  col pending_jobs integer NOT NULL default=-
+  col total_jobs integer NOT NULL default=-
+  idx auto(pk) UNIQUE (id)
+
+TABLE jobs [autoincrement]
+  col attempts integer NOT NULL default=-
+  col available_at integer NOT NULL default=-
+  col created_at integer NOT NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col payload text NOT NULL default=-
+  col queue varchar NOT NULL default=-
+  col reserved_at integer NULL default=-
+  idx jobs_queue_index INDEX (queue)
+
+TABLE metadata [autoincrement]
+  col created_at datetime NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col key varchar NOT NULL default=-
+  col metadatable_id integer NOT NULL default=-
+  col metadatable_type varchar NOT NULL default=-
+  col parent_id integer NULL default=-
+  col source varchar NULL default=-
+  col type varchar NULL default=-
+  col updated_at datetime NULL default=-
+  col value text NULL default=-
+  idx metadata_key_index INDEX (key)
+  idx metadata_metadatable_type_metadatable_id_index INDEX (metadatable_type,metadatable_id)
+  fk (parent_id) -> metadata(id) ON DELETE CASCADE ON UPDATE NO ACTION
+
+TABLE migrations [autoincrement]
+  col batch integer NOT NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col migration varchar NOT NULL default=-
+
+TABLE multiroom_presets [autoincrement]
+  col created_at datetime NULL default=-
+  col device_ids text NOT NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col name varchar NOT NULL default=-
+  col updated_at datetime NULL default=-
+
+TABLE password_reset_tokens
+  col created_at datetime NULL default=-
+  col email varchar NOT NULL default=- pk=1
+  col token varchar NOT NULL default=-
+  idx auto(pk) UNIQUE (email)
+
+TABLE physical_items [autoincrement]
+  col acquired_on date NULL default=-
+  col album_id integer NULL default=-
+  col artist varchar NOT NULL default=-
+  col artist_key varchar NOT NULL default=-
+  col barcode varchar NULL default=-
+  col catalogue_number varchar NULL default=-
+  col condition varchar NULL default=-
+  col created_at datetime NULL default=-
+  col file_id integer NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col location varchar NULL default=-
+  col medium varchar NOT NULL default=-
+  col notes text NULL default=-
+  col release_group_mbid varchar NULL default=-
+  col release_mbid varchar NULL default=-
+  col ripped_at datetime NULL default=-
+  col title varchar NOT NULL default=-
+  col title_key varchar NOT NULL default=-
+  col updated_at datetime NULL default=-
+  col year integer NULL default=-
+  idx physical_items_album_id_index INDEX (album_id)
+  idx physical_items_artist_key_title_key_index INDEX (artist_key,title_key)
+  idx physical_items_barcode_index INDEX (barcode)
+  idx physical_items_medium_index INDEX (medium)
+  idx physical_items_release_group_mbid_index INDEX (release_group_mbid)
+  fk (album_id) -> albums(id) ON DELETE SET NULL ON UPDATE NO ACTION
+  fk (file_id) -> files(id) ON DELETE SET NULL ON UPDATE NO ACTION
+
+TABLE playlist_track [autoincrement]
+  col created_at datetime NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col playlist_id integer NOT NULL default=-
+  col position integer NOT NULL default='0'
+  col track_id integer NOT NULL default=-
+  col updated_at datetime NULL default=-
+  idx playlist_track_playlist_id_position_index INDEX (playlist_id,position)
+  idx playlist_track_playlist_id_track_id_unique UNIQUE (playlist_id,track_id)
+  fk (playlist_id) -> playlists(id) ON DELETE CASCADE ON UPDATE NO ACTION
+  fk (track_id) -> tracks(id) ON DELETE CASCADE ON UPDATE NO ACTION
+
+TABLE playlists [autoincrement]
+  col created_at datetime NULL default=-
+  col description text NULL default=-
+  col external_id varchar NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col images text NULL default=-
+  col last_played_at datetime NULL default=-
+  col name varchar NOT NULL default=-
+  col refreshed_at datetime NULL default=-
+  col rules text NULL default=-
+  col source varchar NULL default=-
+  col updated_at datetime NULL default=-
+  idx playlists_external_id_source_unique UNIQUE (external_id,source)
+  idx playlists_last_played_at_index INDEX (last_played_at)
+
+TABLE plays [autoincrement]
+  col album_name varchar NULL default=-
+  col artist_name varchar NULL default=-
+  col created_at datetime NULL default=-
+  col device_id integer NOT NULL default=-
+  col duration integer NULL default=-
+  col ended_at datetime NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col image_url text NULL default=-
+  col played_at datetime NOT NULL default=-
+  col radio_name varchar NULL default=-
+  col radio_station_id integer NULL default=-
+  col skipped tinyint(1) NOT NULL default='0'
+  col source_name varchar NULL default=-
+  col source_type varchar NULL default=-
+  col track_id integer NULL default=-
+  col track_name varchar NULL default=-
+  col updated_at datetime NULL default=-
+  idx plays_device_id_played_at_index INDEX (device_id,played_at)
+  idx plays_source_type_index INDEX (source_type)
+  idx plays_track_id_index INDEX (track_id)
+  fk (device_id) -> devices(id) ON DELETE CASCADE ON UPDATE NO ACTION
+  fk (radio_station_id) -> radio_stations(id) ON DELETE SET NULL ON UPDATE NO ACTION
+  fk (track_id) -> tracks(id) ON DELETE SET NULL ON UPDATE NO ACTION
+
+TABLE radio_plays [autoincrement]
+  col artist varchar NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col radio_station_id integer NOT NULL default=-
+  col source varchar NOT NULL default='icy'
+  col started_at datetime NOT NULL default=-
+  col title varchar NOT NULL default=-
+  idx radio_plays_radio_station_id_started_at_index INDEX (radio_station_id,started_at)
+  fk (radio_station_id) -> radio_stations(id) ON DELETE CASCADE ON UPDATE NO ACTION
+
+TABLE radio_station_meta [autoincrement]
+  col id integer NOT NULL default=- pk=1
+  col key varchar NOT NULL default=-
+  col radio_station_id integer NOT NULL default=-
+  col value varchar NOT NULL default=-
+  idx radio_station_meta_radio_station_id_key_unique UNIQUE (radio_station_id,key)
+  fk (radio_station_id) -> radio_stations(id) ON DELETE CASCADE ON UPDATE NO ACTION
+
+TABLE radio_stations [autoincrement]
+  col created_at datetime NULL default=-
+  col favorited_at datetime NULL default=-
+  col genre varchar NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col image_url varchar NULL default=-
+  col last_played_at datetime NULL default=-
+  col name varchar NOT NULL default=-
+  col updated_at datetime NULL default=-
+  idx radio_stations_favorited_at_index INDEX (favorited_at)
+  idx radio_stations_last_played_at_index INDEX (last_played_at)
+
+TABLE sessions
+  col id varchar NOT NULL default=- pk=1
+  col ip_address varchar NULL default=-
+  col last_activity integer NOT NULL default=-
+  col payload text NOT NULL default=-
+  col user_agent text NULL default=-
+  col user_id integer NULL default=-
+  idx auto(pk) UNIQUE (id)
+  idx sessions_last_activity_index INDEX (last_activity)
+  idx sessions_user_id_index INDEX (user_id)
+
+TABLE settings
+  col created_at datetime NULL default=-
+  col key varchar NOT NULL default=- pk=1
+  col updated_at datetime NULL default=-
+  col value text NULL default=-
+  idx auto(pk) UNIQUE (key)
+
+TABLE storage_locations [autoincrement]
+  col config text NOT NULL default=-
+  col created_at datetime NULL default=-
+  col driver varchar NOT NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col last_scanned_at datetime NULL default=-
+  col name varchar NOT NULL default=-
+  col role varchar NOT NULL default='library'
+  col updated_at datetime NULL default=-
+  idx storage_locations_name_unique UNIQUE (name)
+
+TABLE sync_group_members [autoincrement]
+  col created_at datetime NULL default=-
+  col device_id integer NOT NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col offset_ms integer NOT NULL default='0'
+  col sync_group_id integer NOT NULL default=-
+  col updated_at datetime NULL default=-
+  idx sync_group_members_device_id_unique UNIQUE (device_id)
+  fk (device_id) -> devices(id) ON DELETE CASCADE ON UPDATE NO ACTION
+  fk (sync_group_id) -> sync_groups(id) ON DELETE CASCADE ON UPDATE NO ACTION
+
+TABLE sync_groups [autoincrement]
+  col created_at datetime NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col leader_device_id integer NOT NULL default=-
+  col name varchar NULL default=-
+  col updated_at datetime NULL default=-
+  idx sync_groups_leader_device_id_unique UNIQUE (leader_device_id)
+  fk (leader_device_id) -> devices(id) ON DELETE CASCADE ON UPDATE NO ACTION
+
+TABLE track_files [autoincrement]
+  col created_at datetime NULL default=-
+  col derived_from_file_id integer NULL default=-
+  col file_id integer NOT NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col is_primary tinyint(1) NOT NULL default='0'
+  col profile varchar NULL default=-
+  col role varchar NOT NULL default='original'
+  col track_id integer NOT NULL default=-
+  col updated_at datetime NULL default=-
+  idx track_files_track_id_file_id_unique UNIQUE (track_id,file_id)
+  fk (derived_from_file_id) -> files(id) ON DELETE SET NULL ON UPDATE NO ACTION
+  fk (file_id) -> files(id) ON DELETE CASCADE ON UPDATE NO ACTION
+  fk (track_id) -> tracks(id) ON DELETE CASCADE ON UPDATE NO ACTION
+
+TABLE tracks [autoincrement]
+  col album_id integer NULL default=-
+  col artist_id integer NULL default=-
+  col created_at datetime NULL default=-
+  col duration integer NULL default=-
+  col external_id varchar NULL default=-
+  col favorited_at datetime NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col images text NULL default=-
+  col name varchar NOT NULL default=-
+  col name_key varchar NULL default=-
+  col source varchar NULL default=-
+  col updated_at datetime NULL default=-
+  idx tracks_album_id_index INDEX (album_id)
+  idx tracks_album_id_name_key_index INDEX (album_id,name_key)
+  idx tracks_artist_id_index INDEX (artist_id)
+  idx tracks_artist_id_name_key_index INDEX (artist_id,name_key)
+  idx tracks_external_id_source_unique UNIQUE (external_id,source)
+  idx tracks_favorited_at_index INDEX (favorited_at)
+  fk (album_id) -> albums(id) ON DELETE CASCADE ON UPDATE NO ACTION
+  fk (artist_id) -> artists(id) ON DELETE CASCADE ON UPDATE NO ACTION
+
+TABLE users [autoincrement]
+  col created_at datetime NULL default=-
+  col email varchar NULL default=-
+  col email_verified_at datetime NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col name varchar NOT NULL default=-
+  col password varchar NOT NULL default=-
+  col remember_token varchar NULL default=-
+  col updated_at datetime NULL default=-
+  idx users_email_unique UNIQUE (email)
+
+TABLE wanted_tracks [autoincrement]
+  col album varchar NULL default=-
+  col artist varchar NOT NULL default=-
+  col artist_key varchar NOT NULL default=-
+  col created_at datetime NULL default=-
+  col fulfilled_at datetime NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col image_url text NULL default=-
+  col source varchar NOT NULL default='manual'
+  col title varchar NOT NULL default=-
+  col title_key varchar NOT NULL default=-
+  col track_id integer NULL default=-
+  col updated_at datetime NULL default=-
+  col wanted_at datetime NOT NULL default=-
+  idx wanted_tracks_artist_key_title_key_unique UNIQUE (artist_key,title_key)
+  idx wanted_tracks_track_id_index INDEX (track_id)
+  idx wanted_tracks_wanted_at_index INDEX (wanted_at)
+  fk (track_id) -> tracks(id) ON DELETE SET NULL ON UPDATE NO ACTION

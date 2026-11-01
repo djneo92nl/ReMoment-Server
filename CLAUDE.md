@@ -35,6 +35,7 @@ docs/
     profiles.md             Profiles (workstream 1a): Control / Standard / Full, `PROFILE`, the gate table in config/profile.php, how scheduler, workers, routes, nav and containers are gated, SQLite for Control and its conditions, `profile:stress-sqlite`, `profile:upgrade`, what is unverified
     client-devices.md       DB schema, model, controller, admin UI internals
     backup-restore.md       backup:run / backup:restore: archive contents, secrets excluded by default, fresh-install restore, SQLite and SD-card note, upgrade flow
+    schema-plan.md          Schema review before the migration squash (14.3): table inventory, findings, data vs schema migrations, squash design with the `schema:baseline` mechanism, pre-squash fix-list; rehearsal harness in scripts/schema/ (`schema.sh check` diffs the schema against committed MariaDB and SQLite baselines)
     availability-layer.md   Availability layer design (workstream 3): providers, catalogue_albums/album_availability, MusicBrainz discography sync, wishlist, API/UI, build order (plan, not built)
     alerts.md               Alert model (workstream 14.1): one place raises/resolves alerts, kinds and thresholds, dedupe, MQTT remoment/alerts/*, GET /api/alerts, ack, how to add a kind
     credentials.md          Credentials layer (workstream 14.4): ServiceCredentials registry for Spotify/Last.fm/Discogs/AcoustID/TheAudioDB keys, /settings/services, encrypted secrets, backup exclusion, base-URL/relay hook, setup steps, how to add a service
