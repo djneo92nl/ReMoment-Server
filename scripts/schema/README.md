@@ -56,3 +56,12 @@ scripts/schema/schema.sh diff scripts/schema/baseline/mariadb.schema.txt prod-ma
 
 Do this against production and dev **before** the squash: production may carry drift the migrations do not describe (the
 SQLite-to-MariaDB move, hand-made indexes). The squash proof assumes production equals the baseline.
+
+## In CI
+
+The `mariadb-migrations` job of `.github/workflows/laravel.yml` runs on every push and pull request to `main`: a `mariadb:11.4`
+service container (health-checked), `php artisan migrate --force` on the fresh database, then `php scripts/schema/dump.php`
+diffed against `baseline/mariadb.schema.txt`. It runs `dump.php` directly on the runner, so it needs no docker-in-docker and
+not `schema.sh`; a schema that drifts from the baseline fails the job. SQLite stays the database of the test job; the SQLite
+baseline is not checked in CI (use `schema.sh check` locally). The workflow has not been run on GitHub yet; the same
+commands were run against a throw-away local MariaDB 11.4 container (identical to the baseline).
