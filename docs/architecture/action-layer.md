@@ -1,6 +1,6 @@
 # Action layer: design spike (workstream 14.5)
 
-**Status (2026-11-05): spike done, recommendation below; nothing existing was changed.** The prototype is `app/Domain/Actions/` with `tests/Feature/Actions/ActionLayerSpikeTest.php`; it is not wired into any route, tool or page.
+**Status (2026-11-07): spike done and the four additions of section 4 built (see "8. Built"); the prototype (`app/Domain/Actions/`, `ActionLayerSpikeTest`) was deleted on the owner's decision, the findings below stay.** Section 3 describes the prototype as it was; its tests no longer exist.
 
 **Question.** Can an action ("move playback", "activate a source", "send a TV key", later "activate a scene") be defined once (typed input, validation rules, handler, result, name and description) and the REST route, the MCP tool, a scene step, the Home Assistant `rest_command` and the OpenAPI entry derived from it, instead of being written by hand in each place? Scenes (8.1) and the HA package (8a) are not built; they need the answer first.
 
@@ -135,3 +135,44 @@ Nothing has to be migrated for C. If the owner later wants A for some actions:
 4. Should the Livewire device pages move to the REST operations over time (so one path remains), or stay on the domain classes as today? The spike assumes they stay.
 5. Does a scene run need the admin token in any case (e.g. a step that changes a setting)? Suggested no: only guest-level operations are scene-capable.
 6. HA: is a downloadable YAML file enough, or should HA discover the operations by reading `GET /api/scene-operations` (a generated list, would let HA services be built on startup)? Unverified how HA custom services would consume it.
+
+## 8. Built (2026-11-07)
+
+The four additions of section 4, as small commits. No new Composer dependency.
+
+| Addition | Where |
+|---|---|
+| `openapi.yaml` parses with a strict YAML parser | nine plain scalars quoted (lines 1266, 1348, 2186, 3214, 3256, 3257, 3278, 3389, 3403 of the file before commit `3b56b70`) and one duplicate path key merged (line 1970, below); the text is unchanged |
+| Operation-id convention | every operation has a unique camelCase `operationId` (117 of 117; `listAlerts` and `acknowledgeAlert` were the two missing); see "Operation ids" |
+| Contract test | `tests/Feature/ApiContractTest.php`, `tests/Support/openapi-known-missing.php` |
+| Scene-capable operations | `config/scene-operations.php` (26 operations), `App\Domain\Scenes\SceneOperations` (list + `validateStep`), `App\Domain\Scenes\OpenApiSpec` (strict load, `$ref`s resolved, operation lookup, flattened inputs) |
+| HA package | `php artisan ha:package [--output=] [--base-url=]`, `App\Domain\Scenes\HaPackage`; see [home-assistant.md](home-assistant.md) |
+
+### What the strict parse found
+
+Besides the quoting, a real bug: **`/library/playlists` was a path key twice** (the `post` of `createPlaylist` and the `get` of `listPlaylists`). A lenient parser keeps only the last one, so `POST /library/playlists` was invisible to every consumer that loaded the file. The two blocks are one path item now. Two kinds of quoted line also changed what a lenient parse made of them: `{ description: Validation error, or not_connected }` and `{ description: string or integer, depending on the field }` parsed as a description plus a junk key (`or not_connected: null`); quoted, they say what they meant. Symfony YAML and PyYAML (6.0.3, from an existing Python, nothing installed) both parse the file now. PyYAML is stricter in one place: a flow mapping whose plain scalar contains `: ` (`description: ... copy: the wish ...`) passes Symfony and fails PyYAML, so those two lines are quoted as well.
+
+### Operation ids
+
+- One per operation, **verb + resource in camelCase** (`movePlayback`, `activateSource`, `pressRemoteKey`, `setVolume`, `playAlbum`), unique across the file, matching `^[a-z][a-zA-Z0-9]*$`. Existing ids were kept; the names are a stable API for scene steps and the HA package, so renaming one is a breaking change (rename in the config and any stored scene too).
+- A route without one is not scene-capable, not in the HA package and fails the contract test. MCP tool names are separate (they are grouped and written for agents).
+
+### The contract test
+
+`tests/Feature/ApiContractTest.php` (6 tests). **Public API = every route whose URI starts with `api/`** (the admin ones under `api/admin` included, they are documented with `security`); web pages, Livewire, `/mcp`, `/stream` and framework routes are not. It asserts: (a) the file parses strictly; (b) every `/api` route has an operation, except the entries of `tests/Support/openapi-known-missing.php` (`missing`); (c) every documented operation is an `/api` route, except `stale` entries, which must be served somewhere else; (d) unique camelCase operationIds; (e) the documented body fields of `movePlayback`, `activateSource` and `pressRemoteKey` reach the routes' validation (the routes are called with a payload built from the schema, through `FakePlayerDriver`, `FakeSourceDriver`, `FakeRemoteDriver`: no 422 on a documented field). **The lists only shrink**: a listed entry that is documented (or no longer routed) fails the test until removed, a new undocumented route fails it until documented.
+
+**Numbers:** 117 documented operations (117 operationIds), 151 `/api` routes, **35 known-missing** (admin file and storage management 15, `bluetooth`/`info`/`network`/`sound-adjustment`/`wired-speakers`/`wireless-speakers` per-device settings 15, source controls 2, `GET /library/tracks/{id}/waveform`, `POST /librespot/event`, `GET /radio/{id}/now`), **1 known-stale** (`GET /stream/{track}` is documented under the `/api` server but served at `/stream/{track}`; changing the file's server base would change the iOS contract, so it is listed).
+
+### Scene operations and the step validator
+
+`config/scene-operations.php` lists the operationIds a scene step may call, with `label`, `device_param` (the input, a path parameter or a body property, that is the device; null when the operation is not about one device) and `enabled`. The first version is the curated guest-level subset of section 7 question 3: playback controls (`transport`, `setVolume`, `setMute`, `setShuffle`, `setRepeat`, `setPower`, `activateSource`, `movePlayback`), queue (`addToQueue`, `clearQueue`), multiroom and sync groups (`multiroomJoin`, `multiroomLeave`, `createSyncGroup`, `deleteSyncGroup`, `addSyncGroupMember`, `removeSyncGroupMember`), TV (`pressRemoteKey`, `sendDigits`) and play on a device (`playRadio`, `playPlaylist`, `playAlbum`, `playArtist`, `playTrack`, `playTracks`, `playListeningMode`, `playExternal`): 26. Not listed: anything with `security: adminToken` (a test checks the OpenAPI entry and the route's `admin.token` middleware for each listed operation), multiroom presets (web only, no REST operation) and scene activation (scenes are not built).
+
+`SceneOperations::validateStep(array $step): array` returns `field => message` (empty = valid) for a step `{operation, device_id, params}`: unknown, unlisted or disabled operation; the device (`device_id`, integer, required exactly when `device_param` is set, never also in `params`); required inputs, unknown parameters, type, `enum`, `minimum`/`maximum`, `maxLength`, `pattern`, `minItems` and array items of the operation's path, query and body inputs. It is the save-time check; at run time the route's own validation stays the validator. The scene editor, the runner and the scene tables are not built.
+
+### Owner's answers used (open questions of section 7)
+
+The owner had not answered 1 to 6 when this was built; the defaults suggested above were implemented: (1) yes, fixed first; (2) known-missing list, may only shrink; (3) curated subset; (4) Livewire stays on the domain classes; (5) guest-level operations only; (6) a downloadable generated YAML file, no `GET /api/scene-operations`. The prototype question (7 of the task) was asked: delete, done.
+
+### Unverified
+
+The generated `rest_command` package has never been loaded by a running Home Assistant (the payload Jinja, `dict(p, key=value)` and `tojson`, follows HA's documentation). The contract test checks routes and three operations' request field names, not response shapes.

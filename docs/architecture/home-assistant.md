@@ -56,6 +56,21 @@ HA automations need things to trigger on and things to call.
 - The doc keeps worked examples: "scene when the TV input becomes HDMI 2", "pause the music when the doorbell rings", "morning scene on a schedule".
 - No auth to configure: the API is open on the LAN, as for every client. Admin-only calls are not in the package.
 
+### Generated rest_command package
+
+`php artisan ha:package [--output=remoment.yaml] [--base-url=http://remoment.local]` writes one YAML file with a `rest_command` per scene-capable operation (`config/scene-operations.php`, 26 today), generated from `docs/api/openapi.yaml` (`App\Domain\Scenes\HaPackage`). Each command is named `remoment_{snake_case operationId}` (`remoment_move_playback`), its `url` is the server's `APP_URL` (or `--base-url`) plus `/api` and the operation's path with `{device}` as `{{ device }}`, its `method` the operation's, and its `payload` a Jinja template that renders the JSON body from the service data: required properties first, optional ones only when the call passes them. The device is just the operation's `device_param` input (`device` for most). Only guest-level operations are in the package (no admin token to configure). A settings-page download and scene activation are not built yet (scenes are not).
+
+```yaml
+rest_command:
+  remoment_move_playback:
+    url: 'http://remoment.local/api/devices/{{ device }}/move'
+    method: post
+    content_type: application/json
+    payload: "{% set p = {'to_device_id': to_device_id} %}{% if stop_source is defined %}{% set p = dict(p, stop_source=stop_source) %}{% endif %}{{ p | tojson }}"
+```
+
+**Unverified:** the file has only been parsed (Symfony YAML in `tests/Unit/Scenes/HaPackageTest.php`), never loaded by a running Home Assistant; the template syntax follows HA's `rest_command` documentation. Query parameters (none of the listed operations has one) appear only when required. See [action-layer.md](action-layer.md) section 8.
+
 **Later, optional:** an MQTT command path (a `button` per scene, a source `select`) means the server subscribes to `remoment/ha/+/set`. That is a new `mqtt:listen` process next to `device:listen`; decide when the REST package proves too clumsy. Open question 4 below.
 
 **Still not exposed:** players as `media_player` entities (HA has its own integrations for every speaker). A TV is the same: its power, input and now playing reach HA as the source sensor and events above, not as a second TV entity.

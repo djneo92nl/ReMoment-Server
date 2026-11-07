@@ -38,9 +38,10 @@ docs/
     schema-plan.md          Schema review before the migration squash (14.3): table inventory, findings, data vs schema migrations, squash design with the `schema:baseline` mechanism, pre-squash fix-list; rehearsal harness in scripts/schema/ (`schema.sh check` diffs the schema against committed MariaDB and SQLite baselines)
     availability-layer.md   Availability layer design (workstream 3): providers, catalogue_albums/album_availability, MusicBrainz discography sync, wishlist, API/UI, build order (plan, not built)
     alerts.md               Alert model (workstream 14.1): one place raises/resolves alerts, kinds and thresholds, dedupe, MQTT remoment/alerts/*, GET /api/alerts, ack, how to add a kind
-    action-layer.md         Action layer spike (14.5): can an action be defined once and route/MCP/OpenAPI/scene/HA derived? Prototype in app/Domain/Actions, numbers, recommendation (keep REST + openapi.yaml as the definition, scenes call operations by operationId)
+    action-layer.md         Action layer spike (14.5): can an action be defined once and route/MCP/OpenAPI/scene/HA derived? numbers, recommendation (keep REST + openapi.yaml as the definition, scenes call operations by operationId), and what was built from it: operationIds, contract test, scene-operation list, `ha:package`
     credentials.md          Credentials layer (workstream 14.4): ServiceCredentials registry for Spotify/Last.fm/Discogs/AcoustID/TheAudioDB keys, /settings/services, encrypted secrets, backup exclusion, base-URL/relay hook, setup steps, how to add a service
     database.md             MariaDB (SQLite for tests only): why, .env settings, db:import-sqlite, recovering a corrupt file, driver-specific SQL
+    developer-tools.md      /settings/developer: quality test (transcode ladder played on a device), simulate now playing, MQTT console, device inspector, stream URL tester
     device-drivers.md       Driver contracts, existing drivers, guide for adding a new brand
     beovision-tv.md         BeoVision / Beoplay V1 TV controls design: V1 API findings, one-way remote commands, TV screens (list, detail, remote), probe plan, phases; mostly unbuilt
     philips-tv.md           Philips Android TV on top of the UPnP driver (Jointspace v6): pairing command, standby, apps as sources, active app as now playing; what is unverified
@@ -54,7 +55,6 @@ docs/
     discovery-for-clients.md mDNS advertisement (_remoment._tcp via host Avahi) so clients find the server
     system-requirements.md  Hardware tiers for the full server (Pi minimum up to Essentia + ML), what runs, disk and network needs
     audio-analysis.md       Analysis of the own audio files: loudness, ReplayGain, Chromaprint/AcoustID, Essentia sidecar (BPM, key, mood), `analysis` queue, library:analyze, smart fields
-    track-sections-spike.md Spike for 16.2 (sections of a track): librosa novelty vs Essentia SBic vs structure models, cost, licences, recommendation, PR plan
     metadata-enrichment.md  Per-source enrichment jobs (MusicBrainz track/artist/album, Wikipedia, Cover Art Archive, lyrics, Spotify, Last.fm, TheAudioDB, Discogs), DLNA tags, canonical genres: markers, retries, rate limits, library:enrich
     artist-settings.md      Admin page per artist: photo/backdrop choice, MusicBrainz/Spotify/Last.fm mappings, details overrides, files, default source; the `manual` metadata source
     structure-service.md    Structure service (workstream 16.2): docker/structure, librosa novelty sections of one track on demand, contract, RAM/time measured, compose profile `structure`
@@ -146,6 +146,9 @@ php artisan library:enrich [--only=metadata --only=artist-images] [--limit=200] 
 
 # Audio analysis of the own files (loudness, fingerprint + AcoustID, BPM/key/mood via the optional Essentia sidecar); needs ANALYSIS_ENABLED=true, runs on the `analysis` queue (scheduled nightly). --now with --file runs inline
 php artisan library:analyze [--limit=100] [--stage=loudness|waveform|quality|fingerprint|acoustid|essentia] [--file=ID --now] [--dry-run]
+
+# Home Assistant rest_command package (YAML) for the scene-capable operations of config/scene-operations.php, generated from docs/api/openapi.yaml; unverified in a running HA; see docs/architecture/home-assistant.md
+php artisan ha:package [--output=remoment.yaml] [--base-url=http://remoment.local]
 
 # Re-select the tracks of smart (rule-based) playlists (scheduled daily)
 php artisan playlists:refresh-smart [--playlist=ID]
@@ -894,6 +897,7 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 - `/settings` — overview of listeners, MQTT config
 - `/settings/users` — Admin & Apps: the shared admin login (change password) and the apps signed in with it (revoke)
 - `/settings/analysis` — audio analysis status: per-stage progress, what runs now, sidecar, problems with retry (see `docs/architecture/audio-analysis.md`)
+- `/settings/developer` — developer tools (admin): quality test, simulate playback, MQTT console, device inspector, stream URL tester (see `docs/architecture/developer-tools.md`)
 - `/settings/health` — external services (Spotify/Last.fm/Discogs/TheAudioDB credentials, MusicBrainz, Wikipedia, Cover Art Archive, LRCLIB, storage locations; `Domain/Health/ExternalServices`, one read-only probe each, results cached 15 min, "Check now" re-runs them), supervisor, scheduler, queue worker, pending jobs, MQTT broker and per-device listener health
 - `/settings/devices` — discovered-devices list (scan, add, ignore) on top, drivers grouped by brand below, add by IP (see `docs/architecture/device-discovery.md`); `/devices/discover` redirects here
 - `/settings/dlna` — discover DLNA servers, trigger library scans
