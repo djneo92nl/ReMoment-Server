@@ -50,3 +50,19 @@ jobs:
         DB_CONNECTION: sqlite
         DB_DATABASE: database/database.sqlite
       run: php artisan test
+
+  frontend-build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        # Same major as the dev/prod image (docker/8.4/Dockerfile NODE_VERSION); Vite 7 needs Node 20.19+ or 22.12+.
+        node-version: '22'
+        cache: npm
+    - name: Install npm dependencies
+      run: npm ci
+    - name: Build front end
+      run: npm run build
