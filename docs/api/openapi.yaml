@@ -25,6 +25,11 @@ info:
     `network`, `wireless-speakers`, `info` — see `docs/api/device-settings.md`) and
     source controls (`/devices/{id}/controls` — see `docs/api/source-controls.md`).
 
+    **Operation ids.** Every operation has a unique camelCase `operationId` (verb + resource,
+    e.g. `movePlayback`, `pressRemoteKey`); it is the operation's name for scene steps and the
+    Home Assistant package, so keep it stable. `tests/Feature/ApiContractTest.php` checks this
+    file against the routes; see `docs/architecture/action-layer.md`.
+
     Errors on device endpoints: `503 unreachable`, `422 unsupported`, `502 driver_error`.
     Always check a device's `capabilities` before calling a feature endpoint.
 servers:
@@ -2261,6 +2266,7 @@ paths:
     get:
       tags: [Alerts]
       summary: Alerts of the server, newest first
+      operationId: listAlerts
       description: >-
         Conditions the server detects (stuck queue, silent scheduler, stale backup, unreachable storage,
         offline device, down listener), raised and later resolved; the same alerts are pushed on MQTT
@@ -2298,6 +2304,7 @@ paths:
     post:
       tags: [Alerts]
       summary: Acknowledge an alert (admin-wide, not per user)
+      operationId: acknowledgeAlert
       security: [{ adminToken: [] }]
       parameters:
         - { name: alert, in: path, required: true, schema: { type: integer } }
