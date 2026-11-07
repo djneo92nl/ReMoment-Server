@@ -66,3 +66,71 @@ jobs:
       run: npm ci
     - name: Build front end
       run: npm run build
+
+  mariadb-migrations:
+    # Production runs MariaDB 11.4; the test job above runs SQLite. This proves the migrations on the real engine and
+    # that the schema equals the committed baseline (scripts/schema/README.md). The tests themselves stay on SQLite.
+
+    runs-on: ubuntu-latest
+
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: remoment
+          MARIADB_USER: remoment
+          MARIADB_PASSWORD: remoment
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      DB_CONNECTION: mariadb
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: remoment
+      DB_USERNAME: remoment
+      DB_PASSWORD: remoment
+      SCHEMA_DRIVER: mysql
+
+    steps:
+    - uses: shivammathur/setup-php@15c43e89cdef867065b0213be354c2841860869e
+      with:
+        php-version: '8.4'
+        extensions: pdo_mysql
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+    - name: Clone Sonos fork (pinned)
+      # Keep the SHA in step with the laravel-tests job.
+      env:
+        SONOS_REF: f1243a3262845cfe02700de975df44e20933d598
+      run: |
+        if [ ! -d packages/duncan3dc/sonos/.git ]; then
+          mkdir -p packages/duncan3dc
+          git clone https://github.com/djneo92nl/sonos.git packages/duncan3dc/sonos
+          git -C packages/duncan3dc/sonos checkout --detach "$SONOS_REF"
+        fi
+    - name: Copy .env
+      run: php -r "file_exists('.env') || copy('.env.example', '.env');"
+    - name: Install Dependencies
+      run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
+    - name: Generate key
+      run: php artisan key:generate
+    - name: Directory Permissions
+      run: chmod -R 777 storage bootstrap/cache
+    - name: Migrate a fresh MariaDB
+      env:
+        CACHE_STORE: array
+        SESSION_DRIVER: array
+        QUEUE_CONNECTION: sync
+      run: php artisan migrate --force
+    - name: Compare the schema with the committed MariaDB baseline
+      run: |
+        php scripts/schema/dump.php > mariadb.schema.txt
+        diff -u scripts/schema/baseline/mariadb.schema.txt mariadb.schema.txt
