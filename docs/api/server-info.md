@@ -41,7 +41,7 @@ Unauthenticated, like the rest of the API. Controller: `app/Http/Controllers/Api
 | Field | Source | Notes |
 |-------|--------|-------|
 | `name` | `APP_NAME` | Display name, e.g. for a "Connected to …" line |
-| `version` | `APP_VERSION` (default `dev`) | Server release label, free-form |
+| `version` | `config('app.version')`, read from the `VERSION` file at the repository root | Semantic version of the release (`1.0.0-dev` before 1.0); `0.0.0-unknown` if the file is missing. The same value is printed by `php artisan app:version` and recorded in the database (Setting `app_version`) by `app:version --record` |
 | `api_version` | `InfoController::API_VERSION` | Integer, bumped only on breaking changes to the client contract. Firmware can refuse/warn on an unknown major |
 | `base_url` | Request scheme + host (+ port) | Exactly how the client reached the server. Not `APP_URL`, which may be an mDNS name or reverse-proxy URL the client can't use |
 | `api_base_url` | `base_url` + `/api` | Prefix for all REST endpoints |

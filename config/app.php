@@ -15,8 +15,13 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
 
-    // Reported to client devices by GET /api/info and the mDNS TXT record.
-    'version' => env('APP_VERSION', 'dev'),
+    // The release version: the VERSION file at the repository root (semantic version). Reported by GET /api/info,
+    // `php artisan app:version` and backup manifests. A missing or empty file never throws.
+    'version' => (static function (): string {
+        $version = is_file(base_path('VERSION')) ? trim((string) @file_get_contents(base_path('VERSION'))) : '';
+
+        return $version !== '' ? $version : '0.0.0-unknown';
+    })(),
 
     /*
     |--------------------------------------------------------------------------

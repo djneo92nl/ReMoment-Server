@@ -120,6 +120,9 @@ php artisan test tests/Path/To/TestFile.php
 php artisan profile:stress-sqlite [--minutes=1] [--listeners=6] [--workers=2] [--web=2] [--intensity=1] [--json]
 php artisan profile:upgrade [--to-profile=standard|full] [--database=remoment] [--dry-run] [--force]
 
+# Version: print the VERSION file's version (`--json`: version, recorded version, profile; `--record`: store it as the installed version, Setting `app_version`)
+php artisan app:version [--json] [--record]
+
 # Backup (database + safe settings + manifest, no secrets unless --with-secrets; scheduled nightly, keeps BACKUP_KEEP) and restore on a fresh `migrate`; see docs/architecture/backup-restore.md
 php artisan backup:run [--path=] [--keep=N] [--no-db] [--with-secrets]
 php artisan backup:restore {archive} [--force]
