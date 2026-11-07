@@ -1263,7 +1263,7 @@ paths:
     post:
       tags: [Library]
       operationId: wantTrack
-      description: Wish for a song (from the play history, a radio station or by hand): something to buy or rip. One wish per artist and title. Not available to client devices.
+      description: 'Wish for a song (from the play history, a radio station or by hand): something to buy or rip. One wish per artist and title. Not available to client devices.'
       requestBody:
         required: true
         content:
@@ -1345,7 +1345,7 @@ paths:
                     items: { $ref: "#/components/schemas/ExternalItem" }
         "403": { description: Forbidden for client devices }
         "404": { description: unknown_provider }
-        "422": { description: Validation error, or not_connected }
+        "422": { description: 'Validation error, or not_connected' }
         "502": { description: The service did not answer (driver_error) }
   /library/external/{provider}/artists/{id}:
     parameters:
@@ -1816,31 +1816,6 @@ paths:
                         name: { type: string }
                         track_count: { type: integer }
                         track_source: { type: string, nullable: true, enum: [files, dlna, spotify], description: "The one library the playlist's tracks come from; null while empty. A playlist never mixes libraries." }
-  /library/playlists:
-    post:
-      tags: [Library]
-      summary: Create an empty playlist made here
-      operationId: createPlaylist
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [name]
-              properties:
-                name: { type: string, maxLength: 255 }
-      responses:
-        "201":
-          description: Created
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  id: { type: integer }
-                  name: { type: string }
-                  track_count: { type: integer }
   /library/playlists/{playlist}/tracks:
     parameters:
       - name: playlist
@@ -1989,6 +1964,30 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/PlaylistListItem" }
                   next_cursor: { type: string, nullable: true }
+    post:
+      tags: [Library]
+      summary: Create an empty playlist made here
+      operationId: createPlaylist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 255 }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: integer }
+                  name: { type: string }
+                  track_count: { type: integer }
   /library/playlists/{playlist}:
     parameters:
       - name: playlist
@@ -2183,7 +2182,7 @@ paths:
             schema:
               type: object
               properties:
-                scope: { type: string, description: A library id, `local`, `streaming` or `all`. }
+                scope: { type: string, description: 'A library id, `local`, `streaming` or `all`.' }
                 client: { type: string, description: A client `api_token` whose hidden sources apply. }
       responses:
         "200":
@@ -3211,7 +3210,7 @@ components:
         track_count: { type: integer, nullable: true }
         image: { type: string, nullable: true, description: "The service's own image URL; show it through the artwork pipeline." }
         in_library: { type: boolean }
-        library_id: { type: integer, nullable: true, description: The library artist, album or track when in_library. }
+        library_id: { type: integer, nullable: true, description: 'The library artist, album or track when in_library.' }
     PhysicalItemInput:
       type: object
       required: [artist, title, medium]
@@ -3253,8 +3252,8 @@ components:
         artist: { type: string }
         title: { type: string }
         album: { type: string, nullable: true }
-        track_id: { type: integer, nullable: true, description: The library track of the song, when there is one. }
-        fulfilled: { type: boolean, description: The library track has an own file or a DLNA copy: the wish is closed. }
+        track_id: { type: integer, nullable: true, description: 'The library track of the song, when there is one.' }
+        fulfilled: { type: boolean, description: 'The library track has an own file or a DLNA copy: the wish is closed.' }
         source: { type: string, enum: [history, radio, manual] }
         wanted_at: { type: string, format: date-time }
         artwork: { type: object, nullable: true, additionalProperties: true }
@@ -3275,7 +3274,7 @@ components:
         album_id: { type: integer, nullable: true, description: The library album when the library has it; null = missing from the library. }
         wanted: { type: boolean }
         ignored: { type: boolean }
-        fulfilled: { type: boolean, description: Wished and now owned: the wish is closed. }
+        fulfilled: { type: boolean, description: 'Wished and now owned: the wish is closed.' }
         availability:
           type: array
           items:
@@ -3386,7 +3385,7 @@ components:
                 properties:
                   field: { type: string, example: genre }
                   operator: { type: string, example: is }
-                  value: { description: string or integer, depending on the field }
+                  value: { description: 'string or integer, depending on the field' }
                   text: { type: string, example: Genre is Rock }
         rules_summary: { type: string, nullable: true, example: "Genre is Rock and Times played at least 3, up to 50 tracks" }
         playable: { type: boolean }
@@ -3400,7 +3399,7 @@ components:
               name: { type: string }
               artist_name: { type: string, nullable: true }
               duration: { type: integer, nullable: true }
-              artwork: { $ref: "#/components/schemas/LibraryArtwork", description: The track's album cover, null when none or not processed }
+              artwork: { $ref: "#/components/schemas/LibraryArtwork", description: 'The track''s album cover, null when none or not processed' }
               playable: { type: boolean, description: "In local mode: has a local copy playable on device_id" }
               missing_locally: { type: boolean, description: "Local mode only: the track has no copy in the Local library (not playable)" }
     SearchTrack:
