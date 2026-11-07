@@ -18,11 +18,16 @@ jobs:
     - uses: actions/checkout@v4
       with:
         submodules: true
-    - name: Clone Sonos fork
+    - name: Clone Sonos fork (pinned)
+      # Pinned to a commit, not the branch, so a push to the fork cannot change what CI builds.
+      # Bump: git ls-remote https://github.com/djneo92nl/sonos refs/heads/laravel12  -> paste the SHA below.
+      env:
+        SONOS_REF: f1243a3262845cfe02700de975df44e20933d598
       run: |
         if [ ! -d packages/duncan3dc/sonos/.git ]; then
           mkdir -p packages/duncan3dc
-          git clone --branch laravel12 https://github.com/djneo92nl/sonos.git packages/duncan3dc/sonos
+          git clone https://github.com/djneo92nl/sonos.git packages/duncan3dc/sonos
+          git -C packages/duncan3dc/sonos checkout --detach "$SONOS_REF"
         fi
     - name: Copy .env
       run: php -r "file_exists('.env') || copy('.env.example', '.env');"
