@@ -123,6 +123,9 @@ php artisan profile:upgrade [--to-profile=standard|full] [--database=remoment] [
 # Version: print the VERSION file's version (`--json`: version, recorded version, profile; `--record`: store it as the installed version, Setting `app_version`)
 php artisan app:version [--json] [--record]
 
+# Upgrade, part 1 (9a): read-only pre-flight (downgrade, unknown newer migration, pending migrations, disk, heartbeats, profile) and the backup; migrates nothing yet. --check exits 0 (nothing pending) / 10 (upgrade available) / 1 (blocked); backup failure exits 2; --json needs --force to run; see docs/architecture/backup-restore.md
+php artisan app:upgrade [--check] [--json] [--force]
+
 # Backup (database + safe settings + manifest, no secrets unless --with-secrets; scheduled nightly, keeps BACKUP_KEEP) and restore on a fresh `migrate`; see docs/architecture/backup-restore.md
 php artisan backup:run [--path=] [--keep=N] [--no-db] [--with-secrets]
 php artisan backup:restore {archive} [--force]

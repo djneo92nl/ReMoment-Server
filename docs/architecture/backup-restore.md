@@ -53,6 +53,16 @@ Refusals: the archive's latest migration is newer than the app's (a downgrade; u
 
 **`APP_KEY` and `--with-secrets`.** Service secrets are stored encrypted with the install's `APP_KEY` (see [credentials.md](credentials.md)). An archive made with `--with-secrets` holds those encrypted values, so restoring it on an install with a different `APP_KEY` probably leaves them unreadable (the registry then treats them as not set and you enter the keys again). *Not verified.* Keep the `APP_KEY` with your backups if you use `--with-secrets`.
 
+## Upgrade command (part 1)
+
+`php artisan app:upgrade [--check] [--json] [--force]` (`App\Console\Commands\AppUpgrade`, facts from `App\Domain\System\UpgradeCheck`) is the first half of the upgrade of 9a: a read-only pre-flight and the mandatory backup. **It does not migrate or restart anything yet** (part 2: migrate, caches, workers, health check, rollback text).
+
+Pre-flight (changes nothing): code version (`config('app.version')`) against the recorded one (`InstalledVersion::recorded()`); the code older than the recorded version is a downgrade and **blocks**; a name in the `migrations` table that no file in `database/migrations` has (a newer release ran here) **blocks**; the database must connect; pending migrations are listed by name; free space in the backup directory (database size plus `upgrade.disk_margin_mb`, default 100) and a writable directory **block** when missing; scheduler and queue heartbeats are read like `/settings/health` and only **warn**; the profile is reported.
+
+`--check` stops there: exit **0** nothing pending, **10** an upgrade is available, **1** blocked. `--json` prints `{ version_code, version_recorded, pending_migrations, blocked, reasons, warnings, profile, disk_ok }` (`version_recorded` null when none).
+
+Without `--check` it asks for confirmation (`--force` skips it; with `--json` or a non-interactive terminal `--force` is required, else exit 1), then writes the backup through `BackupWriter`, the class `backup:run` uses (no secrets, no pruning). A failing backup prints the error and exits **2** and nothing goes on; on success it prints the archive path and size and says part 2 is not built yet. Exit 1 also covers a blocked pre-flight and a declined prompt.
+
 ## Not in the backup: your music files
 
 Own audio files (`MUSIC_DIR`, `LIBRARY_DIR`, S3 locations) are yours and large. Back them up with what you use for the rest of your files (rsync, restic, Proxmox backup of the mount, S3 versioning). After restoring on a new machine, mount them at the same paths and run `php artisan library:scan-files`; the database already knows the files (tracks, playlists, plays) and matches them.
