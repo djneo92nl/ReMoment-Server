@@ -16,6 +16,7 @@ Detailed documentation lives in `docs/`. CLAUDE.md holds enough context to under
 
 ```
 docs/
+  user/                     End-user docs (English, tiered): install per method, first run, adding devices, troubleshooting, reverse proxy, upgrades and backups; start at README.md
   api/
     client-devices.md       Client device registration flow, all endpoints, firmware guide
     jellyfin.md             Jellyfin on a Philips TV: continue watching / next up and play in the Jellyfin app (GET /api/devices/{id}/jellyfin, POST .../jellyfin/play)
