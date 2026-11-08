@@ -412,7 +412,17 @@ archive into a post-squash install is accepted (same schema, proved by the harne
 pre-squash install) is refused as newer. Both directions are what the rule should be; add a test with a fake pre-squash name when
 the squash lands.
 
-## 8. Questions for the owner
+## 8. Questions for the owner (answered 2026-11-08)
+
+**Answers:**
+1. **Planned tables in 1.0:** only `device_links`. Scenes, `media_servers`, podcasts, episodes and `playback_positions` append after the squash; `physical_locations`, `exports` (already built), `push_subscriptions` (1.1) follow their own workstreams. `device_links` needs its short design (names, keys, `ON DELETE`) before it can be folded into the squash.
+2. **Deleting a device:** **keep its plays with no device.** Make `plays.device_id` nullable with `ON DELETE SET NULL` (fix-list item 9); stats, history and `Play::device` users must handle a null device.
+3. **A track twice in one playlist:** allowed; no unique rule on `playlist_track`.
+4. **Framework tables:** drop `sessions`, `cache`, `cache_locks`, `jobs`, `job_batches` (and `failed_jobs` only if the queue never uses the database driver in any profile: check before dropping; the Control profile uses Redis too).
+5. **The hop through the last pre-squash release:** accepted.
+
+**The original questions, kept for reference:**
+
 
 1. **Planned tables** (`device_links`, `physical_locations`, scenes, podcasts/episodes/`playback_positions`, `push_subscriptions`,
    `exports`, `media_servers`): which of them are really in 1.0? Each needs a short design (names, keys, `ON DELETE`) and a
