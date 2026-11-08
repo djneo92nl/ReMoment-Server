@@ -48,6 +48,7 @@ Device and library tools do not re-implement anything: `ApiBridge` dispatches an
 | `remove_library_item` | **ADMIN**, destructive: track, album or artist; `confirm` required, DLNA-available items are kept (tracks: `force`) |
 | `storage` | **ADMIN**: locations, test/scan a location (queued), import, reorganize (`dry_run`, else `confirm`), track files, verify a file |
 | `deep_analysis` | **ADMIN**: `request` (track_id, kinds `sections` and/or `stems`, default `sections`) queues the sections or the stems (Demucs loudness lanes, vocal ratio, instrumental ranges) of one track and answers `queued` / `already_done` / `not_available` with an estimate; `status` per kind (`none`/`queued`/`running`/`done`/`failed`); `remove` a stored result; see `docs/api/deep-analysis.md` |
+| `export` | **ADMIN**: `estimate` (type album/playlist/artist/tracks, id or track_ids, profile) plans an export of tracks with an own file and queues nothing; `start` queues it (refused with the estimate over the limits); `status` (id) progress and signed download urls (a path, valid 15 minutes); `list`; `cancel` (id) cancels or removes; see `docs/api/export.md` |
 | `alerts` | `list` the server's alerts (stuck queue, silent scheduler, stale backup, unreachable storage, offline device, down listener; `state`, `since`, `limit`), open to everyone; `ack` an alert needs the admin token; see `docs/architecture/alerts.md` |
 
 Destructive actions answer `confirmation_required (422)` until `confirm=true`. Queued actions need the queue worker.

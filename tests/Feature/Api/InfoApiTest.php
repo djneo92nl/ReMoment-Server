@@ -36,7 +36,7 @@ class InfoApiTest extends TestCase
                 'ws_port' => 9001,
                 'ws_url' => 'ws://192.168.1.50:9001',
             ],
-            'features' => ['alerts' => true, 'profile' => 'full', 'deep_analysis' => false],
+            'features' => ['alerts' => true, 'profile' => 'full', 'deep_analysis' => false] + $this->exportFeature(),
         ], Arr::except($response->json(), 'placeholder'));
     }
 
@@ -48,7 +48,7 @@ class InfoApiTest extends TestCase
         Http::fake(['structure:8091/health' => function () use (&$healthy) {
             return $healthy ? Http::response(['ok' => true, 'version' => 1, 'method' => 'novelty-v1']) : Http::response('', 503);
         }]);
-        $this->getJson('/api/info')->assertJsonPath('features', ['alerts' => true, 'profile' => 'full', 'deep_analysis' => true, 'deep_analysis_kinds' => ['sections']]);
+        $this->getJson('/api/info')->assertJsonPath('features', ['alerts' => true, 'profile' => 'full', 'deep_analysis' => true, 'deep_analysis_kinds' => ['sections']] + $this->exportFeature());
 
         Cache::flush();
         $healthy = false;
@@ -113,5 +113,11 @@ class InfoApiTest extends TestCase
 
         $this->getJson('http://remoment.local/api/info')
             ->assertJsonPath('mqtt.host', 'remoment.local');
+    }
+
+    /** `features.export` is there when this machine has ffmpeg (ExportApiTest covers it). */
+    private function exportFeature(): array
+    {
+        return \App\Domain\Analysis\Tools::available(\App\Domain\Analysis\Tools::ffmpeg()) ? ['export' => true] : [];
     }
 }

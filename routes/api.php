@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\ClientController;
 use App\Http\Controllers\Api\DeepAnalysisController;
 use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\DeviceSettingsController;
+use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\ExternalCatalogueController;
 use App\Http\Controllers\Api\InfoController;
 use App\Http\Controllers\Api\JellyfinController;
@@ -176,6 +177,9 @@ Route::get('/clients/{apiToken}/artwork', [ClientController::class, 'artwork']);
 
 // Admin token login for apps. Routes that change configuration go in the `admin.token` group (see docs/api/admin-auth.md).
 Route::post('/admin/login', [AdminAuthController::class, 'login']);
+// Signed, temporary download of one export part: the signature is the authorization (docs/api/export.md)
+Route::get('/library/exports/{id}/download/{part}', [ExportController::class, 'download'])
+    ->middleware('signed:relative')->whereNumber('part')->name('api.library.exports.download');
 Route::middleware('admin.token')->group(function () {
     Route::get('/admin/me', [AdminAuthController::class, 'me']);
     Route::delete('/admin/token', [AdminAuthController::class, 'logout']);
@@ -185,6 +189,13 @@ Route::middleware('admin.token')->group(function () {
     Route::post('/library/tracks/{track}/deep-analysis', [DeepAnalysisController::class, 'store']);
     Route::get('/library/tracks/{track}/deep-analysis', [DeepAnalysisController::class, 'show']);
     Route::delete('/library/tracks/{track}/deep-analysis/{kind}', [DeepAnalysisController::class, 'destroy']);
+
+    // Export from the library as zip parts (docs/api/export.md); admin only, the download itself is signed
+    Route::post('/library/exports/estimate', [ExportController::class, 'estimate']);
+    Route::post('/library/exports', [ExportController::class, 'store']);
+    Route::get('/library/exports', [ExportController::class, 'index']);
+    Route::get('/library/exports/{id}', [ExportController::class, 'show']);
+    Route::delete('/library/exports/{id}', [ExportController::class, 'destroy']);
 
     // Storage locations and the library's files (docs/architecture/file-storage.md)
     Route::get('/admin/storage/locations', [StorageController::class, 'locations']);

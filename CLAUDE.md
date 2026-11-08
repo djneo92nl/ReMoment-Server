@@ -21,6 +21,7 @@ docs/
     client-devices.md       Client device registration flow, all endpoints, firmware guide
     jellyfin.md             Jellyfin on a Philips TV: continue watching / next up and play in the Jellyfin app (GET /api/devices/{id}/jellyfin, POST .../jellyfin/play)
     deep-analysis.md        Deep analysis of one track on request (admin token): POST/GET/DELETE /api/library/tracks/{id}/deep-analysis, kinds `sections` and `stems`, states, where the result shows
+    export.md               Export from the library as zip for an MP3 player/car radio (admin token): estimate, start, poll, signed 15-minute download, cancel/remove; MCP tool `export`, `features.export`
     library.md              Library browse (artists, albums, playlists), favorites, play album/artist/playlist on a device (DLNA or Spotify), playlist artwork
     source-controls.md      Per-source controls (change disc, FM presets) from control profiles: GET/POST /api/devices/{id}/controls, resolution, transports
     physical.md             Physical collection (CDs, records, tapes): items by barcode or by hand, MusicBrainz barcode lookup, `physical` availability provider, wishes closed by owning it

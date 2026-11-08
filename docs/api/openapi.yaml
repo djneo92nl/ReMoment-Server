@@ -1847,6 +1847,122 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { description: "`unknown_kind` or `no_file`", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /library/exports/estimate:
+    post:
+      tags: [Library]
+      summary: What an export would hold, without queueing anything
+      description: "Admin only. Plans the selection for a profile: how many tracks are copied, transcoded or skipped (no own file) and the estimated size and number of zip parts. See docs/api/export.md."
+      operationId: estimateExport
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ExportRequest" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ExportEstimate" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { description: "Validation error (unknown type, id or profile)", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /library/exports:
+    post:
+      tags: [Library]
+      summary: Start an export (a zip for an MP3 player or car radio), written in the background
+      description: "Admin only. Refused with `export_too_large` (and the estimate) when the plan is over `EXPORT_MAX_GB` or `EXPORT_DIR_MAX_GB`, `nothing_to_export` when no track has an own file, `not_available` (409) without ffmpeg. Poll GET /library/exports/{id}."
+      operationId: startExport
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ExportRequest" }
+      responses:
+        "202":
+          description: Queued
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, status, estimate]
+                properties:
+                  id: { type: string, description: The export id (uuid) }
+                  status: { type: string, enum: [queued] }
+                  estimate: { $ref: "#/components/schemas/ExportEstimate" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { description: "`not_available`: ffmpeg is missing", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "422":
+          description: "Validation error, `export_too_large` or `nothing_to_export` (these two carry `estimate`)"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Error" }
+                  - type: object
+                    properties:
+                      estimate: { $ref: "#/components/schemas/ExportEstimate" }
+    get:
+      tags: [Library]
+      summary: Recent exports, newest first
+      operationId: listExports
+      security: [{ adminToken: [] }]
+      parameters:
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/Export" } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+  /library/exports/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string }, description: "Export id (uuid) from POST /library/exports" }
+    get:
+      tags: [Library]
+      summary: Status, progress and, when done, signed download URLs of one export
+      description: "Admin only. Every GET makes fresh signed part URLs (valid 15 minutes); they are paths, put the server address in front."
+      operationId: getExport
+      security: [{ adminToken: [] }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Export" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Library]
+      summary: Cancel a queued or running export, or remove a finished one with its files
+      operationId: deleteExport
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [ok] }
+                  id: { type: string }
+                  result: { type: string, enum: [cancelled, removed] }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /library/exports/{id}/download/{part}:
+    get:
+      tags: [Library]
+      summary: Download one zip part of a finished export
+      description: "No token: the `expires` and `signature` query parameters of the URL from GET /library/exports/{id} are the authorization (403 without a valid signature). Supports Range requests."
+      operationId: downloadExportPart
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: part, in: path, required: true, schema: { type: integer, minimum: 1 }, description: "1-based part number" }
+        - { name: expires, in: query, required: true, schema: { type: integer } }
+        - { name: signature, in: query, required: true, schema: { type: string } }
+      responses:
+        "200": { description: The zip file, content: { application/zip: { schema: { type: string, format: binary } } } }
+        "206": { description: Partial content (Range request), content: { application/zip: { schema: { type: string, format: binary } } } }
+        "403": { description: Missing, invalid or expired signature, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "404": { description: The export or part is not available (not finished, expired, removed), content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
   /library/editable-playlists:
     get:
       tags: [Library]
@@ -2857,6 +2973,99 @@ components:
             profile: { type: string, enum: [control, standard, full], description: "The profile this server runs. Control has no library, catalogue or analysis: those endpoints answer 422 not_available_in_profile (see docs/architecture/profiles.md)" }
             deep_analysis: { type: boolean, description: "A deep-analysis service answers its health check (cached for a minute): POST /library/tracks/{id}/deep-analysis can queue something" }
             deep_analysis_kinds: { type: array, items: { $ref: "#/components/schemas/DeepAnalysisKind" }, description: "The kinds that can run now (sections: structure service; stems: stems service). Present only when not empty." }
+            export: { type: boolean, description: "Export from the library as zip is available: the profile has the library and own files, and ffmpeg can transcode (POST /library/exports). Present only when true." }
+
+    ExportRequest:
+      type: object
+      required: [type]
+      properties:
+        type: { type: string, enum: [album, playlist, artist, tracks] }
+        id: { type: integer, description: "Album, playlist or artist id (a merged id resolves to the survivor); required unless type is tracks" }
+        track_ids: { type: array, minItems: 1, maxItems: 5000, items: { type: integer }, description: "type tracks: library track ids, exported in this order" }
+        profile: { type: string, enum: [highest, mp3-320, mp3-256, mp3-192, mp3-128, compat], default: mp3-320 }
+        options:
+          type: object
+          properties:
+            layout: { type: string, enum: [tree, flat], description: "Folders Artist/Album (default for album and artist) or one flat folder with a position prefix (default for playlist and tracks)" }
+    ExportSelection:
+      type: object
+      properties:
+        type: { type: string, enum: [album, playlist, artist, tracks] }
+        id: { type: integer, nullable: true }
+        track_ids: { type: array, items: { type: integer } }
+    ExportSkipped:
+      type: object
+      properties:
+        track_id: { type: integer }
+        name: { type: string, nullable: true }
+        reason: { type: string, description: "`no_own_file`, or while running `transcode_failed`, `copy_failed`, `file_missing`" }
+    ExportEstimate:
+      type: object
+      properties:
+        title: { type: string }
+        selection: { $ref: "#/components/schemas/ExportSelection" }
+        totals:
+          type: object
+          properties:
+            profile: { type: string }
+            tracks: { type: integer }
+            exportable: { type: integer }
+            copied: { type: integer }
+            transcoded: { type: integer }
+            skipped: { type: integer }
+            estimated_bytes: { type: integer }
+            parts: { type: integer }
+            exceeds_limits: { type: boolean }
+            exceeds: { type: array, items: { type: string, enum: [max_gb, dir_max_gb] } }
+        skipped: { type: array, items: { $ref: "#/components/schemas/ExportSkipped" } }
+        limits:
+          type: object
+          properties:
+            max_gb: { type: number }
+            part_gb: { type: number }
+            dir_max_gb: { type: number }
+    Export:
+      type: object
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [queued, running, done, failed, expired] }
+        title: { type: string }
+        selection: { $ref: "#/components/schemas/ExportSelection" }
+        profile: { type: string }
+        options: { type: object }
+        progress:
+          type: object
+          properties:
+            files_done: { type: integer }
+            files_total: { type: integer }
+            percent: { type: integer }
+        totals:
+          type: object
+          properties:
+            tracks: { type: integer, nullable: true }
+            copied: { type: integer, nullable: true }
+            transcoded: { type: integer, nullable: true }
+            skipped: { type: integer, nullable: true }
+            estimated_bytes: { type: integer, nullable: true }
+            planned_parts: { type: integer, nullable: true }
+        skipped: { type: array, items: { $ref: "#/components/schemas/ExportSkipped" } }
+        parts:
+          type: array
+          description: "Only when done"
+          items:
+            type: object
+            properties:
+              part: { type: integer, description: 1-based }
+              name: { type: string }
+              size: { type: integer }
+              files: { type: integer }
+              url: { type: string, description: "Signed path valid 15 minutes; prefix the server address" }
+        bytes: { type: integer, nullable: true }
+        error: { type: string, nullable: true }
+        created_at: { type: string, format: date-time, nullable: true }
+        started_at: { type: string, format: date-time, nullable: true }
+        finished_at: { type: string, format: date-time, nullable: true }
+        expires_at: { type: string, format: date-time, nullable: true }
 
     DeepAnalysisKind:
       type: string

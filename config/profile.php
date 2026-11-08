@@ -94,6 +94,7 @@ return [
         'file_storage' => [
             'settings/storage', 'settings/storage/*', 'stream/*',
             'api/admin/storage/*', 'api/admin/files/*', 'api/admin/tracks/*',
+            'api/library/exports', 'api/library/exports/*',
         ],
         'dlna' => ['settings/dlna', 'settings/dlna/*'],
         'library' => [

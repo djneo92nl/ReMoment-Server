@@ -455,7 +455,7 @@ class StemsDeepAnalysisTest extends TestCase
 
     public function test_features_list_the_kinds_that_can_run(): void
     {
-        $this->getJson('/api/info')->assertJsonPath('features', ['alerts' => true, 'profile' => 'full', 'deep_analysis' => true, 'deep_analysis_kinds' => ['stems']]);
+        $this->getJson('/api/info')->assertJsonPath('features', ['alerts' => true, 'profile' => 'full', 'deep_analysis' => true, 'deep_analysis_kinds' => ['stems']] + $this->exportFeature());
 
         config(['analysis.structure_url' => 'http://structure:8091']);
         Http::fake(['structure:8091/health' => Http::response(['ok' => true])]);
@@ -464,7 +464,7 @@ class StemsDeepAnalysisTest extends TestCase
 
         config(['analysis.stems_url' => null, 'analysis.structure_url' => null]);
         Cache::flush();
-        $this->getJson('/api/info')->assertJsonPath('features', ['alerts' => true, 'profile' => 'full', 'deep_analysis' => false]);
+        $this->getJson('/api/info')->assertJsonPath('features', ['alerts' => true, 'profile' => 'full', 'deep_analysis' => false] + $this->exportFeature());
     }
 
     public function test_the_stems_probe_is_disabled_without_a_url_and_says_what_is_wrong_with_one(): void
@@ -519,5 +519,11 @@ class StemsDeepAnalysisTest extends TestCase
         $this->assertEquals([['start' => 1.0, 'end' => 2.0]], $out['instrumental']);
         $this->assertSame(1.0, $out['vocal_ratio']);
         $this->assertSame(2, $out['rate_hz']);
+    }
+
+    /** `features.export` is there when this machine has ffmpeg (ExportApiTest covers it). */
+    private function exportFeature(): array
+    {
+        return \App\Domain\Analysis\Tools::available(\App\Domain\Analysis\Tools::ffmpeg()) ? ['export' => true] : [];
     }
 }

@@ -1,6 +1,6 @@
 # Export from the library (workstream 13)
 
-Status: **steps 1 and 2 built** (the decision logic; the job, zip, naming, m3u8). The API, MCP tool, web dialog and retention are not built; see the roadmap, "13. Export from the library".
+Status: **steps 1 to 3 built** (the decision logic; the job, zip, naming, m3u8; the API, MCP tool and OpenAPI, see [docs/api/export.md](../api/export.md)). The web dialog and retention are not built; see the roadmap, "13. Export from the library".
 
 ## ExportPlanner
 

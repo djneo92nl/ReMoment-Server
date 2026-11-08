@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Domain\Analysis\DeepAnalysis;
+use App\Domain\Analysis\Tools;
 use App\Domain\Artwork\NowPlayingArtwork;
 use App\Domain\Profile\Profile;
 use App\Http\Controllers\Controller;
@@ -52,7 +53,9 @@ class InfoController extends Controller
                 // deep_analysis_kinds says which.
                 'deep_analysis' => $deepKinds !== [],
             ]
-            + ($deepKinds !== [] ? ['deep_analysis_kinds' => $deepKinds] : []),
+            + ($deepKinds !== [] ? ['deep_analysis_kinds' => $deepKinds] : [])
+            // Export from the library as zip (docs/api/export.md): the profile has the library and own files, and ffmpeg can transcode.
+            + (Profile::allows('library') && Profile::allows('file_storage') && Tools::available(Tools::ffmpeg()) ? ['export' => true] : []),
         ]);
     }
 }
