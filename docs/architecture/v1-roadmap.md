@@ -369,7 +369,7 @@ Done when: CI is green on SQLite and MariaDB with the warnings above, `docs/user
 
 ## 10. Manager (control of the running instance) and SMB shares
 
-Status: **decided into 1.0 (hard requirement), design draft.** Decided 2026-10-27. Extends 9a: the "updater service" that was left for later is now part of 1.0, and the upgrade command stays as its CLI.
+Status: **decided into 1.0 (hard requirement); skeleton built (build order step 1: read-only API, token, container status, logs, restart, audit, CLI; Node, see [manager.md](manager.md)), the rest to do.** Decided 2026-10-27. Extends 9a: the "updater service" that was left for later is now part of 1.0, and the upgrade command stays as its CLI.
 
 **What it is.** A small, separate service, the **ReMoment Manager**, that runs on the **host** next to the app, survives the app being broken, and can see and control the running install: its processes and containers, upgrades with a backup first, host health, and the SMB shares for the library and the drop directory. Design reference: **DevDash** (`~/Code/devdash`, the owner's own tool): a dependency-free service that drives `docker compose` through `execFile` with argument arrays, a job map with streamed output, state on disk, a thin CLI that is only a client of the same HTTP API, mutating endpoints that need a header and a Host allow-list, bound to localhost. Reuse its shape and lessons (logic lives in the server so the UI and CLI are identical; never build shell strings from request input; hide nothing that is merely unhealthy but show crashed and restarting containers).
 

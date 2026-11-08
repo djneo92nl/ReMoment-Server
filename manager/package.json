@@ -1,0 +1,9 @@
+{
+  "name": "remoment-manager",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "description": "ReMoment Manager: host service that shows and restarts the compose project. No dependencies.",
+  "bin": { "remoment-manager": "bin/remoment-manager" },
+  "scripts": { "test": "node --test test/" }
+}

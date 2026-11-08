@@ -42,6 +42,7 @@ docs/
     action-layer.md         Action layer spike (14.5): can an action be defined once and route/MCP/OpenAPI/scene/HA derived? numbers, recommendation (keep REST + openapi.yaml as the definition, scenes call operations by operationId), and what was built from it: operationIds, contract test, scene-operation list, `ha:package`
     credentials.md          Credentials layer (workstream 14.4): ServiceCredentials registry for Spotify/Last.fm/Discogs/AcoustID/TheAudioDB keys, /settings/services, encrypted secrets, backup exclusion, base-URL/relay hook, setup steps, how to add a service
     database.md             MariaDB (SQLite for tests only): why, .env settings, db:import-sqlite, recovering a corrupt file, driver-specific SQL
+    manager.md              ReMoment Manager (workstream 10 skeleton, `manager/`): host service, Node one file, own token, 127.0.0.1:8099: status, logs, restart of one compose project, audit, CLI `remoment-manager`, security rules, tests with a fake docker; web page, upgrade, SMB, installers still to do
     developer-tools.md      /settings/developer: quality test (transcode ladder played on a device), simulate now playing, MQTT console, device inspector, stream URL tester
     device-drivers.md       Driver contracts, existing drivers, guide for adding a new brand
     beovision-tv.md         BeoVision / Beoplay V1 TV controls design: V1 API findings, one-way remote commands, TV screens (list, detail, remote), probe plan, phases; mostly unbuilt

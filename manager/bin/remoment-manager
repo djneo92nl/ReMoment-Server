@@ -1,0 +1,126 @@
+#!/usr/bin/env node
+'use strict';
+// remoment-manager CLI: only a client of the manager's HTTP API, like the future web page.
+
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
+const home = process.env.REMOMENT_MANAGER_HOME || path.join(os.homedir(), '.remoment-manager');
+const tokenFile = path.join(home, 'token');
+const port = process.env.REMOMENT_MANAGER_PORT || 8099;
+const BASE = `http://127.0.0.1:${port}`;
+const tty = process.stdout.isTTY;
+const c = (code, s) => (tty ? `\x1b[${code}m${s}\x1b[0m` : s);
+
+const HELP = `remoment-manager: control the running ReMoment install
+
+  remoment-manager status [--json]
+  remoment-manager logs <service> [--tail N]
+  remoment-manager restart <service>
+  remoment-manager restart-all
+  remoment-manager audit [--limit N] [--json]
+  remoment-manager token          where the token file is (never the token itself)
+
+Talks to ${BASE} (REMOMENT_MANAGER_PORT, REMOMENT_MANAGER_HOME).`;
+
+function die(msg) { console.error(c(31, msg)); process.exit(1); }
+
+function flag(args, name) {
+  const i = args.indexOf(name);
+  if (i === -1) return undefined;
+  const v = args[i + 1];
+  args.splice(i, 2);
+  return v;
+}
+
+async function api(method, p) {
+  let token;
+  try { token = fs.readFileSync(tokenFile, 'utf8').trim(); } catch { die(`No token file at ${tokenFile}. Start the manager once, or set REMOMENT_MANAGER_HOME.`); }
+  let res;
+  try {
+    res = await fetch(BASE + p, { method, headers: { authorization: `Bearer ${token}`, 'x-remoment-manager': '1' } });
+  } catch { die(`Cannot reach the manager at ${BASE}. Is it running?`); }
+  const text = await res.text();
+  if (!res.ok) {
+    let msg = text;
+    try { const j = JSON.parse(text); msg = j.message || j.error || text; } catch { /* plain */ }
+    die(`${res.status}: ${msg}`);
+  }
+  return text;
+}
+
+function human(bytes) {
+  if (bytes == null) return '-';
+  const u = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let i = 0; let v = bytes;
+  while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+  return `${v.toFixed(i ? 1 : 0)} ${u[i]}`;
+}
+
+function dur(s) {
+  if (s == null) return '-';
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h${Math.floor((s % 3600) / 60)}m`;
+  return `${Math.floor(s / 86400)}d${Math.floor((s % 86400) / 3600)}h`;
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  const json = args.includes('--json');
+  if (json) args.splice(args.indexOf('--json'), 1);
+  const cmd = args.shift();
+
+  switch (cmd) {
+    case 'status': {
+      const text = await api('GET', '/status');
+      if (json) return console.log(text);
+      const s = JSON.parse(text);
+      console.log(c(1, `Project ${s.project}`));
+      for (const x of s.services) {
+        const flagTxt = x.problem ? c(31, ` ${x.problem.toUpperCase()}`) : '';
+        const state = x.state === 'running' ? c(32, x.state) : c(33, x.state);
+        console.log(`  ${x.service.padEnd(18)} ${state}${x.health ? ` (${x.health})` : ''}${flagTxt}  up ${dur(x.up_seconds)}  restarts ${x.restart_count}  mem ${x.memory_usage ? x.memory_usage.split('/')[0].trim() : '-'}  cpu ${x.cpu_percent ?? '-'}%`);
+      }
+      const h = s.host;
+      console.log(c(1, 'Host'));
+      if (h.disk) console.log(`  disk free   ${human(h.disk.free_bytes)} of ${human(h.disk.total_bytes)}`);
+      console.log(`  memory free ${human(h.memory.free_bytes)} of ${human(h.memory.total_bytes)}`);
+      console.log(`  load        ${h.load.map((n) => n.toFixed(2)).join(' ')}`);
+      console.log(`  uptime      ${dur(h.uptime_seconds)}`);
+      if (h.cpu_temperature_c != null) console.log(`  cpu temp    ${h.cpu_temperature_c.toFixed(1)} °C`);
+      return;
+    }
+    case 'logs': {
+      const tail = flag(args, '--tail');
+      const svc = args[0];
+      if (!svc) die('Usage: remoment-manager logs <service> [--tail N]');
+      process.stdout.write(await api('GET', `/logs/${encodeURIComponent(svc)}${tail ? `?tail=${encodeURIComponent(tail)}` : ''}`));
+      return;
+    }
+    case 'restart': {
+      if (!args[0]) die('Usage: remoment-manager restart <service>');
+      const text = await api('POST', `/restart/${encodeURIComponent(args[0])}`);
+      return console.log(json ? text : `Restarted ${args[0]}.`);
+    }
+    case 'restart-all': {
+      const text = await api('POST', '/restart-all');
+      return console.log(json ? text : 'Restarted all services.');
+    }
+    case 'audit': {
+      const limit = flag(args, '--limit');
+      const text = await api('GET', `/audit${limit ? `?limit=${encodeURIComponent(limit)}` : ''}`);
+      if (json) return console.log(text);
+      for (const e of JSON.parse(text).data) console.log(`${e.time}  ${e.action}${e.service ? ' ' + e.service : ''}  ${e.result}`);
+      return;
+    }
+    case 'token':
+      return console.log(json ? JSON.stringify({ token_file: tokenFile }) : `Token file: ${tokenFile} (readable by its owner only)`);
+    default:
+      console.log(HELP);
+      if (cmd && cmd !== 'help' && cmd !== '--help') process.exit(1);
+  }
+}
+
+main().catch((e) => die(e.message));
