@@ -125,6 +125,10 @@
                              label="MQTT">
                 {{ config('mqtt.host') }}
             </x-settings-row>
+            <x-settings-row href="{{ route('settings.developer') }}" icon="fa-solid fa-flask"
+                             label="Developer">
+                Quality test, simulate playback, MQTT, stream URLs
+            </x-settings-row>
         </x-settings-group>
 
         <x-settings-group title="Access">

@@ -33,7 +33,7 @@ Albums indexed before this existed, or retagged since, are filled by `php artisa
 
 ## Proxies
 
-`App\Domain\Storage\Proxies` and the `TranscodeProxy` job make smaller copies of a file for players that cannot decode it (`config/proxies.php`, profiles `mp3-lo` and `mp3-mid`; see [players.md](../api/players.md#proxies)). A proxy lives at `proxies/{profile}/{first 32 chars of the original's sha256}.{ext}` on the private `local` disk, so it follows the content (a retagged or replaced file gets a new one), is invisible to scans, the organizer and the files browser, and `Proxies::prune()` keeps the folder under `PROXIES_MAX_MB`. `GET /stream/{track}?profile=…` serves a ready proxy with range support; otherwise it queues one and answers with the original.
+`App\Domain\Storage\Proxies` and the `TranscodeProxy` job make smaller copies of a file for players that cannot decode it (`config/proxies.php`, profiles `mp3-lo` and `mp3-mid`, plus the `dev` quality-ladder rungs of [developer-tools.md](developer-tools.md) that players never pick; see [players.md](../api/players.md#proxies)). A proxy lives at `proxies/{profile}/{first 32 chars of the original's sha256}.{ext}` on the private `local` disk, so it follows the content (a retagged or replaced file gets a new one), is invisible to scans, the organizer and the files browser, and `Proxies::prune()` keeps the folder under `PROXIES_MAX_MB`. `GET /stream/{track}?profile=…` serves a ready proxy with range support; otherwise it queues one and answers with the original.
 
 ## Queued tasks and the settings page
 

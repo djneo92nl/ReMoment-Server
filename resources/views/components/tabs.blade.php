@@ -1,9 +1,9 @@
-@props(['tabs', 'active' => null])
+@props(['tabs', 'active' => null, 'wrap' => false])
 {{-- Alpine tabs: `tabs` is key => label (or [label, icon]). Put one x-tabs.panel (name="key") per tab in the slot; the first tab is open
-     unless `active` says otherwise. The bar scrolls sideways on phones. Leave out tabs that have no content, and the whole component when none has. --}}
+     unless `active` says otherwise. The bar scrolls sideways on phones, or with `wrap` breaks onto more lines (for many tabs). Leave out tabs that have no content, and the whole component when none has. --}}
 @php $active ??= array_key_first($tabs); @endphp
 <div x-data="{ tab: @js($active) }" {{ $attributes }}>
-    <div class="no-scrollbar -mx-1 flex gap-1 overflow-x-auto px-1 pb-1" role="tablist">
+    <div class="{{ $wrap ? 'flex flex-wrap gap-2' : 'no-scrollbar -mx-1 flex gap-1 overflow-x-auto px-1 pb-1' }}" role="tablist">
         @foreach($tabs as $key => $tab)
             @php [$label, $icon] = (array) $tab + [1 => null]; @endphp
             <button type="button" role="tab" @click="tab = '{{ $key }}'" data-test="tab-{{ $key }}"

@@ -50,7 +50,7 @@ A live stream (a radio station, or the Spotify/Icecast stream) arrives as a `pla
 
 `GET /stream/{track}?profile=mp3-lo` serves a smaller copy of the file. Profiles are in `config/proxies.php`: `mp3-lo` (mono, 22.05 kHz, 48 kbit/s, for handhelds and microcontrollers) and `mp3-mid` (stereo, 44.1 kHz, 128 kbit/s). The server picks the source for a player when it sends `play`: the profile the player registered with, else the original when the player decodes it, else the first profile whose format it decodes.
 
-Proxies are made on demand (ffmpeg, queue `default`), not ahead of time, and kept on the private disk until `PROXIES_MAX_MB` (default 2048) is exceeded, oldest first. When a track's proxy does not exist yet, the server sends `pause`, makes it, and sends the `play` when it is there; a player just keeps handling commands. If it cannot be made, the player gets `stop`. A plain `GET /stream/{track}?profile=…` for a proxy that is not ready yet answers with the original and queues the proxy, so DLNA renderers never get an error. Range requests work on proxies.
+Proxies are made on demand (ffmpeg, queue `heavy`, `PROXIES_QUEUE`), not ahead of time, and kept on the private disk until `PROXIES_MAX_MB` (default 2048) is exceeded, oldest first. When a track's proxy does not exist yet, the server sends `pause`, makes it, and sends the `play` when it is there; a player just keeps handling commands. If it cannot be made, the player gets `stop`. A plain `GET /stream/{track}?profile=…` for a proxy that is not ready yet answers with the original and queues the proxy, so DLNA renderers never get an error. Range requests work on proxies.
 
 ## Lite artwork
 

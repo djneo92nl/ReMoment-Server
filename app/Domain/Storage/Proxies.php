@@ -29,10 +29,27 @@ final class Proxies
         return (bool) config('proxies.enabled') && Tools::available(Tools::ffmpeg());
     }
 
-    /** @return array<string, array{mime: string, extension: string, args: string[]}> */
+    /** @return array<string, array{mime: string, extension: string, args: string[], dev?: bool, label?: string}> */
     public static function profiles(): array
     {
         return config('proxies.profiles', []);
+    }
+
+    /** The profiles a player may be given by itself; the quality-ladder rungs of /settings/developer are left out. */
+    public static function playerProfiles(): array
+    {
+        return array_filter(self::profiles(), fn (array $profile) => empty($profile['dev']));
+    }
+
+    /** The quality-ladder rungs of /settings/developer. */
+    public static function devProfiles(): array
+    {
+        return array_filter(self::profiles(), fn (array $profile) => !empty($profile['dev']));
+    }
+
+    public static function extension(string $profile): ?string
+    {
+        return self::profiles()[$profile]['extension'] ?? null;
     }
 
     public static function known(?string $profile): bool

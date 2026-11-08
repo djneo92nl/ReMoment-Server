@@ -4,6 +4,7 @@ namespace App\Integrations\ReMoment;
 
 use App\Domain\Artwork\LibraryArtwork;
 use App\Domain\Storage\Proxies;
+use App\Domain\Storage\StreamUrl;
 use App\Models\Device;
 use App\Models\DeviceMeta;
 use Illuminate\Support\Str;
@@ -109,6 +110,10 @@ class PlayerDevice
      */
     public static function source(Device $device, ?string $mime): string|false|null
     {
+        if ($profile = StreamUrl::overrideProfile()) {
+            return $profile;
+        }
+
         if ($profile = self::profile($device)) {
             return $profile;
         }
@@ -119,7 +124,7 @@ class PlayerDevice
             return null;
         }
 
-        foreach (Proxies::profiles() as $name => $profile) {
+        foreach (Proxies::playerProfiles() as $name => $profile) {
             if (in_array($profile['mime'], $formats, true) && Proxies::enabled()) {
                 return $name;
             }

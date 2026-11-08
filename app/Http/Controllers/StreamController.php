@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Developer\StreamDiagnostics;
 use App\Domain\Storage\FileStore;
 use App\Domain\Storage\Proxies;
 use App\Models\File;
 use App\Models\Media\Track;
 use App\Models\TrackFile;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
  * Serves a track's file to a device, unauthenticated like the REST API. The file is the primary original,
@@ -19,6 +21,27 @@ use Illuminate\Http\Request;
 class StreamController extends Controller
 {
     public function show(Request $request, Track $track, ?string $extension = null)
+    {
+        $logging = StreamDiagnostics::logging();
+        $started = microtime(true);
+
+        try {
+            $response = StreamDiagnostics::inject() ?? $this->serve($request, $track);
+        } catch (HttpException $e) {
+            $logging && StreamDiagnostics::record($request, $track->id, $e->getStatusCode(), null, (int) ((microtime(true) - $started) * 1000));
+
+            throw $e;
+        }
+
+        $logging && StreamDiagnostics::record(
+            $request, $track->id, $response->getStatusCode(), StreamDiagnostics::sizeOf($response),
+            (int) ((microtime(true) - $started) * 1000), $response->headers->get('Location') ? 'redirect' : null,
+        );
+
+        return $response;
+    }
+
+    private function serve(Request $request, Track $track)
     {
         $profile = $request->query('profile');
 

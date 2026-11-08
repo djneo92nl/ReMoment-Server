@@ -40,6 +40,16 @@ Route::get('/stream/{track}.{extension}', [StreamController::class, 'show'])->wh
     \App\Http\Middleware\RedirectToSetupWizard::class,
 ]);
 
+// A generated test signal for the developer page's tone test; fetched by speakers, so no session either.
+Route::get('/dev/tone/{name}.wav', [\App\Http\Controllers\DevToneController::class, 'show'])->where('name', '[a-z0-9-]+')->name('dev.tone')->withoutMiddleware([
+    \Illuminate\Cookie\Middleware\EncryptCookies::class,
+    \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+    \Illuminate\Session\Middleware\StartSession::class,
+    \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+    \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
+    \App\Http\Middleware\RedirectToSetupWizard::class,
+]);
+
 Route::get('/', function () {
     return redirect()->route('devices.index');
 });
@@ -120,6 +130,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings/users', [SettingsController::class, 'users'])->name('settings.users');
     Route::delete('/settings/app-tokens/{token}', [SettingsController::class, 'revokeAppToken'])->name('settings.app-tokens.destroy');
     Route::get('/settings/health', [SettingsController::class, 'health'])->name('settings.health');
+    Route::get('/settings/developer', fn () => view('settings.developer'))->name('settings.developer');
     Route::get('/settings/analysis', fn () => view('settings.analysis'))->name('settings.analysis');
     Route::get('/settings/library-health', [LibraryHealthController::class, 'index'])->name('settings.library-health');
     Route::get('/settings/library-health/{report}', [LibraryHealthController::class, 'show'])->name('settings.library-health.show');

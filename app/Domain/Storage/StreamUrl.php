@@ -35,15 +35,43 @@ class StreamUrl
         return request()->getSchemeAndHttpHost();
     }
 
+    /** The proxy profile every stream URL built now asks for (/settings/developer), or null. */
+    private static ?string $profile = null;
+
+    /**
+     * Runs $callback with every stream URL asking for `?profile=$profile` (and the extension of that proxy), so a
+     * driver that builds the URL itself plays that quality; null leaves the URLs alone. Cleared afterwards.
+     */
+    public static function withProfile(?string $profile, \Closure $callback): mixed
+    {
+        $previous = self::$profile;
+        self::$profile = $profile;
+
+        try {
+            return $callback();
+        } finally {
+            self::$profile = $previous;
+        }
+    }
+
+    public static function overrideProfile(): ?string
+    {
+        return self::$profile;
+    }
+
     public static function for(int $trackId): string
     {
-        return self::base().'/stream/'.$trackId;
+        return self::base().'/stream/'.$trackId.(self::$profile ? '?profile='.self::$profile : '');
     }
 
     /** The address with the file's extension (`/stream/12.flac`), for renderers that decide the format from it. */
     public static function withExtension(int $trackId, ?string $extension): string
     {
-        return self::for($trackId).($extension ? '.'.strtolower(ltrim($extension, '.')) : '');
+        if (self::$profile) {
+            $extension = Proxies::extension(self::$profile) ?? $extension;
+        }
+
+        return self::base().'/stream/'.$trackId.($extension ? '.'.strtolower(ltrim($extension, '.')) : '').(self::$profile ? '?profile='.self::$profile : '');
     }
 
     /** A `/storage/...` file (artwork) of this server as the speaker reaches it; null for anything else. */
