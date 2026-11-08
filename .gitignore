@@ -27,3 +27,6 @@ Thumbs.db
 /ripper/dist
 /ripper/src-tauri/target
 /ripper/src-tauri/gen
+
+# Hardware check reports (scripts/hardware-check)
+/scripts/hardware-check/reports/

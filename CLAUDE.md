@@ -78,6 +78,7 @@ docs/
     spotify-stream.md        Spotify on any speaker: librespot → ffmpeg → Icecast MP3 stream, `stream_url` capability, --onevent hook as now playing, opt-in compose profile
     smart-playlists.md       Rule-based playlists (source smart): rules JSON, SmartFields registry, builder, editor, daily refresh
     sd-card-export.md        Admin zip of recent covers/backgrounds + logos in the touch client's SD layout
+    hardware-check.md       Pi 2 / Pi 3 hardware test: scripts/hardware-check/run.sh (host facts, idle memory, web timings, 24-hour SQLite stress, log scan; report.md/json, proposed budgets in budgets.conf), manual checklists, results tables; never run on a Pi
     refactor-hardware-check.md  Checklist for real devices after the duplicate-code cleanup: listeners, discovery, DLNA playback, volume, multiroom, API errors, artwork, MQTT
     plugin-architecture.md  Design doc: extracting drivers into composable packages
     setup-wizard.md          First-time setup wizard: steps, Setting flags, auto-redirect middleware
