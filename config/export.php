@@ -40,4 +40,25 @@ return [
     /** Size the whole exports/ directory may take together, in GB; the oldest go first. */
     'dir_max_gb' => (float) env('EXPORT_DIR_MAX_GB', 16),
 
+    /** Disk (private) the exports are written to, under `exports/{id}/`. */
+    'disk' => env('EXPORT_DISK', 'local'),
+
+    /** Queue of the job: the `heavy` worker, one at a time. */
+    'queue' => env('EXPORT_QUEUE', 'heavy'),
+
+    /** Seconds one export job may run (a large artist on a Pi 3 takes a long while). */
+    'timeout' => (int) env('EXPORT_TIMEOUT', 14400),
+
+    /** Seconds one ffmpeg run (one file) may take. */
+    'file_timeout' => (int) env('EXPORT_FILE_TIMEOUT', 600),
+
+    /** Free space that must be left on the disk on top of the estimate, in MB. */
+    'free_margin_mb' => (int) env('EXPORT_FREE_MARGIN_MB', 256),
+
+    /** `nice` level of ffmpeg (0 = off), like the other heavy work, so the web and the players win the CPU. */
+    'nice' => (int) env('EXPORT_NICE', 10),
+
+    /** Longest side of an embedded cover in pixels (baseline JPEG; many head units reject large ones). */
+    'cover_max_px' => 500,
+
 ];
