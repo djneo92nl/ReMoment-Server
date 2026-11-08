@@ -85,7 +85,7 @@ return [
     'routes' => [
         'deep_analysis' => ['api/library/tracks/*/deep-analysis', 'api/library/tracks/*/deep-analysis/*'],
         'rip_upload' => ['api/admin/files'],
-        'analysis' => ['settings/analysis', 'settings/analysis/*', 'settings/library-health', 'settings/library-health/*', 'api/library/health'],
+        'analysis' => ['api/library/tracks/*/mixes-with', 'settings/analysis', 'settings/analysis/*', 'settings/library-health', 'settings/library-health/*', 'api/library/health'],
         'catalogue' => [
             'api/library/wishlist', 'api/library/new-releases', 'api/library/wanted-tracks', 'api/library/wanted-tracks/*',
             'api/library/catalogue/*', 'api/library/physical', 'api/library/physical/*', 'api/library/artists/*/discography',

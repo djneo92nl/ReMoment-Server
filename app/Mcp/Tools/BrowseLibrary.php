@@ -10,7 +10,7 @@ use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
-#[Description('Browse the library. kind: libraries, recent-items, recent, favorites, random-album, artists, albums, tracks, genres, playlists (lists; page with `cursor`, order with `sort`, jump with `letter`) or artist, album, genre, playlist (detail; needs `id`, genre takes its slug). Pass `device_id` on album/playlist detail to see which tracks that device can play. Full shapes: docs/api/library.md.')]
+#[Description('Browse the library. kind: libraries, recent-items, recent, favorites, random-album, artists, albums, tracks, genres, playlists (lists; page with `cursor`, order with `sort`, jump with `letter`) or artist, album, genre, playlist (detail; needs `id`, genre takes its slug) or mixes-with (tracks that mix well with track `id`: similar tempo and compatible key, closest first; page with `cursor`). Pass `device_id` on album/playlist detail to see which tracks that device can play. Full shapes: docs/api/library.md.')]
 #[IsReadOnly]
 class BrowseLibrary extends Tool
 {
@@ -23,8 +23,8 @@ class BrowseLibrary extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'kind' => $schema->string()->enum([...self::LISTS, ...array_keys(self::DETAILS)])->required(),
-            'id' => $schema->string()->description('Artist/album/playlist id, or genre slug (detail kinds)'),
+            'kind' => $schema->string()->enum([...self::LISTS, ...array_keys(self::DETAILS), 'mixes-with'])->required(),
+            'id' => $schema->string()->description('Artist/album/playlist id, or genre slug (detail kinds); the track id for mixes-with'),
             'cursor' => $schema->string()->description('next_cursor of the previous page'),
             'sort' => $schema->string()->description('artists: name|plays; albums: name|artist|year|added|plays; tracks: name|artist|added|plays'),
             'letter' => $schema->string()->description('A-Z or # to start at that letter (artists, albums)'),
@@ -47,6 +47,10 @@ class BrowseLibrary extends Tool
 
         if (in_array($data['kind'], self::LISTS, true)) {
             return $this->api('GET', 'library/'.$data['kind'], $query);
+        }
+
+        if ($data['kind'] === 'mixes-with' && ($data['id'] ?? '') !== '') {
+            return $this->api('GET', 'library/tracks/'.rawurlencode($data['id']).'/mixes-with', $query);
         }
 
         if (!isset(self::DETAILS[$data['kind']]) || ($data['id'] ?? '') === '') {

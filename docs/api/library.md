@@ -25,7 +25,7 @@ Duplicates from before identity existed are merged by an admin running `php arti
 - `PUT …/favorite` (albums, artists, tracks) favorites the survivor; the response adds `canonical_id`.
 - Play and queue bodies take an old id as if the survivor's had been sent: `library/play` (`track_id`), `play-album` (`album_id`, `start_track_id`), `play-artist` (`artist_id`), `play-playlist` (`playlist_id`, `start_track_id`), `POST /devices/{id}/queue` (`id`), and `POST /library/playlists/{id}/tracks` (`track_id`, `album_id`). Their responses do not carry `canonical_id`; read the detail to learn it.
 - Lists (`artists`, `albums`, `tracks`, `recent`, `favorites`, search…) never contain a retired id.
-- `GET /api/library/tracks/{id}/waveform` and `albums/{id}/spotify` resolve too.
+- `GET /api/library/tracks/{id}/waveform`, `tracks/{id}/mixes-with` and `albums/{id}/spotify` resolve too.
 - An id that never existed, or whose record was **removed** (not merged), stays `404` (`422` where a body validation says so today). `DELETE`s and the admin remove actions never follow an alias: a stale id cannot delete the record it became.
 - Web pages (`/albums/{id}`, `/artists/{id}`, `/playlists/{id}`) answer `301` to the canonical URL.
 
@@ -400,6 +400,10 @@ A device lists `library_playback` in `capabilities` when either path exists for 
 ## Stems
 
 `details.stems` (`GET /api/library/albums/{id}` → `tracks[].details`, with `details.vocal_ratio` and `details.instrumental`) and `now_playing.stems`, `.vocal_ratio`, `.instrumental` on `GET /api/devices/{id}`: `{ method, rate_hz, vocals, drums, bass, other }`, each lane a list of integer dB (-80..0, one per `1 / rate_hz` s), `vocal_ratio` 0-1 and `instrumental` `[{ start, end }]` in seconds. `null`/absent until the admin asked for the stems of that track (`POST /api/library/tracks/{id}/deep-analysis` with `kinds: ["stems"]`, [deep-analysis.md](deep-analysis.md)).
+
+## Mixes well with this
+
+`GET /api/library/tracks/{id}/mixes-with?cursor=&scope=&device_id=&client=` (Full profile: it reads the audio analysis) → `{ canonical_id, source: { bpm, camelot }, data: [SearchTrack + { bpm, camelot, key_relation, tempo_relation, tempo_diff_percent }], next_cursor }`, 50 per page. `App\Domain\Library\MixesWith`, a query over `file_analyses` of each track's primary file, no new analysis. A candidate has a tempo within 6 % of the track's, of half it or of double it (`tempo_relation` `same`/`half`/`double`) and a Camelot code (`App\Domain\Analysis\Camelot::compatible`) that is the same, the relative key (same number, other letter) or one step either way (`key_relation` `same`/`relative`/`adjacent`); never the track itself, the same AcoustID recording, or a track of the same artist with the same normalised title. **Order:** key relation (same, relative, adjacent), then tempo difference (against the nearest of the track's tempo, half and double), then direct before half/double time, then id. `scope` and `client` hide sources as on the other lists, `device_id` keeps to tracks that device can play. `422 not_analysed` while the track has no tempo or no key; an unanalysed candidate is simply not listed. MCP: `browse_library` kind `mixes-with` with `id`.
 
 ## Waveform
 

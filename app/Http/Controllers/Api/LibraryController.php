@@ -17,6 +17,7 @@ use App\Domain\Library\LibraryCache;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\LibrarySources;
 use App\Domain\Library\ListeningModes;
+use App\Domain\Library\MixesWith;
 use App\Domain\Library\Normalizer;
 use App\Domain\Library\PlaylistCoverage;
 use App\Domain\Library\PlaylistEditor;
@@ -207,6 +208,44 @@ class LibraryController extends Controller
         return response()->json([
             'data' => $page->map(fn (Track $track) => $this->searchTrack($track))->values(),
             'next_cursor' => $tracks->count() > self::TRACKS_PAGE_SIZE ? $this->encodeCursor($offset + self::TRACKS_PAGE_SIZE) : null,
+        ]);
+    }
+
+    /**
+     * "Mixes well with this" (App\Domain\Library\MixesWith): tracks of the scope with a similar tempo (also half and
+     * double time) and a compatible Camelot key, closest first, 50 per page. `device_id` keeps to what that device
+     * can play. 422 `not_analysed` while the track has no tempo or key. docs/api/library.md.
+     */
+    public function mixesWith(Request $request, Track $track): JsonResponse
+    {
+        $request->validate([
+            'cursor' => ['nullable', 'string', 'max:200'],
+            'device_id' => ['nullable', 'integer', 'exists:devices,id'],
+        ]);
+        $mixes = new MixesWith($track, $this->hiddenSources($request), $this->deviceOf($request));
+        $source = $mixes->source();
+
+        if ($source === null) {
+            return response()->json(['error' => 'not_analysed', 'message' => 'This track has no tempo and key yet (audio analysis has not run for it).'], 422);
+        }
+
+        $offset = $this->decodeCursor($request->query('cursor'));
+        $matches = $mixes->matches();
+        $page = $matches->slice($offset, self::TRACKS_PAGE_SIZE)->values();
+        $tracks = Track::query()->with(['artist', 'album'])->findMany($page->pluck('track_id'))->keyBy('id');
+        $this->preloadArtwork(albums: $tracks->map->album->filter());
+
+        return response()->json([
+            'canonical_id' => $track->id,
+            'source' => $source,
+            'data' => $page->map(fn (array $match) => $this->searchTrack($tracks[$match['track_id']]) + [
+                'bpm' => $match['bpm'],
+                'camelot' => $match['camelot'],
+                'key_relation' => $match['key_relation'],
+                'tempo_relation' => $match['tempo_relation'],
+                'tempo_diff_percent' => round($match['tempo_diff'] * 100, 1),
+            ])->values(),
+            'next_cursor' => $matches->count() > $offset + self::TRACKS_PAGE_SIZE ? $this->encodeCursor($offset + self::TRACKS_PAGE_SIZE) : null,
         ]);
     }
 

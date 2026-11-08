@@ -153,6 +153,7 @@ Route::get('/library/albums/{album}', [LibraryController::class, 'album']);
 Route::get('/library/albums/{album}/spotify', [LibraryController::class, 'albumSpotify']);
 Route::put('/library/albums/{album}/favorite', [LibraryController::class, 'favoriteAlbum']);
 Route::put('/library/tracks/{track}/favorite', [LibraryController::class, 'favoriteTrack']);
+Route::get('/library/tracks/{track}/mixes-with', [LibraryController::class, 'mixesWith']);
 Route::get('/library/tracks/{track}/waveform', [LibraryController::class, 'waveform']);
 Route::get('/library/listening-modes', [LibraryController::class, 'listeningModes']);
 Route::get('/library/health', [LibraryController::class, 'health']);

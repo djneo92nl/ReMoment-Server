@@ -112,7 +112,7 @@ class ProfileTest extends TestCase
     {
         $this->profile('control');
 
-        foreach (['/api/library/albums', '/api/library/artists', '/api/library/wishlist', '/api/library/health', '/api/library/tracks/1/deep-analysis'] as $url) {
+        foreach (['/api/library/albums', '/api/library/artists', '/api/library/wishlist', '/api/library/health', '/api/library/tracks/1/deep-analysis', '/api/library/tracks/1/mixes-with'] as $url) {
             $this->getJson($url)->assertStatus(422)
                 ->assertJsonPath('error', 'not_available_in_profile')
                 ->assertJsonPath('profile', 'control');
@@ -137,6 +137,7 @@ class ProfileTest extends TestCase
 
         $this->getJson('/api/library/albums')->assertOk();
         $this->getJson('/api/library/health')->assertStatus(422)->assertJsonPath('required_profile', 'full');
+        $this->getJson('/api/library/tracks/1/mixes-with')->assertStatus(422)->assertJsonPath('feature', 'analysis');
         $this->getJson('/api/library/tracks/1/deep-analysis')->assertStatus(422)->assertJsonPath('feature', 'deep_analysis');
     }
 

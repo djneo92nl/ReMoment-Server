@@ -1631,6 +1631,54 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/SearchTrack" }
                   next_cursor: { type: string, nullable: true }
+  /library/tracks/{track}/mixes-with:
+    parameters:
+      - name: track
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Library]
+      summary: Tracks that mix well with this one (similar tempo, compatible Camelot key), closest first, 50 per page
+      operationId: listTrackMixesWith
+      description: "Needs audio analysis (Full profile). Candidates have a tempo within 6 % of the track's, or of half or double it, and a Camelot code that is the same, one step either way or the relative key; never the same recording. Order: key relation (same, relative, adjacent), then tempo difference, then direct before half/double time, then id. `422 not_analysed` while the track has no tempo and key."
+      parameters:
+        - { $ref: "#/components/parameters/cursor" }
+        - name: device_id
+          in: query
+          description: Keep to tracks this device can play
+          schema: { type: integer }
+        - { $ref: "#/components/parameters/client" }
+        - { $ref: "#/components/parameters/scope" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  canonical_id: { type: integer }
+                  source:
+                    type: object
+                    properties:
+                      bpm: { type: number }
+                      camelot: { type: string, example: 8A }
+                  data:
+                    type: array
+                    items:
+                      allOf:
+                        - { $ref: "#/components/schemas/SearchTrack" }
+                        - type: object
+                          properties:
+                            bpm: { type: number }
+                            camelot: { type: string, example: 9A }
+                            key_relation: { type: string, enum: [same, relative, adjacent] }
+                            tempo_relation: { type: string, enum: [same, half, double] }
+                            tempo_diff_percent: { type: number, example: 2.1 }
+                  next_cursor: { type: string, nullable: true }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "`not_analysed`: the track has no tempo and key yet" }
   /library/albums/{album}:
     parameters:
       - name: album

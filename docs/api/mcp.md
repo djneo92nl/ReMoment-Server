@@ -36,7 +36,7 @@ Device and library tools do not re-implement anything: `ApiBridge` dispatches an
 | `move_playback` | move what plays to another device (`POST /devices/{id}/move`): same queue and position for library tracks, station for radio, Spotify transfer; local inputs are refused; see `docs/api/playback-move.md` |
 | `sync_group` | sync groups ("fake multiroom"): list, create, add, remove, offset, dissolve; see `docs/api/sync-groups.md` |
 | `device_settings` | sound-adjustment, bluetooth, info (rename), sleep-timer (`docs/api/device-settings.md`) |
-| `search_library`, `browse_library` | search; lists and details of artists, albums, tracks, genres, playlists, recent, favorites |
+| `search_library`, `browse_library` | search; lists and details of artists, albums, tracks, genres, playlists, recent, favorites; kind `mixes-with` (with `id`): tracks that mix well with a track |
 | `set_favorite` | favorite an album, artist or track |
 | `play_from_library` | play a track (or a Spotify track by `spotify_track_id`), an album (optionally limited to a `source`), artist or playlist on a device, or `type: tracks` to shuffle the whole library |
 | `physical` | the physical collection (CDs, records, tapes): `list`, `lookup` a barcode on MusicBrainz, `add`, `update` (also `ripped`), `remove`; an item makes its album owned; see `docs/api/physical.md` |
