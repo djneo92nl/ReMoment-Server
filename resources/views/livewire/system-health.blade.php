@@ -30,6 +30,21 @@
         </x-alert>
     @endunless
 
+    {{-- Installed version and the last upgrade (php artisan app:upgrade) --}}
+    <x-card class="p-6">
+        <div class="text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-3">Version</div>
+        <div class="text-sm font-medium text-gray-900 dark:text-gray-100" data-test="installed-version">{{ $installedVersion ?? config('app.version') }}</div>
+        @if($upgrade)
+            <div class="mt-2 text-xs text-gray-500" data-test="last-upgrade">
+                Last upgrade {{ \Illuminate\Support\Carbon::parse($upgrade['at'])->diffForHumans() }}:
+                {{ $upgrade['from'] ?? 'unknown' }} → {{ $upgrade['to'] }},
+                {{ str_replace('_', ' ', $upgrade['result']) }}
+            </div>
+        @else
+            <div class="mt-2 text-xs text-gray-500">No upgrade recorded. <span class="font-mono">php artisan app:upgrade</span> makes a backup first.</div>
+        @endif
+    </x-card>
+
     {{-- Background processes --}}
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <x-card class="p-6">

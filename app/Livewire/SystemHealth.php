@@ -31,6 +31,8 @@ class SystemHealth extends Component
             'queueWorker' => $this->heartbeat(Heartbeat::QUEUE),
             'queue' => $this->queue(),
             'backup' => BackupStatus::health(),
+            'installedVersion' => \App\Domain\System\InstalledVersion::recorded() ?? \App\Domain\System\InstalledVersion::current(),
+            'upgrade' => \App\Domain\System\UpgradeHistory::latest(),
             'devices' => $this->devices(),
             'alerts' => \App\Domain\Alerts\Alerts::active(),
         ]);

@@ -141,3 +141,12 @@ librespot_track_port: 8010
 # --- Meilisearch (env.j2) ----------------------------------------------------------
 # Unused by the app today (search is MariaDB); `true` adds the `search` compose profile, `full` only.
 meilisearch_enabled: false
+
+# --- Upgrade step (deploy.yml, "Run database migrations") ---------------------------------------
+# The command the deploy runs inside the app container after the code is updated. The default is the
+# long-standing behaviour: migrate only. To use the upgrade command instead (backup first, maintenance mode,
+# migrate, queue restart, health check, rollback instructions; exit 2 backup failed, 3 migration failed,
+# 4 health check failed, which fails the play), set:
+#   upgrade_command: "php artisan app:upgrade --force --json"
+# Note the deploy's `optimize` and container restart steps still run after it.
+upgrade_command: "php artisan migrate --force"

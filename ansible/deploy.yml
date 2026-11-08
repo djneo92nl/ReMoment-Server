@@ -86,7 +86,7 @@
         ansible.builtin.command:
             cmd: >
                 docker compose -f docker-compose.prod.yml exec -T -u sail app
-                php artisan migrate --force
+                {{ upgrade_command }}
             chdir: "{{ app_dir }}"
         changed_when: true
 

@@ -53,15 +53,31 @@ Refusals: the archive's latest migration is newer than the app's (a downgrade; u
 
 **`APP_KEY` and `--with-secrets`.** Service secrets are stored encrypted with the install's `APP_KEY` (see [credentials.md](credentials.md)). An archive made with `--with-secrets` holds those encrypted values, so restoring it on an install with a different `APP_KEY` probably leaves them unreadable (the registry then treats them as not set and you enter the keys again). *Not verified.* Keep the `APP_KEY` with your backups if you use `--with-secrets`.
 
-## Upgrade command (part 1)
+## Upgrade command
 
-`php artisan app:upgrade [--check] [--json] [--force]` (`App\Console\Commands\AppUpgrade`, facts from `App\Domain\System\UpgradeCheck`) is the first half of the upgrade of 9a: a read-only pre-flight and the mandatory backup. **It does not migrate or restart anything yet** (part 2: migrate, caches, workers, health check, rollback text).
+`php artisan app:upgrade [--check] [--json] [--force] [--no-maintenance] [--health-timeout=120]` (`App\Console\Commands\AppUpgrade`; facts from `App\Domain\System\UpgradeCheck`, health from `UpgradeHealth`, history from `UpgradeHistory`) is the upgrade of 9a: pre-flight, backup, migrate, finish, health check, rollback text.
 
-Pre-flight (changes nothing): code version (`config('app.version')`) against the recorded one (`InstalledVersion::recorded()`); the code older than the recorded version is a downgrade and **blocks**; a name in the `migrations` table that no file in `database/migrations` has (a newer release ran here) **blocks**; the database must connect; pending migrations are listed by name; free space in the backup directory (database size plus `upgrade.disk_margin_mb`, default 100) and a writable directory **block** when missing; scheduler and queue heartbeats are read like `/settings/health` and only **warn**; the profile is reported.
+**Pre-flight** (changes nothing): code version (`config('app.version')`) against the recorded one (`InstalledVersion::recorded()`); the code older than the recorded version is a downgrade and **blocks**; a name in the `migrations` table that no file in `database/migrations` has (a newer release ran here) **blocks**; the database must connect; pending migrations are listed by name; free space in the backup directory (database size plus `upgrade.disk_margin_mb`, default 100) and a writable directory **block** when missing; scheduler and queue heartbeats only **warn**; the profile is reported. `--check` stops there: exit **0** nothing pending, **10** an upgrade is available, **1** blocked.
 
-`--check` stops there: exit **0** nothing pending, **10** an upgrade is available, **1** blocked. `--json` prints `{ version_code, version_recorded, pending_migrations, blocked, reasons, warnings, profile, disk_ok }` (`version_recorded` null when none).
+**A real run**, in order (each step is in `steps` with its result and seconds):
 
-Without `--check` it asks for confirmation (`--force` skips it; with `--json` or a non-interactive terminal `--force` is required, else exit 1), then writes the backup through `BackupWriter`, the class `backup:run` uses (no secrets, no pruning). A failing backup prints the error and exits **2** and nothing goes on; on success it prints the archive path and size and says part 2 is not built yet. Exit 1 also covers a blocked pre-flight and a declined prompt.
+1. Confirmation (`--force` skips it; with `--json` or a non-interactive terminal `--force` is required, else exit 1).
+2. Backup through `BackupWriter` (no secrets, no pruning). Failure: exit **2**, nothing changed.
+3. Maintenance mode (`down --retry=60`), unless `--no-maintenance` or the app was already down (then the upgrade leaves it alone).
+4. `migrate --force`; `migrations_run` is the difference of the `migrations` table before and after, so a partial run is listed too. **A failure stops everything: exit 3, the app stays in maintenance mode** (a half-migrated database must not serve requests), the restore instructions are printed, and nothing later runs (no worker restart, version not recorded).
+5. After migrating: the commands of `config('upgrade.after_migrate')` (default `optimize`, which is what `ansible/deploy.yml` runs), `queue:restart` (workers finish their current job), `InstalledVersion::record()`. Then maintenance mode is lifted.
+6. Health check, polled every `upgrade.health_interval` seconds (5) until `--health-timeout`: the database answers, no **critical** alert is active (`Alerts::active()`), the scheduler and queue heartbeats are under 180 s old (as `/settings/health`). Any failure (or a failed step of 5) exits **4** with what failed. **Nothing is rolled back automatically**; the app is up.
+7. Rollback instructions, success or failure (not when nothing was changed): previous version (the recorded one), backup path, and the commands: install the previous code or images, `php artisan backup:restore <archive> --force`, `php artisan up`. Migrations are forward-only; the backup is the way back and anything saved after it is lost.
+
+Exit codes: 0 ok, 10 upgrade available (`--check`), 1 blocked/declined, 2 backup failed, 3 migration failed, 4 health check failed.
+
+**History:** every run that got past the backup adds `{ from, to, at, result: ok|migration_failed|health_failed, backup }` to Setting `upgrade_history` (a JSON list, newest first, the last 10). `/settings/health` (System tab) shows the installed version and the latest entry.
+
+**`--json`** prints one object, nothing else: the pre-flight keys (`version_code`, `version_recorded`, `pending_migrations`, `blocked`, `reasons`, `warnings`, `profile`, `disk_ok`) plus `steps` (`[{ name, result: ok|failed|skipped, seconds }]`), `migrations_run`, `exit_reason` (`ok`, `blocked`, `backup_failed`, `migration_failed`, `health_failed`; `blocked` and a declined prompt print no object beyond the pre-flight, so `exit_reason` may be null there), `exit_code`, `backup` (archive path), `rollback` (`{ previous_version, backup, commands, note }`), `health` (`{ ok, failures }`) and `problems`.
+
+**Ansible:** `upgrade_command` (`ansible/group_vars/all.yml`) is what `deploy.yml` runs after updating the code; the default is `php artisan migrate --force` (unchanged); set it to `php artisan app:upgrade --force --json` to use this command (its exit codes fail the play).
+
+**Not built:** an upgrade from the web, pulling images or code (you install the new version first, then run this), a rollback that runs by itself. Not verified against a real MariaDB or a started stack; the tests use SQLite and an extra migration path.
 
 ## Not in the backup: your music files
 
@@ -76,7 +92,7 @@ The default directory `storage/app/backups` is inside the app directory, which `
 
 ## Upgrade flow
 
-`app:upgrade` (planned, 9a) calls `backup:run`, then migrates. If the migration or the new version fails, install the previous version and `backup:restore --force` the archive from just before. The manifest's migration name is what refuses restoring a newer backup into older code. The planned `profile:upgrade` (Control to Standard) uses `backup:run` as its safety net and `db:import-sqlite` to move the data.
+`app:upgrade` (see above) makes the backup, then migrates. If the migration or the new version fails, install the previous version and `backup:restore --force` the archive from just before. The manifest's migration name is what refuses restoring a newer backup into older code. The planned `profile:upgrade` (Control to Standard) uses `backup:run` as its safety net and `db:import-sqlite` to move the data.
 
 ## Not verified
 

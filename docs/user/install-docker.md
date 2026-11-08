@@ -2,7 +2,7 @@
 
 For people comfortable with Docker and a terminal. This page uses `docker-compose.prod.yml`, the production stack: it builds the images from the repository and runs the app with `network_mode: host`, so it needs a **Linux host** (a Pi, a mini PC, a VM or an LXC with nesting). Docker Desktop on macOS or Windows cannot pass SSDP/mDNS multicast to a container, so device discovery does not work there (add devices by IP instead, see [troubleshooting.md](troubleshooting.md)). `compose.yaml` is the developer stack (Laravel Sail), not an install method.
 
-> **Not available yet:** published container images. Every command below builds the images on your machine from the source (`build:` entries in `docker-compose.prod.yml`); the first build takes a while, longer on a Pi. A Raspberry Pi image is also not built ([install-raspberry-pi.md](install-raspberry-pi.md)). An `app:upgrade` command does not exist either ([upgrading-and-backups.md](upgrading-and-backups.md)).
+> **Not available yet:** published container images. Every command below builds the images on your machine from the source (`build:` entries in `docker-compose.prod.yml`); the first build takes a while, longer on a Pi. A Raspberry Pi image is also not built ([install-raspberry-pi.md](install-raspberry-pi.md)). `app:upgrade` exists but no web upgrade or image pulling does ([upgrading-and-backups.md](upgrading-and-backups.md)).
 
 ## 1. Get the code
 

@@ -6,7 +6,7 @@
 - **Moving Control to Standard or Full:** `php artisan profile:upgrade` (makes a backup first, copies SQLite into MariaDB, prints what to change in `.env`; it edits nothing and restarts nothing). The reverse is not supported.
 - **Updating the software:** by hand, below.
 
-> **Not available yet:** `app:upgrade` (one command that backs up, pulls, migrates and restarts), a web-based upgrade, and a Manager service that does it from a browser are planned for 1.0 and **not built**. Migrations only go forward, so the backup is your way back.
+> **What exists:** `php artisan app:upgrade` (after you have installed the new code): it checks, makes a backup, puts the app in maintenance mode, migrates, clears caches, restarts the queue workers, checks health and prints how to go back (`--check` only looks; `--force` skips the question; `--json` for scripts). If a migration fails the app stays in maintenance mode and you restore the backup it names. **Not built:** an upgrade from the web, pulling new images or code for you, and a Manager service. Migrations only go forward, so the backup is your way back: install the previous version, then `php artisan backup:restore <archive> --force`.
 
 Run artisan inside the container, for example `docker compose -f docker-compose.prod.yml exec -u sail app php artisan backup:run` (see [install-docker.md](install-docker.md)).
 
