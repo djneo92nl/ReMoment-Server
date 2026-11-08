@@ -83,6 +83,47 @@ class LibraryApiTest extends TestCase
         return $this->connectSpotify();
     }
 
+    // --- Related artists ---
+
+    private function similar(Artist $artist, array $names): void
+    {
+        \App\Models\Media\Metadata::create(['metadatable_type' => Artist::class, 'metadatable_id' => $artist->id, 'key' => 'similar_artists', 'value' => json_encode($names), 'type' => 'json', 'source' => 'lastfm']);
+    }
+
+    public function test_artist_detail_lists_related_artists_in_the_library_in_lastfm_order(): void
+    {
+        $this->processedCover('https://img.test/c.jpg');
+        $main = $this->artist('Muse');
+        $this->album($main, 'Absolution');
+        $this->album($this->artist('Coldplay'), 'Parachutes');
+        $this->album($this->artist('The National'), 'Boxer', cover: 'https://img.test/c.jpg');
+        $this->artist('No Albums');
+        $this->similar($main, ['The National', 'Unknown Band', 'No Albums', 'Muse', 'Coldplay']);
+
+        $response = $this->getJson("/api/library/artists/{$main->id}")->assertOk();
+
+        $response->assertJsonPath('related_artists.*.name', ['The National', 'Coldplay']);
+        $this->assertSame(Artist::where('name', 'The National')->value('id'), $response->json('related_artists.0.id'));
+        $this->assertNotNull($response->json('related_artists.0.artwork.proxy_120'));
+        $this->assertNull($response->json('related_artists.1.artwork'));
+    }
+
+    public function test_related_artists_are_empty_without_lastfm_data_and_capped_at_twelve(): void
+    {
+        $main = $this->artist('Solo');
+        $this->album($main, 'One');
+        $this->getJson("/api/library/artists/{$main->id}")->assertOk()->assertJsonPath('related_artists', []);
+
+        $names = [];
+        foreach (range(1, 15) as $i) {
+            $this->album($this->artist("Band $i"), 'LP');
+            $names[] = "Band $i";
+        }
+        $this->similar($main, $names);
+
+        $this->assertCount(12, $this->getJson("/api/library/artists/{$main->id}")->json('related_artists'));
+    }
+
     // --- Browse ---
 
     public function test_artists_are_alphabetical_ignoring_the_and_only_with_albums(): void

@@ -291,7 +291,8 @@ class LibraryController extends Controller
                 fn (Album $a, Album $b) => ($b->released_at?->year ?? PHP_INT_MIN) <=> ($a->released_at?->year ?? PHP_INT_MIN),
                 fn (Album $a, Album $b) => strcasecmp($a->name, $b->name),
             ]);
-        $this->preloadArtwork(albums: $albums);
+        $related = $artist->relatedArtists();
+        $this->preloadArtwork(albums: $albums, artists: $related);
 
         return response()->json([
             'id' => $artist->id,
@@ -311,6 +312,11 @@ class LibraryController extends Controller
                 'tracks' => LibrarySources::availableFrom($artist->tracks(), $id)->count(),
             ], $sources),
             'albums' => $albums->map(fn (Album $album) => $this->albumItem($album) + ['kind' => AlbumKind::of($album, $album->tracks_count)])->values(),
+            'related_artists' => $related->map(fn (Artist $r) => [
+                'id' => $r->id,
+                'name' => $r->name,
+                'artwork' => LibraryItemArtwork::forImages($r->coverAlbum()?->images),
+            ])->all(),
         ] + ($request->query('include') === 'discography' && !$request->filled('client')
             ? ['discography' => $this->discographyOf($artist, $request)]
             : []));

@@ -118,6 +118,27 @@ class Artist extends Model
         return static::query()->whereIn('name', $names)->get()->keyBy('name');
     }
 
+    /**
+     * Last.fm's similar artists that exist in the library (matched on the name key, so "The National" finds
+     * "National"), in Last.fm's order of relevance, never the artist itself; only artists with an album, so the
+     * app has a page to open. Empty while Last.fm has not been read for this artist.
+     *
+     * @return \Illuminate\Support\Collection<int, static>
+     */
+    public function relatedArtists(int $limit = 12): \Illuminate\Support\Collection
+    {
+        $keys = array_values(array_unique(array_map(Normalizer::artist(...), array_filter($this->similarArtists(), 'is_string'))));
+        if (!$keys) {
+            return collect();
+        }
+
+        $found = static::query()->whereIn('name_key', $keys)->where('id', '!=', $this->id)->whereHas('albums')
+            ->with(['albums' => fn ($q) => $q->withCount('plays')->orderByDesc('plays_count')->orderByDesc('created_at')])
+            ->get()->groupBy('name_key');
+
+        return collect($keys)->map(fn (string $key) => $found->get($key)?->sortBy('id')->first())->filter()->take($limit)->values();
+    }
+
     /** Metadata keys photoUrl() reads: eager load just these for a list of artist cards (ReadsMetadata uses the loaded relation). */
     public const PHOTO_METADATA = ['images', 'spotify_image'];
 

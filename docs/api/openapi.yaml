@@ -3572,6 +3572,15 @@ components:
         track_id: { type: integer, nullable: true }
         position: { type: number, minimum: 0 }
         duration: { type: number, minimum: 0 }
+        related_artists:
+          type: array
+          description: "Last.fm similar artists that exist in the library (only those with albums), most relevant first, at most 12. Empty while Last.fm has not been read for the artist. `artwork` is null while the cover is processed."
+          items:
+            type: object
+            properties:
+              id: { type: integer, description: "A library artist id; open it with GET /api/library/artists/{id}." }
+              name: { type: string }
+              artwork: { $ref: "#/components/schemas/LibraryArtwork" }
         volume: { type: integer, minimum: 0, maximum: 100 }
         muted: { type: boolean }
         ended: { type: boolean, description: "The track finished; the server sends the next `play` (or `stop`)" }
