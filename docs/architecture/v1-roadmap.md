@@ -476,7 +476,7 @@ Done when: 12.2 is in the track options and the API, the platform tier table and
 
 ## 13. Export from the library (download with transcode)
 
-Status: **to do, Should.** Added 2026-10-27. Step 1 built (`ExportPlanner`, `config/export.php`; see [export.md](export.md)); steps 2 to 6 to do.
+Status: **to do, Should.** Added 2026-10-27. Steps 1 and 2 built (`ExportPlanner`, `config/export.php`, the `ExportLibrarySelection` job with zip streaming, naming and m3u8; see [export.md](export.md)); steps 3 to 6 to do.
 
 **Goal.** Pick a playlist, an album or an artist (or any track selection) and get a download that plays on an MP3 player or a car radio: the files, named and tagged for such a device, at a quality ceiling the user chooses. Anything above the ceiling is transcoded first, anything at or below it is copied untouched.
 
