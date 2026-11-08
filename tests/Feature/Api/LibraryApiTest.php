@@ -108,6 +108,24 @@ class LibraryApiTest extends TestCase
         $this->assertNull($response->json('related_artists.1.artwork'));
     }
 
+    public function test_artist_image_is_the_photo_in_lists_and_related_rows_else_the_cover(): void
+    {
+        $this->processedCover('https://img.test/photo.jpg');
+        $this->processedCover('https://img.test/cover.jpg');
+        $main = $this->artist('Muse');
+        $this->album($main, 'Absolution');
+        $other = $this->artist('Coldplay');
+        $this->album($other, 'Parachutes', cover: 'https://img.test/cover.jpg');
+        \App\Models\Media\Metadata::create(['metadatable_type' => Artist::class, 'metadatable_id' => $other->id, 'key' => 'images', 'value' => json_encode(['thumb' => 'https://img.test/photo.jpg']), 'type' => 'json', 'source' => 'audiodb']);
+        $this->similar($main, ['Coldplay']);
+
+        $this->getJson("/api/library/artists/{$main->id}")->assertJsonPath('related_artists.0.artwork.hash', md5('https://img.test/photo.jpg'));
+        $this->getJson('/api/library/artists')->assertJsonPath('data.0.artwork.hash', md5('https://img.test/photo.jpg'));
+
+        $other->metadata()->delete();
+        $this->getJson("/api/library/artists/{$main->id}")->assertJsonPath('related_artists.0.artwork.hash', md5('https://img.test/cover.jpg'));
+    }
+
     public function test_related_artists_are_empty_without_lastfm_data_and_capped_at_twelve(): void
     {
         $main = $this->artist('Solo');

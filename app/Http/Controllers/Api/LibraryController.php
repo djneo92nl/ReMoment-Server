@@ -315,7 +315,7 @@ class LibraryController extends Controller
             'related_artists' => $related->map(fn (Artist $r) => [
                 'id' => $r->id,
                 'name' => $r->name,
-                'artwork' => LibraryItemArtwork::forImages($r->coverAlbum()?->images),
+                'artwork' => LibraryItemArtwork::forUrl($r->avatarUrl()),
             ])->all(),
         ] + ($request->query('include') === 'discography' && !$request->filled('client')
             ? ['discography' => $this->discographyOf($artist, $request)]
@@ -1062,7 +1062,7 @@ class LibraryController extends Controller
     {
         $urls = LibraryItemArtwork::urlsOfAlbums($albums);
         foreach ($artists as $artist) {
-            $urls = [...$urls, ...LibraryItemArtwork::urlsOfAlbums([$artist->coverAlbum()])];
+            $urls = [...$urls, $artist->avatarUrl()];
         }
         foreach ($choices as $choice) {
             $urls[] = $choice['url'] ?? null;
@@ -1076,7 +1076,7 @@ class LibraryController extends Controller
     {
         return $query
             ->withCount(['albums' => fn ($q) => LibrarySources::albums($q, $hidden)])
-            ->with(['albums' => fn ($q) => LibrarySources::albums($q, $hidden)->withCount('plays')->orderByDesc('plays_count')->orderByDesc('created_at')]);
+            ->with(['metadata' => fn ($q) => $q->whereIn('key', Artist::PHOTO_METADATA), 'albums' => fn ($q) => LibrarySources::albums($q, $hidden)->withCount('plays')->orderByDesc('plays_count')->orderByDesc('created_at')]);
     }
 
     /**
@@ -1114,7 +1114,7 @@ class LibraryController extends Controller
             'id' => $artist->id,
             'name' => $artist->name,
             'album_count' => (int) $artist->albums_count,
-            'artwork' => LibraryItemArtwork::forImages($artist->coverAlbum()?->images),
+            'artwork' => LibraryItemArtwork::forUrl($artist->avatarUrl()),
             'favorite' => $artist->favorited_at !== null,
         ];
     }

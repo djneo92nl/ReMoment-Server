@@ -2,6 +2,7 @@
 
 namespace App\Models\Media;
 
+use App\Domain\Artwork\LibraryArtwork;
 use App\Domain\Library\Normalizer;
 use App\Models\Concerns\Favoritable;
 use App\Models\Media\Concerns\HasGenres;
@@ -133,7 +134,7 @@ class Artist extends Model
         }
 
         $found = static::query()->whereIn('name_key', $keys)->where('id', '!=', $this->id)->whereHas('albums')
-            ->with(['albums' => fn ($q) => $q->withCount('plays')->orderByDesc('plays_count')->orderByDesc('created_at')])
+            ->with(['metadata' => fn ($q) => $q->whereIn('key', self::PHOTO_METADATA), 'albums' => fn ($q) => $q->withCount('plays')->orderByDesc('plays_count')->orderByDesc('created_at')])
             ->get()->groupBy('name_key');
 
         return collect($keys)->map(fn (string $key) => $found->get($key)?->sortBy('id')->first())->filter()->take($limit)->values();
@@ -146,6 +147,12 @@ class Artist extends Model
     public function photoUrl(): ?string
     {
         return $this->metaValue('photo') ?? ((array) $this->metaJson('images'))['thumb'] ?? $this->metaValue('spotify_image');
+    }
+
+    /** The one image that stands for the artist in lists and rows: their photo, else the cover of their most played album. */
+    public function avatarUrl(): ?string
+    {
+        return $this->photoUrl() ?? LibraryArtwork::coverUrl($this->coverAlbum()?->images);
     }
 
     /** TheAudioDB's fanart (a wide backdrop photo, remote URL); null when unknown. */
