@@ -1,0 +1,24 @@
+ Vendor   Product           Rev 
+ MATSHITA DVD-R   UJ-898    HC10
+
+    First session:             1
+    Last session:              1
+    First track:               1
+    Disc type:                 0 (CD-DA, or CD-ROM with first track in Mode 1)
+    Last track:                14
+    Lead-out:                  79:00.00
+    Session  1, Track  1:      00:02.00  2ch audio, no pre-emphasis, digital copy prohibited
+    Session  1, Track  2:      05:06.32  2ch audio, no pre-emphasis, digital copy prohibited
+    Session  1, Track  3:      10:34.47  2ch audio, no pre-emphasis, digital copy prohibited
+    Session  1, Track  4:      17:13.40  2ch audio, no pre-emphasis, digital copy prohibited
+    Session  1, Track  5:      21:41.35  2ch audio, no pre-emphasis, digital copy prohibited
+    Session  1, Track  6:      27:11.17  2ch audio, no pre-emphasis, digital copy prohibited
+    Session  1, Track  7:      31:33.05  2ch audio, no pre-emphasis, digital copy prohibited
+    Session  1, Track  8:      39:51.05  2ch audio, no pre-emphasis, digital copy prohibited
+    Session  1, Track  9:      44:45.22  2ch audio, no pre-emphasis, digital copy prohibited
+    Session  1, Track 10:      48:45.25  2ch audio, no pre-emphasis, digital copy prohibited
+    Session  1, Track 11:      52:42.45  2ch audio, no pre-emphasis, digital copy prohibited
+    Session  1, Track 12:      58:02.22  2ch audio, no pre-emphasis, digital copy prohibited
+    Session  1, Track 13:      63:53.67  2ch audio, no pre-emphasis, digital copy prohibited
+    Session  1, Track 14:      69:11.07  2ch audio, no pre-emphasis, digital copy prohibited
+

@@ -25,3 +25,7 @@ td.num, td.time { white-space: nowrap; opacity: .7; }
 tr.off input[type=text] { opacity: .45; }
 .library-note:empty { display: none; }
 .library-note { padding: 8px 10px; border-radius: 6px; background: #e6a70033; margin: 12px 0 0; }
+.rip { margin-top: 16px; }
+.rip-row { display: flex; gap: 8px; align-items: center; padding: 3px 0; font-size: .9rem; }
+.rip-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rip-row progress { width: 90px; }

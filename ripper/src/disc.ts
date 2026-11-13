@@ -6,15 +6,23 @@ type Release = {
   disc_number: number; disc_count: number; cover_url: string | null; tracks: Track[];
 };
 
+/** What detect_disc found: the drive and where each track sits on the disc. */
+export type Disc = {
+  disc_id: string; track_count: number; device: string;
+  tracks: { number: number; first_sector: number; sectors: number }[];
+};
+
 type LibraryAlbum = { id: number; name: string; artist: string; year: number | null; track_count: number | null };
 
-/** Ripping itself is not built yet: the Next button stays off until it is. */
-const RIPPING_READY = false;
+/** Ripping needs the disc found with Detect disc, so the drive and track positions are known. */
+const RIPPING_READY = true;
 
 /** What the user is reviewing: the fields end up as tags, the unticked tracks are not ripped. */
 export type Album = {
   albumArtist: string; album: string; year: string; discNumber: number; discCount: number;
   releaseId: string | null; coverUrl: string | null;
+  /** The disc in the drive when it was detected here; without it there is nothing to rip. */
+  disc: Disc | null;
   /** Albums of the library with this artist and title, found by name; ripping them again needs `ripAnyway`. */
   inLibrary: LibraryAlbum[]; ripAnyway: boolean;
   tracks: (Track & { include: boolean })[];
@@ -33,13 +41,13 @@ function el<T extends HTMLElement = HTMLElement>(tag: string, props: Record<stri
 export function albumFromRelease(r: Release): Album {
   return {
     albumArtist: r.artist, album: r.title, year: r.date?.slice(0, 4) ?? '', discNumber: r.disc_number, discCount: r.disc_count,
-    releaseId: r.id, coverUrl: r.cover_url, inLibrary: [], ripAnyway: false, tracks: r.tracks.map((t) => ({ ...t, include: true })),
+    releaseId: r.id, coverUrl: r.cover_url, disc: null, inLibrary: [], ripAnyway: false, tracks: r.tracks.map((t) => ({ ...t, include: true })),
   };
 }
 
 export function blankAlbum(trackCount: number): Album {
   return {
-    albumArtist: '', album: '', year: '', discNumber: 1, discCount: 1, releaseId: null, coverUrl: null, inLibrary: [], ripAnyway: false,
+    albumArtist: '', album: '', year: '', discNumber: 1, discCount: 1, releaseId: null, coverUrl: null, disc: null, inLibrary: [], ripAnyway: false,
     tracks: Array.from({ length: trackCount }, (_, i) => ({ position: i + 1, title: '', artist: '', length_ms: null, mbid: '', recording_id: '', include: true })),
   };
 }
@@ -100,9 +108,10 @@ async function checkLibrary(album: Album, note: HTMLElement, refresh: () => void
 export function renderReview(album: Album, onNext: (album: Album) => void): HTMLElement {
   const root = el('div');
   const note = el('p', { className: 'library-note' });
-  const next = el<HTMLButtonElement>('button', { type: 'button', textContent: 'Next: rip', disabled: true, title: 'Ripping comes in the next milestone' });
+  const next = el<HTMLButtonElement>('button', { type: 'button', textContent: 'Rip and add to library', disabled: true });
   const refresh = () => {
-    next.disabled = !RIPPING_READY || (album.inLibrary.length > 0 && !album.ripAnyway);
+    next.disabled = !RIPPING_READY || !album.disc || (album.inLibrary.length > 0 && !album.ripAnyway);
+    next.title = album.disc ? '' : 'Use Detect disc first: ripping needs the drive';
   };
   const recheck = () => void checkLibrary(album, note, refresh);
   root.append(note);
@@ -140,12 +149,25 @@ export function renderReview(album: Album, onNext: (album: Album) => void): HTML
   return root;
 }
 
-export function initDisc(run: Run, onNext: (album: Album) => void) {
+export function initDisc(run: Run, onNext: (album: Album, into: HTMLElement) => void) {
+  let detected: Disc | null = null;
+
   const review = (album: Album) => {
+    if (detected && detected.disc_id === $<HTMLInputElement>('disc-id').value.trim() && detected.track_count === album.tracks.length) {
+      album.disc = detected;
+    }
     $('choices').replaceChildren();
     $('review').hidden = false;
-    $('review').replaceChildren(renderReview(album, onNext));
+    $('review').replaceChildren(renderReview(album, (a) => onNext(a, $('review'))));
   };
+
+  $('detect').addEventListener('click', async () => {
+    const disc = await run('Reading the disc…', () => invoke<Disc>('detect_disc'));
+    if (!disc) return;
+    detected = disc;
+    $<HTMLInputElement>('disc-id').value = disc.disc_id;
+    $<HTMLFormElement>('lookup-form').requestSubmit();
+  });
 
   $('lookup-form').addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -173,7 +195,7 @@ export function initDisc(run: Run, onNext: (album: Album) => void) {
   });
 
   $('manual').addEventListener('click', () => {
-    const count = Number(prompt('How many tracks are on the disc?', '12'));
+    const count = Number(prompt('How many tracks are on the disc?', String(detected?.track_count ?? 12)));
     if (Number.isInteger(count) && count > 0 && count < 100) review(blankAlbum(count));
   });
 }

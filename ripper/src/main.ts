@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { initDisc } from './disc';
+import { ripAlbum } from './rip';
 import './style.css';
 
 type Uploaded = { path: string; track_id: number | null };
@@ -57,8 +58,7 @@ $('pick').addEventListener('click', async () => {
   $('result').textContent = uploaded ? `Added to the library as ${uploaded.path}` : '';
 });
 
-// Ripping is the next milestone: for now a reviewed album only has to be well formed.
-initDisc(run, (album) => console.log('album to rip', album));
+initDisc(run, ripAlbum);
 
 (async () => {
   const url = await run('Checking sign-in…', () => invoke<string | null>('session_status'));

@@ -1,5 +1,7 @@
+mod discid;
 mod library_check;
 mod musicbrainz;
+mod rip;
 mod tagging;
 mod server;
 
@@ -49,6 +51,37 @@ async fn lookup_disc(disc_id: String) -> Result<Vec<musicbrainz::Release>, Strin
     musicbrainz::lookup(&disc_id).await
 }
 
+/// Reads the disc in the drive: its MusicBrainz disc ID, track count and track lengths.
+#[tauri::command]
+async fn detect_disc() -> Result<discid::Disc, String> {
+    tauri::async_runtime::spawn_blocking(discid::read).await.map_err(|e| e.to_string())?
+}
+
+/// Rips one track of the disc to FLAC, reporting progress on `on_event`; returns where the file is.
+#[tauri::command]
+async fn rip_track(
+    device: String,
+    track: u32,
+    first_sector: u32,
+    sectors: u32,
+    on_event: tauri::ipc::Channel<rip::RipEvent>,
+) -> Result<rip::Ripped, String> {
+    tauri::async_runtime::spawn_blocking(move || rip::rip_track(&device, track, first_sector, sectors, &on_event))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Removes a ripped file after it is uploaded (only files this app made).
+#[tauri::command]
+fn discard_ripped(path: String) -> Result<(), String> {
+    rip::discard(Path::new(&path))
+}
+
+#[tauri::command]
+async fn eject_disc() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(rip::eject).await.map_err(|e| e.to_string())?
+}
+
 /// Albums of the library that carry this title by this artist, to warn before ripping a disc twice.
 #[tauri::command]
 async fn check_library(album_artist: String, album: String) -> Result<Vec<library_check::LibraryAlbum>, String> {
@@ -76,11 +109,29 @@ struct TagRequest {
     release_track_id: Option<String>,
 }
 
+/// The cover of the album being ripped, downloaded once for all its tracks.
+static COVER: std::sync::Mutex<Option<(String, Vec<u8>)>> = std::sync::Mutex::new(None);
+
+async fn cached_cover(url: &str) -> Result<tagging::Cover, String> {
+    let cached = COVER.lock().ok().and_then(|c| c.as_ref().filter(|(u, _)| u == url).map(|(_, data)| data.clone()));
+    let data = match cached {
+        Some(data) => data,
+        None => {
+            let data = musicbrainz::download(url).await?;
+            if let Ok(mut slot) = COVER.lock() {
+                *slot = Some((url.to_string(), data.clone()));
+            }
+            data
+        }
+    };
+    tagging::Cover::from_bytes(data)
+}
+
 /// Writes the tags and embeds the cover (downloaded from `cover_url`) into a ripped FLAC.
 #[tauri::command]
 async fn tag_file(request: TagRequest) -> Result<(), String> {
     let cover = match &request.cover_url {
-        Some(url) => Some(tagging::Cover::from_bytes(musicbrainz::download(url).await?)?),
+        Some(url) => Some(cached_cover(url).await?),
         None => None,
     };
     let album = tagging::AlbumTags {
@@ -106,7 +157,7 @@ async fn tag_file(request: TagRequest) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![session_status, connect, sign_out, upload_file, lookup_disc, tag_file, check_library])
+        .invoke_handler(tauri::generate_handler![session_status, connect, sign_out, upload_file, lookup_disc, tag_file, check_library, detect_disc, rip_track, discard_ripped, eject_disc])
         .run(tauri::generate_context!())
         .expect("error while running the ripper");
 }
