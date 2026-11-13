@@ -18,6 +18,11 @@ const MAX_TAIL = 2000;
 const DEFAULT_TAIL = 200;
 const EXEC_TIMEOUT_MS = 120_000;
 const CHANGE_HEADER = 'x-remoment-manager';
+const SESSION_COOKIE = 'rm_session';
+const SESSION_SECONDS = 12 * 3600;
+const LOGIN_WINDOW_MS = 10 * 60_000;
+const LOGIN_MAX_FAILURES = 10;
+const isLoopback = (bind) => bind === '127.0.0.1' || bind === 'localhost' || bind === '::1';
 
 function loadConfig(env = process.env) {
   const home = env.REMOMENT_MANAGER_HOME || path.join(os.homedir(), '.remoment-manager');
@@ -27,6 +32,10 @@ function loadConfig(env = process.env) {
     tokenFile: path.join(home, 'token'),
     auditFile: path.join(home, 'audit.log'),
     port: Number(env.REMOMENT_MANAGER_PORT || 8099),
+    // 127.0.0.1 unless the admin opts in to the LAN (0.0.0.0 or one address): then the web page is reachable from other machines.
+    bind: env.REMOMENT_MANAGER_BIND || '127.0.0.1',
+    // Extra host names the Host check accepts in LAN mode (IP addresses, `*.local` and this machine's name always are).
+    allowedHosts: String(env.REMOMENT_MANAGER_ALLOWED_HOSTS || '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean),
     projectDir,
     composeFile: path.resolve(projectDir, env.REMOMENT_COMPOSE_FILE || 'docker-compose.prod.yml'),
     project: env.REMOMENT_COMPOSE_PROJECT || 'remoment',
@@ -57,6 +66,111 @@ function run(cmd, args, opts = {}) {
       resolve({ ok: !err, code: err ? (typeof err.code === 'number' ? err.code : -1) : 0, stdout: String(stdout || ''), stderr: String(stderr || '') });
     });
   });
+}
+
+// The manager's own web page: one inline document, no libraries, no external requests (the CSP allows none). It signs in
+// with the manager token (POST /login sets a session cookie) and then reads the same API as the CLI. Text goes in with
+// textContent only, so nothing from a container's logs or names can run as markup.
+function renderPage(nonce, lan) {
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ReMoment Manager</title>
+<style nonce="${nonce}">
+:root{--bg:#f6f6f4;--card:#fff;--text:#1c1b19;--muted:#6b6a66;--line:#e4e3de;--ok:#1f9d55;--bad:#d64545;--warn:#b7791f;--accent:#2d2d2a}
+@media (prefers-color-scheme:dark){:root{--bg:#161615;--card:#1f1f1d;--text:#ecebe7;--muted:#9a9993;--line:#2e2e2b;--ok:#4cc38a;--bad:#f06a6a;--warn:#e0a64a;--accent:#ecebe7}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,sans-serif}
+main{max-width:56rem;margin:0 auto;padding:1.25rem 1rem 3rem}h1{font-size:1.25rem;margin:0}h2{font-size:1rem;margin:0}
+header{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:1rem;margin-bottom:1rem;overflow:hidden}
+.card>h2{padding:.9rem 1.1rem;border-bottom:1px solid var(--line)}.pad{padding:1rem 1.1rem}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem 1rem;padding:.65rem 1.1rem;border-bottom:1px solid var(--line)}.row:last-child{border:0}
+.name{width:9rem;font-weight:600;display:flex;align-items:center;gap:.5rem}.dot{width:.5rem;height:.5rem;border-radius:50%;background:var(--muted)}
+.grow{flex:1;min-width:10rem;color:var(--muted);font-size:.8rem}.state{width:11rem;font-size:.85rem}.bad{color:var(--bad)}.ok{color:var(--ok)}
+button{font:inherit;font-size:.85rem;padding:.35rem .8rem;border-radius:.6rem;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer}
+button:hover{border-color:var(--muted)}button.primary{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+input{font:inherit;width:100%;padding:.6rem .8rem;border-radius:.6rem;border:1px solid var(--line);background:var(--bg);color:var(--text)}
+pre{margin:0;padding:1rem 1.1rem;max-height:24rem;overflow:auto;font:12px/1.5 ui-monospace,monospace;white-space:pre-wrap;word-break:break-all}
+dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(10rem,1fr));gap:.8rem 1.5rem;margin:0}dt{font-size:.75rem;color:var(--muted)}dd{margin:0}
+.banner{border:1px solid var(--warn);color:var(--warn);border-radius:.8rem;padding:.6rem .9rem;font-size:.85rem;margin-bottom:1rem}
+.msg{margin-bottom:1rem;padding:.6rem .9rem;border-radius:.8rem;font-size:.9rem;border:1px solid var(--line)}.msg.bad{border-color:var(--bad)}.hidden{display:none}
+.muted{color:var(--muted);font-size:.8rem}.bar{margin-bottom:.6rem}
+</style></head><body><main>
+<header><h1>ReMoment Manager</h1><div><span id="meta" class="muted"></span> <button id="signout" class="hidden">Sign out</button></div></header>
+${lan ? '<div class="banner">LAN mode: this page is reachable from your network over plain HTTP, and the manager can restart every container. Use it only on a network you trust.</div>' : ''}
+<div id="msg" class="msg hidden"></div>
+<section id="login" class="card hidden"><h2>Sign in</h2><form class="pad" id="loginform">
+<p class="muted">The manager token is in <code>token</code> in the manager's home on the server (<code>remoment-manager token</code> prints the path). It is not the admin password.</p>
+<input id="token" type="password" autocomplete="off" placeholder="Manager token" required> <p><button class="primary" type="submit">Sign in</button></p></form></section>
+<section id="dash" class="hidden">
+<div class="muted bar"><button id="restartall">Restart all</button> &nbsp;<span id="project"></span></div>
+<div class="card"><h2>Containers</h2><div id="services"></div></div>
+<div class="card hidden" id="logcard"><h2 id="logtitle"></h2><pre id="logs"></pre><div class="pad"><button id="logclose">Close</button></div></div>
+<div class="card"><h2>Host</h2><div class="pad"><dl id="host"></dl></div></div>
+<div class="card"><h2>Recent changes</h2><div id="audit"></div></div>
+</section></main>
+<script nonce="${nonce}">
+(function(){
+var H={'x-remoment-manager':'1'},logService=null,timer=null,$=function(i){return document.getElementById(i)};
+function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e}
+function show(id,on){$(id).classList.toggle('hidden',!on)}
+function say(text,bad){var m=$('msg');m.textContent=text||'';m.className='msg'+(bad?' bad':'')+(text?'':' hidden')}
+function api(method,path,body){var o={method:method,credentials:'same-origin',headers:Object.assign({},H)};
+ if(body){o.body=JSON.stringify(body);o.headers['content-type']='application/json'}
+ return fetch(path,o).then(function(r){return r.text().then(function(t){var j=null;try{j=JSON.parse(t)}catch(e){}return{status:r.status,text:t,json:j}})})}
+function bytes(n){if(n==null)return'—';return n>=1073741824?(n/1073741824).toFixed(1)+' GB':Math.round(n/1048576)+' MB'}
+function dur(s){if(s==null)return'—';if(s>=86400)return Math.floor(s/86400)+'d '+Math.floor(s%86400/3600)+'h';if(s>=3600)return Math.floor(s/3600)+'h '+Math.floor(s%3600/60)+'m';return Math.max(1,Math.floor(s/60))+'m'}
+function signedOut(){clearInterval(timer);show('dash',false);show('login',true);show('signout',false);$('meta').textContent=''}
+function renderServices(st){
+ $('project').textContent='Project '+st.project+' · refreshes every 10 s';
+ var box=$('services');box.textContent='';
+ st.services.forEach(function(s){
+  var bad=s.problem||s.state==='missing'||s.health==='unhealthy',row=el('div','row'),n=el('div','name'),d=el('span','dot');
+  d.style.background=bad?'var(--bad)':(s.state==='running'?'var(--ok)':'var(--muted)');n.appendChild(d);n.appendChild(el('span','',s.service));row.appendChild(n);
+  row.appendChild(el('div','state'+(bad?' bad':''),(s.problem||s.state)+(s.health?' · '+s.health:'')+(s.state==='exited'&&s.exit_code!=null?' (exit '+s.exit_code+')':'')));
+  row.appendChild(el('div','grow','up '+dur(s.up_seconds)+' · '+(s.restart_count||0)+' restarts · '+(s.memory_usage||bytes(s.memory_bytes))+' · cpu '+(s.cpu_percent!=null?s.cpu_percent.toFixed(1)+'%':'—')));
+  var lb=el('button','','Logs');lb.onclick=function(){logService=logService===s.service?null:s.service;loadLogs()};
+  var rb=el('button','','Restart');rb.onclick=function(){restart(s.service)};
+  row.appendChild(lb);row.appendChild(rb);box.appendChild(row)});
+ var h=st.host,dl=$('host');dl.textContent='';
+ function item(k,v){var w=el('div');w.appendChild(el('dt','',k));w.appendChild(el('dd','',v));dl.appendChild(w)}
+ item('Disk free',h.disk?bytes(h.disk.free_bytes)+' of '+bytes(h.disk.total_bytes):'—');
+ item('Memory free',bytes(h.memory.free_bytes)+' of '+bytes(h.memory.total_bytes));
+ item('Load (1, 5, 15 min)',(h.load||[]).map(function(l){return l.toFixed(2)}).join('  ')||'—');
+ item('Uptime',dur(h.uptime_seconds));
+ if(h.cpu_temperature_c!=null)item('CPU temperature',Math.round(h.cpu_temperature_c)+' °C')}
+function renderAudit(list){var box=$('audit');box.textContent='';
+ if(!list.length){box.appendChild(el('div','pad muted','No changes made through the manager yet.'));return}
+ list.forEach(function(a){var r=el('div','row');r.appendChild(el('span','muted',new Date(a.time).toLocaleString()));
+  r.appendChild(el('span','',a.action+(a.service?' · '+a.service:'')));r.appendChild(el('span',/^failed/.test(a.result)?'bad':'muted',a.result));box.appendChild(r)})}
+function loadLogs(){
+ if(!logService){show('logcard',false);return}
+ api('GET','/logs/'+encodeURIComponent(logService)+'?tail=200').then(function(r){
+  $('logtitle').textContent='Logs · '+logService+' · last 200 lines';
+  $('logs').textContent=r.status===200?(r.text.trim()||'No output.'):((r.json&&r.json.message)||'Could not read the logs.');show('logcard',true)})}
+function refresh(){
+ return Promise.all([api('GET','/status'),api('GET','/audit?limit=15')]).then(function(rs){
+  if(rs[0].status===401){signedOut();return}
+  show('login',false);show('dash',true);show('signout',true);
+  if(rs[0].status!==200){say((rs[0].json&&rs[0].json.message)||'The manager could not read Docker.',true);return}
+  renderServices(rs[0].json);renderAudit(rs[1].json?rs[1].json.data:[]);loadLogs()})}
+function restart(service){
+ var all=service===null;
+ if(!confirm(all?'Restart every container?':'Restart '+service+'?'))return;
+ say((all?'Restarting everything':'Restarting '+service)+'…');
+ api('POST',all?'/restart-all':'/restart/'+encodeURIComponent(service)).then(function(r){
+  if(r.status===200)say(all?'Restarted every container.':'Restarted '+service+'.');
+  else say((r.json&&(r.json.message||r.json.error))||'The restart failed.',true);refresh()})}
+$('restartall').onclick=function(){restart(null)};
+$('logclose').onclick=function(){logService=null;loadLogs()};
+$('loginform').onsubmit=function(e){e.preventDefault();say('');
+ api('POST','/login',{token:$('token').value}).then(function(r){
+  if(r.status===200){$('token').value='';start()}else say((r.json&&r.json.message)||'Sign in failed.',true)})};
+$('signout').onclick=function(){api('POST','/logout').then(function(){say('');signedOut()})};
+function start(){refresh();clearInterval(timer);timer=setInterval(function(){if(!document.hidden)refresh()},10000)}
+fetch('/health').then(function(r){return r.json()}).then(function(h){$('meta').textContent='v'+h.version}).catch(function(){});
+start();
+})();
+</script></body></html>`;
 }
 
 function createManager(cfg) {
@@ -165,11 +279,88 @@ function createManager(cfg) {
     };
   }
 
-  const send = (res, code, body, type = 'application/json') => {
+  const lan = !isLoopback(cfg.bind);
+  const sessions = new Map(); // session id -> expiry (ms); in memory, gone on restart
+  const failures = new Map(); // remote address -> [timestamps of failed logins]
+
+  const send = (res, code, body, type = 'application/json', extra = {}) => {
     const out = typeof body === 'string' ? body : JSON.stringify(body);
-    res.writeHead(code, { 'content-type': type + '; charset=utf-8', 'cache-control': 'no-store' });
+    res.writeHead(code, { 'content-type': type + '; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', ...extra });
     res.end(out);
   };
+
+  // The Host header must name this machine: against DNS rebinding (a page on another domain pointing at this address).
+  function hostAllowed(header) {
+    const m = /^(.+):(\d+)$/.exec(String(header || '').toLowerCase());
+    if (!m || Number(m[2]) !== cfg.port) return false;
+    const name = m[1];
+    if (name === '127.0.0.1' || name === 'localhost') return true;
+    if (!lan) return false;
+    return /^\d{1,3}(\.\d{1,3}){3}$/.test(name) || name.endsWith('.local') || name === os.hostname().toLowerCase() || cfg.allowedHosts.includes(name);
+  }
+
+  function cookieSession(req) {
+    const m = new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([0-9a-f]{64})`).exec(String(req.headers.cookie || ''));
+    if (!m) return null;
+    const expires = sessions.get(m[1]);
+    if (!expires || expires < Date.now()) { sessions.delete(m[1]); return null; }
+    return m[1];
+  }
+
+  // The API takes the bearer token (CLI, the app) or the session the web page's login created.
+  function authorized(req) {
+    const auth = String(req.headers.authorization || '');
+    if (auth.startsWith('Bearer ')) return tokenMatches(token, auth.slice(7));
+    return cookieSession(req) !== null;
+  }
+
+  function readBody(req) {
+    return new Promise((resolve) => {
+      let body = '';
+      req.on('data', (c) => { body += c; if (body.length > MAX_BODY) { req.destroy(); resolve(null); } });
+      req.on('end', () => resolve(body));
+      req.on('error', () => resolve(null));
+    });
+  }
+
+  async function login(req, res) {
+    if (req.headers[CHANGE_HEADER] !== '1') return send(res, 403, { error: `missing ${CHANGE_HEADER} header` });
+    const who = req.socket.remoteAddress || 'unknown';
+    const recent = (failures.get(who) || []).filter((t) => Date.now() - t < LOGIN_WINDOW_MS);
+    if (recent.length >= LOGIN_MAX_FAILURES) return send(res, 429, { error: 'too_many_attempts', message: 'Too many wrong tokens. Wait ten minutes.' });
+    const body = await readBody(req);
+    let given = '';
+    try { given = String(JSON.parse(body || '{}').token || ''); } catch { /* not JSON */ }
+    if (body === null) return send(res, 413, { error: 'too_large' });
+    if (!given || !tokenMatches(token, given.trim())) {
+      recent.push(Date.now());
+      failures.set(who, recent);
+      return send(res, 401, { error: 'unauthorized', message: 'That is not the manager token.' });
+    }
+    failures.delete(who);
+    for (const [id, exp] of sessions) if (exp < Date.now()) sessions.delete(id);
+    const id = crypto.randomBytes(32).toString('hex');
+    sessions.set(id, Date.now() + SESSION_SECONDS * 1000);
+    audit('login', null, 'ok');
+    send(res, 200, { status: 'ok' }, 'application/json', { 'set-cookie': `${SESSION_COOKIE}=${id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_SECONDS}` });
+  }
+
+  function logout(req, res) {
+    if (req.headers[CHANGE_HEADER] !== '1') return send(res, 403, { error: `missing ${CHANGE_HEADER} header` });
+    const id = cookieSession(req);
+    if (id) sessions.delete(id);
+    send(res, 200, { status: 'ok' }, 'application/json', { 'set-cookie': `${SESSION_COOKIE}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0` });
+  }
+
+  // The page holds nothing secret (all data comes from the API after login), so it is served without a session.
+  function page(res) {
+    const nonce = crypto.randomBytes(16).toString('base64');
+    send(res, 200, renderPage(nonce, lan), 'text/html', {
+      'content-security-policy': `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
+      'x-frame-options': 'DENY',
+      'referrer-policy': 'no-referrer',
+    });
+  }
 
   async function change(res, action, service, args) {
     if (busy) return send(res, 409, { error: 'busy', message: `Another change is running: ${busy}` });
@@ -186,8 +377,7 @@ function createManager(cfg) {
   }
 
   async function handle(req, res) {
-    const allowed = [`127.0.0.1:${cfg.port}`, `localhost:${cfg.port}`];
-    if (!allowed.includes(String(req.headers.host || '').toLowerCase())) return send(res, 403, { error: 'bad_host' });
+    if (!hostAllowed(req.headers.host)) return send(res, 403, { error: 'bad_host' });
 
     const url = new URL(req.url, 'http://x');
     const p = url.pathname;
@@ -195,11 +385,19 @@ function createManager(cfg) {
 
     if (p === '/health') {
       if (method !== 'GET') return send(res, 405, { error: 'method_not_allowed' });
-      return send(res, 200, { status: 'ok', name: 'remoment-manager', version: VERSION, uptime_seconds: Math.round((Date.now() - startedAt) / 1000) });
+      return send(res, 200, { status: 'ok', name: 'remoment-manager', version: VERSION, uptime_seconds: Math.round((Date.now() - startedAt) / 1000), lan });
     }
 
-    const auth = String(req.headers.authorization || '');
-    if (!auth.startsWith('Bearer ') || !tokenMatches(token, auth.slice(7))) return send(res, 401, { error: 'unauthorized' });
+    if (p === '/') {
+      if (method !== 'GET') return send(res, 405, { error: 'method_not_allowed' });
+      return page(res);
+    }
+    if (p === '/login' || p === '/logout') {
+      if (method !== 'POST') return send(res, 405, { error: 'method_not_allowed' });
+      return p === '/login' ? login(req, res) : logout(req, res);
+    }
+
+    if (!authorized(req)) return send(res, 401, { error: 'unauthorized' });
 
     const len = Number(req.headers['content-length'] || 0);
     if (len > MAX_BODY) return send(res, 413, { error: 'too_large' });
@@ -252,7 +450,7 @@ function createManager(cfg) {
   }
 
   const server = http.createServer((req, res) => { handle(req, res).catch(() => send(res, 500, { error: 'internal' })); });
-  return { server, listen: () => new Promise((r) => server.listen(cfg.port, '127.0.0.1', r)), token };
+  return { server, listen: () => new Promise((r) => server.listen(cfg.port, cfg.bind, r)), token };
 }
 
 module.exports = { createManager, loadConfig, VERSION };
@@ -260,5 +458,8 @@ module.exports = { createManager, loadConfig, VERSION };
 if (require.main === module) {
   const cfg = loadConfig();
   const m = createManager(cfg);
-  m.listen().then(() => console.log(`remoment-manager ${VERSION} on http://127.0.0.1:${cfg.port} (token file: ${cfg.tokenFile})`));
+  m.listen().then(() => {
+    console.log(`remoment-manager ${VERSION} on http://${cfg.bind}:${cfg.port} (token file: ${cfg.tokenFile})`);
+    if (!isLoopback(cfg.bind)) console.log('LAN mode: the web page is reachable from the network over plain HTTP. Keep it on a trusted LAN.');
+  });
 }

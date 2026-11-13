@@ -85,7 +85,8 @@ test('token file is created owner-only and never returned', async () => {
 test('/health works without a token and shows nothing sensitive', async () => {
   const r = await req('GET', '/health', { token: null });
   assert.equal(r.status, 200);
-  assert.deepEqual(Object.keys(r.json()).sort(), ['name', 'status', 'uptime_seconds', 'version']);
+  assert.deepEqual(Object.keys(r.json()).sort(), ['lan', 'name', 'status', 'uptime_seconds', 'version']);
+  assert.equal(r.json().lan, false);
 });
 
 test('missing or wrong token gives 401', async () => {
@@ -223,6 +224,119 @@ test('the server source has no shell use', () => {
   assert.ok(!/(?<![.\w])exec\(|execSync|spawnSync|shell:\s*true/.test(src));
   assert.ok(/execFile\(cmd, args/.test(src));
   assert.equal((src.match(/execFile\(/g) || []).length, 1); // one place runs commands
+});
+
+// --- web page: own login with the manager token, a session cookie, optional LAN mode -----------------------------
+
+function raw(port, method, p, { headers = {}, body, host } = {}) {
+  return new Promise((resolve, reject) => {
+    const h = { host: host || `127.0.0.1:${port}`, ...headers };
+    if (body !== undefined) { h['content-type'] = 'application/json'; h['content-length'] = Buffer.byteLength(body); }
+    const r = http.request({ host: '127.0.0.1', port, method, path: p, headers: h }, (res) => {
+      let out = '';
+      res.on('data', (d) => (out += d));
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: out, json: () => JSON.parse(out) }));
+    });
+    r.on('error', reject);
+    r.end(body);
+  });
+}
+const loginWith = (port, token) => raw(port, 'POST', '/login', { headers: change, body: JSON.stringify({ token }) });
+const cookieOf = (res) => String(res.headers['set-cookie'] || '').split(';')[0];
+
+test('the page is served without a session, with a strict policy and nothing from the API in it', async () => {
+  const r = await raw(ctx.port, 'GET', '/');
+  assert.equal(r.status, 200);
+  assert.match(r.headers['content-type'], /text\/html/);
+  assert.match(r.headers['content-security-policy'], /default-src 'none'/);
+  assert.match(r.headers['content-security-policy'], /script-src 'nonce-/);
+  assert.equal(r.headers['x-frame-options'], 'DENY');
+  assert.ok(!r.body.includes(ctx.token));
+  assert.ok(!/LAN mode/.test(r.body)); // loopback: no LAN warning
+  assert.equal((await raw(ctx.port, 'POST', '/')).status, 405);
+});
+
+test('login with the token gives a session that reads the API; a wrong token does not', async () => {
+  const bad = await loginWith(ctx.port, 'nope');
+  assert.equal(bad.status, 401);
+  assert.ok(!bad.headers['set-cookie']);
+
+  const ok = await loginWith(ctx.port, ctx.token);
+  assert.equal(ok.status, 200);
+  const set = String(ok.headers['set-cookie']);
+  assert.match(set, /rm_session=[0-9a-f]{64}/);
+  assert.match(set, /HttpOnly/);
+  assert.match(set, /SameSite=Strict/);
+
+  const cookie = cookieOf(ok);
+  assert.equal((await raw(ctx.port, 'GET', '/status', { headers: { cookie } })).status, 200);
+  assert.equal((await raw(ctx.port, 'GET', '/status', { headers: { cookie: 'rm_session=' + '0'.repeat(64) } })).status, 401);
+  assert.equal((await raw(ctx.port, 'GET', '/status')).status, 401);
+  assert.ok(!ok.body.includes(ctx.token));
+});
+
+test('a session still needs the change header to restart, and logout ends it', async () => {
+  const cookie = cookieOf(await loginWith(ctx.port, ctx.token));
+  assert.equal((await raw(ctx.port, 'POST', '/restart/app', { headers: { cookie } })).status, 403);
+  assert.equal((await raw(ctx.port, 'POST', '/restart/app', { headers: { cookie, ...change } })).status, 200);
+
+  assert.equal((await raw(ctx.port, 'POST', '/logout', { headers: { cookie } })).status, 403);
+  assert.equal((await raw(ctx.port, 'POST', '/logout', { headers: { cookie, ...change } })).status, 200);
+  assert.equal((await raw(ctx.port, 'GET', '/status', { headers: { cookie } })).status, 401);
+});
+
+test('login needs the change header and a small body', async () => {
+  assert.equal((await raw(ctx.port, 'POST', '/login', { body: JSON.stringify({ token: ctx.token }) })).status, 403);
+  const big = await loginWith(ctx.port, 'x'.repeat(5000)).catch((e) => ({ status: e.code }));
+  assert.ok([413, 'ECONNRESET', 'EPIPE'].includes(big.status));
+});
+
+test('repeated wrong tokens are throttled, a right one resets nothing until the window passes', async () => {
+  const port = await freePort();
+  const cfg = loadConfig({ REMOMENT_MANAGER_HOME: path.join(tmp, 'throttle'), REMOMENT_MANAGER_PORT: String(port), REMOMENT_PROJECT_DIR: tmp });
+  const m = createManager(cfg);
+  await m.listen();
+  try {
+    for (let i = 0; i < 10; i++) assert.equal((await loginWith(port, 'wrong' + i)).status, 401);
+    assert.equal((await loginWith(port, 'wrong')).status, 429);
+    assert.equal((await loginWith(port, m.token)).status, 429); // even the right one waits
+  } finally { m.server.close(); }
+});
+
+test('on loopback only 127.0.0.1 and localhost are accepted as Host', async () => {
+  for (const host of [`192.168.1.9:${ctx.port}`, `remoment.local:${ctx.port}`, `evil.example.com:${ctx.port}`, '127.0.0.1:1']) {
+    assert.equal((await raw(ctx.port, 'GET', '/', { host })).status, 403, host);
+  }
+  assert.equal((await raw(ctx.port, 'GET', '/', { host: `localhost:${ctx.port}` })).status, 200);
+});
+
+test('LAN mode accepts the machine by address or .local name, still not a foreign domain, and warns on the page', async () => {
+  const port = await freePort();
+  const cfg = loadConfig({
+    REMOMENT_MANAGER_HOME: path.join(tmp, 'lan'), REMOMENT_MANAGER_PORT: String(port), REMOMENT_PROJECT_DIR: tmp,
+    REMOMENT_MANAGER_BIND: '0.0.0.0', REMOMENT_MANAGER_ALLOWED_HOSTS: 'remoment.example',
+  });
+  const m = createManager(cfg);
+  await m.listen();
+  try {
+    for (const host of [`192.168.1.109:${port}`, `remoment.local:${port}`, `remoment.example:${port}`]) {
+      assert.equal((await raw(port, 'GET', '/', { host })).status, 200, host);
+    }
+    for (const host of [`evil.example.com:${port}`, `192.168.1.109:${port + 1}`, '192.168.1.109']) {
+      assert.equal((await raw(port, 'GET', '/', { host })).status, 403, host);
+    }
+    const page = await raw(port, 'GET', '/', { host: `192.168.1.109:${port}` });
+    assert.match(page.body, /LAN mode/);
+    assert.equal((await raw(port, 'GET', '/health', { host: `192.168.1.109:${port}` })).json().lan, true);
+    // The API is closed to the LAN without the token, as before.
+    assert.equal((await raw(port, 'GET', '/status', { host: `192.168.1.109:${port}` })).status, 401);
+  } finally { m.server.close(); }
+});
+
+test('the page puts text in with textContent only', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  const script = src.slice(src.indexOf('function renderPage'), src.indexOf('function createManager'));
+  assert.ok(!/innerHTML|outerHTML|insertAdjacentHTML|document\.write|eval\(/.test(script));
 });
 
 test('CLI talks to the API: status, logs, restart, audit, token', async () => {

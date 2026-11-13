@@ -93,10 +93,15 @@ frankenphp_max_requests: 500 # worker mode only: a worker restarts itself after 
 
 # --- ReMoment Manager (manager.yml) ------------------------------------------------
 # Host service (outside Docker) that shows and restarts the compose project's containers, docs/architecture/manager.md.
-# Listens on 127.0.0.1 only; its token is a file in manager_home, read with `remoment-manager` on the host.
+# Its token is a file in manager_home, read with `remoment-manager` on the host. By default it listens on 127.0.0.1 only.
+# manager_lan: true also serves its own web page (http://<server>:8099, sign in with the token) to the network, so you can
+# restart containers when the app is down. Plain HTTP and root-equivalent power: only on a LAN you trust.
 # false = manager.yml does nothing (and removes nothing).
 manager_enabled: true
 manager_port: 8099
+manager_lan: false
+# Extra host names the page may be opened by (IP addresses, *.local and the machine's own name always work in LAN mode).
+manager_allowed_hosts: []
 manager_home: /var/lib/remoment-manager
 # Must be the compose project name the deploy uses: docker compose names it after the folder of docker-compose.prod.yml.
 manager_compose_project: "{{ app_dir | basename }}"

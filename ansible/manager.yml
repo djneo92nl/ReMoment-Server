@@ -84,6 +84,6 @@
     - name: Where the token is
       ansible.builtin.debug:
         msg: >-
-          Manager is up on 127.0.0.1:{{ manager_port }} (version {{ manager_health.json.version | default('?') }}).
+          Manager is up on {{ '0.0.0.0' if (manager_lan | bool) else '127.0.0.1' }}:{{ manager_port }} (version {{ manager_health.json.version | default('?') }}){{ ', web page: http://' ~ ansible_host ~ ':' ~ manager_port ~ '/' if (manager_lan | bool) else '' }}.
           Token file: {{ manager_home }}/token, read by `remoment-manager` as {{ ansible_user }}
           (REMOMENT_MANAGER_HOME={{ manager_home }} remoment-manager status).

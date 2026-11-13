@@ -12,7 +12,7 @@ A small service on the **host**, outside the app container, that shows and resta
 |---|---|---|
 | Language | **Node, one dependency-free file**, no npm packages | Reuses DevDash's shape; Node already exists on dev hosts. Go (static binary for armv7/arm64) stays open if Pi measurements say Node is too heavy on 1 GB. |
 | Token | **Separate from the admin password**: random 256-bit hex, created on first start, file mode 0600 in a 0700 directory (`~/.remoment-manager/token`, directory from `REMOMENT_MANAGER_HOME`) | The app cannot verify the admin password while it is down. |
-| Binding | **127.0.0.1 only**, port `REMOMENT_MANAGER_PORT` (default 8099); no setting to bind elsewhere | Root-equivalent power; a LAN page is opt-in later. |
+| Binding | **127.0.0.1** by default, port `REMOMENT_MANAGER_PORT` (default 8099); `REMOMENT_MANAGER_BIND=0.0.0.0` (Ansible: `manager_lan: true`) opens the web page to the LAN | Root-equivalent power; the LAN page is opt-in, plain HTTP, and says so on the page. |
 | Updating itself | Later, by its own installer | Not built. |
 | Init files | Examples below only; nothing installs them | Installers come later. |
 
@@ -55,14 +55,26 @@ It reads the token file and calls the API; `REMOMENT_MANAGER_HOME` and `REMOMENT
 ## Security model
 
 - `execFile` with argument arrays in exactly one place (`run()`); no shell, no generic exec, no docker passthrough. The only request input that reaches a command is a service name equal to one of the compose file's services; `tail` is parsed to an integer and capped.
-- The `Host` header must be `127.0.0.1:<port>` or `localhost:<port>` (also for `/health`), against DNS rebinding; bound to 127.0.0.1.
+- The `Host` header must be `127.0.0.1:<port>` or `localhost:<port>` (also for `/health`), against DNS rebinding; bound to 127.0.0.1 unless LAN mode is switched on (then also IP addresses, `*.local`, this machine's name and the allow-list, see above).
 - Bearer token compared in constant time (SHA-256 of both sides, `timingSafeEqual`); never logged, never returned; the file is re-chmodded 0600 at start.
 - Every change needs the `x-remoment-manager: 1` header (a browser cannot send it cross-site without a preflight).
 - One change at a time (lock): a second change answers 409. Reads (status, logs, audit) stay available during a change. A change has a 120 s limit.
 - Every change is appended (time, action, service, result) to `audit.log` in the manager home, mode 0600. Failed changes are logged as `failed (exit N)`. Denied requests are not logged (no token spam).
-- Request bodies are capped at 1 KiB (no endpoint takes one).
+- Request bodies are capped at 1 KiB (only `/login` takes one: the token).
 
-## Web page (Settings › Manager)
+## The manager's own web page (separate from the app and its admin login)
+
+`GET /` serves one inline page (no libraries, no external requests) that signs in with the **manager token**, never the admin password, and then shows the same data as the CLI: containers (state, health, crashed/restarting, uptime, restarts, memory, CPU), host figures, logs per service, Restart per service and Restart all, and the audit log. It works when the app, the web UI or the database is down, which is the point.
+
+- Sign-in: `POST /login {token}` (needs the `x-remoment-manager: 1` header) sets an `HttpOnly; SameSite=Strict` session cookie, 12 hours, kept in memory (a manager restart signs everyone out); `POST /logout` ends it. The API accepts the bearer token (CLI, the app) or that session; changes still need the header. Ten wrong tokens from one address in ten minutes answer 429 for everyone behind it, even the right token, until the window passes. A login is audited.
+- The page itself holds nothing secret and is served without a session; a CSP with a per-response nonce allows no external requests, `X-Frame-Options: DENY`; page text goes in with `textContent` only (a test forbids `innerHTML` and friends).
+- **Loopback by default.** With `REMOMENT_MANAGER_BIND=0.0.0.0` (or one address) the page is reachable from the network over plain HTTP and shows a warning banner; `/health` then carries `lan: true`. The Host check then accepts IP addresses, `*.local`, this machine's name and `REMOMENT_MANAGER_ALLOWED_HOSTS` (comma list), on the manager's port only; a foreign domain pointing at the address (DNS rebinding) is still refused. Without HTTPS the token and cookie cross the network in clear: only on a trusted LAN, or behind a reverse proxy that adds TLS.
+- Ansible: `manager_lan: true` (and optionally `manager_allowed_hosts`) in `group_vars/all.yml`, then `manager.yml`; the page is at `http://<server>:8099/`.
+- Tested in `manager/test/manager.test.js` (page headers, login, session, header, logout, throttle, Host in both modes) and clicked through once in a browser against the fake docker; not run against the real stack.
+
+## Web page inside the app (Settings › Manager)
+
+This one is the app's view of the manager, behind the admin login, for convenience when the app is up. The manager's own page above is the independent one.
 
 `/settings/manager` (`Livewire\ManagerPanel`, behind the admin login like all of `/settings`) shows the containers with state, health, crashed/restarting, uptime, restarts, memory and CPU, the host figures, a log viewer per service and the recent audit entries; Restart per service and Restart all (with a confirm; restarting `app` stops the server that serves the page, so the answer may not arrive). It refreshes every 10 s while the tab is visible.
 
@@ -110,7 +122,7 @@ launchd (`~/Library/LaunchAgents/nl.remoment.manager.plist`):
 
 ## Still to do (open)
 
-- The manager's own LAN page behind the token, for when the app is down (roadmap step 8, opt-in, with the "LAN only" warning). The page inside ReMoment exists (see above); it has no upgrade, start/stop of single processes or SMB yet.
+- Neither page has upgrade, start/stop of single processes or SMB yet. HTTPS for the LAN page (today: a reverse proxy).
 - Processes inside the app container (supervisor: queue, scheduler, listeners), start/stop of single services.
 - Upgrade and rollback (calls `app:upgrade`, previous image tag plus `backup:run`/`backup:restore`), host backup now, diagnostics bundle.
 - SMB serve and mount (Samba on the host).
