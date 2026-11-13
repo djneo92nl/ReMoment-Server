@@ -40,6 +40,8 @@
             dest: "{{ app_dir }}/.env"
             mode: '0640'
 
+      # The app image is FrankenPHP (docker/frankenphp/Dockerfile, docs/architecture/frankenphp.md), built here on the
+      # target so it matches the host's architecture. The first build after the move from the Sail image takes a while.
       - name: Build Docker image
         ansible.builtin.command:
             # -e rebuild_image=true rebuilds the app image without the layer cache, which is the only way an apt layer

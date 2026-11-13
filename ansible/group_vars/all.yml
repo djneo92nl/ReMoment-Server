@@ -81,6 +81,26 @@ database_driver: "{{ 'sqlite' if profile == 'control' else 'mariadb' }}"
 # analysis worker is always one. Takes effect on the next deploy.
 queue_workers: 2
 
+# --- Web server: FrankenPHP (env.j2, docker-compose.prod.yml) -----------------------
+# The app image is FrankenPHP (Caddy + PHP), docs/architecture/frankenphp.md. deploy.yml builds it on the target host
+# (natively for its architecture). `-e rebuild_image=true` rebuilds without the layer cache to pick up a newer PHP.
+# classic = every request boots the app (default, the Pi floor); worker = Octane, the app stays in memory (RAM per
+# worker; refused in the control profile, still a trial: see "Still to do" in the doc).
+frankenphp_mode: classic
+frankenphp_threads: 4        # PHP threads serving requests at the same time; lower on a 1 GB board
+frankenphp_workers: 2        # worker mode only
+frankenphp_max_requests: 500 # worker mode only: a worker restarts itself after this many requests
+
+# --- ReMoment Manager (manager.yml) ------------------------------------------------
+# Host service (outside Docker) that shows and restarts the compose project's containers, docs/architecture/manager.md.
+# Listens on 127.0.0.1 only; its token is a file in manager_home, read with `remoment-manager` on the host.
+# false = manager.yml does nothing (and removes nothing).
+manager_enabled: true
+manager_port: 8099
+manager_home: /var/lib/remoment-manager
+# Must be the compose project name the deploy uses: docker compose names it after the folder of docker-compose.prod.yml.
+manager_compose_project: "{{ app_dir | basename }}"
+
 # --- Integrations (env.j2) ---------------------------------------------------------
 # User-Agent for MusicBrainz, Wikipedia and the other metadata APIs; they ask for a contact address.
 metadata_user_agent: "ReMoment/1.0 (remko@djneo.nl)"

@@ -5,7 +5,8 @@ Runs ReMoment in an unprivileged LXC container (nesting on, so Docker works) on 
 1. `ansible/inventory.yml`: set the `pve` host (root SSH) and `remoment_server` (the container's IP; with `proxmox_ct_ip: dhcp` the default, step 2 prints the address to fill in here: reserve it in your router). `ansible/group_vars/all.yml`: the `proxmox_*` and `music_dir` variables.
 2. `ansible-playbook -i ansible/inventory.yml ansible/proxmox.yml` — downloads the Debian template (`proxmox_template_pattern`, default Debian 13), creates the container, installs sshd/sudo and the deploy user + your public key. Skips an existing container id.
 3. `ansible/setup.yml --ask-become-pass` — Docker, Avahi (`_remoment._tcp`) and the music folder (removes MiniDLNA if an older run installed it).
-4. `ansible/deploy.yml --ask-vault-pass` — the app.
+4. `ansible/deploy.yml --ask-vault-pass` — the app. It builds the FrankenPHP image (`docker/frankenphp/Dockerfile`) on the host; `frankenphp_mode`, `frankenphp_threads`, `frankenphp_workers` and `frankenphp_max_requests` in `group_vars/all.yml` go into `.env` (see `docs/architecture/frankenphp.md`). The first build after the old Sail image is slow; `-e rebuild_image=true` rebuilds without cache.
+5. `ansible/manager.yml --ask-become-pass` — the ReMoment Manager as a systemd service on the host (Node from apt, unit `remoment-manager`, `127.0.0.1:8099`, token in `manager_home`, CLI `remoment-manager`). Needs the code from step 4; re-run it after a deploy that changes `manager/` so the service restarts on the new code. `manager_enabled: false` skips it. See `docs/architecture/manager.md`.
 
 Skip step 2 to use any existing Debian VM/host instead.
 

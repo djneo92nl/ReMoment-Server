@@ -1,0 +1,89 @@
+---
+# Install or update the ReMoment Manager on the host (a systemd service next to Docker, not a container). Safe to re-run.
+# Usage: ansible-playbook -i ansible/inventory.yml ansible/manager.yml --ask-become-pass
+#
+# Run it after deploy.yml: the service runs manager/server.js from the checkout deploy.yml keeps in app_dir, and a re-run
+# restarts it so it picks up new code. Needs root (apt, systemd), which is why it is not part of deploy.yml.
+# Design and API: docs/architecture/manager.md. Listens on 127.0.0.1 only.
+
+- name: Install the ReMoment Manager
+  hosts: remoment_servers
+  become: true
+  tasks:
+    - name: Check that the manager is wanted
+      ansible.builtin.meta: end_host
+      when: not (manager_enabled | bool)
+
+    - name: Check that deploy.yml has put the code in place
+      ansible.builtin.stat:
+        path: "{{ app_dir }}/manager/server.js"
+      register: manager_code
+
+    - name: Stop when the checkout has no manager yet
+      ansible.builtin.fail:
+        msg: "{{ app_dir }}/manager/server.js is missing: run deploy.yml first (and make sure app_branch has the manager)."
+      when: not manager_code.stat.exists
+
+    # No npm packages: the manager only needs a Node that has node:test-era APIs (18+). Debian 13 ships 20.
+    - name: Install Node.js
+      ansible.builtin.apt:
+        name: nodejs
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Create the manager's home (token, audit log)
+      ansible.builtin.file:
+        path: "{{ manager_home }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0700'
+
+    - name: Install the systemd unit
+      ansible.builtin.template:
+        src: templates/remoment-manager.service.j2
+        dest: /etc/systemd/system/remoment-manager.service
+        mode: '0644'
+      register: manager_unit
+
+    - name: Put the CLI on the PATH
+      ansible.builtin.file:
+        src: "{{ app_dir }}/manager/bin/remoment-manager"
+        dest: /usr/local/bin/remoment-manager
+        state: link
+        force: true
+
+    - name: Point the CLI at the manager's home for every login shell
+      ansible.builtin.copy:
+        dest: /etc/profile.d/remoment-manager.sh
+        content: |
+          # Managed by ansible (manager.yml)
+          export REMOMENT_MANAGER_HOME={{ manager_home }}
+          export REMOMENT_MANAGER_PORT={{ manager_port }}
+        mode: '0644'
+
+    - name: Enable and (re)start the manager
+      ansible.builtin.systemd:
+        name: remoment-manager
+        enabled: true
+        state: restarted
+        daemon_reload: true
+
+    - name: Wait for the manager to answer
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ manager_port }}/health"
+        headers:
+          Host: "127.0.0.1:{{ manager_port }}"
+        status_code: 200
+      register: manager_health
+      retries: 10
+      delay: 1
+      until: manager_health.status == 200
+
+    - name: Where the token is
+      ansible.builtin.debug:
+        msg: >-
+          Manager is up on 127.0.0.1:{{ manager_port }} (version {{ manager_health.json.version | default('?') }}).
+          Token file: {{ manager_home }}/token, read by `remoment-manager` as {{ ansible_user }}
+          (REMOMENT_MANAGER_HOME={{ manager_home }} remoment-manager status).

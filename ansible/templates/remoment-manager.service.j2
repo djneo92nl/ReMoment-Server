@@ -1,0 +1,22 @@
+# Managed by ansible (manager.yml). ReMoment Manager: docs/architecture/manager.md.
+[Unit]
+Description=ReMoment Manager
+After=docker.service network.target
+Wants=docker.service
+
+[Service]
+# The deploy user is in the docker group (setup.yml); the manager runs `docker compose` as it.
+User={{ ansible_user }}
+Environment=REMOMENT_PROJECT_DIR={{ app_dir }}
+Environment=REMOMENT_COMPOSE_FILE=docker-compose.prod.yml
+Environment=REMOMENT_COMPOSE_PROJECT={{ manager_compose_project }}
+Environment=REMOMENT_MANAGER_HOME={{ manager_home }}
+Environment=REMOMENT_MANAGER_PORT={{ manager_port }}
+ExecStart=/usr/bin/node {{ app_dir }}/manager/server.js
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

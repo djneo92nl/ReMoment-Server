@@ -66,7 +66,7 @@ It reads the token file and calls the API; `REMOMENT_MANAGER_HOME` and `REMOMENT
 
 `cd manager && node --test test/` (no packages). A fake `docker` script (`test/fake-docker.js`) is put first on PATH; it answers `compose config --services`, `compose ps`, `inspect`, `stats`, `compose logs`, `compose restart` with canned output and records every call. No real container is touched. Covered: status shape, crashed and restarting, logs tail cap, exact restart arguments, unknown service gives 404 with no command run, 401, 403 (Host and header), 404/405, 409 while a change runs, 413, audit entries, failed restart, token file mode, the CLI.
 
-## Example init files (untested, not installed)
+## Example init files (the Ansible unit is derived from the systemd one; the launchd one is untested)
 
 systemd (`/etc/systemd/system/remoment-manager.service`):
 
@@ -108,7 +108,7 @@ launchd (`~/Library/LaunchAgents/nl.remoment.manager.plist`):
 - Processes inside the app container (supervisor: queue, scheduler, listeners), start/stop of single services.
 - Upgrade and rollback (calls `app:upgrade`, previous image tag plus `backup:run`/`backup:restore`), host backup now, diagnostics bundle.
 - SMB serve and mount (Samba on the host).
-- Installers: Ansible role, Raspberry Pi image, install script for plain compose.
+- Installers: Raspberry Pi image, install script for plain compose. (The Ansible install exists: `ansible/manager.yml`, systemd unit from `ansible/templates/remoment-manager.service.j2`; syntax-checked only, not run against a host.)
 - How the manager updates itself (decision c) and the init system per target (decision d).
 - Go instead of Node, if the Pi measurements say so.
 
