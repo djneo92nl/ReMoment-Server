@@ -107,7 +107,7 @@ test('status shape, crashed and restarting detection, only compose services', as
   assert.equal(r.status, 200);
   const s = r.json();
   assert.equal(s.project, 'remoment');
-  assert.deepEqual(s.services.map((x) => x.service), ['app', 'redis', 'mariadb', 'mosquitto']);
+  assert.deepEqual(s.services.map((x) => x.service), ['app', 'mariadb', 'mosquitto', 'redis']);
   const by = Object.fromEntries(s.services.map((x) => [x.service, x]));
   assert.equal(by.app.state, 'running');
   assert.equal(by.app.health, 'healthy');
