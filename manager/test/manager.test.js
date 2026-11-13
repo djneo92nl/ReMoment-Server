@@ -50,7 +50,7 @@ test.before(async () => {
   fs.writeFileSync(thermal, '48500\n');
   const cfg = loadConfig({
     REMOMENT_MANAGER_HOME: home, REMOMENT_MANAGER_PORT: String(port), REMOMENT_PROJECT_DIR: tmp,
-    REMOMENT_COMPOSE_FILE: 'docker-compose.prod.yml', REMOMENT_COMPOSE_PROJECT: 'remoment', REMOMENT_THERMAL_FILE: thermal,
+    REMOMENT_COMPOSE_FILE: 'docker-compose.prod.yml', REMOMENT_COMPOSE_PROJECT: 'remoment', REMOMENT_THERMAL_FILE: thermal, REMOMENT_SAMPLE_SECONDS: '0',
   });
   const m = createManager(cfg);
   await m.listen();
@@ -85,7 +85,7 @@ test('token file is created owner-only and never returned', async () => {
 test('/health works without a token and shows nothing sensitive', async () => {
   const r = await req('GET', '/health', { token: null });
   assert.equal(r.status, 200);
-  assert.deepEqual(Object.keys(r.json()).sort(), ['lan', 'name', 'status', 'uptime_seconds', 'version']);
+  assert.deepEqual(Object.keys(r.json()).sort(), ['lan', 'name', 'open', 'status', 'uptime_seconds', 'version']);
   assert.equal(r.json().lan, false);
 });
 
@@ -156,12 +156,12 @@ test('restart and restart-all call docker compose with the right arguments and a
   assert.equal(r.status, 200);
   assert.deepEqual(r.json(), { status: 'ok', action: 'restart', service: 'redis' });
   const call = docker.calls().find((c) => c.includes('restart'));
-  assert.deepEqual(call, ['compose', '-f', path.join(tmp, 'docker-compose.prod.yml'), '-p', 'remoment', 'restart', 'redis']);
+  assert.deepEqual(call, ['compose', '-f', path.join(tmp, 'docker-compose.prod.yml'), '-p', 'remoment', '--profile', '*', 'restart', 'redis']);
 
   docker.clear();
   r = await req('POST', '/restart-all', { headers: change });
   assert.equal(r.status, 200);
-  assert.deepEqual(docker.calls().find((c) => c.includes('restart')), ['compose', '-f', path.join(tmp, 'docker-compose.prod.yml'), '-p', 'remoment', 'restart']);
+  assert.deepEqual(docker.calls().find((c) => c.includes('restart')), ['compose', '-f', path.join(tmp, 'docker-compose.prod.yml'), '-p', 'remoment', '--profile', '*', 'restart']);
 
   const a = (await req('GET', '/audit?limit=10')).json().data;
   assert.equal(a[0].action, 'restart-all');
@@ -361,4 +361,57 @@ test('CLI talks to the API: status, logs, restart, audit, token', async () => {
   r = await run('token');
   assert.ok(r.so.includes(ctx.cfg.tokenFile));
   assert.ok(!r.so.includes(ctx.token));
+});
+
+test('start runs `up -d` and stop runs `stop` for one service, with every profile visible, and both are audited', async () => {
+  docker.clear();
+  assert.equal((await req('POST', '/start/mosquitto')).status, 403); // header needed
+  assert.equal((await req('POST', '/start/mosquitto', { headers: change })).status, 200);
+  assert.equal((await req('POST', '/stop/mosquitto', { headers: change })).status, 200);
+  const base = ['compose', '-f', path.join(tmp, 'docker-compose.prod.yml'), '-p', 'remoment', '--profile', '*'];
+  assert.deepEqual(docker.calls().find((c) => c.includes('up')), [...base, 'up', '-d', 'mosquitto']);
+  assert.deepEqual(docker.calls().find((c) => c.includes('stop')), [...base, 'stop', 'mosquitto']);
+  assert.equal((await req('POST', '/start/nope', { headers: change })).status, 404);
+  const audit = (await req('GET', '/audit?limit=5')).json().data;
+  assert.ok(audit.some((a) => a.action === 'start' && a.service === 'mosquitto' && a.result === 'ok'));
+  assert.ok(audit.some((a) => a.action === 'stop' && a.service === 'mosquitto'));
+});
+
+test('a failed start answers 502', async () => {
+  docker.set('start-fail', '1');
+  const r = await req('POST', '/start/app', { headers: change });
+  docker.set('start-fail', '');
+  assert.equal(r.status, 502);
+});
+
+test('history collects CPU samples per service', async () => {
+  const r = await req('GET', '/history');
+  assert.equal(r.status, 200);
+  const d = r.json().data;
+  assert.deepEqual(Object.keys(d).sort(), ['app', 'mariadb', 'mosquitto', 'redis']);
+  assert.ok(d.app.length >= 1);
+  assert.equal(d.app.at(-1).cpu, 1.5);
+  assert.equal((await req('GET', '/history', { token: null })).status, 401);
+});
+
+test('open mode needs no token for the page API, but still the change header and the Host check', async () => {
+  const port = await freePort();
+  const m = createManager(loadConfig({
+    REMOMENT_MANAGER_HOME: path.join(tmp, 'home-open'), REMOMENT_MANAGER_PORT: String(port), REMOMENT_PROJECT_DIR: tmp,
+    REMOMENT_COMPOSE_FILE: 'docker-compose.prod.yml', REMOMENT_SAMPLE_SECONDS: '0', REMOMENT_MANAGER_OPEN: '1',
+  }));
+  await m.listen();
+  const call = (method, p, headers = {}, host = `127.0.0.1:${port}`) => new Promise((resolve, reject) => {
+    const r = http.request({ host: '127.0.0.1', port, method, path: p, headers: { host, ...headers } }, (res) => {
+      let b = ''; res.on('data', (d) => (b += d)); res.on('end', () => resolve({ status: res.statusCode, body: b }));
+    });
+    r.on('error', reject); r.end();
+  });
+  try {
+    assert.equal((await call('GET', '/status')).status, 200);
+    assert.equal(JSON.parse((await call('GET', '/health')).body).open, true);
+    assert.equal((await call('POST', '/restart/redis')).status, 403);
+    assert.equal((await call('POST', '/restart/redis', change)).status, 200);
+    assert.equal((await call('GET', '/status', {}, 'evil.example:' + port)).status, 403);
+  } finally { m.server.close(); }
 });

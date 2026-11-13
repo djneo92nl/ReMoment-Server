@@ -72,6 +72,12 @@ It reads the token file and calls the API; `REMOMENT_MANAGER_HOME` and `REMOMENT
 - Ansible: `manager_lan: true` (and optionally `manager_allowed_hosts`) in `group_vars/all.yml`, then `manager.yml`; the page is at `http://<server>:8099/`.
 - Tested in `manager/test/manager.test.js` (page headers, login, session, header, logout, throttle, Host in both modes) and clicked through once in a browser against the fake docker; not run against the real stack.
 
+### Open mode, start/stop and the CPU graph
+
+- **Open mode** (`REMOMENT_MANAGER_OPEN=1`, Ansible `manager_open: true`): the page and the browser API need no sign-in; the Host check and the `x-remoment-manager` header on changes stay. The token file and bearer token still work for the CLI and the app. With open mode on a LAN, anyone on that network can stop containers.
+- **Start/stop of every service**: `POST /start/{service}` (`compose --profile '*' up -d {service}`, up to 15 minutes, it may build the image) and `POST /stop/{service}`; all commands use `--profile '*'`, so services behind a profile (analysis, structure, stems, icecast, librespot, beolink, meilisearch, mariadb) are listed and can be started. A service stopped here stays stopped until started again; a deploy does not start it unless its profile is in `COMPOSE_PROFILES`.
+- **CPU history**: `GET /history` returns `{ interval_seconds, data: { service: [{ t, cpu, mem }] } }`, an in-memory ring of 240 samples (an hour at the default 15 s, `REMOMENT_SAMPLE_SECONDS`, 0 = off) taken from the same `docker stats` call as `/status` (cached 5 s). It is lost on a manager restart. The page draws one line per container (100% = one core).
+
 ## Web page inside the app (Settings › Manager)
 
 This one is the app's view of the manager, behind the admin login, for convenience when the app is up. The manager's own page above is the independent one.

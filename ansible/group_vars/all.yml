@@ -100,6 +100,9 @@ manager_port: 8099
 # true also serves its own web page (http://<server>:8099, sign in with the token) to the network, so you can
 # restart containers when the app is down. Plain HTTP and root-equivalent power: only on a LAN you trust.
 manager_lan: true
+# true = no sign-in on the web page: anyone who can reach the port can start, stop and restart containers. The token
+# still exists for the CLI and the app's Settings page. Only with manager_lan on a LAN you trust.
+manager_open: true
 # Extra host names the page may be opened by (IP addresses, *.local and the machine's own name always work in LAN mode).
 manager_allowed_hosts: []
 manager_home: /var/lib/remoment-manager

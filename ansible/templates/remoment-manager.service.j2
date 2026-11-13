@@ -14,6 +14,7 @@ Environment=REMOMENT_MANAGER_HOME={{ manager_home }}
 Environment=REMOMENT_MANAGER_PORT={{ manager_port }}
 # manager_lan: the web page on the network (plain HTTP, token login); otherwise 127.0.0.1 only.
 Environment=REMOMENT_MANAGER_BIND={{ '0.0.0.0' if (manager_lan | bool) else '127.0.0.1' }}
+Environment=REMOMENT_MANAGER_OPEN={{ '1' if (manager_open | default(false) | bool) else '0' }}
 {% if manager_allowed_hosts | length > 0 %}
 Environment=REMOMENT_MANAGER_ALLOWED_HOSTS={{ manager_allowed_hosts | join(',') }}
 {% endif %}
