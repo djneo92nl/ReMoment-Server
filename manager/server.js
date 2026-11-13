@@ -33,6 +33,8 @@ function loadConfig(env = process.env) {
     home,
     tokenFile: path.join(home, 'token'),
     auditFile: path.join(home, 'audit.log'),
+    featuresFile: path.join(home, 'features.json'),
+    envFile: path.join(projectDir, '.env'),
     port: Number(env.REMOMENT_MANAGER_PORT || 8099),
     // 127.0.0.1 unless the admin opts in to the LAN (0.0.0.0 or one address): then the web page is reachable from other machines.
     bind: env.REMOMENT_MANAGER_BIND || '127.0.0.1',
@@ -75,6 +77,60 @@ function run(cmd, args, opts = {}) {
   });
 }
 
+// Features: an optional part of the install is a compose profile (its containers) plus the .env values the app reads to
+// use it. Switching one here edits .env and records the choice in features.json in the manager's home, which a deploy
+// re-applies (`node server.js --apply-env`) after it has rewritten .env from the Ansible variables.
+const FEATURES = {
+  analysis: { label: 'Audio analysis', text: 'Essentia sidecar: BPM, key, mood (full profile; a lot of CPU and RAM).', profile: 'analysis', services: ['analysis'], on: { ANALYSIS_ENABLED: 'true', ANALYSIS_ESSENTIA_URL: 'http://127.0.0.1:8090' }, off: { ANALYSIS_ENABLED: 'false', ANALYSIS_ESSENTIA_URL: null }, flag: 'ANALYSIS_ENABLED' },
+  structure: { label: 'Track structure', text: 'Sections of one track on demand (librosa, 0.5-1 GB while it works).', profile: 'structure', services: ['structure'], on: { STRUCTURE_URL: 'http://127.0.0.1:8091' }, off: { STRUCTURE_URL: null }, flag: 'STRUCTURE_URL' },
+  stems: { label: 'Stems', text: 'Per-stem loudness lanes of one track on demand (Demucs, about 1.5 GB RAM).', profile: 'stems', services: ['stems'], on: { STEMS_URL: 'http://127.0.0.1:8092' }, off: { STEMS_URL: null }, flag: 'STEMS_URL' },
+  'spotify-stream': { label: 'Spotify stream', text: 'Spotify on any speaker: librespot and Icecast serve an MP3 stream.', profile: 'spotify-stream', services: ['librespot', 'icecast'], on: { LIBRESPOT_ENABLED: 'true' }, off: { LIBRESPOT_ENABLED: 'false' }, flag: 'LIBRESPOT_ENABLED' },
+  'radio-relay': { label: 'Radio relay', text: 'Radio stations relayed through Icecast.', profile: 'radio-relay', services: ['icecast'], on: { RADIO_RELAY_ENABLED: 'true' }, off: { RADIO_RELAY_ENABLED: 'false' }, flag: 'RADIO_RELAY_ENABLED' },
+};
+
+function readEnvLines(file) { try { return fs.readFileSync(file, 'utf8').split('\n'); } catch { return []; } }
+function envGet(lines, key) {
+  for (let i = lines.length - 1; i >= 0; i--) { const m = new RegExp(`^${key}=(.*)$`).exec(lines[i]); if (m) return m[1].trim().replace(/^"|"$/g, ''); }
+  return null;
+}
+function envSet(lines, key, value) {
+  const out = lines.filter((l) => !new RegExp(`^${key}=`).test(l));
+  while (out.length && out[out.length - 1] === '') out.pop();
+  if (value !== null && value !== undefined) out.push(`${key}=${value}`);
+  out.push('');
+  return out;
+}
+function envProfiles(lines) { return (envGet(lines, 'COMPOSE_PROFILES') || '').split(',').map((x) => x.trim()).filter(Boolean); }
+function featureOn(lines, name) {
+  const f = FEATURES[name];
+  const flag = envGet(lines, f.flag);
+  return envProfiles(lines).includes(f.profile) && flag !== null && flag !== '' && flag !== 'false';
+}
+function readFeatureChoices(cfg) { try { return JSON.parse(fs.readFileSync(cfg.featuresFile, 'utf8')); } catch { return {}; } }
+
+// Writes the recorded choices into .env (a missing choice leaves what is there alone). Returns the names it changed.
+function applyFeatures(cfg) {
+  const choices = readFeatureChoices(cfg);
+  let lines = readEnvLines(cfg.envFile);
+  if (!lines.length) return [];
+  const before = lines.join('\n');
+  for (const [name, on] of Object.entries(choices)) {
+    const f = FEATURES[name];
+    if (!f) continue;
+    for (const [k, v] of Object.entries(on ? f.on : f.off)) lines = envSet(lines, k, v);
+    const profiles = envProfiles(lines).filter((x) => x !== f.profile);
+    if (on) profiles.push(f.profile);
+    lines = envSet(lines, 'COMPOSE_PROFILES', profiles.length ? profiles.join(',') : null);
+  }
+  if (lines.join('\n') !== before) {
+    const mode = (() => { try { return fs.statSync(cfg.envFile).mode & 0o777; } catch { return 0o640; } })();
+    const tmp = cfg.envFile + '.manager';
+    fs.writeFileSync(tmp, lines.join('\n'), { mode });
+    fs.renameSync(tmp, cfg.envFile);
+  }
+  return Object.keys(choices);
+}
+
 // The manager's own web page: one inline document, no libraries, no external requests (the CSP allows none). It signs in
 // with the manager token (POST /login sets a session cookie) and then reads the same API as the CLI. Text goes in with
 // textContent only, so nothing from a container's logs or names can run as markup.
@@ -101,6 +157,7 @@ dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(10rem,1fr));gap:.8r
 .banner{border:1px solid var(--warn);color:var(--warn);border-radius:.8rem;padding:.6rem .9rem;font-size:.85rem;margin-bottom:1rem}
 .msg{margin-bottom:1rem;padding:.6rem .9rem;border-radius:.8rem;font-size:.9rem;border:1px solid var(--line)}.msg.bad{border-color:var(--bad)}.hidden{display:none}
 .muted{color:var(--muted);font-size:.8rem}.bar{margin-bottom:.6rem}
+.busy .dot{animation:pulse 1s infinite}@keyframes pulse{50%{opacity:.25}}.busy .state{color:var(--warn)}button:disabled{opacity:.45;cursor:wait}
 .legend{display:flex;flex-wrap:wrap;gap:.3rem 1rem;margin-top:.6rem;font-size:.8rem}.legend i{display:inline-block;width:.7rem;height:.7rem;border-radius:2px;margin-right:.35rem;vertical-align:-1px}
 </style></head><body><main>
 <header><h1>ReMoment Manager</h1><div><span id="meta" class="muted"></span> <button id="signout" class="hidden">Sign out</button></div></header>
@@ -112,6 +169,7 @@ ${lan && !open ? '<div class="banner">LAN mode: this page is reachable from your
 <section id="dash" class="hidden">
 <div class="muted bar"><button id="restartall">Restart all</button> &nbsp;<span id="project"></span></div>
 <div class="card"><h2>Containers</h2><div id="services"></div></div>
+<div class="card"><h2>Features <span class="muted">switch an optional part on or off: containers and the app's settings</span></h2><div id="features"></div></div>
 <div class="card hidden" id="logcard"><h2 id="logtitle"></h2><pre id="logs"></pre><div class="pad"><button id="logclose">Close</button></div></div>
 <div class="card"><h2>CPU per container <span class="muted" id="cpuspan"></span></h2><div class="pad"><svg id="cpu" viewBox="0 0 600 160" width="100%" role="img" aria-label="CPU load per container"></svg><div id="cpulegend" class="legend"></div></div></div>
 <div class="card"><h2>Host</h2><div class="pad"><dl id="host"></dl></div></div>
@@ -119,7 +177,7 @@ ${lan && !open ? '<div class="banner">LAN mode: this page is reachable from your
 </section></main>
 <script nonce="${nonce}">
 (function(){
-var H={'x-remoment-manager':'1'},logService=null,timer=null,$=function(i){return document.getElementById(i)};
+var H={'x-remoment-manager':'1'},pending={},logService=null,timer=null,$=function(i){return document.getElementById(i)};
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e}
 function show(id,on){$(id).classList.toggle('hidden',!on)}
 function say(text,bad){var m=$('msg');m.textContent=text||'';m.className='msg'+(bad?' bad':'')+(text?'':' hidden')}
@@ -130,18 +188,19 @@ function bytes(n){if(n==null)return'—';return n>=1073741824?(n/1073741824).toF
 function dur(s){if(s==null)return'—';if(s>=86400)return Math.floor(s/86400)+'d '+Math.floor(s%86400/3600)+'h';if(s>=3600)return Math.floor(s/3600)+'h '+Math.floor(s%3600/60)+'m';return Math.max(1,Math.floor(s/60))+'m'}
 function signedOut(){clearInterval(timer);show('dash',false);show('login',true);show('signout',false);$('meta').textContent=''}
 function renderServices(st){
+ lastStatus=st;st.services.forEach(function(x){lastNames[x.service]=1});
  $('project').textContent='Project '+st.project+' · refreshes every 10 s';
  var box=$('services');box.textContent='';
  st.services.forEach(function(s){
-  var bad=s.problem||s.state==='missing'||s.health==='unhealthy',row=el('div','row'),n=el('div','name'),d=el('span','dot');
+  var pn=pending[s.service],bad=!pn&&(s.problem||s.state==='missing'||s.health==='unhealthy'),row=el('div','row'+(pn?' busy':'')),n=el('div','name'),d=el('span','dot');
   d.style.background=bad?'var(--bad)':(s.state==='running'?'var(--ok)':'var(--muted)');n.appendChild(d);n.appendChild(el('span','',s.service));row.appendChild(n);
-  row.appendChild(el('div','state'+(bad?' bad':''),(s.problem||s.state)+(s.health?' · '+s.health:'')+(s.state==='exited'&&s.exit_code!=null?' (exit '+s.exit_code+')':'')));
+  row.appendChild(el('div','state'+(bad?' bad':''),pn?pn+'…':(s.problem||s.state)+(s.health?' · '+s.health:'')+(s.state==='exited'&&s.exit_code!=null?' (exit '+s.exit_code+')':'')));
   row.appendChild(el('div','grow','up '+dur(s.up_seconds)+' · '+(s.restart_count||0)+' restarts · '+(s.memory_usage||bytes(s.memory_bytes))+' · cpu '+(s.cpu_percent!=null?s.cpu_percent.toFixed(1)+'%':'—')));
   var lb=el('button','','Logs');lb.onclick=function(){logService=logService===s.service?null:s.service;loadLogs()};
-  var up=s.state==='running'||s.state==='restarting';
+  var up=s.state==='running'||s.state==='restarting',anyPending=Object.keys(pending).length>0;
   row.appendChild(lb);
-  if(up){var rb=el('button','','Restart');rb.onclick=function(){restart(s.service)};row.appendChild(rb)}
-  var tb=el('button',up?'':'primary',up?'Stop':'Start');tb.onclick=function(){toggle(s.service,up)};row.appendChild(tb);
+  if(up){var rb=el('button','','Restart');rb.disabled=anyPending;rb.onclick=function(){restart(s.service)};row.appendChild(rb)}
+  var tb=el('button',up?'':'primary',up?'Stop':'Start');tb.disabled=anyPending;tb.onclick=function(){toggle(s.service,up)};row.appendChild(tb);
   box.appendChild(row)});
  var h=st.host,dl=$('host');dl.textContent='';
  function item(k,v){var w=el('div');w.appendChild(el('dt','',k));w.appendChild(el('dd','',v));dl.appendChild(w)}
@@ -160,23 +219,46 @@ function loadLogs(){
   $('logtitle').textContent='Logs · '+logService+' · last 200 lines';
   $('logs').textContent=r.status===200?(r.text.trim()||'No output.'):((r.json&&r.json.message)||'Could not read the logs.');show('logcard',true)})}
 function refresh(){
- return Promise.all([api('GET','/status'),api('GET','/audit?limit=15')]).then(function(rs){
+ return Promise.all([api('GET','/status'),api('GET','/audit?limit=15'),api('GET','/features')]).then(function(rs){
   if(rs[0].status===401){signedOut();return}
   show('login',false);show('dash',true);show('signout',true);
   if(rs[0].status!==200){say((rs[0].json&&rs[0].json.message)||'The manager could not read Docker.',true);return}
-  renderServices(rs[0].json);renderAudit(rs[1].json?rs[1].json.data:[]);loadLogs();loadCpu()})}
+  renderServices(rs[0].json);if(rs[2].status===200&&rs[2].json)renderFeatures(rs[2].json.data);renderAudit(rs[1].json?rs[1].json.data:[]);loadLogs();loadCpu()})}
 function restart(service){
  var all=service===null;
  if(!confirm(all?'Restart every container?':'Restart '+service+'?'))return;
  say((all?'Restarting everything':'Restarting '+service)+'…');
+ var key=all?'*':service;pending[key]='Restarting';if(all)Object.keys(lastNames).forEach(function(n){pending[n]='Restarting'});redraw();
  api('POST',all?'/restart-all':'/restart/'+encodeURIComponent(service)).then(function(r){
+  pending={};
   if(r.status===200)say(all?'Restarted every container.':'Restarted '+service+'.');
   else say((r.json&&(r.json.message||r.json.error))||'The restart failed.',true);refresh()})}
 function toggle(service,up){
  if(up&&!confirm('Stop '+service+'?'))return;
  say((up?'Stopping ':'Starting ')+service+(up?'':' (this can take minutes if the image has to be built)')+'…');
+ pending[service]=up?'Stopping':'Starting';redraw();
  api('POST',(up?'/stop/':'/start/')+encodeURIComponent(service)).then(function(r){
+  pending={};
   if(r.status===200)say((up?'Stopped ':'Started ')+service+'.');
+  else say((r.json&&(r.json.message||r.json.error))||'That failed.',true);refresh()})}
+var lastStatus=null,lastNames={};
+function redraw(){if(lastStatus)renderServices(lastStatus);if(lastFeatures)renderFeatures(lastFeatures)}
+var lastFeatures=null;
+function renderFeatures(list){
+ var box=$('features');box.textContent='';lastFeatures=list;
+ list.forEach(function(f){var pn=pending['feature:'+f.name],row=el('div','row'+(pn?' busy':'')),n=el('div','name'),d=el('span','dot');
+  d.style.background=f.enabled?'var(--ok)':'var(--muted)';n.appendChild(d);n.appendChild(el('span','',f.label));row.appendChild(n);
+  row.appendChild(el('div','state',pn?pn+'…':(f.enabled?'on':'off')));
+  row.appendChild(el('div','grow',f.description+' ('+f.services.join(', ')+')'));
+  var b=el('button',f.enabled?'':'primary',f.enabled?'Switch off':'Switch on');b.disabled=Object.keys(pending).length>0;
+  b.onclick=function(){setFeature(f)};row.appendChild(b);box.appendChild(row)})}
+function setFeature(f){
+ var on=!f.enabled;if(!confirm((on?'Switch on ':'Switch off ')+f.label+'? The app container is recreated, so the web UI is unavailable for a few seconds.'))return;
+ say((on?'Switching on ':'Switching off ')+f.label+' (this can take minutes if an image has to be built)…');
+ pending['feature:'+f.name]=on?'Switching on':'Switching off';redraw();
+ api('POST','/features/'+encodeURIComponent(f.name),{enabled:on}).then(function(r){
+  pending={};
+  if(r.status===200)say(f.label+(on?' is on.':' is off.'));
   else say((r.json&&(r.json.message||r.json.error))||'That failed.',true);refresh()})}
 var COLORS=['#2f80ed','#e5484d','#30a46c','#f5a524','#8e4ec6','#12a594','#e93d82','#7c8a97','#d9781a','#5b8def'];
 function renderCpu(h){
@@ -441,6 +523,35 @@ function createManager(cfg) {
     }
   }
 
+  async function setFeature(res, name, enabled) {
+    if (busy) return send(res, 409, { error: 'busy', message: `Another change is running: ${busy}` });
+    busy = `feature ${name}`;
+    lastStatus = null;
+    try {
+      const f = FEATURES[name];
+      const choices = readFeatureChoices(cfg);
+      choices[name] = enabled;
+      fs.writeFileSync(cfg.featuresFile, JSON.stringify(choices, null, 2) + '\n', { mode: 0o600 });
+      applyFeatures(cfg);
+      let r;
+      if (enabled) {
+        r = await composeWith({ timeout: START_TIMEOUT_MS }, 'up', '-d', ...f.services);
+      } else {
+        // A container another enabled feature needs (Icecast is shared) stays up.
+        const needed = new Set(Object.entries(FEATURES).filter(([n]) => n !== name && choices[n] !== false && featureOn(readEnvLines(cfg.envFile), n)).flatMap(([, x]) => x.services));
+        const stop = f.services.filter((x) => !needed.has(x));
+        r = stop.length ? await compose('stop', ...stop) : { ok: true, code: 0, stdout: '', stderr: '' };
+      }
+      // The app reads .env when its container is created: recreate it (only if its environment changed).
+      if (r.ok) r = await composeWith({ timeout: START_TIMEOUT_MS }, 'up', '-d', 'app');
+      lastStatus = null;
+      const result = r.ok ? 'ok' : `failed (exit ${r.code})`;
+      audit(enabled ? 'enable' : 'disable', name, result);
+      if (!r.ok) return send(res, 502, { error: 'docker_failed', message: (r.stderr || r.stdout).trim().slice(-500) });
+      send(res, 200, { status: 'ok', feature: name, enabled });
+    } finally { busy = null; }
+  }
+
   async function handle(req, res) {
     if (!hostAllowed(req.headers.host)) return send(res, 403, { error: 'bad_host' });
 
@@ -463,6 +574,23 @@ function createManager(cfg) {
     }
 
     if (!authorized(req)) return send(res, 401, { error: 'unauthorized' });
+
+    if (p === '/features') {
+      if (method !== 'GET') return send(res, 405, { error: 'method_not_allowed' });
+      const lines = readEnvLines(cfg.envFile);
+      return send(res, 200, { data: Object.entries(FEATURES).map(([name, f]) => ({ name, label: f.label, description: f.text, services: f.services, enabled: featureOn(lines, name) })) });
+    }
+    if (p.startsWith('/features/')) {
+      if (method !== 'POST') return send(res, 405, { error: 'method_not_allowed' });
+      if (req.headers[CHANGE_HEADER] !== '1') return send(res, 403, { error: `missing ${CHANGE_HEADER} header` });
+      const name = decodeURIComponent(p.slice('/features/'.length));
+      if (!Object.hasOwn(FEATURES, name)) return send(res, 404, { error: 'unknown_feature' });
+      const body = await readBody(req);
+      let enabled;
+      try { enabled = JSON.parse(body || '{}').enabled; } catch { /* not JSON */ }
+      if (typeof enabled !== 'boolean') return send(res, 422, { error: 'invalid', message: 'Send {"enabled": true|false}.' });
+      return setFeature(res, name, enabled);
+    }
 
     const len = Number(req.headers['content-length'] || 0);
     if (len > MAX_BODY) return send(res, 413, { error: 'too_large' });
@@ -535,9 +663,13 @@ function createManager(cfg) {
   return { server, listen, token };
 }
 
-module.exports = { createManager, loadConfig, VERSION };
+module.exports = { createManager, loadConfig, applyFeatures, VERSION };
 
-if (require.main === module) {
+if (require.main === module && process.argv.includes('--apply-env')) {
+  // Used by deploy.yml after it rewrote .env: put the features chosen in the Manager back.
+  const done = applyFeatures(loadConfig());
+  console.log(done.length ? `applied: ${done.join(', ')}` : 'nothing to apply');
+} else if (require.main === module) {
   const cfg = loadConfig();
   const m = createManager(cfg);
   m.listen().then(() => {

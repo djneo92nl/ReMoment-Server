@@ -420,3 +420,59 @@ test('services are listed in a fixed (alphabetical) order', async () => {
   const names = (await req('GET', '/status')).json().services.map((s) => s.service);
   assert.deepEqual(names, [...names].sort());
 });
+
+function post(p, body) {
+  return new Promise((resolve, reject) => {
+    const data = JSON.stringify(body);
+    const r = http.request({ host: '127.0.0.1', port: ctx.port, method: 'POST', path: p, headers: { host: `127.0.0.1:${ctx.port}`, authorization: `Bearer ${ctx.token}`, 'x-remoment-manager': '1', 'content-type': 'application/json', 'content-length': Buffer.byteLength(data) } }, (res) => {
+      let b = ''; res.on('data', (d) => (b += d)); res.on('end', () => resolve({ status: res.statusCode, json: () => JSON.parse(b) }));
+    });
+    r.on('error', reject); r.end(data);
+  });
+}
+
+test('features: list, switch on edits .env and starts the containers, switch off undoes it, a deploy re-applies the choice', async () => {
+  const envFile = path.join(tmp, '.env');
+  fs.writeFileSync(envFile, 'APP_NAME=ReMoment\nCOMPOSE_PROFILES=db,spotify-stream\nLIBRESPOT_ENABLED=true\nSTEMS_URL=\nANALYSIS_ENABLED=false\n');
+  const list = (await req('GET', '/features')).json().data;
+  assert.equal(list.find((f) => f.name === 'stems').enabled, false);
+  assert.equal(list.find((f) => f.name === 'spotify-stream').enabled, true);
+  assert.equal((await req('POST', '/features/stems')).status, 403);
+  assert.equal((await post('/features/nope', { enabled: true })).status, 404);
+  assert.equal((await post('/features/stems', { enabled: 'yes' })).status, 422);
+
+  docker.clear();
+  assert.equal((await post('/features/stems', { enabled: true })).status, 200);
+  let env = fs.readFileSync(envFile, 'utf8');
+  assert.match(env, /^STEMS_URL=http:\/\/127\.0\.0\.1:8092$/m);
+  assert.match(env, /^COMPOSE_PROFILES=db,spotify-stream,stems$/m);
+  assert.equal(env.match(/^STEMS_URL=/gm).length, 1);
+  const ups = docker.calls().filter((c) => c.includes('up')).map((c) => c.slice(c.indexOf('up')));
+  assert.deepEqual(ups, [['up', '-d', 'stems'], ['up', '-d', 'app']]);
+
+  // a deploy rewrites .env from its template (without stems), then re-applies what the manager recorded
+  fs.writeFileSync(envFile, 'APP_NAME=ReMoment\nCOMPOSE_PROFILES=db\n');
+  require('../server').applyFeatures(ctx.cfg);
+  env = fs.readFileSync(envFile, 'utf8');
+  assert.match(env, /STEMS_URL=http:\/\/127\.0\.0\.1:8092/);
+  assert.match(env, /COMPOSE_PROFILES=db,stems/);
+
+  docker.clear();
+  assert.equal((await post('/features/stems', { enabled: false })).status, 200);
+  env = fs.readFileSync(envFile, 'utf8');
+  assert.doesNotMatch(env, /STEMS_URL/);
+  assert.match(env, /^COMPOSE_PROFILES=db$/m);
+  assert.ok(docker.calls().some((c) => c.includes('stop') && c.includes('stems')));
+  const audit = (await req('GET', '/audit?limit=5')).json().data;
+  assert.ok(audit.some((a) => a.action === 'enable' && a.service === 'stems'));
+  assert.ok(audit.some((a) => a.action === 'disable' && a.service === 'stems'));
+});
+
+test('features: switching off radio relay keeps Icecast while the Spotify stream needs it', async () => {
+  const envFile = path.join(tmp, '.env');
+  fs.writeFileSync(envFile, 'COMPOSE_PROFILES=db,spotify-stream,radio-relay\nLIBRESPOT_ENABLED=true\nRADIO_RELAY_ENABLED=true\n');
+  docker.clear();
+  assert.equal((await post('/features/radio-relay', { enabled: false })).status, 200);
+  assert.equal(docker.calls().some((c) => c.includes('stop')), false);
+  assert.match(fs.readFileSync(envFile, 'utf8'), /^RADIO_RELAY_ENABLED=false$/m);
+});

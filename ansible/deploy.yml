@@ -40,6 +40,22 @@
             dest: "{{ app_dir }}/.env"
             mode: '0640'
 
+      # Features switched on or off in the ReMoment Manager (its web page) are kept in features.json; the template above
+      # rewrote .env from the Ansible variables, so put those choices back (docs/architecture/manager.md).
+      - name: Check for features chosen in the Manager
+        ansible.builtin.stat:
+            path: "{{ manager_home | default('/var/lib/remoment-manager') }}/features.json"
+        register: manager_features
+
+      - name: Re-apply the features chosen in the Manager
+        ansible.builtin.command:
+            cmd: node {{ app_dir }}/manager/server.js --apply-env
+        environment:
+            REMOMENT_PROJECT_DIR: "{{ app_dir }}"
+            REMOMENT_MANAGER_HOME: "{{ manager_home | default('/var/lib/remoment-manager') }}"
+        when: manager_features.stat.exists
+        changed_when: false
+
       # The app image is FrankenPHP (docker/frankenphp/Dockerfile, docs/architecture/frankenphp.md), built here on the
       # target so it matches the host's architecture. The first build after the move from the Sail image takes a while.
       - name: Build Docker image
