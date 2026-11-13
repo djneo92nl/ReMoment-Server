@@ -55,4 +55,9 @@ RUN chmod +x /usr/local/bin/start-container
 
 EXPOSE 80/tcp
 
+# The base image's healthcheck asks Caddy's admin API (localhost:2019), which the Caddyfiles switch off, so the container
+# would be "unhealthy" forever. Ask the app port for a static file instead: Caddy answers it without booting PHP.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD curl -fsS -o /dev/null "http://127.0.0.1:${APP_PORT:-80}/robots.txt" || exit 1
+
 ENTRYPOINT ["start-container"]

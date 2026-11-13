@@ -49,6 +49,7 @@ The base image is multi-arch (amd64, arm64, arm/v7). Nothing in the Dockerfile o
 
 - Host networking and `APP_PORT` are unchanged, so the Avahi `_remoment._tcp` advertisement needs no change.
 - Caddy runs as `sail` and binds port 80 through `setcap cap_net_bind_service` on the `frankenphp` binary.
+- Healthcheck: the base image probes Caddy's admin API on :2019, which is off here, so the Dockerfile replaces it with a request for `/robots.txt` on `APP_PORT` (served by Caddy, no PHP boot). It shows whether Caddy answers, not whether PHP works. Found when the Manager showed the first production `app` as `unhealthy`; unverified until the rebuilt image runs there.
 - Caddy state lives in `/data` and `/config` (`XDG_*` set in supervisor); nothing persists, there are no certificates.
 - `/stream/{track}` (Range requests) and uploads work as before. A new proxy in front would need its own body limit.
 - Verified on arm64: `/api/info` 200, a 50 MB POST through the body limit, PHP 8.4 ZTS with pcntl, sockets, gd, imagick, redis, igbinary, pdo_mysql, opcache.
