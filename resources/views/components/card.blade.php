@@ -8,7 +8,7 @@
          . ($href ? ' block transition-colors hover:border-gray-300 dark:hover:border-stone-700' : '');
     $tag ??= $href ? 'a' : 'div';
 @endphp
-<{{ $tag }} {{ $attributes->merge(['class' => $cls])->merge($href ? ['href' => $href] : []) }}>
+<{{ $tag }} data-card {{ $attributes->merge(['class' => $cls])->merge($href ? ['href' => $href] : []) }}>
     @if($title)
         <h2 class="text-base font-medium tracking-tight text-gray-900 dark:text-gray-100 mb-5">{{ $title }}</h2>
     @endif

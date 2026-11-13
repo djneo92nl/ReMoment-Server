@@ -119,7 +119,7 @@ before the unique index (keep the newest per tuple). Also check that nothing sto
 suggests several). **Resolve that first; if multi-valued keys exist the unique index must include `value`'s hash or be skipped.**
 `parent_id` (self FK, only ever written as `null` by `Enrichment::save`) is dead: drop (Low, same migration).
 
-**2. `plays`: the one big table has no plain `played_at` index.** Indexes: `(device_id, played_at)`, `track_id`, `source_type`,
+**2. `plays`: the one big table has no plain `played_at` index.** *(Done 2026-11-13: migration `2026_11_13_100000_add_played_at_index_to_plays_table` adds `plays_played_at_index`; both baselines in `scripts/schema/baseline/` list it. The `whereDate` advice below still stands for the web code.)* Indexes: `(device_id, played_at)`, `track_id`, `source_type`,
 FK on `radio_station_id`. Queries that do not start with a device: `PlayHistory` (`orderByDesc('played_at')` over all devices,
 `whereDate('played_at', ...)`), `RecentTracks` (`whereNotNull('track_id')->orderByDesc('played_at')->limit(120)`),
 `StatsController` aggregates, `DeviceCard` `latest('played_at')`, and the planned retention and history API (8.8). On a

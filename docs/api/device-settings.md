@@ -52,6 +52,25 @@ To pair a phone: `PUT { "discoverable": true }`, pair from the phone, poll `GET`
 
 A paired device's `id` is URL-encoded by the device (`FC%3aB2%3a14%3a…`); `DELETE` accepts it encoded or decoded. Verified on an Essence Mk2: the list shape (`id`, `deviceName`, `deviceAddress`, `connected`, `paired`; entries with `paired: false` are left out), toggling `discoverable`, pairing a device, and removing one through the item's own `_links./relation/delete`. The device answers the `DELETE` before it has applied it, so the driver waits (up to about 4 s) until the device is gone from the list and answers `502` if it never is. Not yet exercised on hardware: `reconnect_mode` changes.
 
+## Volume limits
+
+Not a capability: any device with `volume_control` can have them. A maximum volume, and a lower one during quiet hours (`quiet_from` to `quiet_until`, `HH:MM` in the server's timezone, may run past midnight).
+
+```
+GET /api/devices/{id}/volume-limits         → { "max": 60, "quiet_max": 25, "quiet_from": "22:00", "quiet_until": "07:00", "limit": 60 }
+PUT /api/admin/devices/{id}/volume-limits   body: any of { max, quiet_max, quiet_from, quiet_until } (null clears one)   → the same object   (admin token)
+```
+
+`limit` is the limit that applies now (`null`: none) and is also `volume_limit` on every device in `GET /api/devices` and the detail, so a client can cap its slider.
+
+Where it is enforced (`App\Domain\Device\VolumeLimits`):
+
+- `PUT /api/devices/{id}/volume` (also the MCP `volume` tool and scenes) and the web sliders set at most the limit; the answer is the level that was set, so `{ "volume": 80 }` can answer `{ "volume": 60 }`.
+- A device that reports a higher volume (the wheel on the speaker, a remote, its own app) is set back to the limit by the `EnforceVolumeLimit` listener on `VolumeUpdated`, at most once per 3 seconds.
+- Every minute the scheduler lowers a device whose cached volume is above the limit, which is what applies the quiet-hours limit when quiet hours begin.
+
+The web card is "Volume limits" on `/devices/{id}/settings`, shown to the admin only. Not verified on real speakers: how each brand behaves when it is turned up and set back at once.
+
 ## Sleep timer — `sleep_timer`
 
 ```

@@ -114,6 +114,35 @@ class DeviceApiTest extends TestCase
             ->assertJsonPath('data.now_playing.state', 'playing');
     }
 
+    public function test_now_playing_names_the_library_track_behind_it(): void
+    {
+        $device = $this->makeDevice(state: State::Playing);
+        $artist = \App\Models\Media\Artist::create(['name' => 'Lib Artist', 'source' => 'files']);
+        $album = \App\Models\Media\Album::create(['name' => 'Lib Album', 'artist_id' => $artist->id, 'source' => 'files']);
+        $track = \App\Models\Media\Track::create(['name' => 'Lib Song', 'artist_id' => $artist->id, 'album_id' => $album->id, 'source' => 'files', 'duration' => 200]);
+
+        DeviceCache::updateNowPlaying($device->id, new NowPlaying(
+            track: new TrackData(name: 'Lib Song', artist: new ArtistData(name: 'Lib Artist'), duration: 200),
+            album: new \App\Domain\Media\AlbumData(name: 'Lib Album'),
+            state: 'playing',
+        ));
+
+        $this->getJson("/api/devices/{$device->id}")
+            ->assertJsonPath('data.now_playing.library', ['track_id' => $track->id, 'album_id' => $album->id, 'artist_id' => $artist->id]);
+    }
+
+    public function test_now_playing_has_no_library_key_without_a_match(): void
+    {
+        $device = $this->makeDevice(state: State::Playing);
+        DeviceCache::updateNowPlaying($device->id, new NowPlaying(
+            track: new TrackData(name: 'Nobody Knows', artist: new ArtistData(name: 'Nobody'), duration: 100),
+            state: 'playing',
+        ));
+
+        $this->getJson("/api/devices/{$device->id}")
+            ->assertJsonMissingPath('data.now_playing.library');
+    }
+
     public function test_unknown_device_returns_404(): void
     {
         $this->getJson('/api/devices/999')->assertNotFound();

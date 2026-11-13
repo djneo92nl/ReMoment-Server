@@ -83,9 +83,11 @@ return [
     | /not-in-profile (web) when the active profile lacks the feature.
     */
     'routes' => [
+        // Play history and statistics work in every profile (the history feature); narrow rows come before `library`.
+        'history' => ['api/library/stats', 'api/library/history', 'api/devices/*/history'],
         'deep_analysis' => ['api/library/tracks/*/deep-analysis', 'api/library/tracks/*/deep-analysis/*'],
         'rip_upload' => ['api/admin/files'],
-        'analysis' => ['api/library/tracks/*/mixes-with', 'settings/analysis', 'settings/analysis/*', 'settings/library-health', 'settings/library-health/*', 'api/library/health'],
+        'analysis' => ['api/library/tracks/*/mixes-with', 'settings/analysis', 'settings/analysis/*', 'settings/library-health', 'settings/library-health/*', 'api/library/health', 'api/library/health/*'],
         'catalogue' => [
             'api/library/wishlist', 'api/library/new-releases', 'api/library/wanted-tracks', 'api/library/wanted-tracks/*',
             'api/library/catalogue/*', 'api/library/physical', 'api/library/physical/*', 'api/library/artists/*/discography',
@@ -100,7 +102,7 @@ return [
         'library' => [
             'library', 'library/*', 'artists', 'artists/*', 'albums', 'albums/*', 'genres', 'genres/*', 'playlists', 'playlists/*',
             'tracks/*', 'external/*', 'spotify/tracks/*', 'settings/library', 'settings/library/*', 'settings/clients/artwork-export', 'settings/clients/artwork-export/*',
-            'api/library/*', 'api/devices/*/library/*',
+            'api/library/*', 'api/devices/*/library/*', 'party/*',
         ],
     ],
 

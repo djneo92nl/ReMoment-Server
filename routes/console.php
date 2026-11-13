@@ -39,6 +39,9 @@ Schedule::command('catalogue:reconcile')->dailyAt('05:00')->when(fn () => Profil
 // Audio analysis (loudness, fingerprints, BPM/key/mood) of the own files; a bounded batch on its own queue, off by default (ANALYSIS_ENABLED).
 Schedule::command('library:analyze')->dailyAt('02:00')->when(fn () => Profile::allows('analysis'));
 
+// Opt-in (STEMS_NIGHTLY): stems for tracks that have none, a time-budgeted batch for the single `stems` worker, in the same night window.
+Schedule::command('library:analyze-stems')->dailyAt('02:00')->when(fn () => Profile::allows('deep_analysis') && config('analysis.stems_nightly'));
+
 // Picks up files added, changed or removed outside the app in the storage locations (queued; see docs/architecture/file-storage.md).
 Schedule::command('library:scan-files --queue')->dailyAt('03:30')->when(fn () => Profile::allows('file_storage'));
 
@@ -65,6 +68,9 @@ Schedule::call(function () {
 
 // Kills a hung default-queue worker so supervisor starts a new one (a stale queue beat while the scheduler beats).
 Schedule::call(fn () => (new QueueWatchdog)->run())->everyMinute()->name('queue-watchdog');
+
+// Volume limits (VolumeLimits): a device louder than its limit now, e.g. when quiet hours begin, is lowered. Cache only.
+Schedule::call(fn () => \App\Domain\Device\VolumeLimits::enforceDue())->everyMinute()->name('volume-limits');
 
 // Raises and resolves alerts for the conditions above and the devices (docs/architecture/alerts.md); never slows the heartbeat.
 Schedule::command('alerts:check')->everyMinute()->withoutOverlapping(5)->name('alerts-check');

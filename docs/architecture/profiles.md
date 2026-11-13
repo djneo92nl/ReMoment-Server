@@ -63,7 +63,7 @@ Nothing is deleted: the code paths stay, only the entry points are gated. Livewi
 
 | Task | Control | Standard | Full |
 |---|---|---|---|
-| `device:sync-sources`, `device:discover`, `radio:refresh`, `radio:fix-artwork`, radio plays prune, `backup:run`, `queue:prune-failed`, health heartbeat, queue watchdog, `alerts:check`, alerts prune | yes | yes | yes |
+| `device:sync-sources`, `device:discover`, `radio:refresh`, `radio:fix-artwork`, radio plays prune, `backup:run`, `queue:prune-failed`, health heartbeat, queue watchdog, `alerts:check`, alerts prune, volume limits | yes | yes | yes |
 | `library:warm` (every 5 min), `artwork:backfill`, `artwork:prerender`, `playlists:refresh-smart`, `library:merge-duplicates` (`library`) | – | yes | yes |
 | `library:enrich` (`enrichment`) | – | yes | yes |
 | `library:scan-files` (`file_storage`) | – | yes | yes |

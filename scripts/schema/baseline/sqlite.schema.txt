@@ -472,6 +472,7 @@ TABLE plays [autoincrement]
   col track_name varchar NULL default=-
   col updated_at datetime NULL default=-
   idx plays_device_id_played_at_index INDEX (device_id,played_at)
+  idx plays_played_at_index INDEX (played_at)
   idx plays_source_type_index INDEX (source_type)
   idx plays_track_id_index INDEX (track_id)
   fk (device_id) -> devices(id) ON DELETE CASCADE ON UPDATE NO ACTION

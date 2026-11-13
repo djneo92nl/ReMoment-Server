@@ -14,6 +14,7 @@ use App\Domain\Library\GenreColors;
 use App\Domain\Library\IdAliases;
 use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibraryCache;
+use App\Domain\Library\LibraryOverview;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\LibrarySources;
 use App\Domain\Library\ListeningModes;
@@ -25,7 +26,9 @@ use App\Domain\Library\PlaylistMode;
 use App\Domain\Library\RandomAlbum;
 use App\Domain\Library\RecentItems;
 use App\Domain\Library\SmartPlaylist\SmartPlaylistDescriber;
+use App\Domain\Library\SoundFilter;
 use App\Domain\Library\SpotifyCatalog;
+use App\Domain\Stats\PlayTotals;
 use App\Http\Controllers\Controller;
 use App\Jobs\LookupSpotifyAvailability;
 use App\Models\Client;
@@ -136,7 +139,7 @@ class LibraryController extends Controller
         $request->validate([
             'cursor' => ['nullable', 'string', 'max:200'],
             'letter' => ['nullable', 'string', 'regex:/^[A-Za-z#]$/'],
-            'sort' => ['nullable', 'in:name,artist,year,added,plays'],
+            'sort' => ['nullable', 'in:name,artist,year,added,plays,plr,bpm,arousal'],
             // `missing` is not an album filter: missing albums have no album row (see GET /library/artists/{id}/discography).
             'availability' => ['nullable', 'in:owned,streamable'],
         ]);
@@ -153,6 +156,7 @@ class LibraryController extends Controller
             'year' => $query->orderByRaw('albums.released_at IS NULL')->orderByDesc('albums.released_at')->orderBy('albums.name'),
             'added' => $query->orderByDesc('albums.created_at')->orderByDesc('albums.id'),
             'plays' => $query->withCount('plays')->orderByDesc('plays_count')->orderByDesc('albums.created_at'),
+            'plr', 'bpm', 'arousal' => SoundFilter::orderAlbums($query, $sort),
             default => $query->orderByRaw(self::ALBUM_SORT_NAME)->orderBy('albums.name'),
         };
 
@@ -175,25 +179,45 @@ class LibraryController extends Controller
         ]);
     }
 
-    /** All tracks of the scope, paged: `sort` is name (default), artist ("The " ignored), added (newest first) or plays. */
+    /**
+     * All tracks of the scope, paged: `sort` is name (default), artist ("The " ignored), added (newest first), plays, or an
+     * analysis value (plr, bpm, arousal: highest first, unanalysed last). Sound filters (SoundFilter) keep analysed tracks that
+     * meet them; `include=analysis` adds a compact analysis block per row; `count_only=1` answers `{ total }` and nothing else.
+     */
     public function tracks(Request $request): JsonResponse
     {
         $request->validate([
             'cursor' => ['nullable', 'string', 'max:200'],
             'letter' => ['nullable', 'string', 'regex:/^[A-Za-z#]$/'],
-            'sort' => ['nullable', 'in:name,artist,added,plays'],
-        ]);
+            'sort' => ['nullable', 'in:name,artist,added,plays,plr,bpm,arousal'],
+            'include' => ['nullable', 'in:analysis'],
+            'count_only' => ['nullable', 'boolean'],
+        ] + SoundFilter::rules());
         $hidden = $this->hiddenSources($request);
         $offset = $this->decodeCursor($request->query('cursor'));
         $sort = $request->query('sort', 'name');
+        $criteria = SoundFilter::criteria($request->query());
 
-        $query = LibrarySources::tracks(Track::query(), $hidden)->with(['artist', 'album']);
+        $query = LibrarySources::tracks(Track::query(), $hidden);
+        if ($criteria !== []) {
+            SoundFilter::apply($query, $criteria);
+        }
+
+        if ($request->boolean('count_only')) {
+            return response()->json(['total' => $query->count()]);
+        }
+
+        $query->with(['artist', 'album']);
+        if ($request->query('include') === 'analysis') {
+            $query->with('analysis');
+        }
 
         match ($sort) {
             'artist' => $query->leftJoin('artists', 'artists.id', '=', 'tracks.artist_id')
                 ->orderByRaw(self::ARTIST_SORT_NAME)->orderBy('tracks.name')->select('tracks.*'),
             'added' => $query->orderByDesc('tracks.created_at'),
             'plays' => $query->withCount('plays')->orderByDesc('plays_count')->orderByDesc('tracks.created_at'),
+            'plr', 'bpm', 'arousal' => SoundFilter::orderTracks($query, $sort),
             default => $query->orderByRaw(self::TRACK_SORT_NAME),
         };
 
@@ -204,11 +228,20 @@ class LibraryController extends Controller
         $tracks = $query->orderBy('tracks.id')->offset($offset)->limit(self::TRACKS_PAGE_SIZE + 1)->get();
         $page = $tracks->take(self::TRACKS_PAGE_SIZE);
         $this->preloadArtwork(albums: $page->map->album->filter());
+        $withAnalysis = $request->query('include') === 'analysis';
 
         return response()->json([
-            'data' => $page->map(fn (Track $track) => $this->searchTrack($track))->values(),
+            'data' => $page->map(fn (Track $track) => $this->searchTrack($track) + ($withAnalysis ? ['analysis' => $this->compactAnalysis($track)] : []))->values(),
             'next_cursor' => $tracks->count() > self::TRACKS_PAGE_SIZE ? $this->encodeCursor($offset + self::TRACKS_PAGE_SIZE) : null,
         ]);
+    }
+
+    /** The few analysis values a list row carries (`include=analysis`), raw; null for a track without an analysed file. */
+    private function compactAnalysis(Track $track): ?array
+    {
+        $sound = $track->sound();
+
+        return $sound === null ? null : array_combine($keys = ['bpm', 'camelot', 'arousal', 'valence', 'danceability', 'instrumental', 'plr', 'loudness'], array_map(fn ($k) => $sound[$k], $keys));
     }
 
     /**
@@ -300,6 +333,7 @@ class LibraryController extends Controller
             'name' => $artist->name,
             'favorite' => $artist->favorited_at !== null,
             'genres' => $artist->genres(),
+            ...PlayTotals::forArtist($artist->id),
             'details' => $artist->details() + [
                 'fanart' => LibraryItemArtwork::fanart($artist->fanartUrl()),
                 'gallery' => array_values(array_filter(array_map(LibraryItemArtwork::fanart(...), $artist->galleryUrls()))),
@@ -475,12 +509,15 @@ class LibraryController extends Controller
         $tracks = LibraryPlayback::albumTracks($album, $hidden);
         // The playback keys plus what the track details read, so neither costs a query per track.
         $tracks->load(['genreRelation', 'analysis', 'metadata' => fn ($q) => $q->whereIn('key', array_unique([...LibraryPlayback::PLAYBACK_METADATA, ...Track::DISPLAY_METADATA]))]);
+        $trackPlays = PlayTotals::forTracks($tracks->pluck('id'));
         $items = $tracks->map(fn (Track $track) => [
             'id' => $track->id,
             'name' => $track->name,
             'duration' => $track->duration,
             'playable' => LibraryPlayback::trackPlayable($track, $device),
             'favorite' => $track->favorited_at !== null,
+            'plays' => $trackPlays[$track->id]['plays'],
+            'last_played_at' => $trackPlays[$track->id]['last_played_at'],
             'details' => $track->details(),
         ])->values();
 
@@ -495,6 +532,7 @@ class LibraryController extends Controller
             'genres' => $album->genres(),
             'details' => $album->details(),
             'sources' => LibrarySources::ofTracks($tracks),
+        ] + PlayTotals::forAlbum($album->id) + [
             'playable' => $items->contains('playable', true),
             'tracks' => $items,
         ]);
@@ -511,6 +549,12 @@ class LibraryController extends Controller
             ->header('Cache-Control', 'public, max-age=3600');
     }
 
+    /** The library at a glance as data: totals, decades, coverage, sound buckets, formats, analysis progress (docs/api/overview.md). */
+    public function overview(Request $request): JsonResponse
+    {
+        return response()->json(LibraryOverview::forApi($this->hiddenSources($request)));
+    }
+
     /** How many findings each library health report has; the findings themselves are on the web page. */
     public function health(): JsonResponse
     {
@@ -521,6 +565,32 @@ class LibraryController extends Controller
             array_keys(LibraryReports::definitions()),
             LibraryReports::definitions(),
         ))]);
+    }
+
+    /** The findings of one library health report (docs/api/library-health.md). */
+    public function healthReport(Request $request, string $report): JsonResponse
+    {
+        abort_unless(LibraryReports::exists($report), 404, 'Unknown report.');
+        $request->validate([
+            'cursor' => ['nullable', 'string', 'max:200'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:200'],
+            'client' => ['nullable', 'string', 'max:100'],
+        ]);
+        $limit = $request->integer('limit', 100);
+        $offset = $this->decodeCursor($request->query('cursor'));
+        $definition = LibraryReports::definitions()[$report];
+
+        // One more than asked tells whether there is a next page. The physical collection is closed to client tokens.
+        $found = LibraryReports::findings($report, $limit + 1, $offset, !$request->filled('client'));
+
+        return response()->json([
+            'key' => $report,
+            'title' => $definition['title'],
+            'description' => $definition['description'],
+            'count' => LibraryReports::counts()[$report] ?? 0,
+            'data' => array_slice($found, 0, $limit),
+            'next_cursor' => count($found) > $limit ? $this->encodeCursor($offset + $limit) : null,
+        ]);
     }
 
     /** The listening modes (focus, party, …) the library has enough analysed tracks for; see docs/architecture/listening-modes.md. */
@@ -1021,15 +1091,7 @@ class LibraryController extends Controller
     /** @return array<string, mixed> */
     private function searchTrack(Track $track): array
     {
-        return [
-            'id' => $track->id,
-            'name' => $track->name,
-            'artist_name' => $track->artist?->name,
-            'album_id' => $track->album_id,
-            'album_name' => $track->album?->name,
-            'duration' => $track->duration,
-            'artwork' => LibraryItemArtwork::forImages($track->album?->images),
-        ];
+        return \App\Domain\Library\ApiItems::track($track);
     }
 
     public function favoriteAlbum(Request $request, Album $album): JsonResponse
@@ -1110,13 +1172,7 @@ class LibraryController extends Controller
 
     private function artistItem(Artist $artist): array
     {
-        return [
-            'id' => $artist->id,
-            'name' => $artist->name,
-            'album_count' => (int) $artist->albums_count,
-            'artwork' => LibraryItemArtwork::forUrl($artist->avatarUrl()),
-            'favorite' => $artist->favorited_at !== null,
-        ];
+        return \App\Domain\Library\ApiItems::artist($artist);
     }
 
     /** @param array<int, array{url: string, sources: array}> $artwork PlaylistArtwork::choose() */
@@ -1157,14 +1213,7 @@ class LibraryController extends Controller
 
     private function albumItem(Album $album): array
     {
-        return [
-            'id' => $album->id,
-            'name' => $album->name,
-            'artist_name' => $album->artist?->name,
-            'year' => $album->released_at?->year,
-            'artwork' => LibraryItemArtwork::forImages($album->images),
-            'favorite' => $album->favorited_at !== null,
-        ];
+        return \App\Domain\Library\ApiItems::album($album);
     }
 
     /**

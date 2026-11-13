@@ -24,6 +24,10 @@
                     {{ $clientCount }} {{ $clientCount === 1 ? 'client' : 'clients' }}
                 @endif
             </x-settings-row>
+            <x-settings-row href="{{ route('settings.tags') }}" icon="fa-solid fa-tags"
+                             label="Tags">
+                NFC tags and QR codes that play something
+            </x-settings-row>
         </x-settings-group>
 
         @if(\App\Domain\Profile\Profile::allows('file_storage'))

@@ -15,6 +15,7 @@ use App\Events\Device\QueueUpdated;
 use App\Events\Device\VolumeUpdated;
 use App\Listeners\Device\ClosePlaybackHistory;
 use App\Listeners\Device\DispatchArtworkProcessing;
+use App\Listeners\Device\EnforceVolumeLimit;
 use App\Listeners\Device\HoldOwnModesWhileSpotifyRouted;
 use App\Listeners\Device\PublishBatteryToMqtt;
 use App\Listeners\Device\PublishModesToMqtt;
@@ -93,6 +94,8 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(ProgressUpdated::class, SyncGroupMirror::class);
         Event::listen(NowPlayingEnded::class, UpdateDeviceCache::class);
         Event::listen(NowPlayingEnded::class, [ClosePlaybackHistory::class, 'handle']);
+        // First: a device above its volume limit is set back (VolumeLimits); the report itself still goes on.
+        Event::listen(VolumeUpdated::class, EnforceVolumeLimit::class);
         Event::listen(VolumeUpdated::class, UpdateDeviceCache::class);
         Event::listen(VolumeUpdated::class, PublishVolumeToMqtt::class);
         Event::listen(BatteryUpdated::class, UpdateDeviceCache::class);

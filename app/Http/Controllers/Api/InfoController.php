@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Analysis\AudioAnalysis;
 use App\Domain\Analysis\DeepAnalysis;
 use App\Domain\Analysis\Tools;
 use App\Domain\Artwork\NowPlayingArtwork;
@@ -52,6 +53,8 @@ class InfoController extends Controller
                 // A deep-analysis service answers its health check (cached for a minute): sections or stems of a track on request;
                 // deep_analysis_kinds says which.
                 'deep_analysis' => $deepKinds !== [],
+                // Audio analysis of the own files is enabled and the profile allows it: the Sound data (TrackAnalysis, waveform) can exist.
+                'analysis' => AudioAnalysis::enabled() && Profile::allows('analysis'),
             ]
             + ($deepKinds !== [] ? ['deep_analysis_kinds' => $deepKinds] : [])
             // Export from the library as zip (docs/api/export.md): the profile has the library and own files, and ffmpeg can transcode.

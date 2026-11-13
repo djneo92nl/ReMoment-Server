@@ -2,6 +2,8 @@
 
 namespace App\Domain\Library;
 
+use App\Domain\Analysis\AnalysisProgress;
+use App\Domain\Profile\Profile;
 use App\Models\FileAnalysis;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
@@ -111,6 +113,67 @@ final class LibraryOverview
                 'coverage' => $coverage,
             ];
         });
+    }
+
+    /**
+     * The overview as data (GET /api/library/overview): glance, sound buckets, own-file formats and, when the profile has
+     * analysis, how far each analysis stage is. Counts come from the same cached numbers as the web Library page.
+     */
+    public static function forApi(array $hidden): array
+    {
+        $glance = self::glance($hidden);
+        $sound = self::soundBuckets($hidden);
+        $coverageKeys = ['Albums with a cover' => 'covers', 'Artists with genres' => 'genres', 'Albums with release details' => 'release_details', 'Own files analysed' => 'analysed'];
+
+        return [
+            'totals' => ['artists' => $glance['artists'], 'albums' => $glance['albums'], 'tracks' => $glance['tracks'], 'hours' => $glance['hours']],
+            'decades' => collect($glance['decades'])->map(fn ($albums, $decade) => ['decade' => (int) $decade, 'albums' => $albums])->values()->all(),
+            'coverage' => array_map(fn ($row) => ['key' => $coverageKeys[$row['label']] ?? null] + $row, $glance['coverage']),
+            'sound' => [
+                'moods' => collect($sound['moods'])->map(fn ($albums, $name) => ['name' => (string) $name, 'albums' => $albums])->values()->all(),
+                'tempos' => collect(self::TEMPOS)->map(fn ($range, $key) => ['key' => $key, 'from' => $range[0], 'to' => $key === 'fast' ? null : $range[1], 'albums' => $sound['tempos'][$key] ?? 0])->values()->all(),
+            ],
+            'formats' => self::formats($hidden),
+            'analysis' => Profile::allows('analysis') ? self::analysisCoverage() : null,
+        ];
+    }
+
+    /**
+     * The own files of the scope's tracks by codec, bit depth and sample rate (most tracks first, at most 20 rows).
+     *
+     * @return list<array{codec: string|null, bit_depth: int|null, sample_rate: int|null, tracks: int}>
+     */
+    public static function formats(array $hidden): array
+    {
+        return LibraryCache::remember('library:formats:'.self::key($hidden), function () use ($hidden) {
+            return LibrarySources::tracks(Track::query(), $hidden)
+                ->join('track_files', fn ($join) => $join->on('track_files.track_id', '=', 'tracks.id')->where('track_files.is_primary', true)->where('track_files.role', TrackFile::ORIGINAL))
+                ->join('files', 'files.id', '=', 'track_files.file_id')
+                ->selectRaw('COALESCE(files.codec, files.extension) as codec, files.bit_depth, files.sample_rate, COUNT(DISTINCT tracks.id) as tracks')
+                ->groupBy('codec', 'files.bit_depth', 'files.sample_rate')
+                ->orderByDesc('tracks')->orderBy('codec')
+                ->limit(20)->get()
+                ->map(fn ($r) => ['codec' => $r->codec, 'bit_depth' => $r->bit_depth !== null ? (int) $r->bit_depth : null, 'sample_rate' => $r->sample_rate !== null ? (int) $r->sample_rate : null, 'tracks' => (int) $r->tracks])
+                ->all();
+        });
+    }
+
+    /** @return array{enabled: bool, files: int, complete: int, with_problems: int, backlog: int, stages: list<array>} */
+    private static function analysisCoverage(): array
+    {
+        $p = AnalysisProgress::get();
+
+        return [
+            'enabled' => $p['enabled'],
+            'files' => $p['files'],
+            'complete' => $p['complete'],
+            'with_problems' => $p['with_problems'],
+            'backlog' => $p['backlog'],
+            'stages' => array_values(array_map(fn ($st) => [
+                'key' => $st['key'], 'enabled' => $st['enabled'], 'reason' => $st['reason'],
+                'done' => $st['done'], 'pending' => $st['pending'], 'failed' => $st['failed'], 'gave_up' => $st['gave_up'], 'total' => $p['files'],
+            ], $p['stages'])),
+        ];
     }
 
     /**

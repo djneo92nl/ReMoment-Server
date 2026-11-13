@@ -36,8 +36,17 @@ class InfoApiTest extends TestCase
                 'ws_port' => 9001,
                 'ws_url' => 'ws://192.168.1.50:9001',
             ],
-            'features' => ['alerts' => true, 'profile' => 'full', 'deep_analysis' => false] + $this->exportFeature(),
+            'features' => ['alerts' => true, 'profile' => 'full', 'deep_analysis' => false, 'analysis' => false] + $this->exportFeature(),
         ], Arr::except($response->json(), 'placeholder'));
+    }
+
+    public function test_analysis_feature_needs_the_setting_and_the_profile(): void
+    {
+        config(['analysis.enabled' => true]);
+        $this->getJson('/api/info')->assertJsonPath('features.analysis', true);
+
+        config(['analysis.enabled' => false]);
+        $this->getJson('/api/info')->assertJsonPath('features.analysis', false);
     }
 
     public function test_deep_analysis_feature_follows_the_structure_service_health(): void
@@ -48,7 +57,7 @@ class InfoApiTest extends TestCase
         Http::fake(['structure:8091/health' => function () use (&$healthy) {
             return $healthy ? Http::response(['ok' => true, 'version' => 1, 'method' => 'novelty-v1']) : Http::response('', 503);
         }]);
-        $this->getJson('/api/info')->assertJsonPath('features', ['alerts' => true, 'profile' => 'full', 'deep_analysis' => true, 'deep_analysis_kinds' => ['sections']] + $this->exportFeature());
+        $this->getJson('/api/info')->assertJsonPath('features', ['alerts' => true, 'profile' => 'full', 'deep_analysis' => true, 'analysis' => false, 'deep_analysis_kinds' => ['sections']] + $this->exportFeature());
 
         Cache::flush();
         $healthy = false;

@@ -7,6 +7,7 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Reports on the health of the own files: what the audio analysis found wrong (suspected transcodes, clipping,
@@ -89,6 +90,109 @@ final class LibraryReports
             ]),
             default => self::trackRows($key, $limit),
         };
+    }
+
+    /**
+     * The findings of one report as data for clients (GET /api/library/health/{report}): ids, a one-line reason in the
+     * server's own wording, the file where there is one and, for albums, the physical-collection items that match.
+     * Newest-stable order: the report's own order, then the file id; paged by offset.
+     *
+     * @return list<array{report: string, kind: string, title: string, reason: string, track_id: int|null, album_id: int|null, artist_id: int|null, file: array|null, copies: list<array>|null, physical: list<array>|null}>
+     */
+    public static function findings(string $key, int $limit = 100, int $offset = 0, bool $withPhysical = true): array
+    {
+        $findings = match ($key) {
+            'duplicates' => self::duplicateFindings($limit, $offset),
+            'incomplete' => self::incomplete()->orderByRaw('(have - total) asc')->orderBy('albums.id')->offset($offset)->limit($limit)->get()->map(fn ($r) => self::finding($key, 'album', "{$r->artist} · {$r->album}", "{$r->have} of {$r->total} tracks", albumId: (int) $r->album_id))->all(),
+            'unlinked', 'missing' => self::query($key)->orderBy('files.path')->orderBy('files.id')->offset($offset)->limit($limit)
+                ->get(['files.path', 'files.size', 'files.extension'])->map(fn ($r) => self::finding($key, 'file', $r->path, self::size((int) $r->size), file: ['path' => $r->path, 'extension' => $r->extension, 'size' => (int) $r->size]))->all(),
+            default => self::trackFindings($key, $limit, $offset),
+        };
+
+        $physical = $withPhysical ? self::physicalByAlbum(array_filter(array_column($findings, 'album_id'))) : [];
+
+        return array_map(fn ($f) => ['physical' => $withPhysical && $f['album_id'] ? ($physical[$f['album_id']] ?? []) : null] + $f, $findings);
+    }
+
+    private static function finding(string $report, string $kind, string $title, string $reason, ?int $trackId = null, ?int $albumId = null, ?int $artistId = null, ?array $file = null, ?array $copies = null): array
+    {
+        return [
+            'report' => $report, 'kind' => $kind, 'title' => $title, 'reason' => $reason,
+            'track_id' => $trackId, 'album_id' => $albumId, 'artist_id' => $artistId, 'file' => $file, 'copies' => $copies,
+        ];
+    }
+
+    /** @return list<array> */
+    private static function trackFindings(string $key, int $limit, int $offset): array
+    {
+        $rows = self::query($key)->orderBy('files.id')->offset($offset)->limit($limit)->get([
+            'tracks.id as track_id', 'tracks.name as track', 'tracks.album_id', 'tracks.artist_id', 'artists.name as artist', 'files.path', 'files.extension', 'files.sample_rate', 'files.bitrate', 'files.size',
+            'file_analyses.spectral_cutoff_hz as cutoff', 'file_analyses.lossless_suspect as suspect', 'file_analyses.clipped_samples as clipped',
+            'file_analyses.decode_warnings as warnings',
+        ]);
+
+        return $rows->map(fn ($r) => self::finding(
+            $key, 'track',
+            trim(($r->artist ? $r->artist.' · ' : '').$r->track),
+            match ($key) {
+                'transcodes' => sprintf('%s, spectrum ends at %s kHz (%d%% sure)', strtoupper((string) $r->extension), number_format($r->cutoff / 1000, 1), round($r->suspect * 100)),
+                'damaged' => (string) (json_decode((string) $r->warnings, true)[0] ?? 'decoder warnings'),
+                'clipping' => number_format((int) $r->clipped).' peaks at the ceiling',
+                default => self::format($r),
+            },
+            (int) $r->track_id, $r->album_id ? (int) $r->album_id : null, $r->artist_id ? (int) $r->artist_id : null,
+            ['path' => $r->path, 'extension' => $r->extension, 'size' => (int) $r->size],
+        ))->all();
+    }
+
+    /** @return list<array> */
+    private static function duplicateFindings(int $limit, int $offset): array
+    {
+        $groups = self::duplicateGroups()->orderByDesc('copies')->orderBy('recording')->offset($offset)->limit($limit)->get();
+
+        return $groups->map(function ($group) {
+            $files = self::files()
+                ->join('file_analyses', 'file_analyses.file_id', '=', 'files.id')
+                ->leftJoin('track_files', fn ($j) => $j->on('track_files.file_id', '=', 'files.id')->where('track_files.is_primary', true))
+                ->leftJoin('tracks', 'tracks.id', '=', 'track_files.track_id')
+                ->leftJoin('artists', 'artists.id', '=', 'tracks.artist_id')
+                ->where('file_analyses.acoustid_recording_mbid', $group->recording)
+                ->get(['files.id as file_id', 'files.path', 'files.extension', 'files.bitrate', 'files.bit_depth', 'files.size', 'file_analyses.spectral_cutoff_hz as cutoff', 'tracks.id as track_id', 'tracks.name as track', 'tracks.album_id', 'tracks.artist_id', 'artists.name as artist']);
+
+            // Best first: lossless, then the higher bit depth and bitrate.
+            $files = $files->sortByDesc(fn ($f) => [in_array(strtolower((string) $f->extension), self::LOSSLESS, true), (int) $f->bit_depth, (int) $f->bitrate, (int) $f->cutoff])->values();
+            $first = $files->first();
+
+            return self::finding(
+                'duplicates', 'group',
+                trim(($first->artist ? $first->artist.' · ' : '').($first->track ?? basename($first->path))),
+                $files->count().' copies of the same recording; best first',
+                $first->track_id ? (int) $first->track_id : null, $first->album_id ? (int) $first->album_id : null, $first->artist_id ? (int) $first->artist_id : null,
+                ['path' => $first->path, 'extension' => $first->extension, 'size' => (int) $first->size],
+                $files->map(fn ($f) => [
+                    'path' => $f->path, 'extension' => $f->extension, 'size' => (int) $f->size, 'track_id' => $f->track_id ? (int) $f->track_id : null,
+                    'description' => self::format($f) ?: 'unknown',
+                ])->all(),
+            );
+        })->all();
+    }
+
+    /**
+     * The physical-collection items (CD, vinyl, tape) tied to these albums, by album id.
+     *
+     * @param  array<int, int>  $albumIds
+     * @return array<int, list<array{id: int, medium: string, ripped: bool, location: string|null}>>
+     */
+    private static function physicalByAlbum(array $albumIds): array
+    {
+        if ($albumIds === [] || !Schema::hasTable('physical_items')) {
+            return [];
+        }
+
+        return DB::table('physical_items')->whereIn('album_id', array_unique($albumIds))->orderBy('id')->get(['id', 'album_id', 'medium', 'ripped_at', 'location'])
+            ->groupBy('album_id')
+            ->map(fn ($items) => $items->map(fn ($i) => ['id' => (int) $i->id, 'medium' => $i->medium, 'ripped' => $i->ripped_at !== null, 'location' => $i->location])->values()->all())
+            ->all();
     }
 
     /** Present, non-hidden files. */

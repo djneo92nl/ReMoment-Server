@@ -227,8 +227,24 @@ class LibraryPlayback
         return $this->playTracks($device, self::artistTracks($artist), null, $shuffle, null, $source);
     }
 
-    public function playTrack(Device $device, Track $track): PlaybackResult
+    /**
+     * Plays one track. By default the rest of its album is queued behind it (from this track onwards, in album
+     * order); $withAlbum = false plays the track alone (the quality test needs exactly one).
+     */
+    public function playTrack(Device $device, Track $track, bool $withAlbum = true): PlaybackResult
     {
+        if ($withAlbum && $track->album_id && ($album = $track->album)) {
+            $albumTracks = self::albumTracks($album);
+
+            if ($albumTracks->count() > 1 && $albumTracks->contains('id', $track->id)) {
+                try {
+                    return $this->playTracks($device, $albumTracks, $track, album: $album);
+                } catch (NotPlayableException) {
+                    // The album can't be queued here: fall back to the track alone.
+                }
+            }
+        }
+
         if (self::canPlayDlna($device) && $track->getDlnaUrl()) {
             $this->onDriver(fn () => $device->driver->playLibraryTrack($track));
 

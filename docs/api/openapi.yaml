@@ -44,6 +44,7 @@ tags:
   - name: Library playback
   - name: Clients
   - name: Players
+  - name: Tags
   - name: Admin
 
 paths:
@@ -146,6 +147,18 @@ paths:
               schema: { $ref: "#/components/schemas/Volume" }
         "422": { $ref: "#/components/responses/DeviceError" }
         "503": { $ref: "#/components/responses/DeviceError" }
+  /devices/{device}/volume-limits:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    get:
+      tags: [Playback]
+      summary: The device's volume limits (a maximum, and a lower one during quiet hours)
+      operationId: getVolumeLimits
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VolumeLimits" }
   /devices/{device}/mute:
     parameters: [{ $ref: "#/components/parameters/device" }]
     get:
@@ -1281,7 +1294,7 @@ paths:
                 title: { type: string }
                 album: { type: string, nullable: true }
                 image_url: { type: string, nullable: true }
-                source: { type: string, enum: [history, radio, manual] }
+                source: { type: string, enum: [history, radio, manual, streaming] }
       responses:
         "200":
           description: Already wished
@@ -1584,7 +1597,7 @@ paths:
         - { $ref: "#/components/parameters/cursor" }
         - name: sort
           in: query
-          schema: { type: string, enum: [name, artist, year, added, plays], default: name }
+          schema: { type: string, enum: [name, artist, year, added, plays, plr, bpm, arousal], default: name, description: "`plr`, `bpm` and `arousal` order by the mean over the album's analysed tracks, highest first, albums without analysis last" }
         - name: letter
           in: query
           description: "Start at the first album whose sort key (album name with `name`, artist name with `artist`, \"The \" ignored for artists only) is at or after this letter (`#` = the start). Ignored with `year`, `added`, `plays` and with a cursor."
@@ -1608,11 +1621,28 @@ paths:
       tags: [Library]
       summary: All tracks of the scope, 50 per page
       operationId: listTracks
+      description: "Sound filters keep tracks whose own audio file is analysed and meets every criterion given (Full profile has the data; elsewhere nothing matches). A track without analysis, or without the value a filter tests, never matches. Values are raw, never normalised (arousal and valence of a library may use only a narrow part of 0 to 1). `include=analysis` adds an `analysis` block per row (null for an unanalysed track); `count_only=1` answers `{ total }` for the same filters, for a slider. `sort=plr|bpm|arousal` is highest first, unanalysed last. See docs/api/sound-query.md."
       parameters:
         - { $ref: "#/components/parameters/cursor" }
         - name: sort
           in: query
-          schema: { type: string, enum: [name, artist, added, plays], default: name }
+          schema: { type: string, enum: [name, artist, added, plays, plr, bpm, arousal], default: name }
+        - { name: include, in: query, schema: { type: string, enum: [analysis] }, description: "Adds `analysis` (TrackSoundSummary or null) to every row" }
+        - { name: count_only, in: query, schema: { type: boolean }, description: "Answer `{ total }` (tracks matching the scope and filters) instead of a page" }
+        - { name: bpm_min, in: query, schema: { type: number } }
+        - { name: bpm_max, in: query, schema: { type: number } }
+        - { name: camelot, in: query, schema: { type: string, example: "8A,9A" }, description: "Comma list of Camelot codes, any of them" }
+        - { name: arousal_min, in: query, schema: { type: number, minimum: 0, maximum: 1 } }
+        - { name: arousal_max, in: query, schema: { type: number, minimum: 0, maximum: 1 } }
+        - { name: valence_min, in: query, schema: { type: number, minimum: 0, maximum: 1 } }
+        - { name: valence_max, in: query, schema: { type: number, minimum: 0, maximum: 1 } }
+        - { name: danceability_min, in: query, schema: { type: number, minimum: 0, maximum: 1 } }
+        - { name: instrumental_min, in: query, schema: { type: number, minimum: 0, maximum: 1 } }
+        - { name: plr_min, in: query, schema: { type: number }, description: "Peak-to-loudness ratio in dB, at least" }
+        - { name: mood, in: query, schema: { type: string, example: "relaxed,happy" }, description: "Comma list of happy, sad, aggressive, relaxed, party, acoustic, electronic; any of them" }
+        - { name: lossless_suspect_max, in: query, schema: { type: number, minimum: 0, maximum: 1 }, description: "At most this suspicion of a transcode (lossy files have no value and never match)" }
+        - { name: measured_bit_depth_min, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: clipping, in: query, schema: { type: integer, enum: [0, 1] }, description: "1 = clipping suspected, 0 = not" }
         - name: letter
           in: query
           description: "Start at the first track whose sort key (track name with `name`, artist name with `artist`) is at or after this letter (`#` = the start). Ignored with `added`, `plays` and with a cursor."
@@ -1627,10 +1657,30 @@ paths:
               schema:
                 type: object
                 properties:
+                  total: { type: integer, description: "Only with count_only=1: the answer is `{ total }` and nothing else" }
                   data:
                     type: array
-                    items: { $ref: "#/components/schemas/SearchTrack" }
+                    items:
+                      allOf:
+                        - { $ref: "#/components/schemas/SearchTrack" }
+                        - type: object
+                          properties:
+                            analysis:
+                              allOf: [{ $ref: "#/components/schemas/TrackSoundSummary" }]
+                              nullable: true
+                              description: "Only with include=analysis; null for a track without an analysed file"
                   next_cursor: { type: string, nullable: true }
+  /library/tracks/{track}/waveform:
+    parameters:
+      - { name: track, in: path, required: true, schema: { type: integer }, description: "Library track id (a merged id resolves to the survivor)" }
+    get:
+      tags: [Library]
+      summary: The waveform of a track's own audio file
+      operationId: getTrackWaveform
+      description: "404 until the file is analysed (`features.analysis`). Cacheable for an hour."
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/TrackWaveform" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
   /library/tracks/{track}/mixes-with:
     parameters:
       - name: track
@@ -2017,12 +2067,142 @@ paths:
                   added: { type: integer }
                   track_count: { type: integer }
         "422": { description: "Validation error, `unsupported` for a smart or Spotify playlist, or `source_mismatch` when the tracks come from another library than the playlist holds (or from several)" }
+  /library/history:
+    get:
+      tags: [Library]
+      summary: What was played, newest first, on every device
+      operationId: listPlayHistory
+      description: "The server's own play log, household-wide (no per-person history). Cursor-paged on (started_at, id), 50 per page. Plays of a library track outside `scope` are left out; radio, source and unmatched text-only plays always stay. Works in every profile. See docs/api/history.md."
+      parameters:
+        - { $ref: "#/components/parameters/cursor" }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - { name: from, in: query, schema: { type: string, format: date }, description: "First day (Y-m-d, server timezone)" }
+        - { name: to, in: query, schema: { type: string, format: date }, description: "Last day, inclusive" }
+        - { name: q, in: query, schema: { type: string, maxLength: 100 }, description: "Matches title, artist, album, station or source name" }
+        - { name: device_id, in: query, schema: { type: integer }, description: "Only plays on this device" }
+        - { $ref: "#/components/parameters/client" }
+        - { $ref: "#/components/parameters/scope" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PlayHistoryPage" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "Invalid cursor or filter", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /devices/{device}/history:
+    parameters:
+      - { $ref: "#/components/parameters/device" }
+    get:
+      tags: [Devices]
+      summary: What was played on one device, newest first
+      operationId: listDevicePlayHistory
+      description: "Same entries and filters as GET /library/history, for one device."
+      parameters:
+        - { $ref: "#/components/parameters/cursor" }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - { name: from, in: query, schema: { type: string, format: date }, description: "First day (Y-m-d, server timezone)" }
+        - { name: to, in: query, schema: { type: string, format: date }, description: "Last day, inclusive" }
+        - { name: q, in: query, schema: { type: string, maxLength: 100 }, description: "Matches title, artist, album, station or source name" }
+        - { $ref: "#/components/parameters/client" }
+        - { $ref: "#/components/parameters/scope" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PlayHistoryPage" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "Invalid cursor or filter", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /library/albums/{album}/plays:
+    parameters:
+      - { name: album, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Library]
+      summary: Recent plays of an album's tracks, newest first
+      operationId: listAlbumPlays
+      description: "Every play of the album's tracks (no scope trimming). A merged id resolves to the survivor."
+      parameters:
+        - { $ref: "#/components/parameters/cursor" }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - { name: from, in: query, schema: { type: string, format: date }, description: "First day (Y-m-d, server timezone)" }
+        - { name: to, in: query, schema: { type: string, format: date }, description: "Last day, inclusive" }
+        - { name: q, in: query, schema: { type: string, maxLength: 100 }, description: "Matches title, artist, album, station or source name" }
+        - { name: device_id, in: query, schema: { type: integer }, description: "Only plays on this device" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PlayHistoryPage" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "Invalid cursor or filter", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /library/artists/{artist}/plays:
+    parameters:
+      - { name: artist, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Library]
+      summary: Recent plays of an artist's tracks, newest first
+      operationId: listArtistPlays
+      description: "Every play of the artist's tracks (no scope trimming). A merged id resolves to the survivor."
+      parameters:
+        - { $ref: "#/components/parameters/cursor" }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - { name: from, in: query, schema: { type: string, format: date }, description: "First day (Y-m-d, server timezone)" }
+        - { name: to, in: query, schema: { type: string, format: date }, description: "Last day, inclusive" }
+        - { name: q, in: query, schema: { type: string, maxLength: 100 }, description: "Matches title, artist, album, station or source name" }
+        - { name: device_id, in: query, schema: { type: integer }, description: "Only plays on this device" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PlayHistoryPage" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "Invalid cursor or filter", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /library/health/{report}:
+    parameters:
+      - { name: report, in: path, required: true, schema: { type: string, enum: [transcodes, damaged, clipping, duplicates, lossy, incomplete, unlinked, missing] } }
+    get:
+      tags: [Library]
+      summary: The findings of one library health report
+      operationId: getLibraryHealthReport
+      description: "Full profile only. Each finding names the track, album and artist (where there is one), a one-line `reason` in the server's own wording ('suspected', cutoff in kHz) and, for albums with a physical-collection item, that item (medium, ripped, shelf): the re-rip list for CDs the household owns. The physical collection is closed to client tokens, so `physical` is null with `?client=`. Paged by `cursor`, 100 per page by default, in the report's own order. See docs/api/library-health.md."
+      parameters:
+        - { $ref: "#/components/parameters/cursor" }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 100 } }
+        - { $ref: "#/components/parameters/client" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key: { type: string }
+                  title: { type: string }
+                  description: { type: string }
+                  count: { type: integer, description: "All findings of the report (cached for ten minutes, like GET /library/health)" }
+                  data: { type: array, items: { $ref: "#/components/schemas/HealthFinding" } }
+                  next_cursor: { type: string, nullable: true }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /library/overview:
+    get:
+      tags: [Library]
+      summary: The library at a glance (totals, decades, coverage, sound buckets, formats) and how far audio analysis is
+      operationId: getLibraryOverview
+      description: "What the web Library page shows, as data. Cached for a few minutes per scope, so counts can lag a scan. `analysis` is null in profiles without analysis (Standard, Control: Control has no library at all and answers 422 not_available_in_profile). See docs/api/overview.md."
+      parameters:
+        - { $ref: "#/components/parameters/client" }
+        - { $ref: "#/components/parameters/scope" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/LibraryOverview" } } } }
+  /library/stats:
+    get:
+      tags: [Library]
+      summary: Listening statistics of the household (totals, by hour, weekday, day, source, device, top lists)
+      operationId: getListeningStats
+      description: "The JSON version of the web /stats page, read from the play log: per household and per device, never per person. Dates are in the server's timezone; the default range is the last 30 days including today, at most 731 days. Plays of a library track outside `scope` are left out; plays without a library track (radio, unmatched text-only plays) always count. 'Plays logged', not plays heard: see docs/api/stats.md for what skipped, seconds and a play mean."
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date }, description: "First day (Y-m-d), default 29 days before `to`" }
+        - { name: to, in: query, schema: { type: string, format: date }, description: "Last day (Y-m-d), inclusive, default today" }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 10 }, description: "Length of each top list" }
+        - { $ref: "#/components/parameters/client" }
+        - { $ref: "#/components/parameters/scope" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ListeningStats" } } } }
+        "422": { description: "Bad date, `to` before `from`, or a range over 731 days", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
   /library/health:
     get:
       tags: [Library]
       summary: How many findings each library health report has
       operationId: libraryHealth
-      description: Counts only, cached for ten minutes and zero until audio analysis has run. The findings are on the web page /settings/library-health.
+      description: Counts only, cached for ten minutes and zero until audio analysis has run. The findings of one report are at GET /library/health/{report}.
       responses:
         "200":
           description: OK
@@ -2369,16 +2549,16 @@ paths:
     post:
       tags: [Library playback]
       operationId: playListeningMode
-      description: Plays a random selection of up to 100 tracks that fit the mode and that the device can play. 422 `not_playable` when fewer than 5 qualify on this device, 422 `unsupported` when the device has no library playback.
+      description: "Plays a random selection of up to 100 tracks that fit the mode and that the device can play. Send a preset `mode`, or a custom `filter` (the sound filter of GET /library/tracks, at least one criterion; own analysed files only). 422 `not_playable` when fewer than 5 qualify on this device, 422 `unsupported` when the device has no library playback, a validation 422 for an unknown mode, a bad filter value, an empty filter, or neither. See docs/api/sound-query.md."
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [mode]
               properties:
                 mode: { type: string, description: A `key` from `GET /library/listening-modes`, example: sleep }
+                filter: { $ref: "#/components/schemas/SoundFilter" }
       responses:
         "200":
           description: OK
@@ -2388,7 +2568,7 @@ paths:
                 type: object
                 properties:
                   status: { type: string, example: ok }
-                  mode: { type: string }
+                  mode: { type: string, description: "Only when a preset `mode` was sent" }
                   queued: { type: integer }
         "422": { $ref: "#/components/responses/DeviceError" }
   /devices/{device}/library/play-playlist:
@@ -2483,6 +2663,63 @@ paths:
                   data: { $ref: "#/components/schemas/Alert" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /tags/{uid}:
+    parameters:
+      - { name: uid, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [Tags]
+      summary: What a tag plays
+      operationId: getTag
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/PlayTag" }
+        "404": { description: "unknown_tag: not assigned to anything" }
+  /tags/{uid}/play:
+    parameters:
+      - { name: uid, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Tags]
+      summary: Play a tag's target (a reader taps the tag)
+      description: |
+        On `device_id`, else the tag's own device, else the first device of the client `client` (its api_token).
+        The errors are those of the play endpoint behind the target (422 not_playable, not_available_in_profile,
+        unsupported; 502; 503). An unknown uid answers 404 `unknown_tag` and is kept for 10 minutes so the admin
+        can assign it. See docs/api/tags.md.
+      operationId: playTag
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                device_id: { type: integer }
+                client: { type: string, description: A client device's api_token }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  tag: { $ref: "#/components/schemas/PlayTag" }
+                  device:
+                    type: object
+                    properties:
+                      id: { type: integer }
+                      name: { type: string }
+        "404": { description: "unknown_tag" }
+        "422": { description: "no_device, not_playable, unsupported or not_available_in_profile" }
+        "502": { $ref: "#/components/responses/DeviceError" }
+        "503": { $ref: "#/components/responses/DeviceError" }
   /admin/login:
     post:
       tags: [Admin]
@@ -2558,6 +2795,125 @@ paths:
                 type: object
                 properties:
                   status: { type: string, example: ok }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+  /admin/tags:
+    get:
+      tags: [Admin]
+      summary: All tags
+      operationId: listTags
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/PlayTag" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+    post:
+      tags: [Admin]
+      summary: Add a tag
+      operationId: createTag
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - { $ref: "#/components/schemas/PlayTagInput" }
+                - { type: object, required: [target_type, target_id] }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/PlayTag" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { description: Validation error (also a uid that is in use) }
+  /admin/tags/last-scanned:
+    get:
+      tags: [Admin]
+      summary: The unknown tag that was tapped in the last 10 minutes
+      operationId: lastScannedTag
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    nullable: true
+                    properties:
+                      uid: { type: string }
+                      at: { type: string }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+  /admin/tags/{tag}:
+    parameters:
+      - { name: tag, in: path, required: true, schema: { type: integer } }
+    put:
+      tags: [Admin]
+      summary: Change a tag (not its uid)
+      operationId: updateTag
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PlayTagInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/PlayTag" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+    delete:
+      tags: [Admin]
+      summary: Remove a tag
+      operationId: deleteTag
+      security: [{ adminToken: [] }]
+      responses:
+        "200": { description: OK }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+  /admin/devices/{device}/volume-limits:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    put:
+      tags: [Admin]
+      summary: Set the device's volume limits (null clears one)
+      operationId: setVolumeLimits
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                max: { type: integer, minimum: 0, maximum: 100, nullable: true }
+                quiet_max: { type: integer, minimum: 0, maximum: 100, nullable: true }
+                quiet_from: { type: string, example: "22:00", nullable: true }
+                quiet_until: { type: string, example: "07:00", nullable: true }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VolumeLimits" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
   /admin/devices/{device}/sources/{source_id}:
     parameters:
@@ -2971,6 +3327,7 @@ components:
           properties:
             alerts: { type: boolean, description: "GET /api/alerts exists" }
             profile: { type: string, enum: [control, standard, full], description: "The profile this server runs. Control has no library, catalogue or analysis: those endpoints answer 422 not_available_in_profile (see docs/architecture/profiles.md)" }
+            analysis: { type: boolean, description: "Audio analysis of the own files is enabled (ANALYSIS_ENABLED) and the profile allows it (Full). False: Sound data (TrackAnalysis, waveform, listening modes) will not appear, so explain an empty Sound page instead of showing nothing. Always present." }
             deep_analysis: { type: boolean, description: "A deep-analysis service answers its health check (cached for a minute): POST /library/tracks/{id}/deep-analysis can queue something" }
             deep_analysis_kinds: { type: array, items: { $ref: "#/components/schemas/DeepAnalysisKind" }, description: "The kinds that can run now (sections: structure service; stems: stems service). Present only when not empty." }
             export: { type: boolean, description: "Export from the library as zip is available: the profile has the library and own files, and ffmpeg can transcode (POST /library/exports). Present only when true." }
@@ -3094,6 +3451,325 @@ components:
         message: { type: string, nullable: true, description: "Why the last run failed (shown while state is failed)" }
         stale: { type: boolean, description: "A stored result exists from an older stage version; state is then none until it is requested again" }
         available: { type: boolean, description: "This kind's service is configured and healthy right now" }
+    HealthFinding:
+      type: object
+      properties:
+        report: { type: string }
+        kind: { type: string, enum: [track, album, file, group], description: "`track`: one track's file; `album`: an incomplete album; `file`: a file without a track, or missing; `group`: duplicate recordings (see `copies`)" }
+        title: { type: string, description: "`Artist · Track`, `Artist · Album` or a file path" }
+        reason: { type: string, description: "One line, in the server's wording: `FLAC, spectrum ends at 16.5 kHz (95% sure)`, `3 of 12 tracks`. A transcode is only ever suspected." }
+        track_id: { type: integer, nullable: true }
+        album_id: { type: integer, nullable: true }
+        artist_id: { type: integer, nullable: true }
+        file:
+          type: object
+          nullable: true
+          properties:
+            path: { type: string }
+            extension: { type: string, nullable: true }
+            size: { type: integer, description: Bytes }
+        copies:
+          type: array
+          nullable: true
+          description: "Duplicates only: every copy, best first (lossless, then bit depth, bitrate, spectrum)"
+          items:
+            type: object
+            properties:
+              path: { type: string }
+              extension: { type: string, nullable: true }
+              size: { type: integer }
+              track_id: { type: integer, nullable: true }
+              description: { type: string, example: "MP3 · 192 kbps · spectrum ends at 19.0 kHz" }
+        physical:
+          type: array
+          nullable: true
+          description: "Physical-collection items tied to the finding's album (empty when none; null without an album or for a client token)"
+          items:
+            type: object
+            properties:
+              id: { type: integer, description: "Item id of /library/physical/{id}" }
+              medium: { type: string, enum: [cd, tape, vinyl, minidisc, other] }
+              ripped: { type: boolean }
+              location: { type: string, nullable: true, example: Shelf B2 }
+    LibraryOverview:
+      type: object
+      properties:
+        totals:
+          type: object
+          properties:
+            artists: { type: integer }
+            albums: { type: integer }
+            tracks: { type: integer }
+            hours: { type: number, description: "Total duration of the tracks, one decimal" }
+        decades:
+          type: array
+          description: "Albums per release decade, oldest first (albums with a release date from 1900 on)"
+          items:
+            type: object
+            properties:
+              decade: { type: integer, example: 1970 }
+              albums: { type: integer }
+        coverage:
+          type: array
+          description: "How complete the metadata is, as have of of. `analysed` is listed only when the library has own files; it counts files with a loudness measurement."
+          items:
+            type: object
+            properties:
+              key: { type: string, enum: [covers, genres, release_details, analysed] }
+              label: { type: string }
+              have: { type: integer }
+              of: { type: integer }
+        sound:
+          type: object
+          description: "Albums per mood and per tempo bucket, from analysed own files only (empty until analysis has run)"
+          properties:
+            moods:
+              type: array
+              description: "Most albums first"
+              items:
+                type: object
+                properties:
+                  name: { type: string }
+                  albums: { type: integer }
+            tempos:
+              type: array
+              description: "Always slow, steady, fast. An album counts in every bucket one of its analysed tracks falls in. BPM from inclusive, to exclusive (null: open end)."
+              items:
+                type: object
+                properties:
+                  key: { type: string, enum: [slow, steady, fast] }
+                  from: { type: integer }
+                  to: { type: integer, nullable: true }
+                  albums: { type: integer }
+        formats:
+          type: array
+          description: "Own files of the scope's tracks by codec (extension when the codec is unknown), bit depth and sample rate, most tracks first, at most 20 rows"
+          items:
+            type: object
+            properties:
+              codec: { type: string, nullable: true, example: flac }
+              bit_depth: { type: integer, nullable: true }
+              sample_rate: { type: integer, nullable: true }
+              tracks: { type: integer }
+        analysis:
+          type: object
+          nullable: true
+          description: "Null when the profile has no analysis. Counts are of own files that can be analysed (not DLNA, not Spotify) and are cached for a minute."
+          properties:
+            enabled: { type: boolean, description: "ANALYSIS_ENABLED; false explains a zero everywhere" }
+            files: { type: integer, description: "Own files that can be analysed" }
+            complete: { type: integer, description: "Files with every enabled stage done" }
+            with_problems: { type: integer, description: "Files with a failed or given-up stage" }
+            backlog: { type: integer, description: "Files with an enabled stage still to run" }
+            stages:
+              type: array
+              items:
+                type: object
+                properties:
+                  key: { type: string, enum: [loudness, waveform, quality, fingerprint, acoustid, essentia] }
+                  enabled: { type: boolean }
+                  reason: { type: string, nullable: true, description: "Why the stage cannot run (ffmpeg missing, analysis off …)" }
+                  done: { type: integer }
+                  pending: { type: integer, description: "Waiting to run (includes files changed since or a newer stage version)" }
+                  failed: { type: integer, description: "Failed, will be retried" }
+                  gave_up: { type: integer, description: "Failed too often, not retried" }
+                  total: { type: integer, description: "Equals analysis.files; done + pending + failed + gave_up = total" }
+    PlayHistoryEntry:
+      type: object
+      description: "One logged play. `track_id`, `album_id` and `artist_id` are null for a play that matches no library track (radio, a stream, a track logged as text)."
+      properties:
+        id: { type: integer }
+        type: { type: string, enum: [track, radio, source], description: "`radio` for a station, `source` for line-in, TV and the like (name is the source)" }
+        name: { type: string, nullable: true, description: "Track title, station name or source name" }
+        artist_name: { type: string, nullable: true }
+        album_name: { type: string, nullable: true }
+        track_id: { type: integer, nullable: true }
+        album_id: { type: integer, nullable: true }
+        artist_id: { type: integer, nullable: true }
+        station:
+          type: object
+          nullable: true
+          properties:
+            id: { type: integer }
+            name: { type: string }
+        device:
+          type: object
+          nullable: true
+          description: "Null when the device was removed (the plays are kept)"
+          properties:
+            id: { type: integer }
+            name: { type: string }
+        library: { type: string, nullable: true, enum: [files, dlna, spotify, null], description: "The library the track is available from (own files before DLNA); null without a library track" }
+        source_type: { type: string, nullable: true, example: dlna, description: "How it played (radio, dlna, spotify, line-in …) as logged" }
+        artwork: { $ref: "#/components/schemas/LibraryArtwork" }
+        duration: { type: integer, nullable: true, description: Seconds }
+        started_at: { type: string, format: date-time }
+        ended_at: { type: string, format: date-time, nullable: true, description: "Null while it plays, or when the server never saw it end" }
+        listened_seconds: { type: integer, nullable: true, description: "ended_at - started_at; null while ended_at is null" }
+        completed: { type: boolean, description: "Closed and not skipped (a skip is a play closed within 30 s)" }
+        skipped: { type: boolean }
+    PlayHistoryPage:
+      type: object
+      properties:
+        data: { type: array, items: { $ref: "#/components/schemas/PlayHistoryEntry" } }
+        next_cursor: { type: string, nullable: true }
+    ListeningStats:
+      type: object
+      properties:
+        range:
+          type: object
+          properties:
+            from: { type: string, format: date }
+            to: { type: string, format: date, description: Inclusive }
+        totals:
+          type: object
+          properties:
+            plays: { type: integer, description: Plays logged in the range }
+            seconds: { type: integer, description: "Seconds of finished plays only (ended_at - played_at); a play still open, or never closed, counts 0" }
+            skipped: { type: integer, description: "Plays closed within 30 s of wall clock" }
+            artists: { type: integer, description: Distinct library artists played }
+            tracks: { type: integer, description: "Distinct library tracks played (text-only plays have no track)" }
+        by_hour: { type: array, minItems: 24, maxItems: 24, items: { type: integer }, description: "Plays per hour of day 0-23 (server timezone)" }
+        by_weekday: { type: array, minItems: 7, maxItems: 7, items: { type: integer }, description: "Plays per weekday, 0 = Sunday" }
+        by_day:
+          type: array
+          description: "Every day of the range, oldest first, zero-filled"
+          items:
+            type: object
+            properties:
+              day: { type: string, format: date }
+              plays: { type: integer }
+              seconds: { type: integer }
+        by_source:
+          type: array
+          description: "Most plays first; `unknown` when the play has no source type"
+          items:
+            type: object
+            properties:
+              source_type: { type: string, example: dlna }
+              plays: { type: integer }
+        by_device:
+          type: array
+          description: "Most plays first; only devices with plays in the range"
+          items:
+            type: object
+            properties:
+              device_id: { type: integer }
+              name: { type: string, nullable: true }
+              plays: { type: integer }
+              seconds: { type: integer }
+              by_hour: { type: array, minItems: 24, maxItems: 24, items: { type: integer } }
+        top:
+          type: object
+          properties:
+            artists:
+              type: array
+              items:
+                allOf:
+                  - { $ref: "#/components/schemas/ArtistItem" }
+                  - { type: object, properties: { plays: { type: integer } } }
+            albums:
+              type: array
+              items:
+                allOf:
+                  - { $ref: "#/components/schemas/AlbumItem" }
+                  - { type: object, properties: { plays: { type: integer } } }
+            tracks:
+              type: array
+              items:
+                allOf:
+                  - { $ref: "#/components/schemas/SearchTrack" }
+                  - { type: object, properties: { plays: { type: integer } } }
+    TrackDetails:
+      type: object
+      description: "What the library shows about a track beyond its name and duration. `analysis` is null until the own file is analysed."
+      properties:
+        genres: { type: array, items: { type: string } }
+        quality: { type: string, nullable: true, description: "Text a DLNA server reported, e.g. `FLAC · 16-bit / 44.1 kHz · 1411 kbps · stereo`" }
+        credits:
+          type: object
+          description: "MusicBrainz credits by role (`composer`, `instrument` as `Name (guitar)` …); empty object when none"
+          additionalProperties: { type: array, items: { type: string } }
+        isrc: { type: string, nullable: true }
+        explicit: { type: boolean, nullable: true }
+        popularity: { type: integer, nullable: true, description: "Spotify, 0 to 100" }
+        listeners: { type: integer, nullable: true, description: Last.fm }
+        playcount: { type: integer, nullable: true, description: Last.fm }
+        analysis:
+          allOf: [{ $ref: "#/components/schemas/TrackAnalysis" }]
+          nullable: true
+        sections:
+          allOf: [{ $ref: "#/components/schemas/TrackSections" }]
+          nullable: true
+          description: Null until requested (deep analysis)
+        sections_reason: { type: string, nullable: true, enum: [too_short, no_structure, null] }
+        stems: { type: object, nullable: true, additionalProperties: true, description: "Null until requested (deep analysis); see TrackStems" }
+        vocal_ratio: { type: number, nullable: true }
+        instrumental: { type: array, nullable: true, items: { type: object, additionalProperties: true }, description: "Instrumental ranges (stems); null until requested" }
+    SoundFilter:
+      type: object
+      description: "Criteria over the analysis of a track's own audio file; all given criteria must hold. Same names and meaning as the query parameters of GET /library/tracks. Raw values, no normalisation. `camelot` and `mood` take a comma-separated string or a list."
+      properties:
+        bpm_min: { type: number }
+        bpm_max: { type: number }
+        camelot: { type: string, example: "8A,9A" }
+        arousal_min: { type: number, minimum: 0, maximum: 1 }
+        arousal_max: { type: number, minimum: 0, maximum: 1 }
+        valence_min: { type: number, minimum: 0, maximum: 1 }
+        valence_max: { type: number, minimum: 0, maximum: 1 }
+        danceability_min: { type: number, minimum: 0, maximum: 1 }
+        instrumental_min: { type: number, minimum: 0, maximum: 1 }
+        plr_min: { type: number }
+        mood: { type: string, example: "relaxed,happy" }
+        lossless_suspect_max: { type: number, minimum: 0, maximum: 1 }
+        measured_bit_depth_min: { type: integer, minimum: 1 }
+        clipping: { type: integer, enum: [0, 1] }
+    TrackSoundSummary:
+      type: object
+      description: "The few analysis values a list row carries (include=analysis), the same raw values as TrackAnalysis; each null when its stage has not run."
+      properties:
+        bpm: { type: number, nullable: true }
+        camelot: { type: string, nullable: true }
+        arousal: { type: number, nullable: true }
+        valence: { type: number, nullable: true }
+        danceability: { type: number, nullable: true }
+        instrumental: { type: number, nullable: true }
+        plr: { type: number, nullable: true }
+        loudness: { type: number, nullable: true, description: LUFS }
+    TrackAnalysis:
+      type: object
+      description: "Computed from the track's own audio file (own files only, never DLNA or Spotify). Every field is null while the stage that computes it has not run (BPM, key, danceability, mood need the Essentia sidecar; arousal, valence, instrumental and mood its ML build). null is 'no information', never zero. Values are raw; the server does not normalise energy or mood."
+      properties:
+        bpm: { type: number, nullable: true }
+        key: { type: string, nullable: true, description: "Sharps, C to B" }
+        mode: { type: string, nullable: true, enum: [major, minor, null] }
+        camelot: { type: string, nullable: true, example: 8A, description: "1A to 12B" }
+        loudness: { type: number, nullable: true, description: "Integrated EBU R128 loudness, LUFS" }
+        loudness_range: { type: number, nullable: true, description: LU }
+        true_peak: { type: number, nullable: true, description: dBFS }
+        plr: { type: number, nullable: true, description: "Peak-to-loudness ratio in dB (true_peak - loudness); low is heavily compressed" }
+        replaygain_track_gain: { type: number, nullable: true, description: dB }
+        replaygain_album_gain: { type: number, nullable: true, description: dB }
+        danceability: { type: number, nullable: true, description: "0 to 1" }
+        arousal: { type: number, nullable: true, description: "0 to 1, raw (a library may only use a narrow part of it)" }
+        valence: { type: number, nullable: true, description: "0 to 1, raw" }
+        instrumental: { type: number, nullable: true, description: "0 to 1" }
+        mood: { type: array, items: { type: string }, description: "Classifier moods; empty list when none" }
+        recording_mbid: { type: string, nullable: true }
+        spectral_cutoff_hz: { type: integer, nullable: true, description: "Where the spectrum falls off a cliff; null when it does not" }
+        lossless_suspect: { type: number, nullable: true, description: "0 to 1 for a lossless file: how likely a transcode or upsample; null for lossy. Say 'suspected', never proof" }
+        measured_bit_depth: { type: integer, nullable: true }
+        clipping: { type: boolean, nullable: true }
+        mono: { type: boolean, nullable: true }
+        phase_issue: { type: boolean, nullable: true }
+        lead_silence_ms: { type: integer, nullable: true }
+        trail_silence_ms: { type: integer, nullable: true }
+        decode_warnings: { type: array, items: { type: string } }
+    TrackWaveform:
+      type: object
+      properties:
+        points: { type: array, items: { type: integer, minimum: 0, maximum: 100 } }
+        duration: { type: integer, nullable: true, description: Seconds }
     TrackSections:
       type: array
       description: "The sections of a track in seconds, from the structure service. Empty when it found none (see sections_reason)."
@@ -3169,6 +3845,45 @@ components:
       required: [volume]
       properties:
         volume: { type: integer, minimum: 0, maximum: 100 }
+    PlayTag:
+      type: object
+      properties:
+        id: { type: integer }
+        uid: { type: string, description: "Upper case, letters and digits only" }
+        label: { type: string, nullable: true }
+        target:
+          type: object
+          properties:
+            type: { type: string, enum: [album, artist, playlist, track, radio, physical] }
+            id: { type: integer }
+            name: { type: string, nullable: true }
+            exists: { type: boolean }
+        device:
+          type: object
+          nullable: true
+          properties:
+            id: { type: integer }
+            name: { type: string }
+        shuffle: { type: boolean }
+        last_used_at: { type: string, nullable: true }
+        url: { type: string, description: The page behind the tag's QR code }
+    PlayTagInput:
+      type: object
+      properties:
+        uid: { type: string, description: "Empty: a new uid for a QR code. Ignored on update" }
+        label: { type: string, nullable: true }
+        target_type: { type: string, enum: [album, artist, playlist, track, radio, physical] }
+        target_id: { type: integer }
+        device_id: { type: integer, nullable: true }
+        shuffle: { type: boolean }
+    VolumeLimits:
+      type: object
+      properties:
+        max: { type: integer, nullable: true, description: Maximum volume }
+        quiet_max: { type: integer, nullable: true, description: Maximum during quiet hours }
+        quiet_from: { type: string, nullable: true, example: "22:00" }
+        quiet_until: { type: string, nullable: true, example: "07:00" }
+        limit: { type: integer, nullable: true, description: The limit that applies now }
     Mute:
       type: object
       required: [muted]
@@ -3194,6 +3909,7 @@ components:
         capabilities:
           type: array
           items: { $ref: "#/components/schemas/Capability" }
+        volume_limit: { type: integer, nullable: true, description: "The volume limit that applies now (null: none); a volume above it is lowered to it" }
         battery: { $ref: "#/components/schemas/Battery" }
         multiroom: { $ref: "#/components/schemas/MultiRoom" }
         mqtt_topic: { type: string, example: remoment/player/1 }
@@ -3284,6 +4000,24 @@ components:
           allOf: [{ $ref: "#/components/schemas/TrackSections" }]
           description: Present only when the admin asked for the sections of the playing track (deep analysis).
         sections_reason: { type: string, enum: [too_short, no_structure], description: "Present with an empty `sections`" }
+        library:
+          type: object
+          description: The library record behind the playing track (same lookup as the waveform; a streamed copy of an own track resolves to it). Absent when nothing matches. Ids are the surviving (canonical) ids.
+          required: [track_id, album_id, artist_id]
+          properties:
+            track_id: { type: integer }
+            album_id: { type: integer, nullable: true, description: Null for a track without an album }
+            artist_id: { type: integer, nullable: true }
+        lyrics:
+          type: object
+          description: Present when the library track has lyrics.
+          properties:
+            plain: { type: string, nullable: true }
+            synced: { type: string, nullable: true, description: LRC text with [mm:ss.xx] stamps }
+        waveform:
+          type: array
+          description: Present when the playing track is a library track with an analysed own file. 0-100 heights, RMS contrast-normalised per track.
+          items: { type: integer, minimum: 0, maximum: 100 }
         stems: { $ref: "#/components/schemas/TrackStems" }
         vocal_ratio: { type: number, minimum: 0, maximum: 1, description: "Share of the track that is not instrumental. Present with `stems`." }
         instrumental: { $ref: "#/components/schemas/InstrumentalRanges" }
@@ -3518,7 +4252,7 @@ components:
         album: { type: string, nullable: true }
         track_id: { type: integer, nullable: true, description: 'The library track of the song, when there is one.' }
         fulfilled: { type: boolean, description: 'The library track has an own file or a DLNA copy: the wish is closed.' }
-        source: { type: string, enum: [history, radio, manual] }
+        source: { type: string, enum: [history, radio, manual, streaming] }
         wanted_at: { type: string, format: date-time }
         artwork: { type: object, nullable: true, additionalProperties: true }
     CatalogueItem:
@@ -3557,6 +4291,8 @@ components:
         name: { type: string }
         favorite: { type: boolean }
         genres: { type: array, items: { type: string } }
+        plays: { type: integer, description: "Plays logged of this record (all libraries, all time); 0 when never played" }
+        last_played_at: { type: string, format: date-time, nullable: true, description: "Null when never played" }
         details:
           type: object
           additionalProperties: true
@@ -3572,6 +4308,19 @@ components:
               name: { type: string }
               albums: { type: integer }
               tracks: { type: integer }
+        discography:
+          type: array
+          description: "Only with include=discography and never for a client token: the MusicBrainz discography, newest first."
+          items: { $ref: "#/components/schemas/CatalogueItem" }
+        related_artists:
+          type: array
+          description: "Last.fm similar artists that exist in the library (only those with albums), most relevant first, at most 12. Empty while Last.fm has not been read for the artist. `artwork` is null while the cover is processed."
+          items:
+            type: object
+            properties:
+              id: { type: integer, description: "A library artist id; open it with GET /api/library/artists/{id}." }
+              name: { type: string }
+              artwork: { $ref: "#/components/schemas/LibraryArtwork" }
         albums:
           type: array
           items:
@@ -3600,7 +4349,13 @@ components:
           type: object
           additionalProperties: true
           description: "label, release type, mood, rating, credits … see docs/api/library.md"
+        plays: { type: integer, description: "Plays logged of this record (all libraries, all time); 0 when never played" }
+        last_played_at: { type: string, format: date-time, nullable: true, description: "Null when never played" }
         playable: { type: boolean }
+        sources:
+          type: array
+          items: { type: string, enum: [files, dlna, spotify] }
+          description: "Where the album's visible tracks come from, in that order (a track merged from two counts for both)."
         tracks:
           type: array
           items:
@@ -3611,10 +4366,9 @@ components:
               duration: { type: integer, nullable: true }
               playable: { type: boolean }
               favorite: { type: boolean }
-              details:
-                type: object
-                additionalProperties: true
-                description: "genres, quality, credits, analysis … `sections` (TrackSections, null until requested) with `sections_reason`, and `stems` (TrackStems, null until requested) with `vocal_ratio` and `instrumental`; see docs/api/library.md"
+              plays: { type: integer, description: "Plays logged of this track; 0 when never played" }
+              last_played_at: { type: string, format: date-time, nullable: true }
+              details: { $ref: "#/components/schemas/TrackDetails" }
     PlaylistDetail:
       type: object
       properties:
@@ -3672,7 +4426,7 @@ components:
         id: { type: integer }
         name: { type: string }
         artist_name: { type: string, nullable: true }
-        album_id: { type: integer }
+        album_id: { type: integer, nullable: true, description: Null for a track without an album }
         album_name: { type: string, nullable: true }
         duration: { type: integer, nullable: true }
         artwork: { $ref: "#/components/schemas/LibraryArtwork" }
@@ -3781,15 +4535,6 @@ components:
         track_id: { type: integer, nullable: true }
         position: { type: number, minimum: 0 }
         duration: { type: number, minimum: 0 }
-        related_artists:
-          type: array
-          description: "Last.fm similar artists that exist in the library (only those with albums), most relevant first, at most 12. Empty while Last.fm has not been read for the artist. `artwork` is null while the cover is processed."
-          items:
-            type: object
-            properties:
-              id: { type: integer, description: "A library artist id; open it with GET /api/library/artists/{id}." }
-              name: { type: string }
-              artwork: { $ref: "#/components/schemas/LibraryArtwork" }
         volume: { type: integer, minimum: 0, maximum: 100 }
         muted: { type: boolean }
         ended: { type: boolean, description: "The track finished; the server sends the next `play` (or `stop`)" }

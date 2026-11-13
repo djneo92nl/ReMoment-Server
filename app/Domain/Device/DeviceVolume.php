@@ -6,7 +6,7 @@ use App\Domain\Device\Cache\Volume;
 use App\Integrations\Contracts\VolumeControlInterface;
 use App\Models\Device;
 
-/** Sets a device's volume (0-100) and records it right away, instead of waiting for its listener to see it. */
+/** Sets a device's volume (0-100, never above its limit: VolumeLimits) and records it right away, instead of waiting for its listener to see it. */
 final class DeviceVolume
 {
     /**
@@ -22,7 +22,7 @@ final class DeviceVolume
             return null;
         }
 
-        $volume = max(0, min(100, $volume));
+        $volume = VolumeLimits::clamp($device, max(0, min(100, $volume)));
         $driver->setVolume($volume);
         Volume::updateVolume($device->id, $volume);
 

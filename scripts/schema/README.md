@@ -14,7 +14,7 @@ scripts/schema/schema.sh diff A.txt B.txt
 scripts/schema/schema.sh crosscheck             # Eloquent models vs the migrated schema (columns, tables)
 ```
 
-Needs only docker (images `mariadb:11.4` and a PHP 8.4 image with `pdo_mysql` and `pdo_sqlite`: `sail-8.4/app` by default,
+Needs only docker (images `mariadb:11.4` and a PHP 8.4 image with `pdo_mysql` and `pdo_sqlite`: `remoment/app-dev` by default (`docker compose build`),
 override with `SCHEMA_PHP_IMAGE`; `SCHEMA_DB_IMAGE` for the database image).
 
 ## What it touches

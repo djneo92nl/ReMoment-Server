@@ -115,4 +115,11 @@ return [
     /** What the service needs while it works (measured: flat 1.5 GB in 60 s windows), shown with the estimate. */
     'stems_ram_mb' => (int) env('STEMS_RAM_MB', 1500),
 
+    /** Opt-in: the nightly `library:analyze-stems` queues stems for tracks that have none, up to `stems_night_hours` of estimated work per night. Off by default (CPU heavy). */
+    'stems_nightly' => (bool) env('STEMS_NIGHTLY', false),
+    'stems_night_hours' => (float) env('STEMS_NIGHT_HOURS', 4),
+
+    /** Tracks longer than this (seconds) are skipped by the nightly batch: the service refuses them (its own STEMS_MAX_DURATION). */
+    'stems_max_duration' => (int) env('STEMS_MAX_DURATION', 1200),
+
 ];

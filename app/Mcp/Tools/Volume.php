@@ -54,6 +54,10 @@ class Volume extends Tool
             $state += $body;
         }
 
+        // The device's volume limit now (null: none); a volume above it is lowered to it.
+        [$status, $limits] = app(ApiBridge::class)->call('GET', "$path/volume-limits");
+        $state['limit'] = $status < 300 ? ($limits['limit'] ?? null) : null;
+
         return Response::json($state);
     }
 }

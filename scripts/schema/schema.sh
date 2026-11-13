@@ -11,7 +11,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 HERE="$ROOT/scripts/schema"
-PHP_IMAGE="${SCHEMA_PHP_IMAGE:-sail-8.4/app:latest}"   # any image with php 8.4, pdo_mysql, pdo_sqlite
+PHP_IMAGE="${SCHEMA_PHP_IMAGE:-remoment/app-dev:latest}"   # any image with php 8.4, pdo_mysql, pdo_sqlite
 DB_IMAGE="${SCHEMA_DB_IMAGE:-mariadb:11.4}"
 SUFFIX="$(date +%s)-$$"
 NET="remoment-schema-net-$SUFFIX"

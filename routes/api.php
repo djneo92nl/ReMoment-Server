@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\SourceControlsController;
 use App\Http\Controllers\Api\SpotifyStreamController;
 use App\Http\Controllers\Api\StorageController;
 use App\Http\Controllers\Api\SyncGroupController;
+use App\Http\Controllers\Api\TagController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/info', InfoController::class);
@@ -43,6 +44,7 @@ Route::post('/devices/{device}/{action}', [DeviceController::class, 'action'])
 
 Route::get('/devices/{device}/volume', [DeviceController::class, 'getVolume']);
 Route::put('/devices/{device}/volume', [DeviceController::class, 'setVolume']);
+Route::get('/devices/{device}/volume-limits', [DeviceController::class, 'getVolumeLimits']);
 Route::get('/devices/{device}/mute', [DeviceController::class, 'getMute']);
 Route::put('/devices/{device}/mute', [DeviceController::class, 'setMute']);
 
@@ -157,7 +159,14 @@ Route::put('/library/tracks/{track}/favorite', [LibraryController::class, 'favor
 Route::get('/library/tracks/{track}/mixes-with', [LibraryController::class, 'mixesWith']);
 Route::get('/library/tracks/{track}/waveform', [LibraryController::class, 'waveform']);
 Route::get('/library/listening-modes', [LibraryController::class, 'listeningModes']);
+Route::get('/library/history', [\App\Http\Controllers\Api\PlayHistoryController::class, 'index']);
+Route::get('/devices/{device}/history', [\App\Http\Controllers\Api\PlayHistoryController::class, 'device']);
+Route::get('/library/albums/{album}/plays', [\App\Http\Controllers\Api\PlayHistoryController::class, 'album']);
+Route::get('/library/artists/{artist}/plays', [\App\Http\Controllers\Api\PlayHistoryController::class, 'artist']);
+Route::get('/library/stats', [\App\Http\Controllers\Api\ListeningStatsController::class, 'index']);
+Route::get('/library/overview', [LibraryController::class, 'overview']);
 Route::get('/library/health', [LibraryController::class, 'health']);
+Route::get('/library/health/{report}', [LibraryController::class, 'healthReport']);
 Route::get('/library/genres', [LibraryController::class, 'genres']);
 Route::get('/library/genres/{genre:slug}', [LibraryController::class, 'genre']);
 Route::get('/library/playlists', [LibraryController::class, 'playlists']);
@@ -174,6 +183,10 @@ Route::get('/clients/status/{registrationToken}', [ClientController::class, 'sta
 Route::get('/clients/{apiToken}/devices', [ClientController::class, 'devices']);
 Route::put('/clients/{apiToken}/heartbeat', [ClientController::class, 'heartbeat']);
 Route::get('/clients/{apiToken}/artwork', [ClientController::class, 'artwork']);
+
+// Tap to play: NFC tags and QR codes (docs/api/tags.md); managing them is in the admin group
+Route::get('/tags/{uid}', [TagController::class, 'show']);
+Route::post('/tags/{uid}/play', [TagController::class, 'play']);
 
 // Admin token login for apps. Routes that change configuration go in the `admin.token` group (see docs/api/admin-auth.md).
 Route::post('/admin/login', [AdminAuthController::class, 'login']);
@@ -211,6 +224,12 @@ Route::middleware('admin.token')->group(function () {
     Route::delete('/admin/tracks/{track}/files', [StorageController::class, 'destroyTrack']);
     Route::delete('/admin/files/{file}', [StorageController::class, 'destroyFile']);
     // Device source visibility (the web UI's DeviceSourceManager)
+    Route::get('/admin/tags', [TagController::class, 'index']);
+    Route::get('/admin/tags/last-scanned', [TagController::class, 'lastScanned']);
+    Route::post('/admin/tags', [TagController::class, 'store']);
+    Route::put('/admin/tags/{tag}', [TagController::class, 'update']);
+    Route::delete('/admin/tags/{tag}', [TagController::class, 'destroy']);
+    Route::put('/admin/devices/{device}/volume-limits', [DeviceController::class, 'setVolumeLimits']);
     Route::put('/admin/devices/{device}/sources/{sourceId}', [DeviceController::class, 'updateSource'])->where('sourceId', '[^/]+');
     Route::post('/admin/files/{file}/move', [StorageController::class, 'move']);
     Route::put('/admin/files/{file}/tags', [StorageController::class, 'tags']);

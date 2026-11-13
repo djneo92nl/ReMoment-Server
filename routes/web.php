@@ -110,6 +110,10 @@ Route::post('/playlists/{playlist}/play/{device}', [PlaylistController::class, '
 Route::post('/player/select/{device}', [PlayerController::class, 'select'])->name('player.select');
 Route::delete('/player', [PlayerController::class, 'clear'])->name('player.clear');
 
+// Party: the guest page behind a device's party link (docs/frontend/party.md)
+Route::get('/party/{token}', \App\Http\Controllers\PartyController::class)->name('party');
+// Tap to play: the page behind a tag's QR code plays its target (docs/api/tags.md)
+Route::get('/t/{uid}', \App\Http\Controllers\TagPageController::class)->name('tags.play');
 Route::get('/devices/{device}/settings', fn (\App\Models\Device $device) => view('devices.settings', ['device' => $device]))->name('devices.settings');
 
 Route::get('/dashboard', function () {
@@ -170,6 +174,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/settings/lastfm/disconnect', [LastfmAuthController::class, 'disconnect'])->name('lastfm.disconnect');
 
     Route::get('/settings/clients', [SettingsController::class, 'clients'])->name('settings.clients');
+    Route::view('/settings/tags', 'settings.tags')->name('settings.tags');
     Route::post('/settings/clients/artwork-export', [ArtworkExportController::class, 'store'])->name('settings.clients.artwork-export');
     Route::get('/settings/clients/artwork-export/download', [ArtworkExportController::class, 'download'])->name('settings.clients.artwork-export.download');
 });

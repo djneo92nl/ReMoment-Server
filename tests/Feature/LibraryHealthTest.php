@@ -174,4 +174,70 @@ class LibraryHealthTest extends TestCase
         $this->assertSame(['key' => 'transcodes', 'title' => 'Suspected transcodes', 'description' => LibraryReports::definitions()['transcodes']['description'], 'count' => 1], $response->json('data.0'));
         $this->assertSame(0, $response->json('data.1.count'));
     }
+
+    public function test_the_api_lists_findings_with_ids_reason_and_the_physical_link(): void
+    {
+        [, $fake] = $this->file('Fake', ['lossless_suspect' => 0.95, 'spectral_cutoff_hz' => 16500]);
+        $this->file('Clean', ['lossless_suspect' => 0.1]);
+        \Illuminate\Support\Facades\DB::table('physical_items')->insert([
+            ['artist' => 'Band', 'title' => 'LP', 'artist_key' => 'band', 'title_key' => 'lp', 'medium' => 'cd', 'location' => 'Shelf B2', 'album_id' => $this->album->id, 'ripped_at' => null, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        $r = $this->getJson('/api/library/health/transcodes')->assertOk()->json();
+
+        $this->assertSame('transcodes', $r['key']);
+        $this->assertSame(1, $r['count']);
+        $this->assertNull($r['next_cursor']);
+        $f = $r['data'][0];
+        $this->assertSame(['track', $fake->id, $this->album->id, $fake->artist_id], [$f['kind'], $f['track_id'], $f['album_id'], $f['artist_id']]);
+        $this->assertSame('FLAC, spectrum ends at 16.5 kHz (95% sure)', $f['reason']);
+        $this->assertSame('Fake.flac', $f['file']['path']);
+        $this->assertSame([['id' => 1, 'medium' => 'cd', 'ripped' => false, 'location' => 'Shelf B2']], $f['physical']);
+
+        // A client token never sees the physical collection.
+        $this->assertNull($this->getJson('/api/library/health/transcodes?client=nope')->json('data.0.physical'));
+        $this->getJson('/api/library/health/nonsense')->assertNotFound();
+    }
+
+    public function test_the_api_pages_file_and_album_reports(): void
+    {
+        foreach (['a', 'b', 'c'] as $n) {
+            File::create(['storage_location_id' => (StorageLocation::first() ?? StorageLocation::create(['name' => 'Music', 'driver' => 'local', 'config' => ['root' => '/tmp'], 'role' => 'library']))->id, 'path' => "{$n}.flac", 'hash' => $n, 'size' => 1024, 'mtime' => 1, 'status' => File::PRESENT, 'extension' => 'flac']);
+        }
+
+        $first = $this->getJson('/api/library/health/unlinked?limit=2')->assertOk()->json();
+        $this->assertSame(['a.flac', 'b.flac'], array_column($first['data'], 'title'));
+        $this->assertSame('file', $first['data'][0]['kind']);
+        $this->assertNull($first['data'][0]['track_id']);
+        $second = $this->getJson('/api/library/health/unlinked?limit=2&cursor='.$first['next_cursor'])->json();
+        $this->assertSame(['c.flac'], array_column($second['data'], 'title'));
+        $this->assertNull($second['next_cursor']);
+
+        Metadata::create(['metadatable_type' => Album::class, 'metadatable_id' => $this->album->id, 'key' => 'track_count', 'value' => '12', 'type' => 'int', 'source' => 'musicbrainz']);
+        $this->file('Only');
+        $inc = $this->getJson('/api/library/health/incomplete')->json('data.0');
+        $this->assertSame('album', $inc['kind']);
+        $this->assertSame($this->album->id, $inc['album_id']);
+        $this->assertSame('1 of 12 tracks', $inc['reason']);
+    }
+
+    public function test_duplicate_findings_list_the_copies_best_first(): void
+    {
+        $this->file('Song', ['acoustid_recording_mbid' => 'rec-1', 'spectral_cutoff_hz' => 16000], 'mp3');
+        $this->file('Song', ['acoustid_recording_mbid' => 'rec-1'], 'flac', ['path' => 'better.flac']);
+
+        $g = $this->getJson('/api/library/health/duplicates')->assertOk()->json('data.0');
+
+        $this->assertSame('group', $g['kind']);
+        $this->assertSame('better.flac', $g['copies'][0]['path']);
+        $this->assertCount(2, $g['copies']);
+        $this->assertSame('2 copies of the same recording; best first', $g['reason']);
+    }
+
+    public function test_findings_need_the_full_profile(): void
+    {
+        config(['profile.current' => 'standard']);
+
+        $this->getJson('/api/library/health/transcodes')->assertStatus(422)->assertJsonPath('error', 'not_available_in_profile');
+    }
 }

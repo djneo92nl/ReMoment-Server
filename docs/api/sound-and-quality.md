@@ -37,7 +37,7 @@ The web app shows the *Signal* row **only when something is wrong**, joined with
 
 ## Camelot and "mixes well"
 
-`camelot` is a plain label. Two tracks mix well when their codes are the same, one step apart on the wheel with the same letter (`12A` and `1A` are neighbours), or the same number with the other letter (relative major and minor). A client may compute that itself; the server will offer it as a query later, so do not store the rule in more places than needed.
+`camelot` is a plain label. Two tracks mix well when their codes are the same, one step apart on the wheel with the same letter (`12A` and `1A` are neighbours), or the same number with the other letter (relative major and minor). `GET /api/library/tracks/{id}/mixes-with` returns the matches (tempo within 6 %, also half/double, and a compatible key), so a client does not need to store the rule.
 
 ## Listening modes
 
@@ -51,7 +51,7 @@ The web app shows the *Signal* row **only when something is wrong**, joined with
 
 ## Library health
 
-`GET /api/library/health` → `{ "data": [ { "key", "title", "description", "count" } ] }`: how many findings each report has (suspected transcodes, damaged files, clipping, duplicate recordings, lossy files, incomplete albums, files without a track, missing files). A client can show a badge or a summary line from it, for example "3 suspected transcodes". The findings themselves (titles, details, links to albums) are only on the web page, `/settings/library-health`; open it in a browser instead of building a list. Counts are cached for ten minutes and are zero until the analysis has run. Details in `docs/architecture/library-health.md`.
+`GET /api/library/health` → `{ "data": [ { "key", "title", "description", "count" } ] }`: how many findings each report has (suspected transcodes, damaged files, clipping, duplicate recordings, lossy files, incomplete albums, files without a track, missing files). A client can show a badge or a summary line from it, for example "3 suspected transcodes". The findings themselves are at `GET /api/library/health/{report}` (below); the web page is `/settings/library-health`. Counts are cached for ten minutes and are zero until the analysis has run. Details in `docs/architecture/library-health.md`.
 
 ## Smart playlists
 

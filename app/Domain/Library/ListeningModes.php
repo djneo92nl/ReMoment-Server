@@ -137,6 +137,23 @@ final class ListeningModes
     }
 
     /**
+     * A custom mode: up to LIMIT random tracks that meet a sound filter (SoundFilter::criteria()), own analysed files only,
+     * limited to what $device can play when given.
+     *
+     * @return Builder<Track>
+     */
+    public static function customTracks(array $criteria, ?Device $device = null): Builder
+    {
+        $query = SmartPlaylistBuilder::query(SmartPlaylistBuilder::defaults(), self::SCOPE);
+        SoundFilter::apply($query, $criteria);
+        if ($device !== null) {
+            LibraryPlayback::playableTracks($query, $device);
+        }
+
+        return $query->inRandomOrder()->limit(self::LIMIT);
+    }
+
+    /**
      * @param  list<array{0: string, 1: string, 2?: string|int}>  $rules  [field, operator, value?]
      */
     private static function define(array $rules): array

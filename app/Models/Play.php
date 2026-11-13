@@ -64,12 +64,18 @@ class Play extends Model
         return LibraryItemArtwork::proxy($raw, $size);
     }
 
+    /** SQL for the seconds a finished play lasted (ended_at - played_at). */
+    public static function secondsSql(string $prefix = ''): string
+    {
+        return DB::getDriverName() === 'sqlite'
+            ? "CAST(ROUND((julianday({$prefix}ended_at) - julianday({$prefix}played_at)) * 86400) AS INTEGER)"
+            : "TIMESTAMPDIFF(SECOND, {$prefix}played_at, {$prefix}ended_at)";
+    }
+
     /** Seconds listened over the given plays (all plays by default): finished plays only, summed in SQL. */
     public static function secondsListened(?Builder $plays = null): int
     {
-        $seconds = DB::getDriverName() === 'sqlite'
-            ? 'CAST(ROUND((julianday(ended_at) - julianday(played_at)) * 86400) AS INTEGER)'
-            : 'TIMESTAMPDIFF(SECOND, played_at, ended_at)';
+        $seconds = self::secondsSql();
 
         return (int) ($plays ?? static::query())
             ->whereNotNull('ended_at')

@@ -36,7 +36,7 @@ class ProfileGatesTest extends TestCase
             ->values()->all();
     }
 
-    private const BASE = ['device:sync-sources', 'radio:refresh', 'radio:fix-artwork', 'radio-plays-prune', 'backup:run', 'queue:prune-failed --hours=720', 'health-heartbeat', 'queue-watchdog', 'alerts:check', 'alerts-prune'];
+    private const BASE = ['device:sync-sources', 'radio:refresh', 'radio:fix-artwork', 'radio-plays-prune', 'backup:run', 'queue:prune-failed --hours=720', 'health-heartbeat', 'queue-watchdog', 'alerts:check', 'alerts-prune', 'volume-limits'];
 
     public function test_control_schedules_only_the_base(): void
     {

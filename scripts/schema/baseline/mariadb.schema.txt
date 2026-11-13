@@ -522,6 +522,7 @@ TABLE plays [engine=InnoDB collation=utf8mb4_unicode_ci]
   col updated_at timestamp NULL default=NULL
   idx PRIMARY UNIQUE BTREE (id)
   idx plays_device_id_played_at_index INDEX BTREE (device_id,played_at)
+  idx plays_played_at_index INDEX BTREE (played_at)
   idx plays_radio_station_id_foreign INDEX BTREE (radio_station_id)
   idx plays_source_type_index INDEX BTREE (source_type)
   idx plays_track_id_index INDEX BTREE (track_id)

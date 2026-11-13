@@ -31,6 +31,11 @@ docs/
     server-info.md          GET /api/info bootstrap endpoint (API/MQTT/artwork addresses for clients)
     mcp.md                  MCP server at /mcp for AI agents: tools, admin-token gating, how tools reuse the REST API
     admin-auth.md           Token login of the single admin for apps: POST /api/admin/login, bearer tokens, revocation, what it gates
+    stats.md                Listening statistics GET /api/library/stats (by hour/weekday/day/source/device, top lists), `plays` and `last_played_at` on details, what the numbers mean
+    history.md              Play history lists: GET /api/library/history, /devices/{id}/history, /albums/{id}/plays, /artists/{id}/plays; entry shape, cursor, filters
+    overview.md             GET /api/library/overview: glance, decades, coverage, sound buckets, formats, analysis progress per stage
+    library-health.md       GET /api/library/health/{report}: findings with ids, reason, duplicate copies and the physical-collection link
+    sound-query.md          Sound filters on GET /api/library/tracks (bpm, camelot, arousal, mood, plr …), include=analysis, count_only, sort=plr|bpm|arousal, `filter` on play-listening-mode
     openapi.yaml            OpenAPI 3 contract for native clients (info, devices, playback, radio, multiroom, library, clients); update it when an endpoint's shape changes
     device-settings.md      Sound adjustment (bass/treble/loudness), Bluetooth pairing, device name: endpoints, shapes, per-platform support
   architecture/
@@ -156,6 +161,9 @@ php artisan library:enrich [--only=metadata --only=artist-images] [--limit=200] 
 
 # Audio analysis of the own files (loudness, fingerprint + AcoustID, BPM/key/mood via the optional Essentia sidecar); needs ANALYSIS_ENABLED=true, runs on the `analysis` queue (scheduled nightly). --now with --file runs inline
 php artisan library:analyze [--limit=100] [--stage=loudness|waveform|quality|fingerprint|acoustid|essentia] [--file=ID --now] [--dry-run]
+
+# Opt-in nightly stems (STEMS_NIGHTLY=true, 02:00): queue stems for tracks that have none, newest first, within STEMS_NIGHT_HOURS (default 4) of estimated work on the single `stems` worker; --hours overrides, --dry-run counts; see docs/architecture/stems-service.md
+php artisan library:analyze-stems [--hours=4] [--dry-run]
 
 # Home Assistant rest_command package (YAML) for the scene-capable operations of config/scene-operations.php, generated from docs/api/openapi.yaml; unverified in a running HA; see docs/architecture/home-assistant.md
 php artisan ha:package [--output=remoment.yaml] [--base-url=http://remoment.local]
@@ -861,7 +869,7 @@ See `docs/architecture/device-drivers.md` for the Mozart driver's contracts and 
 ## Infrastructure (Docker)
 
 Defined in `compose.yaml` via Laravel Sail:
-- **laravel.test** – PHP 8.4 app server (port 80)
+- **laravel.test** – PHP 8.4 app server on FrankenPHP like production (ports 80 and `APP_PORT_ALT`; `FRANKENPHP_MODE=worker` opts into Octane, see `docs/architecture/frankenphp.md`)
 - **mariadb** – the database (named volume, not a bind mount; see `docs/architecture/database.md`)
 - **redis** – cache, sessions, and queue backend
 - **mosquitto** – MQTT broker (port 1883; WebSockets on 9001 for browser live updates)

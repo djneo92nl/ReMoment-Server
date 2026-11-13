@@ -24,7 +24,7 @@ Device and library tools do not re-implement anything: `ApiBridge` dispatches an
 |---|---|
 | `list_devices`, `get_device` | `GET /devices`, `GET /devices/{id}` (now playing, capabilities, modes) |
 | `playback_control` | play, pause, stop, next, previous, seek, shuffle, repeat, like, power |
-| `volume` | read or set volume and mute |
+| `volume` | read or set volume and mute; the answer has `limit`, the device's volume limit now (`null`: none), and a volume above it is lowered to it |
 | `queue` | `action`: `list` (default) Up Next, `jump`, `add` / `next` (track, album, artist or playlist at the end / after the current track), `remove`, `move`, `clear` (`confirm=true`); see `docs/api/queue.md` |
 | `sources` | list/activate sources; list/run source controls (CD, FM presets) |
 | `jellyfin` | Jellyfin on a TV: list continue watching and next up, or start an `item_id` (optional `position_ticks`) in the Jellyfin app on the TV; `GET /devices/{id}/jellyfin`, `POST …/jellyfin/play` |
@@ -40,6 +40,7 @@ Device and library tools do not re-implement anything: `ApiBridge` dispatches an
 | `set_favorite` | favorite an album, artist or track |
 | `play_from_library` | play a track (or a Spotify track by `spotify_track_id`), an album (optionally limited to a `source`), artist or playlist on a device, or `type: tracks` to shuffle the whole library |
 | `physical` | the physical collection (CDs, records, tapes): `list`, `lookup` a barcode on MusicBrainz, `add`, `update` (also `ripped`), `remove`; an item makes its album owned; see `docs/api/physical.md` |
+| `tags` | tap to play (NFC tags, QR codes): `get` and `play` a tag by uid (open); with the admin token `list`, `last_scanned`, `add`, `update`, `remove`; see `docs/api/tags.md` |
 | `external` | browse an external service (Spotify) for any artist: `search`, `artist`, `album`, and the account's `playlists` / one `playlist` / `saved_albums` / `liked_tracks` / `recent` (read live); `play` an item (artist, album, track or playlist) on a device without importing it; nothing is added to the library; see `docs/api/availability.md` |
 | `catalogue` | the MusicBrainz discography of an artist (owned / streamable / known per album, filters), the household wishlist, one entry, and `wish`/`unwish`/`ignore`/`unignore`/`wish_song`/`unwish_song`, `new_releases` (open, no admin token); see `docs/api/availability.md` |
 | `manage_playlist` | create (normal or smart), rename, delete (`confirm`), add (tracks, or an album with `source`)/remove/move tracks, set smart rules; ids merged away by `library:merge-duplicates` still work (see `docs/api/library.md`) |

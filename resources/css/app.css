@@ -77,3 +77,9 @@
     .tint-hero { background: linear-gradient(115deg, var(--tint-dark, #292524) 0%, transparent 80%); }
 }
 .hero-collage { -webkit-mask-image: linear-gradient(to left, #000 35%, transparent); mask-image: linear-gradient(to left, #000 35%, transparent); }
+
+/* Flat sections (device page): inside `.flat`, an <x-card> loses its surface, border, shadow and padding and becomes a section on the page itself,
+   its title the small uppercase label. The now-playing device card is not inside `.flat`, so it stays the page's one surface. */
+.flat [data-card] { background: transparent; border: 0; box-shadow: none; border-radius: 0; padding: 0; }
+.flat [data-card] > h2 { font-size: 0.75rem; line-height: 1rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: #6b7280; margin-bottom: 0.5rem; }
+@media (prefers-color-scheme: dark) { .flat [data-card] > h2 { color: #9ca3af; } }

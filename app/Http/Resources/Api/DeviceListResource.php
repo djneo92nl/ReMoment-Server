@@ -5,6 +5,7 @@ namespace App\Http\Resources\Api;
 use App\Domain\Device\Cache\Battery;
 use App\Domain\Device\Cache\MultiRoom;
 use App\Domain\Device\DeviceCapabilities;
+use App\Domain\Device\VolumeLimits;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -22,6 +23,7 @@ class DeviceListResource extends JsonResource
             'state' => $this->state?->value,
             'last_seen' => $this->last_seen,
             'capabilities' => DeviceCapabilities::for($this->resource),
+            'volume_limit' => VolumeLimits::capFor($this->resource),
             'battery' => Battery::get($this->id)?->toArray(),
             'multiroom' => MultiRoom::get($this->id)?->resolve($this->resource),
             'mqtt_topic' => "remoment/player/{$this->id}",

@@ -74,7 +74,7 @@ final class QualityPlayer
 
         $url = StreamUrl::withProfile($profile, function () use ($track, $device) {
             $url = $track->getDlnaUrl();
-            app(LibraryPlayback::class)->playTrack($device, $track);
+            app(LibraryPlayback::class)->playTrack($device, $track, withAlbum: false);
 
             return $url;
         });

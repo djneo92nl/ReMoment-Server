@@ -129,7 +129,7 @@ class LibrarySources
     }
 
     /** Metadata keys that make a track available from the metadata row's source. */
-    private const SOURCE_METADATA = ['dlna_url', 'external_id'];
+    public const SOURCE_METADATA = ['dlna_url', 'external_id'];
 
     /** Hidden sources that are valid, e.g. what a client stored. */
     public static function normalize(?array $hidden): array

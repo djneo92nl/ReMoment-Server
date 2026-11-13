@@ -40,7 +40,6 @@ return [
         'PUT /devices/{}/wired-speakers/{}',
         'GET /devices/{}/wireless-speakers',
         'POST /devices/{}/wireless-speakers/scan',
-        'GET /library/tracks/{}/waveform',
         'POST /librespot/event',
         'GET /radio/{}/now',
     ],

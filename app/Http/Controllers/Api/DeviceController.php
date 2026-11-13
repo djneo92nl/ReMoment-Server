@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Domain\Artwork\LibraryItemArtwork;
 use App\Domain\Device\Cache\Modes;
+use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\MultiRoomPeers;
 use App\Domain\Device\PlaybackModes;
 use App\Domain\Device\RepeatMode;
 use App\Domain\Device\SourceSync;
 use App\Domain\Device\SpotifyRouting;
+use App\Domain\Device\VolumeLimits;
 use App\Domain\Library\IdAliases;
 use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibraryPlayback;
@@ -18,6 +20,7 @@ use App\Domain\Library\NotPlayableException;
 use App\Domain\Library\PlaybackFailedException;
 use App\Domain\Library\PlaybackResult;
 use App\Domain\Library\PlaylistMode;
+use App\Domain\Library\SoundFilter;
 use App\Domain\Library\SpotifyUri;
 use App\Domain\Playback\NotMovableException;
 use App\Domain\Playback\PlaybackMover;
@@ -296,8 +299,32 @@ class DeviceController extends Controller
     {
         $request->validate(['volume' => ['required', 'integer', 'min:0', 'max:100']]);
 
-        return $this->withDriver($device, VolumeControlInterface::class, 'volume_control',
-            fn (VolumeControlInterface $driver) => ['volume' => $driver->setVolume($request->integer('volume'))]);
+        // Never above the device's limit (VolumeLimits); the answer is the level that was set.
+        $volume = VolumeLimits::clamp($device, $request->integer('volume'));
+
+        return $this->withDriver($device, VolumeControlInterface::class, 'volume_control', function (VolumeControlInterface $driver) use ($device, $volume) {
+            $set = $driver->setVolume($volume);
+            Volume::updateVolume($device->id, (int) $set);
+
+            return ['volume' => $set];
+        });
+    }
+
+    public function getVolumeLimits(Device $device): JsonResponse
+    {
+        return response()->json(VolumeLimits::get($device) + ['limit' => VolumeLimits::capFor($device)]);
+    }
+
+    public function setVolumeLimits(Request $request, Device $device): JsonResponse
+    {
+        $data = $request->validate([
+            'max' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:100'],
+            'quiet_max' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:100'],
+            'quiet_from' => ['sometimes', 'nullable', 'date_format:H:i'],
+            'quiet_until' => ['sometimes', 'nullable', 'date_format:H:i'],
+        ]);
+
+        return response()->json(VolumeLimits::set($device, $data) + ['limit' => VolumeLimits::capFor($device)]);
     }
 
     public function getMute(Device $device): JsonResponse
@@ -450,7 +477,16 @@ class DeviceController extends Controller
     /** Plays a listening mode (a random selection of analysed tracks that fit it); see docs/architecture/listening-modes.md. */
     public function libraryPlayListeningMode(Request $request, Device $device, LibraryPlayback $library): JsonResponse
     {
-        $data = $request->validate(['mode' => ['required', 'string', Rule::in(ListeningModes::keys())]]);
+        $data = $request->validate([
+            'mode' => ['required_without:filter', 'nullable', 'string', Rule::in(ListeningModes::keys())],
+            // A custom mode: the same sound filter as GET /library/tracks, instead of a preset (docs/api/sound-query.md).
+            'filter' => ['required_without:mode', 'nullable', 'array'],
+        ] + SoundFilter::rules('filter.'));
+
+        $criteria = isset($data['filter']) ? SoundFilter::criteria($data['filter']) : null;
+        if (isset($data['filter']) && !isset($data['mode']) && $criteria === []) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['filter' => 'The filter needs at least one criterion.']);
+        }
 
         if ($error = $this->assertReachable($device)) {
             return $error;
@@ -460,14 +496,17 @@ class DeviceController extends Controller
             return $this->unsupported('library_playback');
         }
 
-        $tracks = ListeningModes::tracks($data['mode'], $device)->with(['metadata', 'artist'])->get();
+        $query = isset($data['mode'])
+            ? ListeningModes::tracks($data['mode'], $device)
+            : ListeningModes::customTracks($criteria, $device);
+        $tracks = $query->with(['metadata', 'artist'])->get();
         if ($tracks->count() < ListeningModes::MIN_TRACKS) {
             return response()->json(['error' => 'not_playable', 'message' => 'Not enough analysed tracks fit this mode on this device.'], 422);
         }
 
         return $this->playFromLibrary(
             fn () => $library->playTracks($device, $tracks),
-            ['mode' => $data['mode'], 'queued' => $tracks->count()],
+            (isset($data['mode']) ? ['mode' => $data['mode']] : []) + ['queued' => $tracks->count()],
         );
     }
 

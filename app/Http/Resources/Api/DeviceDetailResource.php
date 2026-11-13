@@ -7,6 +7,7 @@ use App\Domain\Device\Cache\Modes;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\RemoteKey;
 use App\Domain\Device\State;
+use App\Domain\Library\NowPlayingLibrary;
 use App\Domain\Library\NowPlayingSections;
 use App\Domain\Library\NowPlayingStems;
 use App\Domain\Library\NowPlayingWaveform;
@@ -33,6 +34,10 @@ class DeviceDetailResource extends JsonResource
                 }
 
                 $nowPlaying['modes'] = Modes::get($this->id)->toArray();
+
+                if (($library = NowPlayingLibrary::for($cachedNowPlaying)) !== null) {
+                    $nowPlaying['library'] = $library;
+                }
 
                 $waveform = NowPlayingWaveform::for($cachedNowPlaying);
                 if ($waveform !== null) {
