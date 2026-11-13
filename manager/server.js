@@ -221,7 +221,8 @@ function createManager(cfg) {
   async function services() {
     const r = await compose('config', '--services');
     if (!r.ok) throw new Error('docker compose config failed');
-    return r.stdout.split('\n').map((s) => s.trim()).filter(Boolean);
+    // `config --services` comes back in no fixed order: sort, so the page does not reshuffle on every refresh.
+    return r.stdout.split('\n').map((s) => s.trim()).filter(Boolean).sort();
   }
 
   function audit(action, service, result) {

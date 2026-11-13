@@ -415,3 +415,8 @@ test('open mode needs no token for the page API, but still the change header and
     assert.equal((await call('GET', '/status', {}, 'evil.example:' + port)).status, 403);
   } finally { m.server.close(); }
 });
+
+test('services are listed in a fixed (alphabetical) order', async () => {
+  const names = (await req('GET', '/status')).json().services.map((s) => s.service);
+  assert.deepEqual(names, [...names].sort());
+});
