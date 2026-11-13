@@ -22,7 +22,7 @@ class UiComponentsTest extends TestCase
         $this->assertStringContainsString('p-6', Blade::render('<x-card class="p-6">x</x-card>'));
         $this->assertStringContainsString('rounded-2xl', Blade::render('<x-card compact>x</x-card>'));
         $this->assertStringContainsString('overflow-hidden', Blade::render('<x-card flush>x</x-card>'));
-        $this->assertStringContainsString('<a href="/a"', Blade::render('<x-card href="/a">x</x-card>'));
+        $this->assertStringContainsString('<a data-card href="/a"', Blade::render('<x-card href="/a">x</x-card>'));
     }
 
     public function test_alert_types_get_their_colour_icon_and_role(): void

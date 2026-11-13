@@ -125,6 +125,10 @@
                     </span>
                 @endif
             </x-settings-row>
+            <x-settings-row href="{{ route('settings.manager') }}" icon="fa-solid fa-server"
+                             label="Manager">
+                Containers, restart, logs and host health
+            </x-settings-row>
             <x-settings-row href="{{ route('settings.profile') }}" icon="fa-solid fa-layer-group"
                              label="Profile">
                 {{ \App\Domain\Profile\Profile::label() }} &middot; what this server runs

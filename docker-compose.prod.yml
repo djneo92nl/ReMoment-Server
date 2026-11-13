@@ -39,6 +39,9 @@ services:
             # Control's SQLite file (DB_DATABASE=/data/sqlite/database.sqlite): a named volume, because SQLite's locking
             # does not survive a bind mount (docs/architecture/database.md). Unused by Standard and Full.
             - 'remoment-sqlite:/data/sqlite'
+            # The ReMoment Manager's home (host service, ansible/manager.yml): the app reads its token from here for
+            # Settings › Manager (config/manager.php). Read-only; a host without a manager just has an empty folder.
+            - '${MANAGER_HOME:-/var/lib/remoment-manager}:/run/remoment-manager:ro'
         depends_on:
             mariadb:
                 condition: service_healthy

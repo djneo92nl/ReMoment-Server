@@ -1,6 +1,6 @@
 # ReMoment Manager (workstream 10, read-only core)
 
-Code: `manager/` (`server.js`, `bin/remoment-manager`, `test/`). Status: **skeleton built**: status, logs, restart, audit, CLI. No web page, no upgrade, no SMB, no installers yet (see "Still to do"). Plan: [v1-roadmap.md](v1-roadmap.md) section 10.
+Code: `manager/` (`server.js`, `bin/remoment-manager`, `test/`). Status: **skeleton built**: status, logs, restart, audit, CLI, and the web page Settings › Manager (admin login, `App\Domain\Manager\ManagerClient`). No upgrade, no SMB, no Pi image yet (see "Still to do"). Plan: [v1-roadmap.md](v1-roadmap.md) section 10.
 
 ## What it is for
 
@@ -62,6 +62,12 @@ It reads the token file and calls the API; `REMOMENT_MANAGER_HOME` and `REMOMENT
 - Every change is appended (time, action, service, result) to `audit.log` in the manager home, mode 0600. Failed changes are logged as `failed (exit N)`. Denied requests are not logged (no token spam).
 - Request bodies are capped at 1 KiB (no endpoint takes one).
 
+## Web page (Settings › Manager)
+
+`/settings/manager` (`Livewire\ManagerPanel`, behind the admin login like all of `/settings`) shows the containers with state, health, crashed/restarting, uptime, restarts, memory and CPU, the host figures, a log viewer per service and the recent audit entries; Restart per service and Restart all (with a confirm; restarting `app` stops the server that serves the page, so the answer may not arrive). It refreshes every 10 s while the tab is visible.
+
+The app calls the manager at `MANAGER_URL` (default `http://127.0.0.1:8099`: production runs host-networked) with the manager's own token and the `x-remoment-manager: 1` header (`config/manager.php`). The token is read from `MANAGER_TOKEN_FILE` (default `/run/remoment-manager/token`), the manager's home mounted read-only into the app container (`MANAGER_HOME`, `docker-compose.prod.yml`, set by Ansible's `env.j2`); `MANAGER_TOKEN` is an alternative. The admin password is never the token. Without a manager, a token or an answer the page explains which one is missing instead of failing. Not available on a dev machine where Docker runs the app in a bridge network (the manager's Host check wants `127.0.0.1`). Tests: `tests/Feature/ManagerPageTest.php` with `Http::fake`; unverified against the real manager.
+
 ## Tests
 
 `cd manager && node --test test/` (no packages). A fake `docker` script (`test/fake-docker.js`) is put first on PATH; it answers `compose config --services`, `compose ps`, `inspect`, `stats`, `compose logs`, `compose restart` with canned output and records every call. No real container is touched. Covered: status shape, crashed and restarting, logs tail cap, exact restart arguments, unknown service gives 404 with no command run, 401, 403 (Host and header), 404/405, 409 while a change runs, 413, audit entries, failed restart, token file mode, the CLI.
@@ -104,7 +110,7 @@ launchd (`~/Library/LaunchAgents/nl.remoment.manager.plist`):
 
 ## Still to do (open)
 
-- The web page inside ReMoment (Settings › Manager) and the app-to-manager link with the admin login (the roadmap's step 2), and the manager's own LAN page behind the token (step 8, opt-in, with the "LAN only" warning).
+- The manager's own LAN page behind the token, for when the app is down (roadmap step 8, opt-in, with the "LAN only" warning). The page inside ReMoment exists (see above); it has no upgrade, start/stop of single processes or SMB yet.
 - Processes inside the app container (supervisor: queue, scheduler, listeners), start/stop of single services.
 - Upgrade and rollback (calls `app:upgrade`, previous image tag plus `backup:run`/`backup:restore`), host backup now, diagnostics bundle.
 - SMB serve and mount (Samba on the host).
