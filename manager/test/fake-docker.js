@@ -23,6 +23,7 @@ else if (cmd === 'inspect') process.stdout.write(read('inspect.json'));
 else if (cmd === 'stats') process.stdout.write(read('stats.ndjson'));
 else if (cmd === 'compose logs') { const n = Number(rest[rest.indexOf('--tail') + 1]); for (let i = 1; i <= n; i++) console.log('line ' + i); }
 else if (cmd === 'compose up' || cmd === 'compose stop') process.exit(read('start-fail') ? 1 : 0);
+else if (cmd === 'compose exec') process.exit(read('exec-fail') ? 1 : 0);
 else if (cmd === 'compose restart') {
   const ms = Number(read('restart-sleep-ms') || 0);
   if (read('restart-fail')) { process.stderr.write('boom'); process.exit(1); }

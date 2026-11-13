@@ -19,6 +19,7 @@ const DEFAULT_TAIL = 200;
 const EXEC_TIMEOUT_MS = 120_000;
 const START_TIMEOUT_MS = 900_000; // `up -d` may build an image first
 const HISTORY_POINTS = 240;
+const OPTIMIZE_TRIES = 10;
 const CHANGE_HEADER = 'x-remoment-manager';
 const SESSION_COOKIE = 'rm_session';
 const SESSION_SECONDS = 12 * 3600;
@@ -46,6 +47,7 @@ function loadConfig(env = process.env) {
     thermalFile: env.REMOMENT_THERMAL_FILE || '/sys/class/thermal/thermal_zone0/temp',
     // No sign-in for the web page and the browser API: whoever reaches the port may use it (the bearer token still works
     // for the CLI and the app). Only sensible on a trusted LAN.
+    optimizeRetryMs: Number(env.REMOMENT_OPTIMIZE_RETRY_MS || 3000),
     open: ['1', 'true', 'yes'].includes(String(env.REMOMENT_MANAGER_OPEN || '').toLowerCase()),
     // CPU history: one `docker stats` sample every N seconds (0 = none), kept for an hour.
     sampleSeconds: Number(env.REMOMENT_SAMPLE_SECONDS === undefined ? 15 : env.REMOMENT_SAMPLE_SECONDS),
@@ -544,6 +546,18 @@ function createManager(cfg) {
       }
       // The app reads .env when its container is created: recreate it (only if its environment changed).
       if (r.ok) r = await composeWith({ timeout: START_TIMEOUT_MS }, 'up', '-d', 'app');
+      // The cached config (bootstrap/cache) still holds the old .env values: clear it and cache the new ones. The container
+      // may still be starting, so retry a few times.
+      if (r.ok) {
+        for (const cmd of ['optimize:clear', 'optimize']) {
+          for (let attempt = 0; attempt < OPTIMIZE_TRIES; attempt++) {
+            r = await composeWith({}, 'exec', '-T', '-u', 'sail', 'app', 'php', 'artisan', cmd);
+            if (r.ok) break;
+            await new Promise((done) => setTimeout(done, cfg.optimizeRetryMs));
+          }
+          if (!r.ok) { r.stderr = `php artisan ${cmd} failed: ${(r.stderr || r.stdout).trim()}`; break; }
+        }
+      }
       lastStatus = null;
       const result = r.ok ? 'ok' : `failed (exit ${r.code})`;
       audit(enabled ? 'enable' : 'disable', name, result);

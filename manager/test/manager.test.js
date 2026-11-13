@@ -50,7 +50,7 @@ test.before(async () => {
   fs.writeFileSync(thermal, '48500\n');
   const cfg = loadConfig({
     REMOMENT_MANAGER_HOME: home, REMOMENT_MANAGER_PORT: String(port), REMOMENT_PROJECT_DIR: tmp,
-    REMOMENT_COMPOSE_FILE: 'docker-compose.prod.yml', REMOMENT_COMPOSE_PROJECT: 'remoment', REMOMENT_THERMAL_FILE: thermal, REMOMENT_SAMPLE_SECONDS: '0',
+    REMOMENT_COMPOSE_FILE: 'docker-compose.prod.yml', REMOMENT_COMPOSE_PROJECT: 'remoment', REMOMENT_THERMAL_FILE: thermal, REMOMENT_SAMPLE_SECONDS: '0', REMOMENT_OPTIMIZE_RETRY_MS: '1',
   });
   const m = createManager(cfg);
   await m.listen();
@@ -449,6 +449,8 @@ test('features: list, switch on edits .env and starts the containers, switch off
   assert.equal(env.match(/^STEMS_URL=/gm).length, 1);
   const ups = docker.calls().filter((c) => c.includes('up')).map((c) => c.slice(c.indexOf('up')));
   assert.deepEqual(ups, [['up', '-d', 'stems'], ['up', '-d', 'app']]);
+  const execs = docker.calls().filter((c) => c.includes('exec')).map((c) => c.slice(c.indexOf('exec')));
+  assert.deepEqual(execs, [['exec', '-T', '-u', 'sail', 'app', 'php', 'artisan', 'optimize:clear'], ['exec', '-T', '-u', 'sail', 'app', 'php', 'artisan', 'optimize']]);
 
   // a deploy rewrites .env from its template (without stems), then re-applies what the manager recorded
   fs.writeFileSync(envFile, 'APP_NAME=ReMoment\nCOMPOSE_PROFILES=db\n');
@@ -475,4 +477,15 @@ test('features: switching off radio relay keeps Icecast while the Spotify stream
   assert.equal((await post('/features/radio-relay', { enabled: false })).status, 200);
   assert.equal(docker.calls().some((c) => c.includes('stop')), false);
   assert.match(fs.readFileSync(envFile, 'utf8'), /^RADIO_RELAY_ENABLED=false$/m);
+});
+
+test('features: a failing optimize is reported, after retries', async () => {
+  fs.writeFileSync(path.join(tmp, '.env'), 'COMPOSE_PROFILES=db\n');
+  docker.set('exec-fail', '1');
+  docker.clear();
+  const r = await post('/features/stems', { enabled: true });
+  docker.set('exec-fail', '');
+  assert.equal(r.status, 502);
+  assert.match(r.json().message, /optimize:clear failed/);
+  assert.equal(docker.calls().filter((c) => c.includes('exec')).length, 10);
 });
