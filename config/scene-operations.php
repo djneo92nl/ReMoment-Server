@@ -29,6 +29,7 @@ return [
     'setPower' => ['label' => 'Switch on or to standby', 'device_param' => 'device', 'enabled' => true],
     'activateSource' => ['label' => 'Activate a source', 'device_param' => 'device', 'enabled' => true],
     'movePlayback' => ['label' => 'Move playback to another device', 'device_param' => 'device', 'enabled' => true],
+    'announce' => ['label' => 'Play an announcement clip', 'device_param' => null, 'enabled' => true],
 
     // Queue
     'addToQueue' => ['label' => 'Add to the queue', 'device_param' => 'device', 'enabled' => true],

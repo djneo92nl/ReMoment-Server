@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AdminAuthController;
 use App\Http\Controllers\Api\AlertController;
+use App\Http\Controllers\Api\AnnouncementController;
 use App\Http\Controllers\Api\BeolinkStreamController;
 use App\Http\Controllers\Api\ClientController;
 use App\Http\Controllers\Api\DeepAnalysisController;
@@ -188,6 +189,10 @@ Route::get('/clients/{apiToken}/artwork', [ClientController::class, 'artwork']);
 Route::get('/tags/{uid}', [TagController::class, 'show']);
 Route::post('/tags/{uid}/play', [TagController::class, 'play']);
 
+// Announcements: a clip on speakers, then back to what played (docs/api/announcements.md); clips are managed in the admin group
+Route::get('/announcements/clips', [AnnouncementController::class, 'clips']);
+Route::post('/announcements', [AnnouncementController::class, 'store']);
+
 // Admin token login for apps. Routes that change configuration go in the `admin.token` group (see docs/api/admin-auth.md).
 Route::post('/admin/login', [AdminAuthController::class, 'login']);
 // Signed, temporary download of one export part: the signature is the authorization (docs/api/export.md)
@@ -224,6 +229,8 @@ Route::middleware('admin.token')->group(function () {
     Route::delete('/admin/tracks/{track}/files', [StorageController::class, 'destroyTrack']);
     Route::delete('/admin/files/{file}', [StorageController::class, 'destroyFile']);
     // Device source visibility (the web UI's DeviceSourceManager)
+    Route::post('/admin/announcements/clips', [AnnouncementController::class, 'upload']);
+    Route::delete('/admin/announcements/clips/{name}', [AnnouncementController::class, 'destroy']);
     Route::get('/admin/tags', [TagController::class, 'index']);
     Route::get('/admin/tags/last-scanned', [TagController::class, 'lastScanned']);
     Route::post('/admin/tags', [TagController::class, 'store']);

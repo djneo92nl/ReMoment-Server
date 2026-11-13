@@ -40,6 +40,16 @@ Route::get('/stream/{track}.{extension}', [StreamController::class, 'show'])->wh
     \App\Http\Middleware\RedirectToSetupWizard::class,
 ]);
 
+// An announcement clip (docs/api/announcements.md); fetched by speakers, so no session either.
+Route::get('/announce/{name}.mp3', [\App\Http\Controllers\AnnouncementClipController::class, 'show'])->where('name', '[a-z0-9-]+')->name('announce.clip')->withoutMiddleware([
+    \Illuminate\Cookie\Middleware\EncryptCookies::class,
+    \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+    \Illuminate\Session\Middleware\StartSession::class,
+    \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+    \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
+    \App\Http\Middleware\RedirectToSetupWizard::class,
+]);
+
 // A generated test signal for the developer page's tone test; fetched by speakers, so no session either.
 Route::get('/dev/tone/{name}.wav', [\App\Http\Controllers\DevToneController::class, 'show'])->where('name', '[a-z0-9-]+')->name('dev.tone')->withoutMiddleware([
     \Illuminate\Cookie\Middleware\EncryptCookies::class,
@@ -175,6 +185,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/settings/clients', [SettingsController::class, 'clients'])->name('settings.clients');
     Route::view('/settings/tags', 'settings.tags')->name('settings.tags');
+    Route::view('/settings/announcements', 'settings.announcements')->name('settings.announcements');
     Route::post('/settings/clients/artwork-export', [ArtworkExportController::class, 'store'])->name('settings.clients.artwork-export');
     Route::get('/settings/clients/artwork-export/download', [ArtworkExportController::class, 'download'])->name('settings.clients.artwork-export.download');
 });

@@ -55,11 +55,7 @@ final class PlaybackMover
 
         $snapshot = $this->capture->capture($from);
 
-        $result = match ($snapshot->kind) {
-            PlaybackSnapshot::SPOTIFY => $this->moveSpotify($to, $snapshot),
-            PlaybackSnapshot::RADIO => $this->moveRadio($to, $snapshot),
-            default => $this->moveLibrary($to, $snapshot, $position),
-        };
+        $result = $this->apply($to, $snapshot, $position);
 
         // Spotify's transfer already took playback away from A.
         if ($stopSource && $snapshot->kind !== PlaybackSnapshot::SPOTIFY) {
@@ -67,6 +63,24 @@ final class PlaybackMover
         }
 
         return $result + ['kind' => $snapshot->kind];
+    }
+
+    /**
+     * Start what a snapshot holds on $to: the second half of a move, also used to put playback back on the
+     * device it was captured from (after an announcement, see Announcer).
+     *
+     * @return array{queued: int, skipped: int, position: int}
+     *
+     * @throws NotPlayableException $to can't play it
+     * @throws PlaybackFailedException $to or Spotify failed
+     */
+    public function apply(Device $to, PlaybackSnapshot $snapshot, ?\Closure $position = null): array
+    {
+        return match ($snapshot->kind) {
+            PlaybackSnapshot::SPOTIFY => $this->moveSpotify($to, $snapshot),
+            PlaybackSnapshot::RADIO => $this->moveRadio($to, $snapshot),
+            default => $this->moveLibrary($to, $snapshot, $position),
+        };
     }
 
     private function moveSpotify(Device $to, PlaybackSnapshot $snapshot): array

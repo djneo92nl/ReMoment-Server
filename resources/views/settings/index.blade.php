@@ -28,6 +28,10 @@
                              label="Tags">
                 NFC tags and QR codes that play something
             </x-settings-row>
+            <x-settings-row href="{{ route('settings.announcements') }}" icon="fa-solid fa-bullhorn"
+                             label="Announcements">
+                Clips to play on speakers
+            </x-settings-row>
         </x-settings-group>
 
         @if(\App\Domain\Profile\Profile::allows('file_storage'))

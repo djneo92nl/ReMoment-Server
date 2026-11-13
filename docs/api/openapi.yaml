@@ -2663,6 +2663,56 @@ paths:
                   data: { $ref: "#/components/schemas/Alert" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /announcements/clips:
+    get:
+      tags: [Playback]
+      summary: The clips an announcement can play
+      operationId: listAnnouncementClips
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/AnnouncementClip" }
+  /announcements:
+    post:
+      tags: [Playback]
+      summary: Play a clip on one or more devices; each goes back to what it played
+      description: |
+        Needs the `stream_url` capability per device. Each device answers for itself in `devices`; `status` is
+        `ok`, `partial` or `failed` (502 when no device took the clip). Playback is restored by a queued job after
+        the clip's length, so the queue worker must run. See docs/api/announcements.md.
+      operationId: announce
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [clip, device_ids]
+              properties:
+                clip: { type: string, example: chime }
+                device_ids:
+                  type: array
+                  items: { type: integer }
+                volume: { type: integer, minimum: 0, maximum: 100, description: Volume during the clip (never above the device's limit) }
+      responses:
+        "200":
+          description: At least one device plays the clip
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AnnouncementResult" }
+        "422": { description: Validation error (unknown clip or device) }
+        "502":
+          description: No device took the clip
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AnnouncementResult" }
   /tags/{uid}:
     parameters:
       - { name: uid, in: path, required: true, schema: { type: string } }
@@ -2796,6 +2846,45 @@ paths:
                 properties:
                   status: { type: string, example: ok }
         "401": { $ref: "#/components/responses/Unauthenticated" }
+  /admin/announcements/clips:
+    post:
+      tags: [Admin]
+      summary: Upload a clip (converted to MP3, the first 30 seconds)
+      operationId: uploadAnnouncementClip
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+                label: { type: string, maxLength: 64 }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/AnnouncementClip" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { description: Not a sound file ffmpeg can read }
+  /admin/announcements/clips/{name}:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+    delete:
+      tags: [Admin]
+      summary: Remove an uploaded clip
+      operationId: deleteAnnouncementClip
+      security: [{ adminToken: [] }]
+      responses:
+        "200": { description: OK }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { description: "Unknown clip, or the built-in chime" }
   /admin/tags:
     get:
       tags: [Admin]
@@ -3845,6 +3934,28 @@ components:
       required: [volume]
       properties:
         volume: { type: integer, minimum: 0, maximum: 100 }
+    AnnouncementClip:
+      type: object
+      properties:
+        name: { type: string, example: chime }
+        label: { type: string }
+        duration_ms: { type: integer }
+        builtin: { type: boolean }
+    AnnouncementResult:
+      type: object
+      properties:
+        status: { type: string, enum: [ok, partial, failed] }
+        clip: { type: string }
+        devices:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              name: { type: string }
+              status: { type: string, enum: [ok, error] }
+              error: { type: string, enum: [unreachable, unsupported, driver_error] }
+              message: { type: string }
     PlayTag:
       type: object
       properties:

@@ -340,6 +340,10 @@ PUT  /api/devices/{id}/volume          body: { "volume": 45 }   → { "volume": 
 
 Volume is an integer 0–100.
 
+### Volume limits
+
+A device can have a maximum volume and a lower one during quiet hours (`App\Domain\Device\VolumeLimits`, device meta `volume_limits`): `PUT /volume` and the web sliders set at most the limit (the answer is the level that was set), a device that reports a higher volume is set back by the `EnforceVolumeLimit` listener (first on `VolumeUpdated`), and an every-minute scheduled call applies quiet hours when they begin. `GET /api/devices/{id}/volume-limits` (open), `PUT /api/admin/devices/{id}/volume-limits` (admin token), `volume_limit` on every device; admin card on `/devices/{id}/settings`. See `docs/api/device-settings.md`.
+
 ### Mute
 
 Part of `volume_control`.
@@ -596,6 +600,12 @@ GET /api/library/physical/lookup?barcode=                      → { data: [Rele
 ```
 
 MCP tool `physical`; web `/library/collection` (Livewire `PhysicalCollection`); table `physical_items`, `App\Domain\Catalogue\PhysicalItems`.
+
+### Announcements, tags and the party page
+
+- **Announcements** (`docs/api/announcements.md`): `POST /api/announcements { clip, device_ids, volume? }` plays a short MP3 clip (`GET /api/announcements/clips`; the built-in `chime` or an upload through `POST /api/admin/announcements/clips`) on devices with `stream_url`; `App\Domain\Playback\Announcer` remembers what played (queue and position, radio, Spotify, input, standby, volume) and the delayed job `RestoreAfterAnnouncement` puts it back with `PlaybackMover::apply()`. Scene operation `announce`, MCP `announce`, `/settings/announcements`. Unverified on hardware.
+- **Tap to play** (`docs/api/tags.md`): `POST /api/tags/{uid}/play { device_id?, client? }` plays what an NFC tag or QR code points to (album, artist, playlist, track, radio station, physical item; table `play_tags`, `App\Domain\Tags\PlayTags`, played through `ApiBridge` so the play endpoints stay the one implementation); an unknown uid is `404 unknown_tag` and kept 10 minutes for the admin; `/api/admin/tags` CRUD, `/settings/tags`, QR page `/t/{uid}`, MCP `tags`.
+- **Party page** (`docs/frontend/party.md`): the admin switches a guest queue on per device (card on `/devices/{id}/settings`, device meta `party`); `/party/{token}` is a page without the app layout where guests search and add tracks to that device's queue (`Livewire\PartyQueue`: only `add`, limited per visitor cookie and per address). Web only, gated with the library.
 
 ### Client Device API
 
