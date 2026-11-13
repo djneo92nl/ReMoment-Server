@@ -104,7 +104,7 @@ dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(10rem,1fr));gap:.8r
 .legend{display:flex;flex-wrap:wrap;gap:.3rem 1rem;margin-top:.6rem;font-size:.8rem}.legend i{display:inline-block;width:.7rem;height:.7rem;border-radius:2px;margin-right:.35rem;vertical-align:-1px}
 </style></head><body><main>
 <header><h1>ReMoment Manager</h1><div><span id="meta" class="muted"></span> <button id="signout" class="hidden">Sign out</button></div></header>
-${lan ? `<div class="banner">${open ? 'Open mode: no sign-in. Anyone on your network can start, stop and restart every container through this page.' : 'LAN mode: this page is reachable from your network over plain HTTP, and the manager can restart every container.'} Use it only on a network you trust.</div>` : ''}
+${lan && !open ? '<div class="banner">LAN mode: this page is reachable from your network over plain HTTP, and the manager can restart every container. Use it only on a network you trust.</div>' : ''}
 <div id="msg" class="msg hidden"></div>
 <section id="login" class="card hidden"><h2>Sign in</h2><form class="pad" id="loginform">
 <p class="muted">The manager token is in <code>token</code> in the manager's home on the server (<code>remoment-manager token</code> prints the path). It is not the admin password.</p>
