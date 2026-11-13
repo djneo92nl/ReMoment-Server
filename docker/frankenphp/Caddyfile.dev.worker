@@ -1,0 +1,34 @@
+{
+	# Development, Octane worker mode (FRANKENPHP_MODE=worker, docs/architecture/frankenphp.md), two ports as in Caddyfile.dev: the app boots once per worker and
+	# stays in memory, so a request costs milliseconds instead of a full framework boot. Costs RAM per worker; opt-in.
+	# Selected by start-container (CADDYFILE). Keep the site block in step with Caddyfile.
+	admin off
+	auto_https off
+	persist_config off
+	frankenphp {
+		num_threads {$FRANKENPHP_THREADS:4}
+		worker {
+			file /var/www/html/public/frankenphp-worker.php
+			# Needs num_threads above to be larger than this: the other threads still serve /stream, uploads and so on.
+			num {$FRANKENPHP_WORKERS:2}
+			# A worker restarts itself after MAX_REQUESTS requests (env, default 500 from start-container) to cap leaks.
+		}
+	}
+}
+
+:80, :{$SUPERVISOR_PHP_ALT_PORT:8080} {
+	route {
+		root * /var/www/html/public
+
+		request_body {
+			max_size 300MB
+		}
+
+		php_server {
+			index frankenphp-worker.php
+			try_files {path} frankenphp-worker.php
+			# public/storage is a symlink
+			resolve_root_symlink
+		}
+	}
+}

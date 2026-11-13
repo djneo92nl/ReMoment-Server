@@ -15,6 +15,11 @@ fi
 
 chmod -R ugo+rw /.composer
 
+# FrankenPHP image: Caddy's state dirs belong to sail, whose uid usermod just changed (the Sail image has none of these).
+for d in /data/caddy /config/caddy; do
+    [ -d "$d" ] && chown sail:sail "$d"
+done
+
 if [ $# -gt 0 ]; then
     if [ "$SUPERVISOR_PHP_USER" = "root" ]; then
         exec "$@"
@@ -29,5 +34,21 @@ else
     # Without the script (an old checkout) every program starts, as before profiles existed.
     : "${START_HISTORY_QUEUE:=false}" "${START_STORAGE_QUEUE:=true}" "${START_HEAVY_QUEUE:=true}" "${START_ANALYSIS_QUEUE:=true}" "${START_STEMS_QUEUE:=true}"
     export START_HISTORY_QUEUE START_STORAGE_QUEUE START_HEAVY_QUEUE START_ANALYSIS_QUEUE START_STEMS_QUEUE
+    # FRANKENPHP_MODE (classic | worker) picks the Caddyfile of the web server (docs/architecture/frankenphp.md). Worker mode
+    # keeps the app in memory (Octane) and costs RAM per worker, so Control (the Pi floor) stays classic.
+    : "${FRANKENPHP_MODE:=classic}" "${FRANKENPHP_WORKERS:=2}" "${MAX_REQUESTS:=500}"
+    if [ "$FRANKENPHP_MODE" = "worker" ] && [ "$(printf '%s' "${PROFILE:-standard}" | tr '[:upper:]' '[:lower:]')" = "control" ]; then
+        echo "start-container: FRANKENPHP_MODE=worker is not available in the control profile, using classic" >&2
+        FRANKENPHP_MODE=classic
+    fi
+    case "$FRANKENPHP_MODE" in
+        worker) CADDYFILE=/etc/caddy/Caddyfile.worker ;;
+        classic) CADDYFILE=/etc/caddy/Caddyfile ;;
+        *)
+            echo "start-container: unknown FRANKENPHP_MODE '$FRANKENPHP_MODE', using classic" >&2
+            CADDYFILE=/etc/caddy/Caddyfile
+            ;;
+    esac
+    export CADDYFILE FRANKENPHP_WORKERS MAX_REQUESTS
     exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
 fi

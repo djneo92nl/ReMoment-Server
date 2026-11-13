@@ -25,6 +25,10 @@ services:
             PROFILE: '${PROFILE:-standard}'
             # FrankenPHP PHP threads serving requests concurrently (docker/frankenphp/Caddyfile).
             FRANKENPHP_THREADS: '${FRANKENPHP_THREADS:-4}'
+            # classic (default) | worker (Octane, opt-in, Standard and Full only; costs RAM per worker, docs/architecture/frankenphp.md).
+            FRANKENPHP_MODE: '${FRANKENPHP_MODE:-classic}'
+            FRANKENPHP_WORKERS: '${FRANKENPHP_WORKERS:-2}'
+            MAX_REQUESTS: '${MAX_REQUESTS:-500}'
             XDEBUG_MODE: 'off'
         volumes:
             - '.:/var/www/html'

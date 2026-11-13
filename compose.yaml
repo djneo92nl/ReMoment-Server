@@ -1,11 +1,13 @@
 services:
     laravel.test:
         build:
-            context: './docker/8.4'
-            dockerfile: Dockerfile
+            # FrankenPHP like production (docker/frankenphp/Dockerfile), plus xdebug and pcov (DEV=true).
+            context: './docker'
+            dockerfile: frankenphp/Dockerfile
             args:
                 WWWGROUP: '${WWWGROUP}'
-        image: 'sail-8.4/app'
+                DEV: 'true'
+        image: 'remoment/app-dev'
         extra_hosts:
             - 'host.docker.internal:host-gateway'
         ports:
@@ -18,12 +20,26 @@ services:
             XDEBUG_MODE: '${SAIL_XDEBUG_MODE:-off}'
             XDEBUG_CONFIG: '${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}'
             IGNITION_LOCAL_SITES_PATH: '${PWD}'
+            SUPERVISOR_PHP_USER: 'sail'
+            # Second listen port of the dev Caddyfile (docker/frankenphp/Caddyfile.dev).
             SUPERVISOR_PHP_ALT_PORT: '${APP_PORT_ALT:-8080}'
+            FRANKENPHP_THREADS: '${FRANKENPHP_THREADS:-4}'
+            # classic (every request boots the app) | worker (Octane: the app stays in memory; docs/architecture/frankenphp.md).
+            FRANKENPHP_MODE: '${FRANKENPHP_MODE:-classic}'
+            FRANKENPHP_WORKERS: '${FRANKENPHP_WORKERS:-2}'
+            MAX_REQUESTS: '${MAX_REQUESTS:-500}'
             # control | standard | full: which supervisor programs start (docker/8.4/profile-env.sh).
             PROFILE: '${PROFILE:-standard}'
         volumes:
             - '.:/var/www/html'
             - './docker/8.4/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf'
+            - './docker/frankenphp/Caddyfile.dev:/etc/caddy/Caddyfile'
+            - './docker/frankenphp/Caddyfile.dev.worker:/etc/caddy/Caddyfile.worker'
+            # The entrypoint is mounted too, so it can never be older than the supervisor config above (an image built
+            # before profiles failed with "ENV_START_HISTORY_QUEUE cannot be expanded"); profile-env.sh comes from the
+            # project mount. The file is not executable on the host, hence `bash` in `entrypoint`.
+            - './docker/8.4/start-container:/usr/local/bin/start-container'
+        entrypoint: ['bash', '/usr/local/bin/start-container']
         networks:
             - sail
         depends_on:

@@ -1,0 +1,21 @@
+{
+	# Development: the same FrankenPHP classic mode as production (Caddyfile), but on two ports because Docker Desktop
+	# drops the port bindings when two host ports map to one container port (the old `php-alt` artisan serve).
+	# Mounted over /etc/caddy/Caddyfile by compose.yaml. Keep the body in step with Caddyfile.
+	admin off
+	auto_https off
+	persist_config off
+	frankenphp {
+		num_threads {$FRANKENPHP_THREADS:4}
+	}
+}
+
+:80, :{$SUPERVISOR_PHP_ALT_PORT:8080} {
+	root * /var/www/html/public
+
+	request_body {
+		max_size 300MB
+	}
+
+	php_server
+}

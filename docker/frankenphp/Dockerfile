@@ -24,6 +24,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # pcntl: device:listen forks one child per device. sockets: MQTT/SSDP. The rest is what composer.json and the app use.
 RUN install-php-extensions pcntl sockets gd imagick redis igbinary msgpack bcmath intl zip mbstring soap exif opcache pdo_mysql pdo_sqlite
 
+# Development image (compose.yaml builds with DEV=true): the debugger and the coverage driver the Sail image had.
+# Both are off until XDEBUG_MODE / a coverage run asks for them. Production never installs them.
+ARG DEV=false
+RUN if [ "$DEV" = "true" ]; then install-php-extensions xdebug pcov; fi
+
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 RUN php -r "exit(version_compare(PHP_VERSION, '$PHP_MIN_VERSION', '>=') ? 0 : 1);" \
@@ -42,6 +47,7 @@ RUN groupadd --force -g $WWWGROUP sail \
     && git config --global --add safe.directory /var/www/html
 
 COPY frankenphp/Caddyfile /etc/caddy/Caddyfile
+COPY frankenphp/Caddyfile.worker /etc/caddy/Caddyfile.worker
 COPY frankenphp/php.ini /usr/local/etc/php/conf.d/99-remoment.ini
 COPY 8.4/start-container /usr/local/bin/start-container
 COPY 8.4/profile-env.sh /usr/local/bin/profile-env.sh

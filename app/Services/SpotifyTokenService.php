@@ -29,11 +29,15 @@ class SpotifyTokenService
         'user-read-recently-played',
     ];
 
-    private Session $session;
+    private ?Session $session = null;
 
-    public function __construct()
+    /**
+     * Built on first use, not in the constructor: a controller instance can outlive one request (Octane worker mode),
+     * and the credentials (Settings › Services) and the callback URL must be read when they are needed.
+     */
+    private function session(): Session
     {
-        $this->session = new Session(
+        return $this->session ??= new Session(
             clientId: self::clientId(),
             clientSecret: self::clientSecret(),
             redirectUri: route('spotify.callback'),
@@ -65,19 +69,19 @@ class SpotifyTokenService
 
     public function getAuthorizationUrl(): string
     {
-        return $this->session->getAuthorizeUrl([
+        return $this->session()->getAuthorizeUrl([
             'scope' => [...self::SCOPES, ...self::OPTIONAL_SCOPES],
         ]);
     }
 
     public function handleCallback(string $code): void
     {
-        $this->session->requestAccessToken($code);
+        $this->session()->requestAccessToken($code);
 
-        Setting::set('spotify_access_token', $this->session->getAccessToken());
-        Setting::set('spotify_refresh_token', $this->session->getRefreshToken());
-        Setting::set('spotify_token_expires_at', (string) $this->session->getTokenExpiration());
-        Setting::set('spotify_granted_scopes', implode(' ', $this->session->getScope()));
+        Setting::set('spotify_access_token', $this->session()->getAccessToken());
+        Setting::set('spotify_refresh_token', $this->session()->getRefreshToken());
+        Setting::set('spotify_token_expires_at', (string) $this->session()->getTokenExpiration());
+        Setting::set('spotify_granted_scopes', implode(' ', $this->session()->getScope()));
     }
 
     public function hasRequiredScopes(): bool
@@ -99,15 +103,15 @@ class SpotifyTokenService
 
         // Refresh if expired or expiring within 60 seconds
         if (time() >= ($expiresAt - 60)) {
-            $this->session->setRefreshToken($refreshToken);
+            $this->session()->setRefreshToken($refreshToken);
 
-            if (!$this->session->refreshAccessToken()) {
+            if (!$this->session()->refreshAccessToken()) {
                 return null;
             }
 
-            $accessToken = $this->session->getAccessToken();
+            $accessToken = $this->session()->getAccessToken();
             Setting::set('spotify_access_token', $accessToken);
-            Setting::set('spotify_token_expires_at', (string) $this->session->getTokenExpiration());
+            Setting::set('spotify_token_expires_at', (string) $this->session()->getTokenExpiration());
         }
 
         return $accessToken;
