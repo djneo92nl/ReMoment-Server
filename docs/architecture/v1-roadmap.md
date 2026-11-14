@@ -268,7 +268,7 @@ Done when: an item can be added by barcode or by hand, shows on its album page, 
 
 **Constraint.** A ripper needs an optical drive on the machine that runs it, and the server (Docker on the Pi/Proxmox hosts, [system-requirements.md](system-requirements.md)) usually has none. So ripping is an **optional, drive-gated feature**; everything else works without it, including "import from a folder".
 
-- **Where it runs (changed 2026-10-27).** The drive is on a **helper machine** or the server. The first helper is built: **ReMoment Ripper** (`ripper/`, a Tauri v2 desktop app, see `ripper/README.md`). It signs in with the **admin login and bearer token** (kept in the OS keychain; not the client-registration flow planned earlier), looks a disc up on MusicBrainz, tags the files and uploads them through `POST /api/admin/files` (the upload endpoint exists: enrichment on upload, no duplicate files, Vorbis album artist and disc tags). Status: sign in and upload one existing file; **ripping itself is not built yet**. This replaces the earlier "standalone script" decision for desktops. **Open:** a headless variant for a Pi with a drive (a Tauri GUI is the wrong shape there); either a small CLI built on the same upload API, or drop it and rip on a desktop.
+- **Where it runs (changed 2026-10-27).** The drive is on a **helper machine** or the server. The first helper is built: **ReMoment Ripper** (`ripper/`, a Tauri v2 desktop app, see `ripper/README.md`). It signs in with the **admin login and bearer token** (kept in the OS keychain; not the client-registration flow planned earlier), looks a disc up on MusicBrainz, tags the files and uploads them through `POST /api/admin/files` (the upload endpoint exists: enrichment on upload, no duplicate files, Vorbis album artist and disc tags). Status: sign in and upload one existing file; **ripping itself is not built yet**. This replaces the earlier "standalone script" decision for desktops. **Open:** a headless variant for a Pi with a drive (a Tauri GUI is the wrong shape there); either a small CLI built on the same upload API, or drop it and rip on a desktop. (Idea 2026-11-14: a node agent with a `ripper` role, driven from the server and the apps, see workstream 18.1; 1.1.)
 - **Engine.** `cyanrip` or `whipper` (secure ripping, AccurateRip check, MusicBrainz disc-ID lookup, FLAC, cue sheet, log), on the helper machine; on the server it is an opt-in container profile like `beolink-stream.md`/`spotify-stream.md` with the drive passed through (`devices:`). Output goes to the inbox; the analysis pipeline follows.
 - **Flow.** `GET /settings/storage` (or `/library/collection`) shows the drive state (empty, disc present, ripping); the disc's MusicBrainz disc ID gives candidate releases; the user confirms the release (or enters a barcode, matching a `physical_item`), the rip runs on a queue (`rip` queue, one at a time), progress is live (MQTT → Livewire like the other live views), the result lands in the library, the physical item gets `ripped_at` and `file_id`, and the disc is optionally ejected.
 - **Quality and failures.** The rip log (AccurateRip result, track confidences) is kept with the files and surfaces in library health ([library-health.md](library-health.md)); a damaged or unconfident rip is flagged, not silently accepted. A disc without a MusicBrainz match can be ripped under a manual name and tagged later (tag editor, workstream 8).
@@ -672,8 +672,63 @@ Status: **17.1 and 17.2 built 2026-10-30, the rest plan; Should.** Added 2026-10
 
 Done when: 181.FM, NTS 1 and FIP all play on the MCi900 from the web UI and the API; a station a renderer can play itself still goes direct; with a real Pi 3, the CPU of one and four relays is measured and the default limit set from it.
 
+## 18. 1.1: Node agent, ripper, line-in, sync (ideas, not planned in detail)
+
+Status: **idea, added 2026-11-14; all of it is 1.1, nothing here is in 1.0.** A brainstorm to see what is possible; each step needs its own plan before it is built. The ESP32 microphone idea is in workstream 19 (1.2).
+
+**Foundation: a ReMoment Node.** A small headless daemon for a Pi (or any machine) that registers like a client (the registration flow of [client-devices.md](../api/client-devices.md)) and declares roles: `ripper`, `line-in`, `player`, `sync-target`. The server sends it jobs over MQTT command topics; results come back over REST (the upload endpoint `POST /api/admin/files` exists). It is the headless answer to the open question in workstream 7 (a Tauri GUI is the wrong shape for a Pi). Nodes are devices, not users: the no-accounts rule holds.
+
+### 18.1 Remote-controlled CD ripper
+- The node wraps `cyanrip` or `whipper` (the engine decision of workstream 7). Disc state, rip, eject and progress are live over MQTT; the rip log feeds library health; the physical item gets `ripped_at` and `file_id`.
+- Clients get a "Rip this disc" card: confirm the release (MusicBrainz disc ID or barcode), then rip. The server and the apps drive it; nothing is typed on the Pi.
+- "Play from the CD": either rip first and play the file (simple), or stream the disc as PCM through 18.2 (a drive is then just another input).
+- *Unverified:* drive passthrough on LXC or Docker; the Pi doing rip, analysis and playback at once (the rule that rip and analysis run one job each and yield to listeners carries over).
+
+### 18.2 Line-in as a stream source *[S to M]*
+- The node captures ALSA, encodes with ffmpeg and serves an HTTP stream; the server exposes it as a source that any DLNA, Sonos or B&O speaker can play, the same pattern as [beolink-stream.md](beolink-stream.md) and the radio relay (workstream 17).
+- Latency is 2 to 5 s: fine for a turntable or CD, not for TV. The docs say so.
+- Now playing for a source with no tags: fingerprint the captured audio (Chromaprint and AcoustID already exist for the own files), then scrobble. A clean line-in suits AcoustID well.
+
+### 18.3 Sync to offline targets *[L; phased]*
+- A **sync target** (USB stick, MP3 player, iPod, phone, a Pi) has a **sync profile**: rules (artists, albums, playlists, smart playlists, re-evaluated on every sync so "unplayed, 120+ BPM, favourites" stays fresh), a capacity budget ("fill 32 GB, ranked by favourites and play count") and a transcode profile reused from the export planner (workstream 13).
+- **Manifest and diff:** the server computes the wanted set with content hashes; the target applies adds and removes, resumably. Pull-based, because the targets are not connected to the server. One protocol for every target:
+  - the iOS app's offline library (downloads to the phone, no extra hardware, first);
+  - a mounted volume written by a node or a Mac helper (folders and relative `.m3u8` playlists);
+  - an iPod: a Rockbox iPod is just folders, a stock iPod needs `libgpod` to write iTunesDB; **last**, a bonus.
+- Syncing back: offline play counts and scrobbles merge into history.
+- Own files only; Spotify and DLNA tracks have no file, as with export.
+- *Open:* iOS background downloads, SD-card wear on a Pi, how a target proves what it holds (hashes or a manifest file).
+
+### 18.4 The Pi as a disconnected node
+With a light SQLite library (the Control profile already uses SQLite), the node pulls a manifest when it can reach the server, keeps the files, plays through its own DAC offline and reports plays when it is back. One box can then be player, ripper, line-in and sync helper. Needs 18.1 and 18.3.
+
+### Build order
+1. Node agent and the headless ripper (closes the workstream 7 question, builds the foundation).
+2. Line-in and CD stream source (small, reuses the stream container pattern).
+3. Sync v1: manifest API, iOS offline library, folder and USB target.
+4. Node offline playback and sync-back.
+5. iPod (`libgpod`) and the `exports` SMB share of workstream 13.
+
+## 19. 1.2: Listening microphone on the ESP32 (idea)
+
+Status: **idea, added 2026-11-14; 1.2, on purpose.** The ESP32 client still needs work of its own, so this waits for it and for 18.2 (the identify pipeline).
+
+- **Hardware and transport:** an ESP32-S3 with an I2S MEMS microphone (INMP441, SPH0645 or a board with one built in) captures 16 kHz mono 16-bit (about 32 KB/s) for 10 to 15 s, started by a touch button ("What's playing?") or an MQTT request, never listening all the time. The ESP32 sends the audio to the server; the server fingerprints it. Audio is discarded after the match, never stored; a `microphone` capability at registration makes it opt-in. Probably `POST /api/clients/{id}/listen`; the result is published on MQTT as a "Room mic" now playing and can be scrobbled.
+- **Matching quality is the risk.** Chromaprint and AcoustID are made for near-identical audio; a room microphone drops the hit rate a lot. Options in order of preference:
+
+  | Source | Method | Expectation |
+  |---|---|---|
+  | Clean line-in (18.2) | AcoustID | works well |
+  | Room mic, track in the own library | an own landmark fingerprint index of the library (audfprint or Dejavu style) | works well, noise-robust |
+  | Room mic, unknown track | an external recognition service (ACRCloud or similar) | works, but costs money or has quotas and sends audio off the network |
+  | Room mic, plain AcoustID | none | hit or miss; do not promise it |
+
+- It is only useful for sources the server cannot see (a record player on a plain amplifier, a radio); for a device ReMoment controls, now playing is already known.
+- **First step, a spike before any build:** record 15 s of music with a phone near a speaker and run it through `fpcalc` and AcoustID, then against a small own-library index of a few hundred tracks; the hit rates decide which path is the main one. Size: S to M for the plumbing, M for the own-library index (which also helps a turntable case where AcoustID has no entry).
+
 ## Not in 1.0
 
+- 1.1: the node agent, CD ripping from a Pi, line-in streaming and sync to offline targets (workstream 18). 1.2: the ESP32 microphone (workstream 19).
 - 1.1 or later, wanted: an SMB share and a USB target for finished exports (workstream 13); more export formats (AAC, Opus).
 - Accounts, profiles, per-user stats or any role model (permanent constraint).
 - Re-streaming Deezer or Tidal audio to other speakers; a Tidal catalogue with its own OAuth login unless a playback path is verified.
