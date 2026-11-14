@@ -1,6 +1,6 @@
 # ReMoment Manager (workstream 10, read-only core)
 
-Code: `manager/` (`server.js`, `bin/remoment-manager`, `test/`). Status: **skeleton built**: status, logs, restart, audit, CLI, and the web page Settings › Manager (admin login, `App\Domain\Manager\ManagerClient`). No upgrade, no SMB, no Pi image yet (see "Still to do"). Plan: [v1-roadmap.md](v1-roadmap.md) section 10.
+Code: `manager/` (`server.js`, `bin/remoment-manager`, `test/`). Status: **skeleton built**: status, logs, restart, audit, CLI, and the web page Settings › Manager (admin login, `App\Domain\Manager\ManagerClient`). Upgrade and rollback are built (see "Upgrade and rollback"); no SMB, no Pi image yet (see "Still to do"). Plan: [v1-roadmap.md](v1-roadmap.md) section 10.
 
 ## What it is for
 
@@ -47,6 +47,9 @@ remoment-manager logs <service> [--tail N]
 remoment-manager restart <service>
 remoment-manager restart-all
 remoment-manager audit [--limit N] [--json]
+remoment-manager upgrade [--wait]       starts the upgrade; --wait follows the log and exits 0 (ok) or 1 (failed)
+remoment-manager rollback [--wait]
+remoment-manager upgrade-status [--json]
 remoment-manager token                  prints the token file's path, never the token
 ```
 
@@ -87,6 +90,27 @@ This one is the app's view of the manager, behind the admin login, for convenien
 `/settings/manager` (`Livewire\ManagerPanel`, behind the admin login like all of `/settings`) shows the containers with state, health, crashed/restarting, uptime, restarts, memory and CPU, the host figures, a log viewer per service and the recent audit entries; Restart per service and Restart all (with a confirm; restarting `app` stops the server that serves the page, so the answer may not arrive). It refreshes every 10 s while the tab is visible.
 
 The app calls the manager at `MANAGER_URL` (default `http://127.0.0.1:8099`: production runs host-networked) with the manager's own token and the `x-remoment-manager: 1` header (`config/manager.php`). The token is read from `MANAGER_TOKEN_FILE` (default `/run/remoment-manager/token`), the manager's home mounted read-only into the app container (`MANAGER_HOME`, `docker-compose.prod.yml`, set by Ansible's `env.j2`); `MANAGER_TOKEN` is an alternative. The admin password is never the token. Without a manager, a token or an answer the page explains which one is missing instead of failing. Not available on a dev machine where Docker runs the app in a bridge network (the manager's Host check wants `127.0.0.1`). Tests: `tests/Feature/ManagerPageTest.php` with `Http::fake`; unverified against the real manager.
+
+## Upgrade and rollback
+
+The web version of `app:upgrade` ([backup-restore.md](backup-restore.md)), which stays as the CLI. Code: `startJob`, `upgradeJob`, `rollbackJob` in `manager/server.js`; state in `upgrade.json` in the manager home (mode 0600, survives a manager restart; a job found still "running" after a restart is marked failed `interrupted`). One change at a time: the job holds the same lock as restart/start/stop, so every other change answers 409 while it runs; reads stay available.
+
+**You install the new code first** (git pull, the Ansible deploy, or a new image on the registry); the manager does not fetch code. What it does for the `app` service:
+
+1. **Keep the current image**: `docker tag <image> <repo>:previous` (the image name is read from `compose config --format json`, `services.app.image`, and checked against a strict pattern). No image yet (first install) is a skipped step. Failure stops before anything changed.
+2. **New image**: `compose build app` (`REMOMENT_UPGRADE_MODE=build`, the default: the code is on disk) or `compose pull app` (`pull`: registry images, once they exist). Failure stops here, the running container is untouched (`image_failed`).
+3. **Start it**: `compose up -d --no-build app`.
+4. **`php artisan app:upgrade --force --json`** in the app container (`exec -T -u sail`), retried while the container is still starting and prints no JSON object. Its exit code and `exit_reason` become the result: **0** ok, **1** `blocked` (pre-flight, nothing migrated), **2** `backup_failed` (nothing migrated), **3** `migration_failed` (**the app stays in maintenance mode**), **4** `health_failed` (the app is up). Anything else or no answer: `app_upgrade_failed`. From its JSON the manager keeps `backup`, `migrations_run`, `steps`, `health`, `problems`, `reasons`, `rollback` (`previous_version`, `backup`, `commands`, `note`). Audit lines: `upgrade started`, then `upgrade ok` or `upgrade failed (<reason>)`.
+
+**Rollback** (`POST /rollback`) is only possible for the last upgrade when it failed and has not been rolled back (`can_rollback`). It follows that upgrade's own `rollback` block, never anything from the request: the previous image comes back (`docker tag <repo>:previous <image>`, `up -d --no-build app`; skipped when step 1 had kept none, refused when the tag is gone), then, **only after `migration_failed` or `health_failed`** (the only exits that touched the database), `php artisan backup:restore <archive> --force` with the archive path from the failed upgrade's answer (refused unless it matches `^/?[A-Za-z0-9_][A-Za-z0-9_./-]*$` with no `..`, so it can never be taken for a flag), then `php artisan up`, `optimize:clear`, `queue:restart`. Anything saved after the backup is lost; after `blocked`/`backup_failed` only the image goes back. A failed step leaves the upgrade rollback-able so it can be retried. Audit: `rollback started`, `rollback ok` / `failed (<reason>)`.
+
+**Security.** Neither endpoint takes a body, a query value or a path segment into a command: the service is the constant `app` (checked to be in the compose file), the image comes from the compose file, the archive from the app's answer, all through the one `execFile` with argument arrays. Token or session, the `x-remoment-manager` header and the Host check apply as to every change. The CLI and the app's Settings › Manager card use the same endpoints; the manager's own page has no upgrade button yet.
+
+**Status stream.** The job answers 202 at once; `GET /upgrade?since=N` returns the records (`upgrade`, `rollback`: `state` running/ok/failed, `exit_code`, `exit_reason`, `message`, `steps: [{name, result: ok|failed|skipped, seconds}]`, …) plus the log lines after `N` (`log_next` is the next offset); the log is in memory, the last 500 lines. Timeouts: 15 minutes per image step and per `app:upgrade` run.
+
+**Settings › Manager** (`Livewire\ManagerPanel`, `ManagerClient::upgrade()/rollback()/upgradeStatus()`): an Upgrade card with an Upgrade button (a `wire:confirm` says the app is unavailable while it migrates and that a backup comes first), the steps and result of the last upgrade or rollback, the hand-run commands of the app's rollback block after a failure, and a Roll back button (with its own confirm, naming the data loss) while `can_rollback`. While a job runs the page polls every 2 s and shows the log. A manager without these endpoints simply shows no card. Admin login only like the whole page; the buttons do nothing else than the two calls above.
+
+**Not verified:** against a real Docker, a real image build or a real `app:upgrade` (the tests use the fake docker and its canned answers); `docker image inspect/tag` and `compose config --format json` output shapes are written from memory; whether `backup:restore --force` into a database that is already migrated forward works on MariaDB (the restore docs say "fresh install"); the app's own container is recreated during an upgrade, so a web page that triggered it loses its connection for a while (the page reconnects through its poll).
 
 ## Tests
 
@@ -130,9 +154,9 @@ launchd (`~/Library/LaunchAgents/nl.remoment.manager.plist`):
 
 ## Still to do (open)
 
-- Neither page has upgrade, start/stop of single processes or SMB yet. HTTPS for the LAN page (today: a reverse proxy).
+- Neither page has start/stop of single processes or SMB yet; the manager's own page has no upgrade button (the CLI and Settings › Manager have). HTTPS for the LAN page (today: a reverse proxy).
 - Processes inside the app container (supervisor: queue, scheduler, listeners), start/stop of single services.
-- Upgrade and rollback (calls `app:upgrade`, previous image tag plus `backup:run`/`backup:restore`), host backup now, diagnostics bundle.
+- Host backup now, diagnostics bundle; registry images for `REMOMENT_UPGRADE_MODE=pull` (none published yet).
 - SMB serve and mount (Samba on the host).
 - Installers: Raspberry Pi image, install script for plain compose. (The Ansible install exists: `ansible/manager.yml`, systemd unit from `ansible/templates/remoment-manager.service.j2`; syntax-checked only, not run against a host.)
 - How the manager updates itself (decision c) and the init system per target (decision d).

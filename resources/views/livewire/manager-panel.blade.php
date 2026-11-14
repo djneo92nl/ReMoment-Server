@@ -10,7 +10,7 @@
     };
 @endphp
 
-<div wire:poll.10s.visible class="space-y-6" data-test="manager-panel">
+<div @if($job['running'] ?? false) wire:poll.2s @else wire:poll.10s.visible @endif class="space-y-6" data-test="manager-panel">
 
     @if($notice)
         <div class="px-5 py-3 text-sm rounded-2xl border text-emerald-800 dark:text-emerald-200 bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-800" data-test="manager-notice">
@@ -70,6 +70,58 @@
                 </div>
             @endforeach
         </x-card>
+
+
+        @if($job)
+            @php
+                $record = ($job['running'] ?? false) && ($job['rollback']['state'] ?? null) === 'running' ? $job['rollback'] : ($job['upgrade'] ?? null);
+                $last = collect([$job['upgrade'] ?? null, $job['rollback'] ?? null])->filter()->sortByDesc('started_at')->first();
+                $icon = fn ($r) => match ($r) { 'ok' => 'fa-circle-check text-emerald-600', 'failed' => 'fa-circle-xmark text-red-600', default => 'fa-minus text-gray-400' };
+            @endphp
+            <x-card flush data-test="manager-upgrade">
+                <div class="px-8 py-5 border-b border-gray-100 dark:border-stone-800 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h2 class="text-base font-medium text-gray-900 dark:text-gray-100">Upgrade</h2>
+                        <p class="text-xs text-gray-500">Installs the new image ({{ $job['mode'] === 'pull' ? 'pulled' : 'built from the code on disk' }}), makes a backup, migrates and checks the app. Install the new code first.</p>
+                    </div>
+                    <div class="flex gap-2">
+                        @if($job['can_rollback'] && ! $job['running'])
+                            <x-secondary-button size="sm" wire:click="rollback"
+                                                wire:confirm="Roll back the last failed upgrade? The previous image comes back and the backup made just before it is restored: anything saved after that backup is lost."
+                                                data-test="rollback"><i class="fa-solid fa-rotate-left mr-2"></i>Roll back</x-secondary-button>
+                        @endif
+                        <x-secondary-button size="sm" wire:click="upgrade" :disabled="$job['running']"
+                                            wire:confirm="Upgrade now? The app is unavailable while it migrates and may stay in maintenance mode if that fails. A backup is made first."
+                                            data-test="upgrade"><i class="fa-solid fa-arrow-up-from-bracket mr-2"></i>Upgrade</x-secondary-button>
+                    </div>
+                </div>
+                @if($last)
+                    <div class="px-8 py-4 space-y-3 text-sm" data-test="upgrade-result">
+                        <div class="flex flex-wrap items-center gap-x-3 text-gray-900 dark:text-gray-100">
+                            <span class="font-medium">{{ ucfirst($last['kind']) }}</span>
+                            @if($last['state'] === 'running')
+                                <span class="text-amber-600"><i class="fa-solid fa-spinner fa-spin mr-1"></i>running</span>
+                            @elseif($last['state'] === 'ok')
+                                <span class="text-emerald-700 dark:text-emerald-300">done</span>
+                            @else
+                                <span class="text-red-600">failed: {{ str_replace('_', ' ', $last['exit_reason'] ?? 'unknown') }}</span>
+                            @endif
+                            <span class="text-xs text-gray-500">{{ \Illuminate\Support\Carbon::parse($last['started_at'])->diffForHumans() }}</span>
+                        </div>
+                        @if($last['message'] ?? null)<p class="text-gray-600 dark:text-gray-400">{{ $last['message'] }}</p>@endif
+                        @foreach($last['steps'] ?? [] as $s)
+                            <div class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400"><i class="fa-solid {{ $icon($s['result']) }}"></i>{{ $s['name'] }}<span class="text-gray-400">{{ $s['seconds'] }} s</span></div>
+                        @endforeach
+                        @if(($last['kind'] ?? '') === 'upgrade' && ($last['state'] ?? '') === 'failed' && ! empty($last['rollback']['commands']))
+                            <p class="text-xs text-gray-500">By hand: <code>{{ implode(' && ', $last['rollback']['commands']) }}</code></p>
+                        @endif
+                        @if(! empty($job['log']) && $job['running'])
+                            <pre class="max-h-48 overflow-auto text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap" data-test="upgrade-log">{{ collect($job['log'])->pluck('line')->implode("\n") }}</pre>
+                        @endif
+                    </div>
+                @endif
+            </x-card>
+        @endif
 
         @if($logService)
             <x-card flush data-test="manager-logs">

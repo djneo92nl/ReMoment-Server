@@ -20,6 +20,9 @@ const HELP = `remoment-manager: control the running ReMoment install
   remoment-manager restart <service>
   remoment-manager restart-all
   remoment-manager audit [--limit N] [--json]
+  remoment-manager upgrade [--wait]       run the app's upgrade (image, backup, migrate, health check); --wait follows it
+  remoment-manager rollback [--wait]      undo the last failed upgrade (previous image, restore its backup)
+  remoment-manager upgrade-status [--json]
   remoment-manager token          where the token file is (never the token itself)
 
 Talks to ${BASE} (REMOMENT_MANAGER_PORT, REMOMENT_MANAGER_HOME).`;
@@ -113,6 +116,38 @@ async function main() {
       const text = await api('GET', `/audit${limit ? `?limit=${encodeURIComponent(limit)}` : ''}`);
       if (json) return console.log(text);
       for (const e of JSON.parse(text).data) console.log(`${e.time}  ${e.action}${e.service ? ' ' + e.service : ''}  ${e.result}`);
+      return;
+    }
+    case 'upgrade':
+    case 'rollback': {
+      const wait = args.includes('--wait');
+      await api('POST', `/${cmd}`);
+      console.log(`${cmd} started.`);
+      if (!wait) return console.log('Follow it with: remoment-manager upgrade-status');
+      let since = 0;
+      for (;;) {
+        const v = JSON.parse(await api('GET', `/upgrade?since=${since}`));
+        for (const l of v.log) console.log(`${l.t}  ${l.line}`);
+        since = v.log_next;
+        if (!v.running) {
+          const rec = v[cmd];
+          console.log(rec.state === 'ok' ? c(32, `${cmd} ok`) : c(31, `${cmd} failed: ${rec.exit_reason}${rec.message ? ` - ${rec.message}` : ''}`));
+          if (cmd === 'upgrade' && rec.state !== 'ok' && v.can_rollback) console.log('Undo it with: remoment-manager rollback --wait');
+          return process.exit(rec.state === 'ok' ? 0 : 1);
+        }
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+    }
+    case 'upgrade-status': {
+      const text = await api('GET', '/upgrade');
+      if (json) return console.log(text);
+      const v = JSON.parse(text);
+      for (const k of ['upgrade', 'rollback']) {
+        const r = v[k];
+        console.log(r ? `${k}: ${r.state}${r.exit_reason && r.state !== 'ok' ? ` (${r.exit_reason})` : ''}  ${r.started_at}` : `${k}: never run`);
+      }
+      if (v.running) console.log(c(33, 'A job is running.'));
+      if (v.can_rollback) console.log('The last upgrade failed: remoment-manager rollback');
       return;
     }
     case 'token':

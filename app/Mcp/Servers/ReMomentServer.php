@@ -56,5 +56,8 @@ class ReMomentServer extends Server
         Tools\Export::class,
         Tools\Alerts::class,
         Tools\PlaybackHistory::class,
+        Tools\LibraryOverview::class,
+        Tools\LibraryHealth::class,
+        Tools\ListeningStats::class,
     ];
 }

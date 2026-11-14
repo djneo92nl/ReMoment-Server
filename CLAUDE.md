@@ -50,7 +50,7 @@ docs/
     action-layer.md         Action layer spike (14.5): can an action be defined once and route/MCP/OpenAPI/scene/HA derived? numbers, recommendation (keep REST + openapi.yaml as the definition, scenes call operations by operationId), and what was built from it: operationIds, contract test, scene-operation list, `ha:package`
     credentials.md          Credentials layer (workstream 14.4): ServiceCredentials registry for Spotify/Last.fm/Discogs/AcoustID/TheAudioDB keys, /settings/services, encrypted secrets, backup exclusion, base-URL/relay hook, setup steps, how to add a service
     database.md             MariaDB (SQLite for tests only): why, .env settings, db:import-sqlite, recovering a corrupt file, driver-specific SQL
-    manager.md              ReMoment Manager (workstream 10 skeleton, `manager/`): host service, Node one file, own token, 127.0.0.1:8099: status, logs, restart of one compose project, audit, CLI `remoment-manager`, security rules, tests with a fake docker; web page, upgrade, SMB, installers still to do
+    manager.md              ReMoment Manager (workstream 10 skeleton, `manager/`): host service, Node one file, own token, 127.0.0.1:8099: status, logs, restart of one compose project, upgrade and rollback (`POST /upgrade`, `/rollback`: runs `app:upgrade --force --json` in the app container, previous image kept as `:previous`, rollback restores the failed upgrade's backup), audit, CLI `remoment-manager`, security rules, tests with a fake docker; SMB, installers still to do
     developer-tools.md      /settings/developer: quality test (transcode ladder played on a device), simulate now playing, MQTT console, device inspector, stream URL tester
     hardware-table.md       Generated supported-hardware table (9b): `hardware:table`, config/hardware-status.php statuses, the stale-page test
     device-drivers.md       Driver contracts, existing drivers, guide for adding a new brand
@@ -103,7 +103,7 @@ When adding a significant feature, add a matching doc in the relevant subfolder 
 
 ## MCP Server
 
-`/mcp` (`app/Mcp/`, `laravel/mcp`, `routes/ai.php`) lets an AI agent control devices and manage the library. Open like the REST API; the tools marked ADMIN (maintenance, removal, storage) are listed only with the admin bearer token (no new accounts). Device/library tools go through `App\Mcp\ApiBridge`, an in-process call of the REST API, so the API stays the single implementation: when you add an endpoint, add or extend a tool in `app/Mcp/Tools/` and the table in `docs/api/mcp.md`. Playlist create/edit/delete lives in `App\Domain\Library\PlaylistEditor` (web UI and MCP share it). See `docs/api/mcp.md`.
+`/mcp` (`app/Mcp/`, `laravel/mcp`, `routes/ai.php`) lets an AI agent control devices and manage the library. Open like the REST API; the tools marked ADMIN (maintenance, removal, storage) are listed only with the admin bearer token (no new accounts). Device/library tools go through `App\Mcp\ApiBridge`, an in-process call of the REST API, so the API stays the single implementation: when you add an endpoint, add or extend a tool in `app/Mcp/Tools/` and the table in `docs/api/mcp.md`. Playlist create/edit/delete lives in `App\Domain\Library\PlaylistEditor` (web UI and MCP share it). The analytics reads have tools too (`library_overview`, `library_health`, `listening_stats`, sound filters on `browse_library` kind `tracks`): open, with the profile gates of their REST routes coming through the bridge. See `docs/api/mcp.md`.
 
 ## Profiles
 
@@ -174,6 +174,9 @@ php artisan library:analyze [--limit=100] [--stage=loudness|waveform|quality|fin
 
 # Opt-in nightly stems (STEMS_NIGHTLY=true, 02:00): queue stems for tracks that have none, newest first, within STEMS_NIGHT_HOURS (default 4) of estimated work on the single `stems` worker; --hours overrides, --dry-run counts; see docs/architecture/stems-service.md
 php artisan library:analyze-stems [--hours=4] [--dry-run]
+
+# Home Assistant MQTT discovery (opt-in: switch on /settings/mqtt or HA_DISCOVERY_ENABLED): publish the retained configs + states of the "ReMoment Server" device (stats, health, clients, sources, event entities; never media_player), or clear them with --remove; the scheduler republishes every 5 minutes while on; unverified in a real HA; see docs/architecture/home-assistant.md
+php artisan ha:discovery [--remove]
 
 # Home Assistant rest_command package (YAML) for the scene-capable operations of config/scene-operations.php, generated from docs/api/openapi.yaml; unverified in a running HA; see docs/architecture/home-assistant.md
 php artisan ha:package [--output=remoment.yaml] [--base-url=http://remoment.local]
@@ -661,6 +664,7 @@ The Mosquitto broker runs in Docker on port 1883. Each device's MQTT base topic 
 | `remoment/player/{id}/battery` | Battery level or charging changes (retained) | `{ "level": 87, "charging": false }` — only for devices that have a battery; same object as the REST `battery` |
 | `remoment/player/{id}/multiroom` | Multiroom role changes (retained) | `{ "role": "host", "host": null, "listeners": [{ "id": 4, "name": "Beoplayer M5" }] }` — `role` is `standalone` / `host` (others listen to it) / `listener` (`host` names the device it is joined to); same object as the REST `multiroom`, `null` there while unknown |
 | `remoment/player/{id}/modes` | Shuffle/repeat/liked changes (retained) | `{ "shuffle": true, "repeat": "off", "liked": null }` — as `now_playing.modes`; `null` = unknown/unsupported. While Spotify is routed to a speaker, Spotify's modes are published on the speaker's id; afterwards its own (or all `null`) |
+| `remoment/ha/*` (opt-in Home Assistant discovery; configs under `homeassistant/<component>/remoment_*/config`) | `ha:discovery`, the 5-minute scheduler task, client saves | Retained JSON states `stats`, `health`, `hub`, `client/{id}`, `sources/{deviceId}`, retained `status` (`online`/`offline`); non-retained events under `events/` (`alert`, `scene_activated`, `client_pending`, `track_started`, `state_changed`, `source_changed`). See `docs/architecture/home-assistant.md` |
 | `remoment/player/{id}/queue` | Queue edited through the server (add, play next, remove, move, clear), **not** retained | `1` — a ping: re-read `GET /api/devices/{id}/queue` |
 
 `/data` is retained so a client subscribing later (e.g. after switching device) gets the current track at once; when the device goes to standby or becomes unreachable the server publishes an empty retained payload, which also removes the retained track from the broker, so clients must treat an empty `/data` as "nothing playing". It is republished from the cache when a device comes back, and identical payloads aren't repeated. `artwork` is absent in the MQTT payload if a real image is not yet processed; `kind` is `album` | `radio` | `source` as in the REST API. Published by the `PublishNowPlayingToMqtt`, `PublishProgressToMqtt`, `PublishStateToMqtt`, `PublishVolumeToMqtt`, `PublishBatteryToMqtt` and `PublishModesToMqtt` listeners. The server only publishes and never subscribes. Browsers subscribe over the WebSocket listener on port 9001 to drive live UI refreshes; see `docs/architecture/live-updates.md`.
@@ -949,7 +953,7 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 - `/settings/users` — Admin & Apps: the shared admin login (change password) and the apps signed in with it (revoke)
 - `/settings/analysis` — audio analysis status: per-stage progress, what runs now, sidecar, problems with retry (see `docs/architecture/audio-analysis.md`)
 - `/settings/developer` — developer tools (admin): quality test, simulate playback, MQTT console, device inspector, stream URL tester (see `docs/architecture/developer-tools.md`)
-- `/settings/manager` — containers, restart, logs and host health through the ReMoment Manager host service (admin; `Livewire\ManagerPanel`, `Domain\Manager\ManagerClient`, `config/manager.php`; see `docs/architecture/manager.md`)
+- `/settings/manager` — containers, restart, logs, host health and the guarded Upgrade / Roll back card (confirm, live result) through the ReMoment Manager host service (admin; `Livewire\ManagerPanel`, `Domain\Manager\ManagerClient`, `config/manager.php`; see `docs/architecture/manager.md`)
 - `/settings/health` — external services (Spotify/Last.fm/Discogs/TheAudioDB credentials, MusicBrainz, Wikipedia, Cover Art Archive, LRCLIB, storage locations; `Domain/Health/ExternalServices`, one read-only probe each, results cached 15 min, "Check now" re-runs them), supervisor, scheduler, queue worker, pending jobs, MQTT broker and per-device listener health
 - `/settings/devices` — discovered-devices list (scan, add, ignore) on top, drivers grouped by brand below, add by IP (see `docs/architecture/device-discovery.md`); `/devices/discover` redirects here
 - `/settings/dlna` — discover DLNA servers, trigger library scans
