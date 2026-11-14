@@ -2672,6 +2672,23 @@ paths:
                   data: { $ref: "#/components/schemas/Alert" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /admin/diagnostics:
+    get:
+      tags: [Alerts]
+      summary: Download the diagnostics bundle (a redacted zip to attach to an issue)
+      description: |
+        A zip with versions, profile, health, queues, failed jobs (class and first line), devices without addresses, alerts,
+        upgrade history and the last 500 log lines. IP/MAC addresses, tokens, passwords and API keys are never included
+        (`docs/architecture/diagnostics.md`). Nothing is uploaded; the response is the file.
+      operationId: downloadDiagnostics
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: The zip
+          content:
+            application/zip:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
   /announcements/clips:
     get:
       tags: [Playback]

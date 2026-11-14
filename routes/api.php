@@ -212,6 +212,9 @@ Route::middleware('admin.token')->group(function () {
     Route::delete('/admin/token', [AdminAuthController::class, 'logout']);
     Route::post('/admin/alerts/{alert}/ack', [AlertController::class, 'acknowledge']);
 
+    // Redacted diagnostics zip to attach to an issue (docs/architecture/diagnostics.md)
+    Route::get('/admin/diagnostics', [\App\Http\Controllers\DiagnosticsController::class, 'download']);
+
     // Deep analysis of one track on request: sections (docs/api/deep-analysis.md)
     Route::post('/library/tracks/{track}/deep-analysis', [DeepAnalysisController::class, 'store']);
     Route::get('/library/tracks/{track}/deep-analysis', [DeepAnalysisController::class, 'show']);

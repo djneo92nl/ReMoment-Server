@@ -45,6 +45,17 @@
         @endif
     </x-card>
 
+    {{-- Diagnostics bundle (admin): one redacted zip to attach to an issue --}}
+    @auth
+        <x-card class="p-6">
+            <div class="text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-3">Diagnostics</div>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <p class="text-sm text-gray-500 max-w-xl">One zip with versions, health, queues, devices and the log tail to attach to an issue. IP and MAC addresses, passwords, tokens and API keys are never included, and nothing is uploaded.</p>
+                <a href="{{ route('settings.health.diagnostics') }}" class="shrink-0 text-sm font-medium underline hover:no-underline" data-test="download-diagnostics">Download diagnostics bundle</a>
+            </div>
+        </x-card>
+    @endauth
+
     {{-- Background processes --}}
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <x-card class="p-6">

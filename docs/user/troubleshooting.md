@@ -49,6 +49,15 @@ A page that redirects to `/not-in-profile/…`, or an API call that answers `422
 
 A warning on `/settings/health`. A request reached the server through a public host name or address, from a public client address, or `APP_URL` is a public name. The API and MQTT have no login, so check your router has no port forwarding to the server, and prefer a VPN; see [reverse-proxy.md](reverse-proxy.md). It resolves itself an hour after the last such request, or acknowledge it if you proxy on purpose.
 
+## Sending us a diagnostics bundle
+
+When you report a problem, attach one zip instead of copying logs by hand:
+
+- **Web:** sign in as admin, open **Settings › Health** and press **Download diagnostics bundle**.
+- **Command line:** `php artisan diagnostics:bundle` (in Docker: `docker compose exec laravel.test php artisan diagnostics:bundle`; `--path=/some/file.zip` chooses the file). It prints where the zip is.
+
+It holds versions, profile, health results, queue and failed-job summaries, your devices (brand, model, state, no addresses), alerts, recent upgrades and the last 500 log lines. IP and MAC addresses, passwords, tokens, API keys, Spotify and Last.fm credentials and your library are **never** included, and there is no option to add them. Nothing is uploaded: you attach the file to the issue yourself. `README.txt` inside the zip lists exactly what is and is not in it; open the files and skim them before posting publicly.
+
 ## Other
 
 - **Jobs stuck, enrichment never finishes:** the Queue tab at `/settings/health` shows pending and failed jobs and can restart the workers.
