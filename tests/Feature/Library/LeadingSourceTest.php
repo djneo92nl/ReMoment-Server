@@ -2,10 +2,12 @@
 
 namespace Tests\Feature\Library;
 
+use App\Domain\Library\LeadingSource;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
 use App\Models\Media\Metadata;
 use App\Models\Media\Track;
+use App\Models\Setting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -25,5 +27,30 @@ class LeadingSourceTest extends TestCase
         ]);
 
         return $album;
+    }
+
+    public function test_files_lead_then_dlna_then_the_own_files_again(): void
+    {
+        $this->assertSame('files', LeadingSource::leading());
+        $this->assertSame('local', LeadingSource::defaultScope());
+
+        $this->album('Streamed', 'dlna');
+
+        $this->assertSame('dlna', LeadingSource::leading());
+        $this->assertSame('streaming', LeadingSource::defaultScope());
+
+        $this->album('Local', 'files');
+
+        $this->assertSame('files', LeadingSource::leading());
+        $this->assertSame('local', LeadingSource::defaultScope());
+    }
+
+    public function test_the_setting_overrides_automatic_detection(): void
+    {
+        $this->album('Local', 'files');
+        Setting::set(LeadingSource::SETTING, 'dlna');
+
+        $this->assertSame('dlna', LeadingSource::leading());
+        $this->assertSame('streaming', LeadingSource::defaultScope());
     }
 }
