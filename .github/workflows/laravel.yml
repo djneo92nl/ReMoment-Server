@@ -56,7 +56,25 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - uses: shivammathur/setup-php@15c43e89cdef867065b0213be354c2841860869e
+      with:
+        php-version: '8.4'
     - uses: actions/checkout@v4
+      with:
+        submodules: true
+    - name: Clone Sonos fork (pinned)
+      # Keep the SHA in step with the laravel-tests job.
+      env:
+        SONOS_REF: f1243a3262845cfe02700de975df44e20933d598
+      run: |
+        if [ ! -d packages/duncan3dc/sonos/.git ]; then
+          mkdir -p packages/duncan3dc
+          git clone https://github.com/djneo92nl/sonos.git packages/duncan3dc/sonos
+          git -C packages/duncan3dc/sonos checkout --detach "$SONOS_REF"
+        fi
+    - name: Install Composer dependencies
+      # resources/js/app.js imports Livewire's ESM build from vendor/livewire.
+      run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
     - uses: actions/setup-node@v4
       with:
         # Same major as the dev/prod image (docker/8.4/Dockerfile NODE_VERSION); Vite 7 needs Node 20.19+ or 22.12+.
