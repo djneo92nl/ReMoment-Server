@@ -24,9 +24,9 @@ class ManagerSmbTest extends TestCase
             'user' => ['name' => 'remoment-smb', 'created_at' => '2026-11-14T10:00:00Z', 'password_set_at' => '2026-11-14T10:00:00Z'],
             'sessions' => ['count' => 2, 'by_share' => ['inbox' => 2], 'data' => []],
             'shares' => [
-                ['name' => 'library', 'label' => 'Music library', 'note' => 'Read-only unless writing is on.', 'enabled' => true, 'writable' => false, 'can_set_writable' => true, 'path' => '/srv/library', 'path_error' => null, 'path_exists' => true],
-                ['name' => 'exports', 'label' => 'Exports', 'note' => 'Finished exports.', 'enabled' => false, 'writable' => false, 'can_set_writable' => false, 'path' => '/srv/exports', 'path_error' => null, 'path_exists' => false],
-                ['name' => 'inbox', 'label' => 'Inbox (drop directory)', 'note' => 'Drop here.', 'enabled' => false, 'writable' => true, 'can_set_writable' => false, 'path' => '/srv/inbox', 'path_error' => null, 'path_exists' => true],
+                ['name' => 'library', 'label' => 'Music library', 'note' => 'Read-only unless writing is on.', 'enabled' => true, 'guest' => false, 'writable' => false, 'can_set_writable' => true, 'path' => '/srv/library', 'path_error' => null, 'path_exists' => true],
+                ['name' => 'exports', 'label' => 'Exports', 'note' => 'Finished exports.', 'enabled' => true, 'guest' => true, 'writable' => false, 'can_set_writable' => false, 'path' => '/srv/exports', 'path_error' => null, 'path_exists' => false],
+                ['name' => 'inbox', 'label' => 'Inbox (drop directory)', 'note' => 'Drop here.', 'enabled' => false, 'guest' => false, 'writable' => true, 'can_set_writable' => false, 'path' => '/srv/inbox', 'path_error' => null, 'path_exists' => true],
             ],
         ], $override);
     }
@@ -78,6 +78,19 @@ class ManagerSmbTest extends TestCase
             ->assertSee('dry-run mode')
             ->assertSee('none yet')
             ->assertSee('not a valid unix user name');
+    }
+
+    public function test_guest_access_is_shown_and_switched_per_share(): void
+    {
+        $this->fakeManager();
+
+        Livewire::actingAs(User::factory()->create())->test(ManagerPanel::class)
+            ->assertSeeHtml('data-test="smb-guest-on-exports"')
+            ->assertDontSeeHtml('data-test="smb-guest-on-library"')
+            ->call('smbGuest', 'library', true)
+            ->assertSee('open to guests');
+
+        Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/smb/shares/library') && $r->data() === ['enabled' => true, 'guest' => true]);
     }
 
     public function test_a_manager_without_smb_just_has_no_card(): void

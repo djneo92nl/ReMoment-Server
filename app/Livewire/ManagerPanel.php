@@ -65,6 +65,13 @@ class ManagerPanel extends Component
         $this->change(fn () => $manager->smbShare($share, $enabled, $writable), "The {$share} share is ".($enabled ? 'on' : 'off').'.');
     }
 
+    /** Opens a switched-on share to guests (no password) or closes it again. Guests are opt-in per share. */
+    public function smbGuest(string $share, bool $guest, ManagerClient $manager): void
+    {
+        $this->smbPreview = null;
+        $this->change(fn () => $manager->smbShare($share, true, guest: $guest), $guest ? "The {$share} share is now open to guests." : "The {$share} share needs the password again.");
+    }
+
     public function smbPreviewShare(string $share, bool $enabled, ManagerClient $manager, ?bool $writable = null): void
     {
         $this->notice = $this->failure = null;

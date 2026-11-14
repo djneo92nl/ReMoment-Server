@@ -89,9 +89,9 @@ class ManagerClient
      *
      * @return array<string, mixed>
      */
-    public function smbShare(string $share, bool $enabled, ?bool $writable = null, bool $dryRun = false): array
+    public function smbShare(string $share, bool $enabled, ?bool $writable = null, bool $dryRun = false, ?bool $guest = null): array
     {
-        $body = ['enabled' => $enabled] + ($writable === null ? [] : ['writable' => $writable]);
+        $body = ['enabled' => $enabled] + ($writable === null ? [] : ['writable' => $writable]) + ($guest === null ? [] : ['guest' => $guest]);
 
         return $this->send('post', '/smb/shares/'.rawurlencode($share).($dryRun ? '?dry_run=1' : ''), body: $body)->json();
     }

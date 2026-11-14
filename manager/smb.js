@@ -60,7 +60,7 @@ function createSmb({ cfg, run, audit, isBusy, setBusy }) {
     const shares = {};
     for (const name of Object.keys(SHARES)) {
       const v = (s.shares && s.shares[name]) || {};
-      shares[name] = { enabled: v.enabled === true, writable: SHARES[name].writable === 'always' ? true : (SHARES[name].writable === 'option' && v.writable === true) };
+      shares[name] = { enabled: v.enabled === true, guest: v.guest === true, writable: SHARES[name].writable === 'always' ? true : (SHARES[name].writable === 'option' && v.writable === true) };
     }
     return { shares, user: s.user && typeof s.user === 'object' ? s.user : null };
   }
@@ -82,8 +82,9 @@ function createSmb({ cfg, run, audit, isBusy, setBusy }) {
         `   comment = ${def.comment}`,
         `   path = ${smb.dirs[def.dir].replace(/\/+$/, '') || '/'}`,
         '   browseable = yes',
-        '   guest ok = no',
-        `   valid users = ${smb.user}`,
+        ...(shares[name].guest
+          ? ['   guest ok = yes'] // opt-in: no password; needs `map to guest = Bad User` in [global] of smb.conf
+          : ['   guest ok = no', `   valid users = ${smb.user}`]),
         `   read only = ${writable ? 'no' : 'yes'}`,
         '   follow symlinks = no',
         '   wide links = no',
@@ -145,7 +146,7 @@ function createSmb({ cfg, run, audit, isBusy, setBusy }) {
       shares: Object.entries(SHARES).map(([name, def]) => {
         const dir = smb.dirs[def.dir];
         return {
-          name, label: def.label, note: def.note, enabled: st.shares[name].enabled, writable: st.shares[name].writable,
+          name, label: def.label, note: def.note, enabled: st.shares[name].enabled, guest: st.shares[name].guest, writable: st.shares[name].writable,
           can_set_writable: def.writable === 'option', path: dir, path_error: pathError(dir), path_exists: (() => { try { return fs.statSync(dir).isDirectory(); } catch { return false; } })(),
         };
       }),
@@ -163,6 +164,7 @@ function createSmb({ cfg, run, audit, isBusy, setBusy }) {
     const enabled = body && body.enabled;
     if (typeof enabled !== 'boolean') return { code: 422, body: { error: 'invalid', message: 'Send {"enabled": true|false}, for the library also "writable".' } };
     if (body.writable !== undefined && typeof body.writable !== 'boolean') return { code: 422, body: { error: 'invalid', message: '"writable" must be true or false.' } };
+    if (body.guest !== undefined && typeof body.guest !== 'boolean') return { code: 422, body: { error: 'invalid', message: '"guest" must be true or false.' } };
     if (body.writable !== undefined && def.writable !== 'option') return { code: 422, body: { error: 'invalid', message: `The ${name} share's writing cannot be changed.` } };
     const problems = setupProblems();
     if (problems.length) return { code: 422, body: { error: 'bad_setup', message: problems[0] } };
@@ -171,13 +173,15 @@ function createSmb({ cfg, run, audit, isBusy, setBusy }) {
     if (enabled) {
       const bad = pathError(smb.dirs[def.dir]);
       if (bad) return { code: 422, body: { error: 'bad_path', message: bad } };
-      if (!st.user) return { code: 422, body: { error: 'no_user', message: 'Create the share user first: the shares are never open without a password.' } };
     }
     st.shares[name].enabled = enabled;
+    if (body.guest !== undefined) st.shares[name].guest = body.guest;
+    if (enabled && !st.shares[name].guest && !st.user) return { code: 422, body: { error: 'no_user', message: 'Create the share user first, or allow guests on this share.' } };
     if (def.writable === 'option' && body.writable !== undefined) st.shares[name].writable = body.writable;
+    if (enabled && def.writable === 'option' && st.shares[name].guest && st.shares[name].writable) return { code: 422, body: { error: 'guest_writable', message: 'The music library cannot be both open to guests and writable.' } };
     const config = render(st.shares);
     const actions = [`write ${smb.confFile}`, `testparm the new file first`, `reload ${smb.service}`];
-    if (dry || smb.dryRun) return { code: 200, body: { dry_run: true, share: name, enabled, writable: st.shares[name].writable, config, actions } };
+    if (dry || smb.dryRun) return { code: 200, body: { dry_run: true, share: name, enabled, writable: st.shares[name].writable, guest: st.shares[name].guest, config, actions } };
 
     if (isBusy()) return { code: 409, body: { error: 'busy', message: `Another change is running: ${isBusy()}` } };
     setBusy(`smb ${name}`);
@@ -188,7 +192,7 @@ function createSmb({ cfg, run, audit, isBusy, setBusy }) {
       const reload = await reloadSamba(Object.values(st.shares).some((s) => s.enabled));
       audit('smb share', name, reload.ok ? (enabled ? 'enabled' : 'disabled') : 'failed (reload)');
       if (!reload.ok) return { code: 502, body: { error: 'reload_failed', message: reload.message } };
-      return { code: 200, body: { status: 'ok', share: name, enabled, writable: st.shares[name].writable } };
+      return { code: 200, body: { status: 'ok', share: name, enabled, writable: st.shares[name].writable, guest: st.shares[name].guest } };
     } finally { setBusy(null); }
   }
 

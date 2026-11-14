@@ -276,6 +276,30 @@ test('a failing smbpasswd is reported without leaking the password', async () =>
   assert.match(audit(), /failed \(smbpasswd\)/);
 });
 
+test('guest access is an explicit per-share option: no password rule, never writable library, needs no user', async () => {
+  const g = await start({}, 'home-guest');
+  try {
+    const c = { c: g, token: g.token };
+    // No share user exists: a password share is refused, a guest share is not.
+    assert.equal((await req('POST', '/smb/shares/exports', { body: { enabled: true }, ...c })).json().error, 'no_user');
+    const r = await req('POST', '/smb/shares/exports', { body: { enabled: true, guest: true }, ...c });
+    assert.equal(r.status, 200);
+    assert.equal(r.json().guest, true);
+    const text = fs.readFileSync(conf, 'utf8');
+    const section = text.split(/^\[/m).find((x) => x.startsWith('exports]'));
+    assert.match(section, /guest ok = yes/);
+    assert.ok(!/valid users/.test(section));
+    assert.equal((await req('GET', '/smb', c)).json().shares.find((x) => x.name === 'exports').guest, true);
+    // The library: guest and writable together are refused.
+    assert.equal((await req('POST', '/smb/shares/library', { body: { enabled: true, guest: true, writable: true }, ...c })).json().error, 'guest_writable');
+    assert.equal((await req('POST', '/smb/shares/library', { body: { enabled: true, guest: 'yes' }, ...c })).status, 422);
+    // Back to password: the share needs the user again.
+    assert.equal((await req('POST', '/smb/shares/exports', { body: { enabled: true, guest: false }, ...c })).json().error, 'no_user');
+    // Default is no guest.
+    assert.equal((await req('GET', '/smb', c)).json().shares.find((x) => x.name === 'inbox').guest, false);
+  } finally { g.m.server.close(); }
+});
+
 test('paths: only plain absolute non-system paths', () => {
   assert.equal(pathError('/srv/library'), null);
   assert.equal(pathError('/srv/my music'), null);

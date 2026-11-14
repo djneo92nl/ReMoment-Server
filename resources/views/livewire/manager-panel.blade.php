@@ -127,7 +127,7 @@
             <x-card flush data-test="manager-smb">
                 <div class="px-8 py-5 border-b border-gray-100 dark:border-stone-800">
                     <h2 class="text-base font-medium text-gray-900 dark:text-gray-100">Network shares (SMB)</h2>
-                    <p class="text-xs text-gray-500">Samba on the host, set up by the manager. Access needs the share user's password; there is no guest access.
+                    <p class="text-xs text-gray-500">Samba on the host, set up by the manager. Access needs the share user's password unless you open a share to guests (off by default; guests also need <code>map to guest = Bad User</code> in smb.conf).
                         Samba is {{ $smb['running'] ? 'running' : 'not running' }}@if($smb['sessions'] !== null) · {{ $smb['sessions']['count'] }} connected @endif.
                         @if($smb['dry_run']) <span class="text-amber-600">The manager is in dry-run mode: nothing is changed.</span>@endif</p>
                 </div>
@@ -170,7 +170,7 @@
                         <div class="flex-1 min-w-48 text-xs text-gray-500">
                             <code>{{ $share['path'] }}</code>@if(! $share['path_exists']) <span class="text-amber-600">(folder missing)</span>@endif
                             @if($share['path_error']) <span class="text-red-600">{{ $share['path_error'] }}</span>@endif
-                            · {{ $share['enabled'] ? ($share['writable'] ? 'read-write' : 'read-only') : 'off' }}
+                            · {{ $share['enabled'] ? ($share['writable'] ? 'read-write' : 'read-only') : 'off' }}@if($share['enabled'] && $share['guest']) · <span class="text-amber-600" data-test="smb-guest-on-{{ $share['name'] }}">open to guests, no password</span>@endif
                             <br>{{ $share['note'] }}
                         </div>
                         <div class="flex flex-wrap gap-2">
@@ -181,9 +181,14 @@
                                     <x-secondary-button size="sm" wire:click="smbShare('{{ $share['name'] }}', true, true)" wire:confirm="Allow writing to the music library over the network? A mistake on a PC can delete music." :disabled="! $share['enabled']" data-test="smb-writable-{{ $share['name'] }}">Allow writing</x-secondary-button>
                                 @endif
                             @endif
+                            @if($share['guest'])
+                                <x-secondary-button size="sm" wire:click="smbGuest('{{ $share['name'] }}', false)" :disabled="! $share['enabled']" data-test="smb-guest-{{ $share['name'] }}">Require password</x-secondary-button>
+                            @else
+                                <x-secondary-button size="sm" wire:click="smbGuest('{{ $share['name'] }}', true)" wire:confirm="Open this share to everyone on the network, without a password? Anyone who can reach this machine can read it{{ $share['writable'] ? ' and write to it' : '' }}." :disabled="! $share['enabled']" data-test="smb-guest-{{ $share['name'] }}">Allow guests</x-secondary-button>
+                            @endif
                             <x-secondary-button size="sm" wire:click="smbPreviewShare('{{ $share['name'] }}', {{ $share['enabled'] ? 'false' : 'true' }})" data-test="smb-preview-{{ $share['name'] }}">Preview</x-secondary-button>
                             <x-secondary-button size="sm" wire:click="smbShare('{{ $share['name'] }}', {{ $share['enabled'] ? 'false' : 'true' }})"
-                                                :disabled="! $share['enabled'] && ! $smb['user']" data-test="smb-toggle-{{ $share['name'] }}">{{ $share['enabled'] ? 'Switch off' : 'Switch on' }}</x-secondary-button>
+                                                :disabled="! $share['enabled'] && ! $smb['user'] && ! $share['guest']" data-test="smb-toggle-{{ $share['name'] }}">{{ $share['enabled'] ? 'Switch off' : 'Switch on' }}</x-secondary-button>
                         </div>
                     </div>
                 @endforeach

@@ -25,7 +25,7 @@ const HELP = `remoment-manager: control the running ReMoment install
   remoment-manager upgrade-status [--json]
   remoment-manager smb [status] [--json]  SMB shares: is Samba running, which shares, sessions
   remoment-manager smb config             the Samba fragment for the current choices (nothing is written)
-  remoment-manager smb enable <library|exports|inbox> [--writable|--read-only] [--dry-run]
+  remoment-manager smb enable <library|exports|inbox> [--writable|--read-only] [--guest|--no-guest] [--dry-run]
   remoment-manager smb disable <library|exports|inbox> [--dry-run]
   remoment-manager smb user create [--dry-run]   create the share user or set a new password (shown once)
   remoment-manager smb user remove [--dry-run]
@@ -169,7 +169,7 @@ async function main() {
         if (!v.include_present) console.log(c(33, `  smb.conf does not include ${v.conf_file} yet`));
         for (const p of v.problems) console.log(c(31, `  ${p}`));
         console.log(`  share user  ${v.user ? v.user.name : 'none (smb user create)'}`);
-        for (const s of v.shares) console.log(`  ${s.name.padEnd(8)} ${s.enabled ? c(32, 'on ') : 'off'} ${s.writable ? 'read-write' : 'read-only '}  ${s.path}${s.path_exists ? '' : c(33, '  (missing)')}`);
+        for (const s of v.shares) console.log(`  ${s.name.padEnd(8)} ${s.enabled ? c(32, 'on ') : 'off'} ${s.writable ? 'read-write' : 'read-only '} ${s.guest ? c(33, 'GUEST') : 'password'}  ${s.path}${s.path_exists ? '' : c(33, '  (missing)')}`);
         if (v.sessions) console.log(`  sessions    ${v.sessions.count}`);
         return;
       }
@@ -180,6 +180,8 @@ async function main() {
         const body = { enabled: sub === 'enable' };
         if (args.includes('--writable')) body.writable = true;
         if (args.includes('--read-only')) body.writable = false;
+        if (args.includes('--guest')) body.guest = true;
+        if (args.includes('--no-guest')) body.guest = false;
         const r = JSON.parse(await api('POST', `/smb/shares/${encodeURIComponent(name)}${q}`, body));
         if (json) return console.log(JSON.stringify(r));
         if (r.dry_run) { console.log(r.config); return console.log(c(33, 'Dry run: nothing was written. Would: ' + r.actions.join('; '))); }
