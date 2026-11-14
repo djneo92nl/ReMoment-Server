@@ -5,5 +5,5 @@
   "type": "commonjs",
   "description": "ReMoment Manager: host service that shows and restarts the compose project. No dependencies.",
   "bin": { "remoment-manager": "bin/remoment-manager" },
-  "scripts": { "test": "node --test test/" }
+  "scripts": { "test": "node --test test/*.test.js" }
 }
