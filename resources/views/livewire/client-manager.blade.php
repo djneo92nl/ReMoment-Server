@@ -46,6 +46,12 @@
                                             <span>{{ $k }}: {{ is_scalar($v) ? $v : json_encode($v) }}</span>
                                         @endforeach
                                     @endif
+                                    @if($client->isNode())
+                                        <span><x-badge variant="outline"><i class="fa-solid fa-server text-[10px]"></i> node</x-badge></span>
+                                        @foreach($client->roles ?? [] as $role)
+                                            <span class="font-mono">{{ $role }}</span>
+                                        @endforeach
+                                    @endif
                                     <span class="text-gray-400 dark:text-gray-600">registered {{ $client->created_at->diffForHumans() }}</span>
                                 </div>
                             </div>
@@ -81,6 +87,22 @@
                                         </x-select>
                                     </div>
                                 </div>
+                                @if($client->isNode())
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-500 mb-2">Roles to switch on <span class="font-normal text-gray-400 dark:text-gray-600">(the node gets jobs only for these)</span></label>
+                                        <div class="flex flex-wrap gap-2">
+                                            @forelse($client->roles ?? [] as $role)
+                                                <label class="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 dark:border-stone-700 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
+                                                    <input type="checkbox" wire:model="approveRoles" value="{{ $role }}"
+                                                           class="rounded border-gray-300 dark:border-stone-600 text-gray-900 dark:text-stone-500 focus:ring-gray-400" />
+                                                    {{ \App\Domain\Node\NodeRoles::ROLES[$role] ?? $role }}
+                                                </label>
+                                            @empty
+                                                <span class="text-xs text-gray-400 dark:text-gray-600 italic">This node declared no roles.</span>
+                                            @endforelse
+                                        </div>
+                                    </div>
+                                @endif
                                 <div class="flex items-center gap-3 pt-1">
                                     <x-primary-button size="md" wire:click="approve">
                                         Approve &amp; Issue Token
@@ -118,10 +140,17 @@
                             <div class="flex flex-wrap items-start justify-between gap-4">
                                 <div class="min-w-0">
                                     <div class="flex items-center gap-2.5 flex-wrap">
+                                        @if($client->isNode())
+                                            <x-badge variant="outline">
+                                                <i class="fa-solid fa-server text-[10px]"></i>
+                                                node
+                                            </x-badge>
+                                        @else
                                         <x-badge :variant="$client->type === 'single' ? 'neutral' : 'outline'">
                                             <i class="fa-solid {{ $client->type === 'single' ? 'fa-microchip' : 'fa-layer-group' }} text-[10px]"></i>
                                             {{ $client->type }}
                                         </x-badge>
+                                        @endif
                                         <span class="text-base font-medium text-gray-900 dark:text-gray-100">
                                             {{ $client->name ?? "Client #{$client->id}" }}
                                         </span>
@@ -150,8 +179,22 @@
                                         @endif
                                     </div>
 
+                                    @if($client->isNode())
+                                        <div class="mt-2 flex flex-wrap gap-2 items-center">
+                                            @forelse($client->roles ?? [] as $role)
+                                                <x-badge :variant="in_array($role, $client->activeRoles()) ? 'outline' : 'neutral'">
+                                                    {{ \App\Domain\Node\NodeRoles::ROLES[$role] ?? $role }}{{ in_array($role, $client->activeRoles()) ? '' : ' (off)' }}
+                                                </x-badge>
+                                            @empty
+                                                <span class="text-xs text-gray-400 dark:text-gray-600 italic">No roles declared</span>
+                                            @endforelse
+                                        </div>
+                                    @endif
+
                                     <div class="mt-2 flex flex-wrap gap-2 items-center">
-                                        @if($client->devices->isNotEmpty())
+                                        @if($client->isNode() && $client->devices->isEmpty())
+                                            <span class="text-xs text-gray-400 dark:text-gray-600 italic">No players assigned</span>
+                                        @elseif($client->devices->isNotEmpty())
                                             @foreach($client->devices as $device)
                                                 <x-badge>
                                                     <i class="fa-solid fa-tv text-[9px] opacity-60"></i>
@@ -211,6 +254,24 @@
                                         </x-select>
                                     </div>
                                 </div>
+
+                                @if($client->isNode())
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-500 mb-2">
+                                            Roles switched on
+                                            <span class="font-normal text-gray-400 dark:text-gray-600">(only roles the node declared)</span>
+                                        </label>
+                                        <div class="flex flex-wrap gap-2">
+                                            @foreach($client->roles ?? [] as $role)
+                                                <label class="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 dark:border-stone-700 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
+                                                    <input type="checkbox" wire:model="editRoles" value="{{ $role }}"
+                                                           class="rounded border-gray-300 dark:border-stone-600 text-gray-900 dark:text-stone-500 focus:ring-gray-400" />
+                                                    {{ \App\Domain\Node\NodeRoles::ROLES[$role] ?? $role }}
+                                                </label>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endif
 
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 mb-2">
@@ -298,7 +359,7 @@
             </div>
         </div>
         <p class="mt-4 text-xs text-gray-400 dark:text-gray-600">
-            Registration body: <span class="font-mono">hardware_id</span>, <span class="font-mono">firmware_version</span>, <span class="font-mono">build_number</span>, <span class="font-mono">metadata</span> (all optional).
+            Registration body: <span class="font-mono">kind</span> (<span class="font-mono">client</span> or <span class="font-mono">node</span>), <span class="font-mono">roles</span>, <span class="font-mono">capabilities</span> (nodes), <span class="font-mono">hardware_id</span>, <span class="font-mono">firmware_version</span>, <span class="font-mono">build_number</span>, <span class="font-mono">metadata</span> (all optional).
             Use <span class="font-mono">hardware_id</span> (MAC / chip ID) for idempotent re-registration on reboot.
             Clients should show the returned <span class="font-mono">pairing_code</span> on screen so it can be matched here before approving.
         </p>

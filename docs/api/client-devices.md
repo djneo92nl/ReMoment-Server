@@ -15,6 +15,8 @@ Two client types exist:
 | `single` | Simple microcontroller (ESP8266, OLED display) controlling one player |
 | `multi` | Smarter device (ESP32-S3, Pi, software integration) controlling several or all players |
 
+A third kind, a **node** (`kind: "node"`), is a headless agent on a Pi or another Linux box that does jobs the server cannot (CD ripping, line-in capture; workstream 18 of the roadmap). It uses the same registration and approval flow and adds declared **roles**; see "Nodes" below and [node-agent.md](../architecture/node-agent.md). The node binary itself is not built yet; only this server side is.
+
 Clients are **not** trusted by default. Every registration starts as `pending` and must be approved by an admin in the web UI at `/settings/clients`. The MQTT topics remain open and unauthenticated — the client API is a convenience layer for discovery and device assignment, not a security boundary.
 
 ---
@@ -117,6 +119,17 @@ If the client was already approved, `status` will be `"approved"` but the `regis
 
 ---
 
+**Node registration.** Add `kind: "node"` (a stable `hardware_id` is then required, else `422 hardware_id_required`), `roles` and `capabilities`:
+
+```json
+{ "kind": "node", "hardware_id": "<machine-id>", "roles": ["ripper", "line-in"],
+  "capabilities": { "ripper": { "drive": "/dev/sr0" } } }
+```
+
+`roles` are from the closed list `ripper`, `line-in`, `player`, `sync-target` (an unknown name is `422`); they are what the node *can* do, and the admin switches roles on at approval. `capabilities` is an informational object keyed by role, at most 16 KiB (`422 too_large`). `kind` is fixed at the first registration: a known `hardware_id` registering with the other kind is `422 kind_mismatch`. A plain client's `roles` and `capabilities` are ignored. Re-registering updates the declared roles and drops enabled roles the node no longer declares.
+
+---
+
 ### `GET /api/clients/status/{registration_token}`
 
 Polls approval status. Call this after registration until `status` is `approved`.
@@ -154,6 +167,8 @@ Polls approval status. Call this after registration until `status` is `approved`
 ```
 
 `devices` is the complete list of devices this client is allowed to control. For `single` clients this is always one entry; for `multi` clients it may be many. Store the `api_token` immediately to persistent storage — this is the only place it is returned alongside the approval notification.
+
+For a node the approved answer also has `kind: "node"` and `roles`: the roles the admin switched on (never more than it declared). Plain clients get neither key.
 
 Returns `HTTP 404` if the `registration_token` is unknown.
 
@@ -196,11 +211,22 @@ Suggested client behavior (decided on the client, no server round-trip): show a 
 
 The server updates `ip_address` from the TCP connection automatically.
 
+**Node heartbeat** (every 30 s, not minutes): a node may also send `status`, stored as its last report and ignored for other clients:
+
+```json
+{ "status": { "roles": { "ripper": { "state": "busy", "detail": "track 3 of 12" } },
+              "uptime_seconds": 3600, "load": 0.4, "disk_free_bytes": 12000000000 } }
+```
+
+`state` is `idle` | `busy` | `error` | `absent`; only known role names are kept. A node with no heartbeat for 90 s counts as offline.
+
 **Response:**
 
 ```json
 { "status": "ok" }
 ```
+
+For a node it is `{ "status": "ok", "roles": ["ripper"] }`: the roles switched on now, so a change by the admin reaches the node within one heartbeat.
 
 Returns `HTTP 404` for an unknown token.
 
@@ -368,3 +394,9 @@ while (true) {
     delay(3000);
 }
 ```
+
+---
+
+## Nodes
+
+`/settings/clients` shows a node with a **node** badge, its declared roles (a role the admin has not switched on is marked "off") and, in the approve and edit forms, one checkbox per declared role. A node has no players unless the admin assigns some, and never gets the "all devices" rule of a `multi` client. Jobs, the MQTT command channel and the node's own token routes are planned in [node-agent.md](../architecture/node-agent.md) (phase N1); nothing here sends a node any work yet.

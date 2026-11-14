@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\Node\NodeRoles;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Str;
@@ -9,7 +10,7 @@ use Illuminate\Support\Str;
 class Client extends Model
 {
     protected $fillable = [
-        'name', 'type', 'hidden_sources', 'status', 'hardware_id',
+        'name', 'type', 'kind', 'roles', 'enabled_roles', 'capabilities', 'node_status', 'hidden_sources', 'status', 'hardware_id',
         'registration_token', 'pairing_code', 'api_token',
         'ip_address', 'firmware_version', 'build_number',
         'battery_percent', 'battery_charging',
@@ -19,6 +20,10 @@ class Client extends Model
     protected $casts = [
         'metadata' => 'array',
         'hidden_sources' => 'array',
+        'roles' => 'array',
+        'enabled_roles' => 'array',
+        'capabilities' => 'array',
+        'node_status' => 'array',
         'battery_percent' => 'integer',
         'battery_charging' => 'boolean',
         'last_seen_at' => 'datetime',
@@ -30,6 +35,17 @@ class Client extends Model
         return $this->belongsToMany(Device::class)
             ->withPivot('sort_order')
             ->orderByPivot('sort_order');
+    }
+
+    public function isNode(): bool
+    {
+        return $this->kind === NodeRoles::KIND_NODE;
+    }
+
+    /** @return list<string> the roles the admin switched on (never more than the node declared) */
+    public function activeRoles(): array
+    {
+        return NodeRoles::normalize(array_values(array_intersect($this->enabled_roles ?? [], $this->roles ?? [])));
     }
 
     /** Unambiguous alphabet for codes a human reads off a screen: no 0/O, 1/I. */

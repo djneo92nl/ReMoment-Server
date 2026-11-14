@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Domain\Library\LibrarySources;
+use App\Domain\Node\NodeRoles;
 use App\Models\Client;
 use App\Models\Device;
 use Livewire\Component;
@@ -15,6 +16,9 @@ class ClientManager extends Component
 
     public string $approveType = 'single';
 
+    /** @var array<string> Declared roles of a node that the admin switches on at approval. */
+    public array $approveRoles = [];
+
     public ?int $editing = null;
 
     public string $editName = '';
@@ -24,6 +28,9 @@ class ClientManager extends Component
     /** @var array<int> */
     public array $editDeviceIds = [];
 
+    /** @var array<string> Enabled roles of a node (always within what it declared). */
+    public array $editRoles = [];
+
     /** @var array<string> Sources this client doesn't see in the library (LibrarySources::all() keys). */
     public array $editHiddenSources = [];
 
@@ -32,16 +39,23 @@ class ClientManager extends Component
         $this->approvingId = $clientId;
         $this->approveName = '';
         $this->approveType = 'single';
+        // A node's declared roles are pre-ticked; the admin unticks what should stay off.
+        $this->approveRoles = Client::findOrFail($clientId)->roles ?? [];
     }
 
     public function approve(): void
     {
         $this->validate([
             'approveType' => ['required', 'in:single,multi'],
+            'approveRoles' => ['array'],
+            'approveRoles.*' => ['string', 'in:'.implode(',', NodeRoles::names())],
         ]);
 
         $client = Client::findOrFail($this->approvingId);
         $client->update([
+            'enabled_roles' => $client->isNode()
+                ? NodeRoles::normalize(array_intersect($this->approveRoles, $client->roles ?? []))
+                : null,
             'status' => 'approved',
             'type' => $this->approveType,
             'name' => trim($this->approveName) ?: null,
@@ -65,6 +79,7 @@ class ClientManager extends Component
         $this->editing = $clientId;
         $this->editName = $client->name ?? '';
         $this->editType = $client->type;
+        $this->editRoles = $client->activeRoles();
         $this->editDeviceIds = $client->devices->pluck('id')->map(fn ($id) => (int) $id)->toArray();
         $this->editHiddenSources = LibrarySources::hiddenFor($client);
     }
@@ -75,6 +90,8 @@ class ClientManager extends Component
             'editType' => ['required', 'in:single,multi'],
             'editDeviceIds' => ['array'],
             'editDeviceIds.*' => ['integer', 'exists:devices,id'],
+            'editRoles' => ['array'],
+            'editRoles.*' => ['string', 'in:'.implode(',', NodeRoles::names())],
             'editHiddenSources' => ['array'],
             'editHiddenSources.*' => ['string', 'in:'.implode(',', array_keys(LibrarySources::all()))],
         ]);
@@ -89,6 +106,9 @@ class ClientManager extends Component
         $client->update([
             'name' => trim($this->editName) ?: null,
             'type' => $this->editType,
+            'enabled_roles' => $client->isNode()
+                ? NodeRoles::normalize(array_intersect($this->editRoles, $client->roles ?? []))
+                : null,
             'hidden_sources' => LibrarySources::normalize($this->editHiddenSources) ?: null,
         ]);
         $client->devices()->sync($deviceIds);

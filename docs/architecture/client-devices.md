@@ -31,6 +31,11 @@ Client devices (ESP8266, ESP32, Raspberry Pi, software integrations) register wi
 | `build_number` | unsigned int nullable | null | |
 | `battery_percent` | unsigned tinyint nullable | null | 0–100, reported on heartbeat; null = no battery / never reported |
 | `battery_charging` | boolean nullable | null | true while on external power, reported on heartbeat |
+| `kind` | string(20) | `client` | `client` or `node` (workstream 18, [node-agent.md](node-agent.md)); fixed at first registration. Separate from `type`, which is about the players a client sees |
+| `roles` | json nullable | null | A node's declared roles (`App\Domain\Node\NodeRoles`: `ripper`, `line-in`, `player`, `sync-target`) |
+| `enabled_roles` | json nullable | null | The roles the admin switched on; `Client::activeRoles()` is this within `roles` |
+| `capabilities` | json nullable | null | A node's informational capabilities per role (max 16 KiB); never executed |
+| `node_status` | json nullable | null | A node's last heartbeat `status` (role states, uptime, load, free disk) |
 | `metadata` | json nullable | null | Arbitrary client-supplied key/value (board type, notes, etc.) |
 | `last_seen_at` | timestamp nullable | null | Updated on `GET /devices` and heartbeat |
 | `approved_at` | timestamp nullable | null | Set when admin approves |
@@ -133,6 +138,12 @@ Device resolution rules:
 | `multi` | none | `Device::orderBy('device_name')->get()` — all devices |
 
 Devices are returned as `DeviceListResource` collection (same shape as `GET /api/devices`).
+
+---
+
+## Nodes
+
+A node is a client with `kind = 'node'`. `register` takes `kind`, `roles` and `capabilities` (validated against `NodeRoles`; `hardware_id` required; `kind_mismatch` on a known id of the other kind); the approved `status` answer and the heartbeat answer carry the active roles; the heartbeat takes `status` and stores it in `node_status` for nodes only. `resolveDevices()` skips the all-devices rule for a node. In `ClientManager` the approve form pre-ticks the declared roles and the edit form changes `enabled_roles`; both intersect with `roles`. No jobs, routes or MQTT topics for nodes exist yet; see [node-agent.md](node-agent.md).
 
 ---
 
