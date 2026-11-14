@@ -74,6 +74,9 @@ class StemsDeepAnalysisTest extends TestCase
                 : ($this->serviceHealthy ? Http::response(['ok' => true, 'version' => 1, 'method' => 'htdemucs']) : Http::response('', 503)),
             'stems:8092/stems' => fn () => $this->stemsAnswer instanceof \Closure ? ($this->stemsAnswer)() : Http::response(...$this->stemsAnswer),
         ]);
+        // The runner has no ffmpeg; the stage only asks `ffmpeg -version`, so answer that.
+        \App\Domain\Analysis\Tools::forget();
+        \Illuminate\Support\Facades\Process::fake(['*' => \Illuminate\Support\Facades\Process::result("ffmpeg version 7\n")]);
         config(['analysis.enabled' => true, 'analysis.stems_url' => 'http://stems:8092', 'analysis.structure_url' => null, 'analysis.essentia_url' => null]);
 
         $this->dir = sys_get_temp_dir().'/remoment-stems-'.uniqid();

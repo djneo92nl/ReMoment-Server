@@ -51,6 +51,9 @@ class InfoApiTest extends TestCase
 
     public function test_deep_analysis_feature_follows_the_structure_service_health(): void
     {
+        // The runner has no ffmpeg; the stage only asks `ffmpeg -version`, so answer that.
+        \App\Domain\Analysis\Tools::forget();
+        \Illuminate\Support\Facades\Process::fake(['*' => \Illuminate\Support\Facades\Process::result("ffmpeg version 7\n")]);
         Cache::flush();
         config(['analysis.structure_url' => 'http://structure:8091']);
         $healthy = true;

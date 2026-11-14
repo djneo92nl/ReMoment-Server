@@ -31,6 +31,9 @@ class TrackSectionsUiTest extends TestCase
         parent::setUp();
 
         Cache::flush();
+        // The runner has no ffmpeg; the stage only asks `ffmpeg -version`, so answer that.
+        \App\Domain\Analysis\Tools::forget();
+        \Illuminate\Support\Facades\Process::fake(['*' => \Illuminate\Support\Facades\Process::result("ffmpeg version 7\n")]);
         config(['analysis.enabled' => true, 'analysis.structure_url' => 'http://structure:8091']);
         Http::fake(['structure:8091/health' => Http::response(['ok' => true])]);
     }
