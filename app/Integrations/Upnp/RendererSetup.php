@@ -17,6 +17,9 @@ final class RendererSetup
 
     public const AV_TRANSPORT = 'urn:schemas-upnp-org:service:AVTransport:1';
 
+    /** Ports whose descriptor is tried at the device's IP when no search is answered (Philips Streamium: the renderer is unadvertised at :7123). */
+    private const DESCRIPTOR_PORTS = [7123];
+
     private const SEARCH_TARGETS = [self::MEDIA_RENDERER, self::AV_TRANSPORT, 'upnp:rootdevice'];
 
     /** @return array<string, string> the device's `upnp_*` meta */
@@ -56,6 +59,10 @@ final class RendererSetup
                     break;
                 }
             }
+        }
+
+        if ($locations === []) {
+            $locations = array_map(fn (int $port) => "http://{$device->ip_address}:{$port}/", self::DESCRIPTOR_PORTS);
         }
 
         foreach ($locations as $location) {

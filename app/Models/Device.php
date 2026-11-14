@@ -39,14 +39,26 @@ class Device extends Model
 
     protected static function booted(): void
     {
-        // An address changed by hand or by discovery: what was looked up at the old address (a UPnP renderer's
-        // control URLs) points nowhere now, so forget it; the listener looks the device up again at the new one.
+        // An address changed by hand or by discovery: the control URLs stored for a UPnP renderer name the old host.
+        // Point them at the new one (keeping port and path: some renderers, like the Streamium's :7123, do not answer
+        // searches, so the stored URL is the only way to them) and let the listener start again at the new address.
         static::updated(function (self $device) {
             if (!$device->wasChanged('ip_address')) {
                 return;
             }
 
-            $device->meta()->where('key', 'like', 'upnp%')->delete();
+            $old = (string) $device->getOriginal('ip_address');
+
+            if ($old !== '' && $device->ip_address) {
+                foreach ($device->meta()->where('key', 'like', 'upnp%')->get() as $meta) {
+                    $moved = preg_replace('#//'.preg_quote($old, '#').'(?=[:/]|$)#', '//'.$device->ip_address, (string) $meta->value);
+
+                    if ($moved !== $meta->value) {
+                        $meta->update(['value' => $moved]);
+                    }
+                }
+            }
+
             \App\Domain\Device\ListenerStatus::recordIpChange($device->id, (string) $device->device_name, $device->getOriginal('ip_address'), $device->ip_address);
             \App\Domain\Device\ListenerStatus::requestRestart($device->id);
         });

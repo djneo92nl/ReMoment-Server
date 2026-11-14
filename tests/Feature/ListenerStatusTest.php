@@ -15,15 +15,18 @@ class ListenerStatusTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_changing_the_ip_forgets_upnp_urls_and_records_the_change(): void
+    public function test_changing_the_ip_moves_upnp_urls_to_the_new_host_and_records_the_change(): void
     {
         $device = Device::factory()->create(['ip_address' => '192.168.1.118']);
         DeviceMeta::create(['device_id' => $device->id, 'key' => 'upnp_avtransport_url', 'value' => 'http://192.168.1.118:49152/ctl']);
+        DeviceMeta::create(['device_id' => $device->id, 'key' => 'upnp_uuid', 'value' => 'uuid:abc']);
         DeviceMeta::create(['device_id' => $device->id, 'key' => 'philips_user', 'value' => 'keep']);
 
         $device->update(['ip_address' => '192.168.1.19']);
 
-        $this->assertSame(['philips_user'], $device->meta()->pluck('key')->all());
+        $meta = $device->meta()->pluck('value', 'key');
+        $this->assertSame('http://192.168.1.19:49152/ctl', $meta['upnp_avtransport_url']);
+        $this->assertSame(['uuid:abc', 'keep'], [$meta['upnp_uuid'], $meta['philips_user']]);
         $change = ListenerStatus::ipChanges()[0];
         $this->assertSame(['192.168.1.118', '192.168.1.19'], [$change['from'], $change['to']]);
         $this->assertSame([$device->id], ListenerStatus::pullRestartRequests([$device->id]));
