@@ -55,7 +55,7 @@ class HaPackageTest extends TestCase
 
     public function test_a_disabled_operation_is_left_out_and_no_admin_operation_is_in(): void
     {
-        config(['scene-operations.setPower.enabled' => false]);
+        config(['scene-operations.operations.setPower.enabled' => false]);
         $commands = $this->package();
 
         $this->assertArrayNotHasKey('remoment_set_power', $commands);

@@ -16,13 +16,14 @@ class SceneOperationsTest extends TestCase
         return new SceneOperations(new OpenApiSpec);
     }
 
-    public function test_every_listed_operation_exists_in_the_contract_and_names_a_real_device_input(): void
+    public function test_every_override_and_exclusion_names_a_real_operation_and_a_real_device_input(): void
     {
-        $listed = config('scene-operations');
-        $all = $this->ops()->all(includeDisabled: true);
+        $spec = new OpenApiSpec;
+        foreach ([...array_keys(config('scene-operations.operations')), ...config('scene-operations.exclude')] as $id) {
+            $this->assertNotNull($spec->operation($id), "{$id} is not in docs/api/openapi.yaml");
+        }
 
-        $this->assertSame(array_keys($listed), array_keys($all), 'A listed operationId is not in docs/api/openapi.yaml');
-        foreach ($all as $id => $operation) {
+        foreach ($this->ops()->all(includeDisabled: true) as $id => $operation) {
             if ($operation['device_param'] !== null) {
                 $this->assertArrayHasKey($operation['device_param'], $operation['inputs'], "{$id}: device_param is not an input");
             }
@@ -30,7 +31,23 @@ class SceneOperationsTest extends TestCase
         }
     }
 
-    public function test_no_listed_operation_needs_the_admin_token(): void
+    public function test_every_guest_level_mutating_operation_is_available_except_the_excluded(): void
+    {
+        $spec = new OpenApiSpec;
+        $expected = [];
+        foreach ($spec->operations() as $id => $operation) {
+            if ($operation['method'] !== 'get' && !isset($operation['operation']['security']) && !in_array($id, config('scene-operations.exclude'), true)) {
+                $expected[] = $id;
+            }
+        }
+
+        $this->assertEqualsCanonicalizing($expected, array_keys($this->ops()->all()));
+        $this->assertArrayHasKey('wantTrack', $this->ops()->all());
+        $this->assertArrayNotHasKey('adminLogin', $this->ops()->all());
+        $this->assertArrayNotHasKey('registerClient', $this->ops()->all());
+    }
+
+    public function test_no_available_operation_needs_the_admin_token(): void
     {
         $spec = new OpenApiSpec;
         $adminPaths = [];
@@ -43,9 +60,8 @@ class SceneOperationsTest extends TestCase
             }
         }
 
-        foreach (array_keys(config('scene-operations')) as $id) {
+        foreach (array_keys($this->ops()->all(includeDisabled: true)) as $id) {
             $operation = $spec->operation($id);
-            $this->assertNotNull($operation, $id);
             $this->assertArrayNotHasKey('security', $operation['operation'], "{$id} is marked admin in openapi.yaml");
             $key = $operation['method'].' /api'.preg_replace('/\{[^}]+\}/', '{}', $operation['path']);
             $this->assertArrayNotHasKey($key, $adminPaths, "{$id} is behind admin.token");
@@ -72,7 +88,7 @@ class SceneOperationsTest extends TestCase
 
     public function test_a_disabled_operation_is_refused(): void
     {
-        config(['scene-operations.setMute.enabled' => false]);
+        config(['scene-operations.operations.setMute.enabled' => false]);
 
         $this->assertArrayHasKey('operation', $this->ops()->validateStep(['operation' => 'setMute', 'device_id' => 1, 'params' => ['muted' => true]]));
         $this->assertArrayNotHasKey('setMute', $this->ops()->all());

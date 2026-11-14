@@ -2,6 +2,8 @@
 
 namespace App\Domain\Scenes;
 
+use Illuminate\Support\Str;
+
 /**
  * The operations a scene step may call (config/scene-operations.php), resolved against docs/api/openapi.yaml.
  *
@@ -20,30 +22,41 @@ class SceneOperations
     }
 
     /**
-     * The listed operations that exist in the contract and are enabled:
-     * `operationId => {id, label, device_param, method, path, inputs}`.
+     * The operations a scene may call: every guest-level operation of the contract that changes something (not GET,
+     * no `security`), minus `scene-operations.exclude`, with the overrides of `scene-operations.operations`
+     * (label, device input, `enabled: false`): `operationId => {id, label, device_param, method, path, inputs}`.
      *
      * @return array<string, array>
      */
     public function all(bool $includeDisabled = false): array
     {
+        $exclude = config('scene-operations.exclude', []);
+        $overrides = config('scene-operations.operations', []);
         $result = [];
-        foreach (config('scene-operations', []) as $id => $entry) {
-            if (!$includeDisabled && !($entry['enabled'] ?? false)) {
+
+        foreach ($this->spec()->operations() as $id => $operation) {
+            if ($operation['method'] === 'get' || isset($operation['operation']['security']) || in_array($id, $exclude, true)) {
                 continue;
             }
-            $operation = $this->spec()->operation($id);
-            if ($operation === null) {
+
+            $inputs = $this->spec()->inputs($id);
+            $entry = $overrides[$id] ?? [];
+            $enabled = (bool) ($entry['enabled'] ?? true);
+            if (!$includeDisabled && !$enabled) {
                 continue;
             }
+
+            $summary = trim((string) ($operation['operation']['summary'] ?? ''));
             $result[$id] = [
                 'id' => $id,
-                'label' => $entry['label'] ?? $id,
-                'device_param' => $entry['device_param'] ?? null,
-                'enabled' => (bool) ($entry['enabled'] ?? false),
+                'label' => $entry['label'] ?? ($summary !== '' ? $summary : Str::headline($id)),
+                'device_param' => array_key_exists('device_param', $entry)
+                    ? $entry['device_param']
+                    : (($inputs['device']['in'] ?? null) === 'path' ? 'device' : null),
+                'enabled' => $enabled,
                 'method' => $operation['method'],
                 'path' => $operation['path'],
-                'inputs' => $this->spec()->inputs($id),
+                'inputs' => $inputs,
             ];
         }
 
