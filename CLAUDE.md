@@ -45,12 +45,14 @@ docs/
     backup-restore.md       backup:run / backup:restore: archive contents, secrets excluded by default, fresh-install restore, SQLite and SD-card note, upgrade flow
     schema-plan.md          Schema review before the migration squash (14.3): table inventory, findings, data vs schema migrations, squash design with the `schema:baseline` mechanism, pre-squash fix-list; rehearsal harness in scripts/schema/ (`schema.sh check` diffs the schema against committed MariaDB and SQLite baselines)
     availability-layer.md   Availability layer design (workstream 3): providers, catalogue_albums/album_availability, MusicBrainz discography sync, wishlist, API/UI, build order (plan, not built)
+    diagnostics.md          Diagnostics bundle (9b): `diagnostics:bundle`, `GET /api/admin/diagnostics`, contents, the Redactor and what it removes, profiles, how to add a section
     alerts.md               Alert model (workstream 14.1): one place raises/resolves alerts, kinds and thresholds, dedupe, MQTT remoment/alerts/*, GET /api/alerts, ack, how to add a kind
     action-layer.md         Action layer spike (14.5): can an action be defined once and route/MCP/OpenAPI/scene/HA derived? numbers, recommendation (keep REST + openapi.yaml as the definition, scenes call operations by operationId), and what was built from it: operationIds, contract test, scene-operation list, `ha:package`
     credentials.md          Credentials layer (workstream 14.4): ServiceCredentials registry for Spotify/Last.fm/Discogs/AcoustID/TheAudioDB keys, /settings/services, encrypted secrets, backup exclusion, base-URL/relay hook, setup steps, how to add a service
     database.md             MariaDB (SQLite for tests only): why, .env settings, db:import-sqlite, recovering a corrupt file, driver-specific SQL
     manager.md              ReMoment Manager (workstream 10 skeleton, `manager/`): host service, Node one file, own token, 127.0.0.1:8099: status, logs, restart of one compose project, audit, CLI `remoment-manager`, security rules, tests with a fake docker; web page, upgrade, SMB, installers still to do
     developer-tools.md      /settings/developer: quality test (transcode ladder played on a device), simulate now playing, MQTT console, device inspector, stream URL tester
+    hardware-table.md       Generated supported-hardware table (9b): `hardware:table`, config/hardware-status.php statuses, the stale-page test
     device-drivers.md       Driver contracts, existing drivers, guide for adding a new brand
     beovision-tv.md         BeoVision / Beoplay V1 TV controls design: V1 API findings, one-way remote commands, TV screens (list, detail, remote), probe plan, phases; mostly unbuilt
     philips-tv.md           Philips Android TV on top of the UPnP driver (Jointspace v6): pairing command, standby, apps as sources, active app as now playing; what is unverified
@@ -129,11 +131,17 @@ php artisan test tests/Path/To/TestFile.php
 php artisan profile:stress-sqlite [--minutes=1] [--listeners=6] [--workers=2] [--web=2] [--intensity=1] [--json]
 php artisan profile:upgrade [--to-profile=standard|full] [--database=remoment] [--dry-run] [--force]
 
+# Supported-hardware table of docs/user/hardware.md, generated from config/devices.php, the driver contracts and config/hardware-status.php (verification status, date, note per driver/model); --check exits 1 when the page is stale (a test runs it); see docs/architecture/hardware-table.md
+php artisan hardware:table [--format=markdown|json] [--check]
+
 # Version: print the VERSION file's version (`--json`: version, recorded version, profile; `--record`: store it as the installed version, Setting `app_version`)
 php artisan app:version [--json] [--record]
 
 # Upgrade (9a): pre-flight (downgrade, unknown newer migration, pending migrations, disk, heartbeats, profile), mandatory backup, maintenance mode, migrate, caches (config('upgrade.after_migrate')), queue:restart, record version, health check, rollback instructions, last 10 runs in Setting `upgrade_history` (shown on /settings/health). Exit 0 ok / 10 upgrade available (--check) / 1 blocked / 2 backup failed / 3 migration failed (app left down) / 4 health check failed; --json needs --force to run and adds steps, migrations_run, exit_reason, rollback; Ansible `upgrade_command`; see docs/architecture/backup-restore.md
 php artisan app:upgrade [--check] [--json] [--force] [--no-maintenance] [--health-timeout=120]
+
+# Diagnostics bundle (9b): one redacted zip for an issue (versions, profile, health, queues, failed jobs, devices without addresses, alerts, upgrade history, log tail; never secrets, IP/MAC addresses or library contents; no flag adds them); also `GET /api/admin/diagnostics` (admin token) and a button on /settings/health; see docs/architecture/diagnostics.md
+php artisan diagnostics:bundle [--path=]
 
 # Backup (database + safe settings + manifest, no secrets unless --with-secrets; scheduled nightly, keeps BACKUP_KEEP) and restore on a fresh `migrate`; see docs/architecture/backup-restore.md
 php artisan backup:run [--path=] [--keep=N] [--no-db] [--with-secrets]

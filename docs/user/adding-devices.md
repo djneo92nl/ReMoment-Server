@@ -2,7 +2,7 @@
 
 Go to `/settings/devices` (the setup wizard links there). *Scan* runs discovery and lists what it finds; nothing is added by itself. Per row: rename, **Add** or **Ignore**. The same scan runs hourly in the background (`DEVICE_AUTO_DISCOVER=false` turns that off). A device that discovery cannot see is added by IP at the bottom of the same page (the "Known device IPs" field helps discovery when scanning is blocked) or at `/devices/create`, where you pick brand and product. `php artisan device:discover [--brand=…] [--host=IP]` does the same from the command line. Discovery details: [device-discovery.md](../architecture/device-discovery.md).
 
-Which models are confirmed to work: see [hardware.md](hardware.md) (a placeholder for now). Until then, this page says what the repository's own docs record.
+Which models are confirmed to work: see [hardware.md](hardware.md), a generated table with how well each model was checked. This page adds per-brand setup notes.
 
 Discovery uses SSDP and mDNS multicast. If the server is in Docker without host networking, or on another VLAN than the devices, scanning finds nothing: [troubleshooting.md](troubleshooting.md).
 
