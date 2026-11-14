@@ -6,43 +6,12 @@ use App\Domain\Radio\Relay\IcecastStatus;
 use App\Domain\Radio\Relay\RadioRelay;
 use App\Domain\Radio\Relay\RelayCommand;
 use App\Domain\Radio\Relay\RelayManager;
-use App\Domain\Radio\Relay\RelayProcess;
 use App\Models\RadioStation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Tests\Support\FakeRelayProcess;
 use Tests\TestCase;
-
-/** A process that is "running" until the test says it ended. */
-final class FakeRelayProcess implements RelayProcess
-{
-    public bool $alive = true;
-
-    public bool $stopped = false;
-
-    public function __construct(public readonly array $command) {}
-
-    public function running(): bool
-    {
-        return $this->alive;
-    }
-
-    public function stop(): void
-    {
-        $this->alive = false;
-        $this->stopped = true;
-    }
-
-    public function exitCode(): ?int
-    {
-        return $this->alive ? null : 1;
-    }
-
-    public function tail(): string
-    {
-        return 'Server returned 403 Forbidden';
-    }
-}
 
 /** The radio relay: the ffmpeg command, Icecast status, the demand cache and the manager that starts and stops the relays. */
 class RadioRelayTest extends TestCase

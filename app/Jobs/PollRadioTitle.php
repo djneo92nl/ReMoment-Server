@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Domain\Radio\NowPlayingProviders;
 use App\Domain\Radio\RadioPlayLog;
+use App\Domain\Radio\Relay\RadioRelay;
 use App\Domain\Radio\StreamTitles;
 use App\Models\RadioStation;
 use Illuminate\Bus\Queueable;
@@ -45,6 +46,7 @@ class PollRadioTitle implements ShouldQueue
         StreamTitles::put($station->id, $title, $source);
 
         if ($title !== null) {
+            RadioRelay::pushTitle($station, $title);
             RadioPlayLog::record($station, $source, $title);
         }
 

@@ -1,6 +1,6 @@
 # Radio relay (station → ffmpeg → Icecast → renderer)
 
-**Status: 17.1 (the relay core) and 17.2 (decision and driver) built 2026-10-30; 17.3-17.4 are plan** (workstream 17 of [v1-roadmap.md](v1-roadmap.md)). What was measured on hardware or against live streams is marked **verified**; the rest is design. "Built so far" below lists what exists.
+**Status: 17.1 (the relay core) and 17.2 (decision and driver) built 2026-10-30; 17.3 (titles, badge) and 17.4 (alerts, API, status, measuring script) built 2026-11-14 against fakes, hardware parts unverified** (workstream 17 of [v1-roadmap.md](v1-roadmap.md)). What was measured on hardware or against live streams is marked **verified**; the rest is design. "Built so far" below lists what exists.
 
 A renderer that can only fetch a plain-HTTP MP3 from the local network should still play any station in the library. The server fetches the station (any scheme, any codec, any redirect), converts it once to MP3 and serves it from the local Icecast; the renderer is given that address instead of the station's own.
 
@@ -104,12 +104,28 @@ station URL ──(HTTPS, AAC, HLS, redirects, ICY)──▶ ffmpeg ──MP3 12
 
 **Not yet verified:** ICY titles on the unit's display, ffmpeg's reconnect when an upstream drops, the listener's keep-alive against a real renderer over a long listen, and a Pi.
 
+### 17.3 and 17.4 (2026-11-14)
+
+| What | Where |
+|---|---|
+| Titles on the mount | `RadioRelay::pushTitle()`, called by `PollRadioTitle` after each poll: while the station is wanted by the relay, a changed title goes to Icecast's `admin/metadata` (`updinfo`); not repeated, retried at the next poll when Icecast refused (mount not up yet). The title still comes from the station (`StreamTitles`), not from the manager |
+| Badge on the playing card | `Domain\Media\Radio::$relay`, set by the UPnP listener when the renderer plays the relay address; `now_playing.radio.relay: true` in the API and a "Relay" badge on the device card |
+| Play answer | `POST /api/devices/{id}/radio/{station}` adds `"relay": true` when the station was started through the relay (`RadioRelay::playedVia`) |
+| Status | `RelayManager` publishes `{at, relays}` to the cache every tick (`RelayStatus`): running relays (since, listeners) and the ones waiting to restart (failures, retry time). `GET /api/radio/relays` (`operationId listRadioRelays`) returns `{enabled, manager, max, data[]}`; `manager` is false when no report came for 15 s. MCP: `radio` with `relays: true`. A "Radio relay" card on `/settings/health` while the relay is on |
+| Alert | kind `radio_relay`, key = station id, warning: raised when a relay died soon after starting three times in a row, resolved once the restarted relay has run 30 s ([alerts.md](alerts.md)) |
+| Priority | every ffmpeg starts under `nice -n 10` (`RADIO_RELAY_NICE`, 0 = off) |
+| After a crash or container restart | demand lives in the cache (`radio:relay:wanted`, one day), so a new manager starts every station asked for within `RADIO_RELAY_IDLE_SECONDS` at its first tick; a renderer that kept playing re-asks through the listener. A renderer's own buffer bridges the few seconds, a longer gap ends its stream and it stays stopped |
+| Pi measurement | `bash scripts/radio-relay/measure.sh "<id> <id> <id> <id>" [seconds]` samples ffmpeg CPU, memory and load with one relay and with all of them |
+| Tests | `tests/Feature/RadioRelayOperationsTest.php` (titles pushed once and retried, alert raised and resolved, status states, the API with a dead manager, a restarted manager, the badge flag) |
+
+**Unverified (needs hardware I did not have):** the idle stop and the keep-alive over a long listen with a real renderer, whether the MCi900 shows the ICY title of the mount, ffmpeg's reconnect when an upstream drops, and **every figure on a Pi 3**: the default `RADIO_RELAY_MAX=4` is still a guess until `measure.sh` has run on one. Nothing here claims otherwise.
+
 ## Phases
 
 1. **17.1 Relay core (built 2026-10-30).** `RelayCommand`, `RelayManager`, `radio:relay`, `IcecastStatus`, config, the compose profile and supervisor program. Tested with a fake process (the command line, restart with backoff, idle stop, the limit). Done when, from the command line, an HTTP MP3 station, an HTTPS-with-redirect station (NTS 1) and an AAC station (FIP) each become a live mount that `curl` and a media player can play.
 2. **17.2 Decision and driver integration (built 2026-10-30).** `RelayDecision`, `radio_relay` meta, `RadioRelay::ensureLive`, the generic UPnP driver's station playback uses it, `streamium:enable` sets `always`. Tested with fakes. Done when 181.FM, NTS 1 and FIP all play on the MCi900 from the web UI and the API, and a station the renderer can play by itself (an HTTP MP3 on a renderer with DNS) is still sent direct.
-3. **17.3 Titles and idle.** Titles pushed to Icecast, the listener keeps the demand alive while a station plays, idle stop verified with a real renderer, a badge on the playing card.
-4. **17.4 Operations.** Alerts, `/api/radio/relays`, the settings status, restart behaviour after a crash and after a container restart, a **Pi 3 measurement** (CPU and memory with one and with four relays; the limit default is set from it), docs (this page, [radio.md](radio.md), the device-drivers guide, CLAUDE.md, the OpenAPI field `relay`).
+3. **17.3 Titles and idle (built 2026-11-14; idle stop with a real renderer unverified).** Titles pushed to Icecast, the listener keeps the demand alive while a station plays, idle stop verified with a real renderer, a badge on the playing card.
+4. **17.4 Operations (built 2026-11-14 except the Pi 3 measurement, which needs the hardware: script ready).** Alerts, `/api/radio/relays`, the settings status, restart behaviour after a crash and after a container restart, a **Pi 3 measurement** (CPU and memory with one and with four relays; the limit default is set from it), docs (this page, [radio.md](radio.md), the device-drivers guide, CLAUDE.md, the OpenAPI field `relay`).
 
 ## Risks and open questions
 

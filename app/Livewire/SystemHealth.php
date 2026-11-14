@@ -34,6 +34,7 @@ class SystemHealth extends Component
             'backup' => BackupStatus::health(),
             'installedVersion' => \App\Domain\System\InstalledVersion::recorded() ?? \App\Domain\System\InstalledVersion::current(),
             'upgrade' => \App\Domain\System\UpgradeHistory::latest(),
+            'relay' => \App\Domain\Radio\Relay\RelayStatus::report(),
             'devices' => $this->devices(),
             'alerts' => \App\Domain\Alerts\Alerts::active(),
             'ipChanges' => array_slice(ListenerStatus::ipChanges(), 0, 5),

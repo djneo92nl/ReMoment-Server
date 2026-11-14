@@ -2,9 +2,9 @@
 
 namespace App\Domain\Radio\Relay;
 
+use App\Domain\Alerts\Alerts;
 use App\Models\RadioStation;
 use Closure;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -19,6 +19,9 @@ final class RelayManager
 
     /** Seconds to wait before restarting a relay, by how many times in a row it died soon after starting. */
     private const BACKOFF_SECONDS = [3, 10, 30, 60];
+
+    /** Deaths in a row (each soon after starting) before the station's alert is raised. */
+    private const ALERT_AFTER_FAILURES = 3;
 
     /** A relay that ran this long was working: its death is a new failure, not part of a streak. */
     private const HEALTHY_SECONDS = 30;
@@ -52,8 +55,9 @@ final class RelayManager
         $this->refreshListeners($now);
         $this->stopIdle($now);
         $this->startWanted($now);
+        $this->resolveHealthy($now);
 
-        Cache::put('radio:relay:status', $this->status(), 120);
+        RelayStatus::publish($this->status($now), $now);
     }
 
     /** @return int[] the stations running now */
@@ -69,10 +73,28 @@ final class RelayManager
         }
     }
 
-    /** @return array<int, array{since: int, listeners: int|null}> */
-    public function status(): array
+    /**
+     * Running relays, and the ones waiting to be restarted after a failure.
+     *
+     * @return array<int, array{state: string, since: int|null, listeners: int|null, failures: int, retry_at: int|null}>
+     */
+    public function status(?int $now = null): array
     {
-        return array_map(fn (array $relay) => ['since' => $relay['started'], 'listeners' => $relay['listeners'] ?? null], $this->running);
+        $now ??= ($this->clock)();
+
+        $rows = [];
+
+        foreach ($this->running as $id => $relay) {
+            $rows[$id] = ['state' => 'running', 'since' => $relay['started'], 'listeners' => $relay['listeners'] ?? null, 'failures' => $this->failed[$id]['failures'] ?? 0, 'retry_at' => null];
+        }
+
+        foreach ($this->failed as $id => $failure) {
+            if (!isset($this->running[$id]) && $failure['until'] > $now) {
+                $rows[$id] = ['state' => 'restarting', 'since' => null, 'listeners' => null, 'failures' => $failure['failures'], 'retry_at' => $failure['until']];
+            }
+        }
+
+        return $rows;
     }
 
     private function reap(int $now): void
@@ -90,6 +112,36 @@ final class RelayManager
             $this->failed[$id] = ['failures' => $failures, 'until' => $now + $wait];
 
             Log::warning("Radio relay {$id}: ffmpeg ended (exit ".($relay['process']->exitCode() ?? '?')."), restart in {$wait}s: ".$relay['process']->tail());
+
+            if ($failures >= self::ALERT_AFTER_FAILURES) {
+                $this->raiseAlert($id, $failures, $relay['process']->tail());
+            }
+        }
+    }
+
+    private function raiseAlert(int $id, int $failures, string $tail): void
+    {
+        $name = RadioStation::find($id)?->name ?? "station {$id}";
+
+        Alerts::raise(
+            'radio_relay',
+            (string) $id,
+            'warning',
+            "Radio relay for {$name} keeps failing",
+            "The relay of {$name} stopped {$failures} times in a row soon after starting, so speakers that need it cannot play this station. Last ffmpeg output: ".trim(mb_substr($tail, -300)),
+            null,
+            ['station_id' => $id, 'failures' => $failures],
+        );
+    }
+
+    /** A relay that has run long enough is working: its alert, if any, is over. */
+    private function resolveHealthy(int $now): void
+    {
+        foreach ($this->running as $id => $relay) {
+            if (isset($this->failed[$id]) && $now - $relay['started'] >= self::HEALTHY_SECONDS) {
+                unset($this->failed[$id]);
+                Alerts::resolve('radio_relay', (string) $id);
+            }
         }
     }
 

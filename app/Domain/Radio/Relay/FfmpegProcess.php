@@ -25,9 +25,27 @@ final class FfmpegProcess implements RelayProcess
         });
     }
 
+    /** Starts ffmpeg at a lower priority (`radio_relay.nice`, 0 = off): a relay must never starve the web server or the listeners on a Pi. */
     public static function launch(array $command): self
     {
+        $nice = (int) config('radio_relay.nice');
+
+        if ($nice > 0 && ($binary = self::niceBinary()) !== null) {
+            $command = [$binary, '-n', (string) $nice, ...$command];
+        }
+
         return new self($command);
+    }
+
+    private static function niceBinary(): ?string
+    {
+        foreach (['/usr/bin/nice', '/bin/nice'] as $path) {
+            if (is_executable($path)) {
+                return $path;
+            }
+        }
+
+        return null;
     }
 
     public function running(): bool

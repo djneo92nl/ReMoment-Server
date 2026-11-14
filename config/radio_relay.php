@@ -22,6 +22,9 @@ return [
     // Relays running at once. Over the limit the longest idle one stops; with none idle a new one waits.
     'max' => (int) env('RADIO_RELAY_MAX', 4),
 
+    // `nice` level of every ffmpeg (0 = no nice), so a relay yields to the web server and the listeners.
+    'nice' => (int) env('RADIO_RELAY_NICE', 10),
+
     // A relay nobody asked for during this long, and nobody listens to, is stopped.
     'idle_seconds' => (int) env('RADIO_RELAY_IDLE_SECONDS', 60),
 

@@ -126,7 +126,7 @@
                             @if($nowPlaying->radio && !$nowPlaying->track)
                                 {{-- Pure radio: no track metadata --}}
                                 <h2 class="text-2xl lg:text-3xl font-medium tracking-tight dark:text-emerald-50 truncate">{{ $nowPlaying->radio->name }}</h2>
-                                <p class="mt-1.5 text-base text-gray-500 dark:text-gray-400">Radio</p>
+                                <p class="mt-1.5 text-base text-gray-500 dark:text-gray-400">Radio @if($nowPlaying->radio->relay)<x-badge variant="info" class="ml-1" title="Converted to MP3 by this server for the speaker">Relay</x-badge>@endif</p>
                             @elseif($nowPlaying->track)
                                 {{-- Track (music or radio-with-track-info) --}}
                                 <h2 class="text-2xl lg:text-3xl font-medium tracking-tight dark:text-emerald-50 truncate">
@@ -139,6 +139,7 @@
                                     @elseif($nowPlaying->radio?->name)
                                         · {{ $nowPlaying->radio->name }}
                                     @endif
+                                    @if($nowPlaying->radio?->relay)<x-badge variant="info" class="ml-1" title="Converted to MP3 by this server for the speaker">Relay</x-badge>@endif
                                 </p>
                                 @if($nowPlaying->source?->sourceType === 'APP')
                                     {{-- A TV app (YouTube, Netflix) playing the title --}}

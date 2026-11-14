@@ -349,7 +349,9 @@ class DeviceListener implements DeviceListenerInterface
         StreamTitles::touch($station);
 
         // A station played through the relay keeps being asked for while it plays.
-        if ($ours['uri'] === RadioRelay::url($station)) {
+        $relayed = $ours['uri'] === RadioRelay::url($station);
+
+        if ($relayed) {
             RadioRelay::want($station);
         }
 
@@ -366,7 +368,7 @@ class DeviceListener implements DeviceListenerInterface
             position: 0,
             type: 'music',
             platform: 'radio',
-            radio: new Radio(name: $station->name, genre: $station->genre, images: $images, id: $station->streamUrl()),
+            radio: new Radio(name: $station->name, genre: $station->genre, images: $images, id: $station->streamUrl(), relay: $relayed),
         );
     }
 

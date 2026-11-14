@@ -9,6 +9,7 @@ class Radio
         public ?string $genre = null,
         public array $images = [],
         public ?string $id = null,
+        public bool $relay = false,
     ) {}
 
     public function toArray(): array
@@ -17,6 +18,7 @@ class Radio
             'name' => $this->name,
             'images' => $this->images,
             'genre' => $this->genre,
+            'relay' => $this->relay ?: null,
         ], fn ($value) => $value !== null);
     }
 }

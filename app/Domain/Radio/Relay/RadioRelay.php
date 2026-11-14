@@ -3,6 +3,7 @@
 namespace App\Domain\Radio\Relay;
 
 use App\Domain\Storage\StreamUrl;
+use App\Models\Device;
 use App\Models\RadioStation;
 use Illuminate\Support\Facades\Cache;
 
@@ -45,9 +46,47 @@ final class RadioRelay
     /** The address a renderer plays: the host of the other stream addresses (`STREAM_BASE_URL`) on the Icecast port. */
     public static function url(RadioStation $station): string
     {
+        return self::urlFor($station->id);
+    }
+
+    public static function urlFor(int $stationId): string
+    {
         $host = parse_url(StreamUrl::base(), PHP_URL_HOST) ?: '127.0.0.1';
 
-        return 'http://'.$host.':'.config('radio_relay.icecast.port').'/'.RelayCommand::mount($station->id);
+        return 'http://'.$host.':'.config('radio_relay.icecast.port').'/'.RelayCommand::mount($stationId);
+    }
+
+    /**
+     * Gives the relayed mount the title the station reports now, for renderers that show ICY titles. Only while the
+     * station is relayed (wanted), and only when the title changed since the last push. True when it was pushed.
+     */
+    public static function pushTitle(RadioStation $station, string $title, ?IcecastStatus $icecast = null): bool
+    {
+        if (!self::enabled() || !isset(self::wanted()[$station->id])) {
+            return false;
+        }
+
+        $key = "radio:relay:title:{$station->id}";
+
+        if (Cache::get($key) === $title) {
+            return false;
+        }
+
+        if (!($icecast ?? new IcecastStatus)->setTitle(RelayCommand::mount($station->id), $title)) {
+            return false; // The mount is not up yet (or Icecast refused): try again at the next poll.
+        }
+
+        Cache::put($key, $title, now()->addHour());
+
+        return true;
+    }
+
+    /** Whether the renderer `$device` was last sent this station through the relay (UPnP renderers; false for anything else). */
+    public static function playedVia(Device $device, RadioStation $station): bool
+    {
+        $played = \App\Integrations\Upnp\MusicPlayerDriver::radio($device->id);
+
+        return $played !== null && $played['station_id'] === $station->id && $played['uri'] === self::url($station);
     }
 
     /**

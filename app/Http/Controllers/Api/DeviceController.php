@@ -24,6 +24,7 @@ use App\Domain\Library\SoundFilter;
 use App\Domain\Library\SpotifyUri;
 use App\Domain\Playback\NotMovableException;
 use App\Domain\Playback\PlaybackMover;
+use App\Domain\Radio\Relay\RadioRelay;
 use App\Domain\Radio\StationNowPlaying;
 use App\Domain\Radio\StreamTitles;
 use App\Events\Device\PlaybackModesUpdated;
@@ -232,11 +233,11 @@ class DeviceController extends Controller
 
     public function playRadio(Device $device, RadioStation $station): JsonResponse
     {
-        return $this->withDriver($device, RadioControlInterface::class, 'radio_control', function (RadioControlInterface $driver) use ($station) {
+        return $this->withDriver($device, RadioControlInterface::class, 'radio_control', function (RadioControlInterface $driver) use ($station, $device) {
             $driver->playRadioStation($station);
             $station->markPlayed();
 
-            return ['status' => 'ok', 'station' => $station->name];
+            return ['status' => 'ok', 'station' => $station->name] + (RadioRelay::playedVia($device, $station) ? ['relay' => true] : []);
         });
     }
 

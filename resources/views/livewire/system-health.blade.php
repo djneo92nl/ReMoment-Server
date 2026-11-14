@@ -87,6 +87,22 @@
             </div>
         </x-card>
 
+        @if($relay['enabled'])
+            <x-card class="p-6">
+                <div class="text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-3">Radio relay</div>
+                {!! $badge($relay['manager'], 'Running', 'Not running') !!}
+                <div class="mt-2 text-xs text-gray-500">
+                    {{ collect($relay['data'])->where('state', 'running')->count() }} of {{ $relay['max'] }} running
+                    @if($failing = collect($relay['data'])->where('state', 'restarting'))
+                        @if($failing->count()) · <span class="text-amber-600 dark:text-amber-400">{{ $failing->count() }} restarting</span>@endif
+                    @endif
+                </div>
+                @foreach($relay['data'] as $row)
+                    <div class="mt-1 text-xs text-gray-500 truncate">{{ $row['station'] ?? '#'.$row['station_id'] }} · {{ $row['state'] }}@if($row['state'] === 'running') · {{ $row['listeners'] ?? 0 }} listening @endif</div>
+                @endforeach
+            </x-card>
+        @endif
+
         <x-card class="p-6">
             <div class="text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-3">Queue worker</div>
             @if(!$scheduler['ok'])
