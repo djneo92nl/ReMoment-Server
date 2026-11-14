@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\LibraryController;
 use App\Http\Controllers\Api\LiteArtworkController;
 use App\Http\Controllers\Api\PhysicalController;
 use App\Http\Controllers\Api\PlayerController;
+use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Api\QueueController;
 use App\Http\Controllers\Api\RemoteKeysController;
 use App\Http\Controllers\Api\SceneController;
@@ -28,6 +29,10 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/info', InfoController::class);
 Route::get('/alerts', [AlertController::class, 'index']);
+Route::middleware('throttle:20,1')->group(function () {
+    Route::post('/push/subscribe', [PushSubscriptionController::class, 'store']);
+    Route::delete('/push/subscribe', [PushSubscriptionController::class, 'destroy']);
+});
 
 // Tiny GIF/BMP/PGM covers for old clients: /api/artwork/{hash}/64.gif?colors=16, the hash is the artwork `hash` of a track or `lite` of a play command.
 Route::get('/artwork/{hash}/{size}.{format}', [LiteArtworkController::class, 'show'])

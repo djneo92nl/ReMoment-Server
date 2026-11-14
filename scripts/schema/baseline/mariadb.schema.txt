@@ -145,17 +145,22 @@ TABLE clients [engine=InnoDB collation=utf8mb4_unicode_ci]
   col battery_charging tinyint(1) NULL default=NULL
   col battery_percent tinyint(3) unsigned NULL default=NULL
   col build_number int(10) unsigned NULL default=NULL
+  col capabilities longtext NULL default=NULL collate=utf8mb4_bin
   col created_at timestamp NULL default=NULL
+  col enabled_roles longtext NULL default=NULL collate=utf8mb4_bin
   col firmware_version varchar(50) NULL default=NULL collate=utf8mb4_unicode_ci
   col hardware_id varchar(100) NULL default=NULL collate=utf8mb4_unicode_ci
   col hidden_sources longtext NULL default=NULL collate=utf8mb4_bin
   col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
   col ip_address varchar(45) NULL default=NULL collate=utf8mb4_unicode_ci
+  col kind varchar(20) NOT NULL default='client' collate=utf8mb4_unicode_ci
   col last_seen_at timestamp NULL default=NULL
   col metadata longtext NULL default=NULL collate=utf8mb4_bin
   col name varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col node_status longtext NULL default=NULL collate=utf8mb4_bin
   col pairing_code varchar(8) NULL default=NULL collate=utf8mb4_unicode_ci
   col registration_token varchar(64) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col roles longtext NULL default=NULL collate=utf8mb4_bin
   col status enum('pending','approved') NOT NULL default='pending' collate=utf8mb4_unicode_ci
   col type enum('single','multi') NOT NULL default='single' collate=utf8mb4_unicode_ci
   col updated_at timestamp NULL default=NULL
@@ -164,8 +169,12 @@ TABLE clients [engine=InnoDB collation=utf8mb4_unicode_ci]
   idx clients_hardware_id_unique UNIQUE BTREE (hardware_id)
   idx clients_pairing_code_unique UNIQUE BTREE (pairing_code)
   idx clients_registration_token_unique UNIQUE BTREE (registration_token)
+  check capabilities json_valid(`capabilities`)
+  check enabled_roles json_valid(`enabled_roles`)
   check hidden_sources json_valid(`hidden_sources`)
   check metadata json_valid(`metadata`)
+  check node_status json_valid(`node_status`)
+  check roles json_valid(`roles`)
 
 TABLE client_device [engine=InnoDB collation=utf8mb4_unicode_ci]
   col client_id bigint(20) unsigned NOT NULL default=-
@@ -580,6 +589,18 @@ TABLE play_tags [engine=InnoDB collation=utf8mb4_unicode_ci]
   idx play_tags_device_id_foreign INDEX BTREE (device_id)
   idx play_tags_uid_unique UNIQUE BTREE (uid)
   fk play_tags_device_id_foreign (device_id) -> devices(id) ON DELETE SET NULL ON UPDATE RESTRICT
+
+TABLE push_subscriptions [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col auth varchar(64) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col created_at timestamp NULL default=NULL
+  col endpoint varchar(700) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col last_success_at timestamp NULL default=NULL
+  col p256dh varchar(128) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col updated_at timestamp NULL default=NULL
+  col user_agent varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  idx PRIMARY UNIQUE BTREE (id)
+  idx push_subscriptions_endpoint_unique UNIQUE BTREE (endpoint)
 
 TABLE radio_plays [engine=InnoDB collation=utf8mb4_unicode_ci]
   col artist varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci

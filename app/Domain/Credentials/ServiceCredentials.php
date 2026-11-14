@@ -163,7 +163,7 @@ final class ServiceCredentials
     /** Every settings key holding a secret: left out of backups and diagnostics bundles. @return list<string> */
     public static function secretSettingKeys(): array
     {
-        $keys = [];
+        $keys = [\App\Domain\Push\Vapid::PRIVATE_SETTING]; // not a service: the server's own Web Push key
         foreach (self::all() as $d) {
             foreach ($d->fields as $f) {
                 if ($f->secret) {

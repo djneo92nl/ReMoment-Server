@@ -140,17 +140,22 @@ TABLE clients [autoincrement]
   col battery_charging tinyint(1) NULL default=-
   col battery_percent integer NULL default=-
   col build_number integer NULL default=-
+  col capabilities text NULL default=-
   col created_at datetime NULL default=-
+  col enabled_roles text NULL default=-
   col firmware_version varchar NULL default=-
   col hardware_id varchar NULL default=-
   col hidden_sources text NULL default=-
   col id integer NOT NULL default=- pk=1
   col ip_address varchar NULL default=-
+  col kind varchar NOT NULL default='client'
   col last_seen_at datetime NULL default=-
   col metadata text NULL default=-
   col name varchar NULL default=-
+  col node_status text NULL default=-
   col pairing_code varchar NULL default=-
   col registration_token varchar NOT NULL default=-
+  col roles text NULL default=-
   col status varchar NOT NULL default='pending'
   col type varchar NOT NULL default='single'
   col updated_at datetime NULL default=-
@@ -522,6 +527,17 @@ TABLE plays [autoincrement]
   fk (device_id) -> devices(id) ON DELETE CASCADE ON UPDATE NO ACTION
   fk (radio_station_id) -> radio_stations(id) ON DELETE SET NULL ON UPDATE NO ACTION
   fk (track_id) -> tracks(id) ON DELETE SET NULL ON UPDATE NO ACTION
+
+TABLE push_subscriptions [autoincrement]
+  col auth varchar NOT NULL default=-
+  col created_at datetime NULL default=-
+  col endpoint varchar NOT NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col last_success_at datetime NULL default=-
+  col p256dh varchar NOT NULL default=-
+  col updated_at datetime NULL default=-
+  col user_agent varchar NULL default=-
+  idx push_subscriptions_endpoint_unique UNIQUE (endpoint)
 
 TABLE radio_plays [autoincrement]
   col artist varchar NULL default=-

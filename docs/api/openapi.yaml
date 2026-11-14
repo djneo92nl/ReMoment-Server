@@ -2655,6 +2655,68 @@ paths:
                           critical: { type: integer }
                       kinds: { type: array, items: { type: string } }
                       total: { type: integer }
+  /push/subscribe:
+    post:
+      tags: [Alerts]
+      summary: Turn on background alert notifications for this browser (Web Push)
+      operationId: subscribePush
+      description: >-
+        Stores the browser's Web Push subscription (`PushSubscription.toJSON()`: endpoint and keys) so warning and
+        critical alerts reach it while the browser is closed. Open like the rest of the API, one row per endpoint
+        (posting the same endpoint again refreshes its keys), no account or user. The endpoint must be https on a
+        known browser push service (`config/push.php`); the server stores at most 100. The browser takes the
+        server's VAPID public key from the settings page (`/settings/health`), not from the API.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [endpoint, keys]
+              properties:
+                endpoint: { type: string, format: uri, example: "https://fcm.googleapis.com/fcm/send/abc" }
+                keys:
+                  type: object
+                  required: [p256dh, auth]
+                  properties:
+                    p256dh: { type: string, example: "BNc..." }
+                    auth: { type: string, example: "x1y2z3" }
+      responses:
+        "200":
+          description: The endpoint was already stored; its keys are refreshed
+          content:
+            application/json:
+              schema: { type: object, properties: { status: { type: string, example: ok } } }
+        "201":
+          description: Stored
+          content:
+            application/json:
+              schema: { type: object, properties: { status: { type: string, example: ok } } }
+        "422":
+          description: Not https, not a known push service, malformed keys, or the server is full (`error` `invalid` or `too_many`)
+        "429":
+          description: More than 20 requests a minute
+    delete:
+      tags: [Alerts]
+      summary: Turn off background alert notifications for this browser
+      operationId: unsubscribePush
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [endpoint]
+              properties:
+                endpoint: { type: string, format: uri }
+      responses:
+        "200":
+          description: Removed (also when it was not stored)
+          content:
+            application/json:
+              schema: { type: object, properties: { status: { type: string, example: ok } } }
+        "429":
+          description: More than 20 requests a minute
   /admin/alerts/{alert}/ack:
     post:
       tags: [Alerts]
@@ -3190,6 +3252,18 @@ paths:
                 firmware_version: { type: string }
                 build_number: { type: integer }
                 metadata: { type: object, additionalProperties: true }
+                kind:
+                  type: string
+                  enum: [client, node]
+                  description: "`node` for a ReMoment Node (a headless agent, see docs/architecture/node-agent.md; needs `hardware_id`). Fixed at first registration (`422 kind_mismatch` afterwards)."
+                roles:
+                  type: array
+                  description: Roles a node can take; the admin switches them on. Nodes only.
+                  items: { $ref: "#/components/schemas/NodeRole" }
+                capabilities:
+                  type: object
+                  additionalProperties: true
+                  description: Informational, keyed by role, at most 16 KiB. Nodes only.
       responses:
         "200":
           description: Already registered
@@ -3248,9 +3322,32 @@ paths:
                 firmware_version: { type: string }
                 build_number: { type: integer }
                 metadata: { type: object, additionalProperties: true }
+                status:
+                  type: object
+                  description: Nodes only, every 30 s. Stored as the node's last reported status; ignored for other clients.
+                  properties:
+                    roles:
+                      type: object
+                      additionalProperties:
+                        type: object
+                        properties:
+                          state: { type: string, enum: [idle, busy, error, absent] }
+                          detail: { type: string, maxLength: 200 }
+                    uptime_seconds: { type: integer }
+                    load: { type: number }
+                    disk_free_bytes: { type: integer }
       responses:
         "200":
-          description: OK
+          description: OK; for a node also `roles`, the roles the admin has switched on
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  roles:
+                    type: array
+                    items: { $ref: "#/components/schemas/NodeRole" }
   /clients/{apiToken}/artwork:
     parameters:
       - { $ref: "#/components/parameters/apiToken" }
@@ -3634,6 +3731,7 @@ components:
             deep_analysis_kinds: { type: array, items: { $ref: "#/components/schemas/DeepAnalysisKind" }, description: "The kinds that can run now (sections: structure service; stems: stems service). Present only when not empty." }
             scenes: { type: boolean, description: "GET /scenes exists (true in every profile)" }
             export: { type: boolean, description: "Export from the library as zip is available: the profile has the library and own files, and ffmpeg can transcode (POST /library/exports). Present only when true." }
+            export_formats: { type: array, items: { type: string, enum: [mp3, aac, opus] }, description: "The formats ffmpeg on this server can make for an export (probed with `ffmpeg -encoders`, cached); present with `export`. Profiles of other formats cannot convert files here." }
 
     ExportRequest:
       type: object
@@ -3642,11 +3740,12 @@ components:
         type: { type: string, enum: [album, playlist, artist, tracks] }
         id: { type: integer, description: "Album, playlist or artist id (a merged id resolves to the survivor); required unless type is tracks" }
         track_ids: { type: array, minItems: 1, maxItems: 5000, items: { type: integer }, description: "type tracks: library track ids, exported in this order" }
-        profile: { type: string, enum: [highest, mp3-320, mp3-256, mp3-192, mp3-128, compat], default: mp3-320 }
+        profile: { type: string, enum: [highest, mp3-320, mp3-256, mp3-192, mp3-128, compat, aac-256, aac-192, aac-128, opus-160, opus-128, opus-96, opus-64], default: mp3-320, description: "MP3, AAC (m4a, ffmpeg's native encoder) or Opus (.opus) with a bitrate ceiling. A file at or below the ceiling in an accepted codec is copied, the rest is transcoded. Many cars and MP3 players do not play Opus, some older ones not m4a; the estimate's `format` says what the server's ffmpeg can make (a profile it cannot make: `422 encoder_unavailable` when files would be transcoded)." }
         options:
           type: object
           properties:
             layout: { type: string, enum: [tree, flat], description: "Folders Artist/Album (default for album and artist) or one flat folder with a position prefix (default for playlist and tracks)" }
+            loudness: { type: string, enum: [off, album, track], default: off, description: "Level the loudness of transcoded files with a gain from the analysis (ReplayGain tags, else measured loudness against -18 LUFS), never past the stored true peak (no clipping). `album` keeps the balance between an album's tracks. Copied files are never changed (bit-exact); transcoded files without analysis data are left as they are. Tags of the baked-in gain are removed from the output." }
     ExportSelection:
       type: object
       properties:
@@ -3677,6 +3776,25 @@ components:
             parts: { type: integer }
             exceeds_limits: { type: boolean }
             exceeds: { type: array, items: { type: string, enum: [max_gb, dir_max_gb] } }
+            loudness:
+              type: object
+              description: "The loudness option's effect on the transcoded files"
+              properties:
+                mode: { type: string, enum: [off, album, track] }
+                leveled: { type: integer, description: "Transcoded files that get a gain" }
+                unleveled: { type: integer, description: "Transcoded files with no analysis data to level them (mode not off)" }
+        format:
+          type: object
+          nullable: true
+          description: "The format the profile converts to; null for `highest`"
+          properties:
+            id: { type: string, enum: [mp3, aac, opus] }
+            label: { type: string }
+            extension: { type: string, description: "mp3, m4a or opus" }
+            mime: { type: string }
+            encoder: { type: string, nullable: true, description: "The ffmpeg encoder that will be used, null when the server has none" }
+            available: { type: boolean }
+            note: { type: string, description: "Compatibility note (for example that many cars do not play Opus)" }
         skipped: { type: array, items: { $ref: "#/components/schemas/ExportSkipped" } }
         limits:
           type: object
@@ -4768,9 +4886,17 @@ components:
         status: { type: string, enum: [pending, approved] }
         api_token: { type: string }
         type: { type: string, enum: [single, multi] }
+        kind: { type: string, enum: [node], description: Present for a node only }
+        roles:
+          type: array
+          description: Present for a node only; the roles the admin has switched on
+          items: { $ref: "#/components/schemas/NodeRole" }
         devices:
           type: array
           items: { $ref: "#/components/schemas/DeviceList" }
+    NodeRole:
+      type: string
+      enum: [ripper, line-in, player, sync-target]
 
     PlayerSummary:
       type: object

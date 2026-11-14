@@ -44,7 +44,7 @@ Add one `new ServiceDeclaration(...)` to `ServiceCredentials::declare()` with it
 - Health probe messages are scrubbed of every credential value (`ExternalServices::redact()`), because an HTTP error message can contain the request URL with the key.
 - No API or JSON response returns a credential. There is **no admin API for credentials** in 1.0: not needed by the apps yet (they would only need set/not-set; add an entry in the `admin.token` group, `docs/api/openapi.yaml` and `docs/api/mcp.md` when one does, exposing declaration metadata and set state only).
 - Writing is admin-only: the page is behind the `auth` middleware and the component refuses a guest on mount and on every request.
-- **Backups:** `Snapshot::isSecretSetting()` leaves out every key in `ServiceCredentials::secretSettingKeys()` plus the old pattern (`token|secret|session_key|password`) as a safety net, unless `--with-secrets`. A restored install must enter its keys again (or have them in `.env`). See `backup-restore.md`.
+- **Backups:** `Snapshot::isSecretSetting()` leaves out every key in `ServiceCredentials::secretSettingKeys()` plus the old pattern (`token|secret|session_key|password`) as a safety net, unless `--with-secrets`. `secretSettingKeys()` also lists the server's own Web Push private key (`push_vapid_private`, encrypted by `App\Domain\Push\Vapid`; not a service, see `docs/frontend/pwa.md`). A restored install must enter its keys again (or have them in `.env`). See `backup-restore.md`.
 - **Diagnostics bundle** (workstream 9b, not built yet): it must exclude the same keys by calling `ServiceCredentials::secretSettingKeys()` and must never include `.env`.
 
 ## Base URL and the relay hook

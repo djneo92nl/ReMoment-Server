@@ -3,7 +3,8 @@
  * data is worse than none. It caches ONLY the offline page and the app icons. API, Livewire,
  * artwork, streams and every page are never cached; a page request that fails (server or
  * network down) gets the offline page instead of the browser's error.
- * It also shows alert notifications (a page asks it to) and opens /settings/health on click.
+ * It also shows alert notifications (a page asks it to, or the server pushes one while the browser is
+ * closed: Web Push, docs/frontend/pwa.md) and opens /settings/health on click.
  */
 const SHELL = 'remoment-shell-__SHELL_VERSION__';
 const PRECACHE = ['/offline', '/icons/icon-192.png', '/icons/icon-512.png'];
@@ -38,6 +39,21 @@ self.addEventListener('fetch', event => {
         event.respondWith(fetch(request).catch(() => caches.match('/offline')));
     }
     // Everything else (API, Livewire, artwork, scripts): not touched, goes straight to the network.
+});
+
+// Background Web Push: the server sends {id, severity, title, body, tag, url}. Same tag as the in-page
+// notification of the alert, so an open tab and a push show one. Only ever shows a notification.
+self.addEventListener('push', event => {
+    let data = {};
+    try { data = event.data ? event.data.json() : {}; } catch (e) { data = { body: event.data ? event.data.text() : '' }; }
+    const url = typeof data.url === 'string' && data.url.startsWith('/') ? data.url : '/settings/health';
+    event.waitUntil(self.registration.showNotification(data.title || 'ReMoment', {
+        body: data.body || '',
+        tag: data.tag || 'remoment-alert',
+        icon: '/icons/icon-192.png',
+        data: { url },
+        requireInteraction: data.severity === 'critical',
+    }));
 });
 
 self.addEventListener('notificationclick', event => {

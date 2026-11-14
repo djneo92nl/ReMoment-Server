@@ -144,6 +144,7 @@ final class Alerts
         }
 
         self::publish($alert);
+        \App\Domain\Push\Push::alert($alert);
 
         return $alert;
     }
@@ -151,12 +152,16 @@ final class Alerts
     private static function refresh(Alert $alert, string $severity, string $title, string $message, ?int $deviceId, ?array $data): Alert
     {
         $changed = $alert->severity !== $severity || $alert->message !== $message;
+        $severityChanged = $alert->severity !== $severity;
         $alert->fill(['severity' => $severity, 'title' => $title, 'message' => $message, 'device_id' => $deviceId, 'data' => $data]);
         if ($alert->isDirty()) {
             $alert->save();
         }
         if ($changed) {
             self::publish($alert);
+        }
+        if ($severityChanged) {
+            \App\Domain\Push\Push::alert($alert); // never throws; a rise to critical notifies again, a repeat does not (SendAlertPush dedupes)
         }
 
         return $alert;

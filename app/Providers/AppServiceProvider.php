@@ -48,6 +48,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(MqttService::class);
+        $this->app->bind(\App\Domain\Push\PushSender::class, \App\Domain\Push\WebPushSender::class);
         $this->app->scoped(\App\Support\SelectedDevice::class);
         $this->app->scoped(\App\Domain\Artwork\ArtworkEntryMemo::class);
         $this->app->scoped(\App\Domain\Library\IdAliases::class);

@@ -81,7 +81,10 @@ class PwaTest extends TestCase
 
         $js = file_get_contents(public_path('js/remoment-pwa.js'));
         // The permission prompt exists only inside the toggle (a click), never at load.
-        $this->assertSame(1, substr_count($js, 'requestPermission()'));
+        // Two click handlers ask: the in-page toggle and the background push toggle (togglePush); nothing else does.
+        $this->assertSame(2, substr_count($js, 'requestPermission()'));
+        $this->assertStringContainsString('async togglePush()', $js);
+        $this->assertGreaterThan(strpos($js, 'async togglePush()'), strrpos($js, 'requestPermission()'));
         $this->assertStringContainsString('async toggle()', $js);
         $this->assertStringContainsString("const LEVELS = ['warning', 'critical'];", $js);
         $this->assertStringContainsString("client.subscribe('remoment/alerts/+')", file_get_contents(public_path('js/remoment-live.js')));

@@ -41,6 +41,7 @@ Reserved for later: `container.crashed` and `disk.low` (the Manager, workstream 
 - **REST** `GET /api/alerts?since=&state=active|resolved|all&limit=` (open, newest first, `since` = id cursor, default `all`, limit 1–200 default 100) → `{ data: [Alert], summary }`. An alert keeps its id when it resolves, so a client polling with `since` sees new alerts only; re-read `state=active` to learn which ended. `POST /api/admin/alerts/{id}/ack` (admin token) → `{ data: Alert }`. Contract in `docs/api/openapi.yaml`.
 - **Web** the active alerts at the top of `/settings/health` (the backup one keeps its own notice); a signed-in admin gets an Acknowledge button on each.
 - **MCP** the `alerts` tool: `list` (open) and `ack` (admin).
+- **Web Push** (8.6 phase 3, opt-in per browser): when an alert is new or its severity changes, `Alerts` calls `App\Domain\Push\Push::alert()`, which queues `Jobs\SendAlertPush` for `warning` and `critical` only (and only when a `push_subscriptions` row exists). The job sends once per alert id and severity and deletes subscriptions the push service answers 404/410 for. A failure in any step is caught: raising an alert never depends on push. See [pwa.md](../frontend/pwa.md).
 - `GET /api/info` has no `features` list yet, so no `alerts` feature key was added; add it when that list exists.
 
 ## Add a kind
@@ -51,8 +52,8 @@ Reserved for later: `container.crashed` and `disk.low` (the Manager, workstream 
 
 ## Consumers
 
-8.6 browser notifications (subscribe to the MQTT topic), 8a Home Assistant (event entities on `remoment/alerts/{kind}`), 8b item 5 (the app's alerts feed is `GET /api/alerts`), the Manager of workstream 10 (raises `container.crashed` and `disk.low` through the same API).
+8.6 browser notifications (subscribe to the MQTT topic) and background Web Push (`Push::alert()` from `Alerts`), 8a Home Assistant (event entities on `remoment/alerts/{kind}`), 8b item 5 (the app's alerts feed is `GET /api/alerts`), the Manager of workstream 10 (raises `container.crashed` and `disk.low` through the same API).
 
 ## Not built here
 
-Browser notifications and the PWA, Home Assistant discovery, Web Push, the Manager, per-user anything (acknowledge is admin-wide). No `features.alerts` key. `scheduler.silent` with a completely dead scheduler is only noticed while the health page is open or by something subscribing to the retained summary and watching its age; a watcher outside the app is the Manager's job.
+The Manager, per-user anything (acknowledge is admin-wide). No `features.alerts` key. `scheduler.silent` with a completely dead scheduler is only noticed while the health page is open or by something subscribing to the retained summary and watching its age; a watcher outside the app is the Manager's job.

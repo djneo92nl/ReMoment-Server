@@ -21,7 +21,7 @@ docs/
     client-devices.md       Client device registration flow, all endpoints, firmware guide
     jellyfin.md             Jellyfin on a Philips TV: continue watching / next up and play in the Jellyfin app (GET /api/devices/{id}/jellyfin, POST .../jellyfin/play)
     deep-analysis.md        Deep analysis of one track on request (admin token): POST/GET/DELETE /api/library/tracks/{id}/deep-analysis, kinds `sections` and `stems`, states, where the result shows
-    export.md               Export from the library as zip for an MP3 player/car radio (admin token): estimate, start, poll, signed 15-minute download, cancel/remove; MCP tool `export`, `features.export`
+    export.md               Export from the library as zip for an MP3 player/car radio (admin token; MP3, AAC m4a, Opus profiles, loudness option): estimate, start, poll, signed 15-minute download, cancel/remove; MCP tool `export`, `features.export`
     library.md              Library browse (artists, albums, playlists), favorites, play album/artist/playlist on a device (DLNA or Spotify), playlist artwork
     source-controls.md      Per-source controls (change disc, FM presets) from control profiles: GET/POST /api/devices/{id}/controls, resolution, transports
     physical.md             Physical collection (CDs, records, tapes): items by barcode or by hand, MusicBrainz barcode lookup, `physical` availability provider, wishes closed by owning it
@@ -42,6 +42,7 @@ docs/
   architecture/
     profiles.md             Profiles (workstream 1a): Control / Standard / Full, `PROFILE`, the gate table in config/profile.php, how scheduler, workers, routes, nav and containers are gated, SQLite for Control and its conditions, `profile:stress-sqlite`, `profile:upgrade`, what is unverified
     client-devices.md       DB schema, model, controller, admin UI internals
+    node-agent.md           ReMoment Node (workstream 18, 1.1): Go agent plan, `kind: node` registration with roles, MQTT-as-doorbell command channel, job lifecycle, security, phases N0-N5; server skeleton built
     backup-restore.md       backup:run / backup:restore: archive contents, secrets excluded by default, fresh-install restore, SQLite and SD-card note, upgrade flow
     schema-plan.md          Schema review before the migration squash (14.3): table inventory, findings, data vs schema migrations, squash design with the `schema:baseline` mechanism, pre-squash fix-list; rehearsal harness in scripts/schema/ (`schema.sh check` diffs the schema against committed MariaDB and SQLite baselines)
     availability-layer.md   Availability layer design (workstream 3): providers, catalogue_albums/album_availability, MusicBrainz discography sync, wishlist, API/UI, build order (plan, not built)
@@ -95,7 +96,7 @@ docs/
     player-bar.md           Sticky bottom player: pinned device cookie, <x-play-button> default play target
     components.md           Shared Blade components (x-card, x-page-header, x-alert, x-badge, x-empty-state, x-table, x-shelf, nav ...) and their props; rules in DESIGN.md at the repo root
     stem-lanes.md           Stem lanes (16.4): a lane per stem under the sections in the album page's Track details, own-scale curves, instrumental band, TrackStems states
-    pwa.md                  Web app (8.6): manifest, root service worker (offline page and icons only, never API/Livewire/artwork), opt-in alert notifications from the MQTT alert topics, no Web Push
+    pwa.md                  Web app (8.6): manifest, root service worker (offline page and icons only, never API/Livewire/artwork), opt-in alert notifications from the MQTT alert topics, opt-in background Web Push (VAPID, `push_subscriptions`, `push:vapid`, `push:test`)
     library.md              /library hub: LibraryHome data, shelves, shuffle, favourites, tinted cards (ArtworkTint)
 ```
 
@@ -175,6 +176,10 @@ php artisan library:analyze [--limit=100] [--stage=loudness|waveform|quality|fin
 # Opt-in nightly stems (STEMS_NIGHTLY=true, 02:00): queue stems for tracks that have none, newest first, within STEMS_NIGHT_HOURS (default 4) of estimated work on the single `stems` worker; --hours overrides, --dry-run counts; see docs/architecture/stems-service.md
 php artisan library:analyze-stems [--hours=4] [--dry-run]
 
+# Web Push (8.6 phase 3): create the VAPID key pair once or show its PUBLIC key (`--rotate` makes a new pair and deletes every stored browser subscription; the private key is encrypted in the settings table and never printed or backed up), and push a test to every subscribed browser without raising an alert; see docs/frontend/pwa.md
+php artisan push:vapid [--rotate] [--force]
+php artisan push:test [--message=]
+
 # Home Assistant MQTT discovery (opt-in: switch on /settings/mqtt or HA_DISCOVERY_ENABLED): publish the retained configs + states of the "ReMoment Server" device (stats, health, clients, sources, event entities; never media_player), or clear them with --remove; the scheduler republishes every 5 minutes while on; unverified in a real HA; see docs/architecture/home-assistant.md
 php artisan ha:discovery [--remove]
 
@@ -229,6 +234,7 @@ Base URL: `/api` — no authentication required.
 ```
 GET  /api/alerts?since=&state=active|resolved|all&limit=   → { data: [Alert], summary }   newest first, `since` = id cursor
 POST /api/admin/alerts/{id}/ack                            → { data: Alert }                  admin token; admin-wide, no per-user state
+POST|DELETE /api/push/subscribe                            { endpoint, keys: { p256dh, auth } } | { endpoint }   open, 20/min; a browser's Web Push subscription for warning/critical alerts while closed (`App\Domain\Push`, `SendAlertPush`); endpoint must be https on a known push service, max 100 rows, no user; see docs/frontend/pwa.md
 ```
 
 Alert `{ id, kind, key, severity: info|warning|critical, title, message, device_id, data, raised_at, resolved_at, acknowledged_at, state: raised|resolved }`.
@@ -883,6 +889,10 @@ Key files:
 See `docs/architecture/client-devices.md` for the full DB schema, device resolution logic, and component internals.
 See `docs/api/client-devices.md` for the firmware integration guide and full endpoint reference.
 
+### Nodes (workstream 18, 1.1)
+
+A **node** is a client with `clients.kind = 'node'` (headless agent for a Pi: CD ripper, line-in later), registered through the same flow with `kind`, `roles` and `capabilities`; the admin switches declared roles on (`enabled_roles`, `Client::activeRoles()`) in `/settings/clients`, where nodes carry a badge. Built: only this server side (columns, register/heartbeat fields, UI, `App\Domain\Node\NodeRoles`). Not built: the node binary, jobs, the `remoment/node/{id}/…` MQTT topics, node routes. Plan and decisions (Go binary first, REST authoritative with MQTT only as a doorbell on the open broker, fixed job types, separate from the Manager and the Ripper desktop app): `docs/architecture/node-agent.md`.
+
 ### Source Management
 
 `DeviceSource` rows represent sources synced from the device. Two UI-controlled fields:
@@ -917,7 +927,7 @@ Client devices find the server via mDNS (`_remoment._tcp`, TXT `path=/api`, `api
 
 ## Frontend
 
-Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interactivity. The site is an installable web app (`/manifest.webmanifest`, `/sw.js`, `/offline`, `<x-pwa-head />`; the worker caches only the offline page and icons, never live data) and `/settings/health` has an opt-in browser notification toggle for warning/critical alerts (`public/js/remoment-pwa.js`, over the MQTT alert topics; no Web Push); see `docs/frontend/pwa.md`. Rendering stays in Livewire: `public/js/remoment-live.js` only listens to MQTT over WebSockets and triggers `$wire.$refresh()`, falling back to 1s polling when the broker is unreachable (see `docs/architecture/live-updates.md`). Tailwind CSS 3 is compiled by Vite (PostCSS); only Font Awesome comes from a CDN. The layout (`resources/views/layouts/app.blade.php`) provides a persistent sidebar navigation (top bar + drawer below `md`) and the sticky bottom player bar. **Read `DESIGN.md` before changing any view**: it defines the colour roles, radius scale, components and sticky stacking order every page must follow.
+Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interactivity. The site is an installable web app (`/manifest.webmanifest`, `/sw.js`, `/offline`, `<x-pwa-head />`; the worker caches only the offline page and icons, never live data) and `/settings/health` has an opt-in browser notification toggle for warning/critical alerts (`public/js/remoment-pwa.js`, over the MQTT alert topics; opt-in background Web Push for a closed browser: `Alerts` → `Push::alert()` → queued `SendAlertPush` → `minishlink/web-push`, VAPID pair in settings with the private half encrypted, `POST|DELETE /api/push/subscribe`; unverified on real push services); see `docs/frontend/pwa.md`. Rendering stays in Livewire: `public/js/remoment-live.js` only listens to MQTT over WebSockets and triggers `$wire.$refresh()`, falling back to 1s polling when the broker is unreachable (see `docs/architecture/live-updates.md`). Tailwind CSS 3 is compiled by Vite (PostCSS); only Font Awesome comes from a CDN. The layout (`resources/views/layouts/app.blade.php`) provides a persistent sidebar navigation (top bar + drawer below `md`) and the sticky bottom player bar. **Read `DESIGN.md` before changing any view**: it defines the colour roles, radius scale, components and sticky stacking order every page must follow.
 
 ### Livewire Components
 
@@ -958,7 +968,7 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 - `/settings/devices` — discovered-devices list (scan, add, ignore) on top, drivers grouped by brand below, add by IP (see `docs/architecture/device-discovery.md`); `/devices/discover` redirects here
 - `/settings/dlna` — discover DLNA servers, trigger library scans
 - `/settings/storage` — Files & Import: file browser, upload and inbox import, storage locations (local/S3) with queued scan/reorganize and live status, and the Library tab (leading source, played tracks) (see `docs/architecture/file-storage.md`)
-- `/settings/storage` also has an Exports tab (`Livewire\ExportList`) and the album, artist and playlist pages an admin-only Export button (`Livewire\ExportDialog`); both use `Domain\Export\ExportService`, the API's implementation (see `docs/architecture/export.md`); `php artisan export:prune` (hourly) is the retention
+- `/settings/storage` also has an Exports tab (`Livewire\ExportList`) and the album, artist and playlist pages an admin-only Export button (`Livewire\ExportDialog`); both use `Domain\Export\ExportService`, the API's implementation (see `docs/architecture/export.md`); `php artisan export:prune` (hourly) is the retention The dialog also offers AAC (m4a) and Opus profiles (only those the server's ffmpeg can encode: `Domain\Export\ExportFormats`, `features.export_formats` in `/api/info`) and a `loudness` option (`off|album|track`: ReplayGain-style gain baked into transcoded files only, never past the true peak; copies stay bit-exact); see `docs/architecture/export.md`.
 - `/settings/services` — Services & keys: every external service's credentials from one registry (`docs/architecture/credentials.md`)
 - `/settings/spotify-connect` — map Spotify Connect speaker names to local devices
 - `/settings/clients` — manage client device registrations; approve/reject pending, assign devices, view tokens; build/download the SD card artwork zips, one per screen size (see `docs/architecture/sd-card-export.md`)
