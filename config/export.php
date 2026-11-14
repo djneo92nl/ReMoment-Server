@@ -67,6 +67,13 @@ return [
     /** Size the whole exports/ directory may take together, in GB; the oldest go first. */
     'dir_max_gb' => (float) env('EXPORT_DIR_MAX_GB', 16),
 
+    /**
+     * Directory the ReMoment Manager shares read-only as the `exports` SMB share (docs/architecture/manager.md); finished
+     * exports are also put there (`ExportShare`). A host directory mounted into the app at the same path
+     * (docker-compose.prod.yml, default /srv/exports). Empty = no share copy.
+     */
+    'share_dir' => env('EXPORT_SHARE_DIR'),
+
     /** Disk (private) the exports are written to, under `exports/{id}/`. */
     'disk' => env('EXPORT_DISK', 'local'),
 

@@ -123,6 +123,81 @@
             </x-card>
         @endif
 
+        @if($smb)
+            <x-card flush data-test="manager-smb">
+                <div class="px-8 py-5 border-b border-gray-100 dark:border-stone-800">
+                    <h2 class="text-base font-medium text-gray-900 dark:text-gray-100">Network shares (SMB)</h2>
+                    <p class="text-xs text-gray-500">Samba on the host, set up by the manager. Access needs the share user's password; there is no guest access.
+                        Samba is {{ $smb['running'] ? 'running' : 'not running' }}@if($smb['sessions'] !== null) · {{ $smb['sessions']['count'] }} connected @endif.
+                        @if($smb['dry_run']) <span class="text-amber-600">The manager is in dry-run mode: nothing is changed.</span>@endif</p>
+                </div>
+
+                @foreach($smb['problems'] as $problem)
+                    <div class="px-8 py-3 text-sm text-red-600 border-b border-gray-100 dark:border-stone-800">{{ $problem }}</div>
+                @endforeach
+                @if(! $smb['include_present'])
+                    <div class="px-8 py-3 text-xs text-amber-700 border-b border-gray-100 dark:border-stone-800" data-test="smb-include">smb.conf does not include <code>{{ $smb['conf_file'] }}</code> yet: add <code>include = {{ $smb['conf_file'] }}</code> to its [global] section, or the shares below are not served.</div>
+                @endif
+
+                @if($sharePassword)
+                    <div class="px-8 py-4 text-sm bg-amber-50 dark:bg-amber-950 border-b border-amber-200 dark:border-amber-800" data-test="smb-password">
+                        <p class="text-gray-900 dark:text-gray-100">Share user <strong>{{ $smb['user']['name'] ?? '' }}</strong>, password <code class="select-all font-mono">{{ $sharePassword }}</code></p>
+                        <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Shown once: it is not stored anywhere readable, so note it now.</p>
+                        <x-secondary-button size="sm" class="mt-2" wire:click="dismissSharePassword" data-test="smb-password-done">I have noted it</x-secondary-button>
+                    </div>
+                @endif
+
+                <div class="px-8 py-3 flex flex-wrap items-center gap-3 border-b border-gray-100 dark:border-stone-800" data-test="smb-user">
+                    <div class="flex-1 text-sm text-gray-700 dark:text-gray-300">
+                        Share user:
+                        @if($smb['user'])<strong>{{ $smb['user']['name'] }}</strong> (separate from the admin login)@else <span class="text-gray-500">none yet; create it before switching a share on</span>@endif
+                    </div>
+                    @if($smb['user'])
+                        <x-secondary-button size="sm" wire:click="createShareUser" wire:confirm="Set a new password for the share user? Machines using the old one are signed out." data-test="smb-user-create">New password</x-secondary-button>
+                    @else
+                        <x-secondary-button size="sm" wire:click="createShareUser" data-test="smb-user-create">Create user</x-secondary-button>
+                    @endif
+                    @if($smb['user'])
+                        <x-secondary-button size="sm" wire:click="removeShareUser" wire:confirm="Remove the share user? Switch every share off first." data-test="smb-user-remove">Remove</x-secondary-button>
+                    @endif
+                </div>
+
+                @foreach($smb['shares'] as $share)
+                    <div class="px-8 py-3 flex flex-wrap items-center gap-x-5 gap-y-1 border-b border-gray-100 dark:border-stone-800 last:border-b-0" data-test="smb-share-{{ $share['name'] }}">
+                        <div class="w-44 text-sm font-medium text-gray-900 dark:text-gray-100">
+                            <span class="inline-block w-1.5 h-1.5 rounded-full {{ $share['enabled'] ? 'bg-emerald-500' : 'bg-gray-400' }} mr-2"></span>{{ $share['label'] }}
+                        </div>
+                        <div class="flex-1 min-w-48 text-xs text-gray-500">
+                            <code>{{ $share['path'] }}</code>@if(! $share['path_exists']) <span class="text-amber-600">(folder missing)</span>@endif
+                            @if($share['path_error']) <span class="text-red-600">{{ $share['path_error'] }}</span>@endif
+                            · {{ $share['enabled'] ? ($share['writable'] ? 'read-write' : 'read-only') : 'off' }}
+                            <br>{{ $share['note'] }}
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            @if($share['can_set_writable'])
+                                @if($share['writable'])
+                                    <x-secondary-button size="sm" wire:click="smbShare('{{ $share['name'] }}', true, false)" :disabled="! $share['enabled']" data-test="smb-writable-{{ $share['name'] }}">Make read-only</x-secondary-button>
+                                @else
+                                    <x-secondary-button size="sm" wire:click="smbShare('{{ $share['name'] }}', true, true)" wire:confirm="Allow writing to the music library over the network? A mistake on a PC can delete music." :disabled="! $share['enabled']" data-test="smb-writable-{{ $share['name'] }}">Allow writing</x-secondary-button>
+                                @endif
+                            @endif
+                            <x-secondary-button size="sm" wire:click="smbPreviewShare('{{ $share['name'] }}', {{ $share['enabled'] ? 'false' : 'true' }})" data-test="smb-preview-{{ $share['name'] }}">Preview</x-secondary-button>
+                            <x-secondary-button size="sm" wire:click="smbShare('{{ $share['name'] }}', {{ $share['enabled'] ? 'false' : 'true' }})"
+                                                :disabled="! $share['enabled'] && ! $smb['user']" data-test="smb-toggle-{{ $share['name'] }}">{{ $share['enabled'] ? 'Switch off' : 'Switch on' }}</x-secondary-button>
+                        </div>
+                    </div>
+                @endforeach
+
+                @if($smbPreview !== null)
+                    <div class="px-8 py-4 border-t border-gray-100 dark:border-stone-800" data-test="smb-preview">
+                        <div class="flex items-center justify-between"><h3 class="text-sm font-medium text-gray-900 dark:text-gray-100">What the Samba file would contain</h3>
+                            <x-secondary-button size="sm" wire:click="closeSmbPreview">Close</x-secondary-button></div>
+                        <pre class="mt-2 max-h-72 overflow-auto text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ $smbPreview }}</pre>
+                    </div>
+                @endif
+            </x-card>
+        @endif
+
         @if($logService)
             <x-card flush data-test="manager-logs">
                 <div class="px-8 py-5 border-b border-gray-100 dark:border-stone-800 flex items-center justify-between">

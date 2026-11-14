@@ -67,6 +67,51 @@ class ManagerClient
         return $this->send('get', '/upgrade', ['since' => max(0, $since)])->json();
     }
 
+    /**
+     * SMB shares (manager/smb.js): Samba state, the three fixed shares, the share user (name only, never a password).
+     *
+     * @return array{dry_run: bool, running: bool, service: string, include_present: bool, conf_file: string, problems: list<string>, user: ?array<string, mixed>, sessions: ?array<string, mixed>, shares: list<array<string, mixed>>}
+     */
+    public function smb(): array
+    {
+        return $this->send('get', '/smb')->json();
+    }
+
+    /** The Samba fragment for the current choices; nothing is written. */
+    public function smbConfig(): string
+    {
+        return (string) $this->send('get', '/smb/config')->json('config');
+    }
+
+    /**
+     * Switches one of the fixed shares (library, exports, inbox) on or off; `$writable` only counts for the library.
+     * With `$dryRun` the manager renders the config and the steps and changes nothing.
+     *
+     * @return array<string, mixed>
+     */
+    public function smbShare(string $share, bool $enabled, ?bool $writable = null, bool $dryRun = false): array
+    {
+        $body = ['enabled' => $enabled] + ($writable === null ? [] : ['writable' => $writable]);
+
+        return $this->send('post', '/smb/shares/'.rawurlencode($share).($dryRun ? '?dry_run=1' : ''), body: $body)->json();
+    }
+
+    /**
+     * Creates the share user or sets a new password. The answer carries the generated password once; the caller must
+     * show it and drop it. Nothing here logs it.
+     *
+     * @return array{status?: string, user: string, created?: bool, password?: string, dry_run?: bool, actions?: list<string>}
+     */
+    public function smbCreateUser(bool $dryRun = false): array
+    {
+        return $this->send('post', '/smb/user'.($dryRun ? '?dry_run=1' : ''))->json();
+    }
+
+    public function smbRemoveUser(): void
+    {
+        $this->send('delete', '/smb/user');
+    }
+
     /** @return list<array{time: string, action: string, service: ?string, result: string}> */
     public function audit(int $limit = 20): array
     {
@@ -91,7 +136,7 @@ class ManagerClient
         return $token !== '' ? $token : null;
     }
 
-    private function send(string $method, string $path, array $query = []): Response
+    private function send(string $method, string $path, array $query = [], array $body = []): Response
     {
         $token = $this->token();
 
@@ -100,7 +145,7 @@ class ManagerClient
         }
 
         try {
-            $response = $this->request($token)->$method($this->url($path), $method === 'get' ? $query : []);
+            $response = $this->request($token)->$method($this->url($path), $method === 'get' ? $query : $body);
         } catch (ConnectionException) {
             throw new ManagerException('unreachable', 'The manager does not answer at '.config('manager.url').'. Is the remoment-manager service running?');
         }

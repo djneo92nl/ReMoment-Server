@@ -36,6 +36,8 @@ services:
             # Own music files: add both paths as local storage locations (/settings/storage).
             - '${MUSIC_DIR:-/srv/music}:${MUSIC_DIR:-/srv/music}'
             - '${LIBRARY_DIR:-/srv/library}:${LIBRARY_DIR:-/srv/library}'
+            # Where finished exports are also put for the manager's `exports` SMB share; set EXPORT_SHARE_DIR in .env to switch it on (docs/architecture/manager.md).
+            - '${EXPORT_SHARE_DIR:-/srv/exports}:${EXPORT_SHARE_DIR:-/srv/exports}'
             # Control's SQLite file (DB_DATABASE=/data/sqlite/database.sqlite): a named volume, because SQLite's locking
             # does not survive a bind mount (docs/architecture/database.md). Unused by Standard and Full.
             - 'remoment-sqlite:/data/sqlite'

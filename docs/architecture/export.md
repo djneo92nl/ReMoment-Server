@@ -45,7 +45,7 @@ Transcode target: the profile's format (`mp3`, `aac`, `opus`; CBR bitrate); loss
 - `parts`: files are packed in order into zips of at most `EXPORT_PART_GB` (4); a file larger than that gets a part of its own.
 - `exceeds`: `max_gb` when the estimate is over `EXPORT_MAX_GB` (8), `dir_max_gb` when over `EXPORT_DIR_MAX_GB` (16). A limit of 0 is off. The caller refuses the export with the estimate.
 
-Environment: `EXPORT_DEFAULT_PROFILE`, `EXPORT_MAX_GB`, `EXPORT_PART_GB`, `EXPORT_KEEP_HOURS` (24, used by the later retention step), `EXPORT_DIR_MAX_GB`.
+Environment: `EXPORT_DEFAULT_PROFILE`, `EXPORT_MAX_GB`, `EXPORT_PART_GB`, `EXPORT_KEEP_HOURS` (24, used by the later retention step), `EXPORT_DIR_MAX_GB`, `EXPORT_SHARE_DIR` (empty = off; a finished export's zips are also put there for the Manager's read-only `exports` SMB share, a hard link or a copy in a folder `{title} - {id8}`, removed with the export by the retention and by cancel; `Domain\Export\ExportShare`, see [manager.md](manager.md) "SMB shares").
 
 ## The job (step 2)
 

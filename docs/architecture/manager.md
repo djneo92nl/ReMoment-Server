@@ -1,6 +1,6 @@
 # ReMoment Manager (workstream 10, read-only core)
 
-Code: `manager/` (`server.js`, `bin/remoment-manager`, `test/`). Status: **skeleton built**: status, logs, restart, audit, CLI, and the web page Settings › Manager (admin login, `App\Domain\Manager\ManagerClient`). Upgrade and rollback are built (see "Upgrade and rollback"); no SMB, no Pi image yet (see "Still to do"). Plan: [v1-roadmap.md](v1-roadmap.md) section 10.
+Code: `manager/` (`server.js`, `bin/remoment-manager`, `test/`). Status: **skeleton built**: status, logs, restart, audit, CLI, and the web page Settings › Manager (admin login, `App\Domain\Manager\ManagerClient`). Upgrade and rollback are built (see "Upgrade and rollback"), and so is **SMB serve** (see "SMB shares", 2026-11-14, tested against fake commands only, never against a real Samba); SMB mount and the Pi image are not (see "Still to do"). Plan: [v1-roadmap.md](v1-roadmap.md) section 10.
 
 ## What it is for
 
@@ -112,9 +112,47 @@ The web version of `app:upgrade` ([backup-restore.md](backup-restore.md)), which
 
 **Not verified:** against a real Docker, a real image build or a real `app:upgrade` (the tests use the fake docker and its canned answers); `docker image inspect/tag` and `compose config --format json` output shapes are written from memory; whether `backup:restore --force` into a database that is already migrated forward works on MariaDB (the restore docs say "fresh install"); the app's own container is recreated during an upgrade, so a web page that triggered it loses its connection for a while (the page reconnects through its poll).
 
+## SMB shares (serve)
+
+Code: `manager/smb.js` (wired into `server.js`), `manager/test/smb.test.js` with `fake-samba.js`; the app side is the Network shares card of Settings › Manager and `ManagerClient::smb*()`. **Every part of it is unverified on a real Samba host**: the tests put fake `id`, `useradd`, `userdel`, `smbpasswd`, `testparm`, `systemctl`, `smbcontrol` and `smbstatus` scripts first on PATH and prove the arguments, the order, the generated file and the refusals, not that Samba accepts the file or serves it.
+
+**What it does.** Samba runs on the host (decided). The manager owns one config *fragment*, `REMOMENT_SMB_CONF` (default `/etc/samba/remoment.conf`), and never edits `smb.conf`. Three fixed shares, named exactly `library`, `exports`, `inbox`, each off until switched on:
+
+| Share | Path (manager environment) | Access |
+|---|---|---|
+| `library` | `REMOMENT_SMB_LIBRARY_DIR` (default `LIBRARY_DIR`, else `/srv/library`) | **read-only**; the admin can switch writing on (a PC can then delete music; the next scan finds changes) |
+| `exports` | `REMOMENT_SMB_EXPORTS_DIR` (default `EXPORT_SHARE_DIR`, else `/srv/exports`) | read-only, always; finished exports appear here (below) |
+| `inbox` | `REMOMENT_SMB_INBOX_DIR` (default `/srv/inbox`; **set it to the root of the inbox storage location**: the manager cannot read the app's database) | read-write, always; copy albums here, then Import inbox |
+
+Every share is `guest ok = no`, `valid users = <share user>`, `follow symlinks = no`, `wide links = no`; writable ones get create/directory masks 0664/0775 and, when `REMOMENT_SMB_FORCE_USER` is set (the app's unix user), `force user` so the app can read and move what arrives. **No guest access, no per-share users**: one share user, separate from the admin login and from every other account (decision made here, to be confirmed by the owner, see the report). A share cannot be switched on before the user exists.
+
+**Share user.** `POST /smb/user` is the only thing that creates it, an explicit authenticated action (CLI `smb user create`, the card's Create user). The name is `REMOMENT_SMB_USER` (default `remoment-smb`, validated against `^[a-z_][a-z0-9_-]{0,30}$`; never the deploy user). Steps: `id -u` (an existing system account the manager did not create is refused `409 user_exists`, never touched), `useradd --system --no-create-home --shell /usr/sbin/nologin --user-group -- NAME`, then `smbpasswd -a -s NAME` with the generated password on **stdin** (never an argument, never in `ps`). A second call is a password reset. The password is 24 characters from a 56-letter alphabet, made with `crypto.randomBytes`, **returned once in that response** and kept nowhere: not in the audit, not in `smb.json`, not in status, not in any error text (a failing `smbpasswd` has the password stripped from its message). The web card shows it in a box with "I have noted it"; the CLI prints it once. `DELETE /smb/user` removes the Samba entry and, only if the manager made the account, the account; refused `409 shares_enabled` while a share is on.
+
+**Applying a change** (`POST /smb/shares/{name}` `{enabled, writable?}`): validate (name from the fixed list, booleans only, the path from the environment checked: absolute, `[A-Za-z0-9_./ -]` only, no `..`, not `/` or a system directory like `/etc`, `/usr`, `/var`, `/home`) → render the fragment for all shares → write `REMOMENT_SMB_CONF.new` (0644) → `testparm -s --suppress-prompt <the new file>`; **only when it accepts it** the file replaces the live one (a rejected file is deleted, the old fragment stays, `502 config_invalid`) → save the choice in `smb.json` (0600, no secrets) → `systemctl start smbd` when Samba is not running and a share is on, else `smbcontrol smbd reload-config`. Switching everything off leaves an empty fragment and does not stop `smbd` (it may serve other things). The one-line `include = <fragment>` in `smb.conf` is **not** added by the manager: the installer or the admin does it once; status says `include_present: false` and the card warns when it is missing. The change takes the same one-at-a-time lock as restart and upgrade (409 while another change runs).
+
+**Dry run.** `?dry_run=1` on any SMB change renders the fragment and lists the steps without writing a file, saving a choice or running a command (also no password is made); `GET /smb/config` renders the current choices; `REMOMENT_SMB_DRY_RUN=1` makes every SMB change a dry run (status says `dry_run: true`). CLI `--dry-run`, the card's Preview button.
+
+```
+GET    /smb                      → { dry_run, running, service, include_present, conf_file, problems, user: {name, created_at, password_set_at}|null, sessions: {count, by_share, data: [{user, machine}]}|null, shares: [{name, label, note, enabled, writable, can_set_writable, path, path_error, path_exists}] }
+GET    /smb/config               → { config }                            the fragment for the current choices, nothing written
+POST   /smb/shares/{name}        { enabled, writable? } [?dry_run=1]     → { status, share, enabled, writable } | { dry_run, share, enabled, writable, config, actions }
+POST   /smb/user [?dry_run=1]    → { status, user, created, password }   the only place a password is ever returned
+DELETE /smb/user [?dry_run=1]    → { status, user, removed }
+```
+
+All need the token (or session) and, for the three changes, the `x-remoment-manager: 1` header and the Host check, like every other change. Errors: `404 unknown_share`, `422 invalid | no_user | bad_path | bad_setup`, `409 busy | user_exists | shares_enabled`, `404 no_user`, `502 config_invalid | write_failed | reload_failed | useradd_failed | smbpasswd_failed | userdel_failed`. `sessions` comes from `smbstatus --json` (Samba 4.12+; `null` when it fails): a count, a count per share, and user and machine name of up to 20 sessions, never addresses. `running` is `systemctl is-active REMOMENT_SMB_SERVICE` (default `smbd`).
+
+CLI: `remoment-manager smb [status]`, `smb config`, `smb enable|disable <share> [--writable|--read-only] [--dry-run]`, `smb user create|remove [--dry-run]`.
+
+**Audit.** `smb share` (service = the share) with `enabled`, `disabled` or `failed (<reason>)`; `smb user` with `created`, `password reset`, `removed` or `failed (...)`. Never a password.
+
+**Security.** Everything runs through the one `run()` (`execFile`, argument arrays, no shell; `run()` got an `input` option for stdin). The only request input is a share name from a fixed list and booleans; the user name and all paths come from the manager's environment and are validated before they reach a command or the file. Root: writing `/etc/samba`, `useradd` and `smbpasswd` need root, and the Ansible unit runs as `remoment`: **SMB needs the manager to run as root** (a drop-in `User=root`) or the fragment and Samba to be writable and the commands permitted otherwise; a failed write says "does the manager run as root?". Not done: the Ansible role does not install Samba or add the include line yet.
+
+**Exports share, app side.** `EXPORT_SHARE_DIR` (config `export.share_dir`, empty = off; `docker-compose.prod.yml` mounts `${EXPORT_SHARE_DIR:-/srv/exports}` into the app at the same path) is the directory the `exports` share points at. When the export job finishes, `App\Domain\Export\ExportShare::publish()` puts the zip parts in a folder `{title} - {first 8 characters of the export id}`: a hard link when the share directory is on the same disk as the private exports directory, else a copy (so two copies of a large export while it is kept). Folder 0755, files 0644. `ExportRetention` (expiry, the directory cap, an export removed) and `ExportService::cancel()` remove the folder with the export; the retention also sweeps folders of unknown exports once an hour old, **only folders matching the ` - xxxxxxxx` pattern**, so anything else in that directory is never touched. A failure to publish is logged and never fails the export. Tests: `tests/Feature/ExportShareTest.php`.
+
 ## Tests
 
-`cd manager && node --test test/` (no packages). A fake `docker` script (`test/fake-docker.js`) is put first on PATH; it answers `compose config --services`, `compose ps`, `inspect`, `stats`, `compose logs`, `compose restart` with canned output and records every call. No real container is touched. Covered: status shape, crashed and restarting, logs tail cap, exact restart arguments, unknown service gives 404 with no command run, 401, 403 (Host and header), 404/405, 409 while a change runs, 413, audit entries, failed restart, token file mode, the CLI.
+`cd manager && node --test test/*.test.js` (no packages). A fake `docker` script (`test/fake-docker.js`) is put first on PATH; it answers `compose config --services`, `compose ps`, `inspect`, `stats`, `compose logs`, `compose restart` with canned output and records every call. No real container is touched. Covered: status shape, crashed and restarting, logs tail cap, exact restart arguments, unknown service gives 404 with no command run, 401, 403 (Host and header), 404/405, 409 while a change runs, 413, audit entries, failed restart, token file mode, the CLI.
 
 ## Example init files (the Ansible unit is derived from the systemd one; the launchd one is untested)
 
@@ -154,15 +192,17 @@ launchd (`~/Library/LaunchAgents/nl.remoment.manager.plist`):
 
 ## Still to do (open)
 
-- Neither page has start/stop of single processes or SMB yet; the manager's own page has no upgrade button (the CLI and Settings › Manager have). HTTPS for the LAN page (today: a reverse proxy).
+- Neither page has start/stop of single processes yet; the manager's own page has no SMB card (the CLI and Settings › Manager have); the manager's own page has no upgrade button (the CLI and Settings › Manager have). HTTPS for the LAN page (today: a reverse proxy).
 - Processes inside the app container (supervisor: queue, scheduler, listeners), start/stop of single services.
 - Host backup now, diagnostics bundle; registry images for `REMOMENT_UPGRADE_MODE=pull` (none published yet).
-- SMB serve and mount (Samba on the host).
+- SMB mount (a NAS share as a storage location) is not built. SMB serve is built but unverified; still open: the installers (install Samba, the `include` line, the root drop-in), guest access (not offered), per-share users, the `exports` share on installs without `EXPORT_SHARE_DIR` set in `.env`, and the manager's own page card.
 - Installers: Raspberry Pi image, install script for plain compose. (The Ansible install exists: `ansible/manager.yml`, systemd unit from `ansible/templates/remoment-manager.service.j2`; syntax-checked only, not run against a host.)
 - How the manager updates itself (decision c) and the init system per target (decision d).
 - Go instead of Node, if the Pi measurements say so.
 
 ## Unverified
+
+- SMB serve (all of it): Samba accepting the fragment, `testparm -s` on a fragment without `[global]`, `smbcontrol smbd reload-config` picking it up, `smbpasswd -a -s` reading two lines from stdin, `smbstatus --json` field names (`sessions`, `tcons`, `username`, `remote_machine`, `service`), a Mac/Windows/Linux client mounting the shares, the `force user` file ownership, hard links across the mounts (a copy is the fallback), systemd unit names other than `smbd` (`REMOMENT_SMB_SERVICE`), running the manager as root.
 
 - Against a real compose stack: the field names of `docker compose ps --format json` (`ID`, `Service`, `State`, `Health`, `ExitCode`, NDJSON on current Compose, an array on older) and `docker stats`/`inspect` output are written from memory and the fake, not checked against a live Docker; the status tests only prove the parsing of that shape.
 - A Pi (armv7, 1 GB): the cost of `docker stats --no-stream` per status call (about a second on a laptop) and Node's footprint.

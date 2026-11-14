@@ -152,6 +152,8 @@ final class ExportRunner
             'status' => Export::DONE, 'part_files' => $this->parts, 'bytes' => array_sum(array_column($this->parts, 'size')),
             'finished_at' => now(), 'expires_at' => now()->addHours((int) config('export.keep_hours')),
         ])->save();
+
+        (new ExportShare)->publish($export, $this->root, $this->parts);
     }
 
     /** Makes the file as it goes into the zip (the original, a remux or a transcode) and writes it into the right part. */

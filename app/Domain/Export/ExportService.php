@@ -105,6 +105,7 @@ class ExportService
 
         // A running job notices that its row is gone at the next file and removes its own output.
         $export->delete();
+        (new ExportShare)->remove($export);
         if ($status !== Export::RUNNING) {
             Storage::disk(config('export.disk'))->deleteDirectory($export->directory());
         }

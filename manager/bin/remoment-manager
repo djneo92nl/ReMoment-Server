@@ -23,6 +23,12 @@ const HELP = `remoment-manager: control the running ReMoment install
   remoment-manager upgrade [--wait]       run the app's upgrade (image, backup, migrate, health check); --wait follows it
   remoment-manager rollback [--wait]      undo the last failed upgrade (previous image, restore its backup)
   remoment-manager upgrade-status [--json]
+  remoment-manager smb [status] [--json]  SMB shares: is Samba running, which shares, sessions
+  remoment-manager smb config             the Samba fragment for the current choices (nothing is written)
+  remoment-manager smb enable <library|exports|inbox> [--writable|--read-only] [--dry-run]
+  remoment-manager smb disable <library|exports|inbox> [--dry-run]
+  remoment-manager smb user create [--dry-run]   create the share user or set a new password (shown once)
+  remoment-manager smb user remove [--dry-run]
   remoment-manager token          where the token file is (never the token itself)
 
 Talks to ${BASE} (REMOMENT_MANAGER_PORT, REMOMENT_MANAGER_HOME).`;
@@ -37,12 +43,12 @@ function flag(args, name) {
   return v;
 }
 
-async function api(method, p) {
+async function api(method, p, body) {
   let token;
   try { token = fs.readFileSync(tokenFile, 'utf8').trim(); } catch { die(`No token file at ${tokenFile}. Start the manager once, or set REMOMENT_MANAGER_HOME.`); }
   let res;
   try {
-    res = await fetch(BASE + p, { method, headers: { authorization: `Bearer ${token}`, 'x-remoment-manager': '1' } });
+    res = await fetch(BASE + p, { method, headers: { authorization: `Bearer ${token}`, 'x-remoment-manager': '1', ...(body ? { 'content-type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
   } catch { die(`Cannot reach the manager at ${BASE}. Is it running?`); }
   const text = await res.text();
   if (!res.ok) {
@@ -149,6 +155,45 @@ async function main() {
       if (v.running) console.log(c(33, 'A job is running.'));
       if (v.can_rollback) console.log('The last upgrade failed: remoment-manager rollback');
       return;
+    }
+    case 'smb': {
+      const dry = args.includes('--dry-run');
+      if (dry) args.splice(args.indexOf('--dry-run'), 1);
+      const q = dry ? '?dry_run=1' : '';
+      const sub = args.shift() || 'status';
+      if (sub === 'status') {
+        const text = await api('GET', '/smb');
+        if (json) return console.log(text);
+        const v = JSON.parse(text);
+        console.log(c(1, 'Samba'), v.running ? c(32, 'running') : c(33, 'not running'), `(${v.service})${v.dry_run ? c(33, '  DRY-RUN mode: nothing is changed') : ''}`);
+        if (!v.include_present) console.log(c(33, `  smb.conf does not include ${v.conf_file} yet`));
+        for (const p of v.problems) console.log(c(31, `  ${p}`));
+        console.log(`  share user  ${v.user ? v.user.name : 'none (smb user create)'}`);
+        for (const s of v.shares) console.log(`  ${s.name.padEnd(8)} ${s.enabled ? c(32, 'on ') : 'off'} ${s.writable ? 'read-write' : 'read-only '}  ${s.path}${s.path_exists ? '' : c(33, '  (missing)')}`);
+        if (v.sessions) console.log(`  sessions    ${v.sessions.count}`);
+        return;
+      }
+      if (sub === 'config') return console.log(JSON.parse(await api('GET', '/smb/config')).config);
+      if (sub === 'enable' || sub === 'disable') {
+        const name = args[0];
+        if (!name) die(`Usage: remoment-manager smb ${sub} <library|exports|inbox>`);
+        const body = { enabled: sub === 'enable' };
+        if (args.includes('--writable')) body.writable = true;
+        if (args.includes('--read-only')) body.writable = false;
+        const r = JSON.parse(await api('POST', `/smb/shares/${encodeURIComponent(name)}${q}`, body));
+        if (json) return console.log(JSON.stringify(r));
+        if (r.dry_run) { console.log(r.config); return console.log(c(33, 'Dry run: nothing was written. Would: ' + r.actions.join('; '))); }
+        return console.log(`${name} ${sub}d${r.writable ? ' (read-write)' : ''}.`);
+      }
+      if (sub === 'user' && (args[0] === 'create' || args[0] === 'remove')) {
+        const r = JSON.parse(await api(args[0] === 'create' ? 'POST' : 'DELETE', `/smb/user${q}`));
+        if (json) return console.log(JSON.stringify(r));
+        if (r.dry_run) return console.log(c(33, 'Dry run: nothing was changed. Would: ' + r.actions.join('; ')));
+        if (args[0] === 'remove') return console.log(`Share user ${r.user} removed.`);
+        console.log(`Share user: ${r.user}\nPassword:   ${r.password}\n${c(33, 'Shown once. Note it now.')}`);
+        return;
+      }
+      die('Usage: remoment-manager smb [status|config|enable|disable|user create|user remove]');
     }
     case 'token':
       return console.log(json ? JSON.stringify({ token_file: tokenFile }) : `Token file: ${tokenFile} (readable by its owner only)`);

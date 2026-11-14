@@ -11,6 +11,7 @@ const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
 const { execFile } = require('child_process');
+const { createSmb, smbConfig } = require('./smb');
 
 const VERSION = '0.1.0';
 const MAX_BODY = 1024; // bytes; no endpoint takes a body
@@ -60,6 +61,8 @@ function loadConfig(env = process.env) {
     open: ['1', 'true', 'yes'].includes(String(env.REMOMENT_MANAGER_OPEN || '').toLowerCase()),
     // CPU history: one `docker stats` sample every N seconds (0 = none), kept for an hour.
     sampleSeconds: Number(env.REMOMENT_SAMPLE_SECONDS === undefined ? 15 : env.REMOMENT_SAMPLE_SECONDS),
+    // SMB shares (smb.js): Samba config fragment, share paths, share user.
+    smb: smbConfig(env, home),
   };
 }
 
@@ -81,10 +84,12 @@ function tokenMatches(expected, given) {
 }
 
 function run(cmd, args, opts = {}) {
+  const { input, ...execOpts } = opts; // `input`: text for the command's stdin (a password for smbpasswd), never an argument
   return new Promise((resolve) => {
-    execFile(cmd, args, { timeout: EXEC_TIMEOUT_MS, maxBuffer: 16 * 1024 * 1024, ...opts }, (err, stdout, stderr) => {
+    const child = execFile(cmd, args, { timeout: EXEC_TIMEOUT_MS, maxBuffer: 16 * 1024 * 1024, ...execOpts }, (err, stdout, stderr) => {
       resolve({ ok: !err, code: err ? (typeof err.code === 'number' ? err.code : -1) : 0, stdout: String(stdout || ''), stderr: String(stderr || '') });
     });
+    if (input !== undefined) { child.stdin.on('error', () => {}); child.stdin.end(input); }
   });
 }
 
@@ -579,6 +584,8 @@ function createManager(cfg) {
   // One job at a time, run in the background; the page and the CLI poll GET /upgrade. Nothing here takes a value from the
   // request: the service is the constant `app` (checked against the compose file), the image comes from the compose file,
   // the backup archive from the last upgrade's own answer (and is checked against ARCHIVE_RE before it reaches a command).
+  const smb = createSmb({ cfg, run, audit, isBusy: () => busy, setBusy: (v) => { busy = v; } });
+
   const jobLog = []; // { t, line }, the current or last job, capped
   let job = null; // the record being written while a job runs
   let saved = readSaved();
@@ -779,6 +786,28 @@ function createManager(cfg) {
     };
   }
 
+  // /smb, /smb/config (GET); /smb/shares/{name} and /smb/user (POST), /smb/user (DELETE). Changes need the header;
+  // `?dry_run=1` renders and plans without touching anything (no header needed to ask, it changes nothing).
+  async function smbRoute(req, res, url, p, method) {
+    const answer = (r) => send(res, r.code, r.body);
+    if (p === '/smb' || p === '/smb/config') {
+      if (method !== 'GET') return send(res, 405, { error: 'method_not_allowed' });
+      return p === '/smb' ? send(res, 200, await smb.status()) : send(res, 200, { config: smb.currentConfig() });
+    }
+    const allowed = p === '/smb/user' ? ['POST', 'DELETE'] : ['POST'];
+    if (!allowed.includes(method)) return send(res, 405, { error: 'method_not_allowed' });
+    if (req.headers[CHANGE_HEADER] !== '1') return send(res, 403, { error: `missing ${CHANGE_HEADER} header` });
+    const dry = ['1', 'true'].includes(url.searchParams.get('dry_run'));
+    if (p === '/smb/user') return answer(method === 'POST' ? await smb.createUser(dry) : await smb.removeUser(dry));
+    let name;
+    try { name = decodeURIComponent(p.slice('/smb/shares/'.length)); } catch { return send(res, 404, { error: 'unknown_share' }); }
+    const raw = await readBody(req);
+    if (raw === null) return send(res, 413, { error: 'too_large' });
+    let body = {};
+    try { body = JSON.parse(raw || '{}'); } catch { return send(res, 422, { error: 'invalid', message: 'The body is not JSON.' }); }
+    return answer(await smb.setShare(name, body, dry));
+  }
+
   async function handle(req, res) {
     if (!hostAllowed(req.headers.host)) return send(res, 403, { error: 'bad_host' });
 
@@ -813,6 +842,8 @@ function createManager(cfg) {
       if (req.headers[CHANGE_HEADER] !== '1') return send(res, 403, { error: `missing ${CHANGE_HEADER} header` });
       return startJob(res, 'rollback', rollbackJob);
     }
+
+    if (p === '/smb' || p === '/smb/config' || p === '/smb/user' || p.startsWith('/smb/shares/')) return smbRoute(req, res, url, p, method);
 
     if (p === '/features') {
       if (method !== 'GET') return send(res, 405, { error: 'method_not_allowed' });

@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Storage;
  * Retention of exports (workstream 13.5): a finished export is kept `EXPORT_KEEP_HOURS`, then its files go and it is
  * marked expired; the whole `exports/` directory stays under `EXPORT_DIR_MAX_GB` (oldest finished first); an expired
  * or failed row is forgotten one keep period later; a directory without a row (and not just created) is removed.
- * Queued and running exports are never touched. Run by `php artisan export:prune` (hourly, with the file_storage feature).
+ * The copy on the `exports` SMB share (`ExportShare`) goes with the files. Queued and running exports are never touched. Run by `php artisan export:prune` (hourly, with the file_storage feature).
  */
 class ExportRetention
 {
@@ -41,6 +41,7 @@ class ExportRetention
 
         // 3. Directories no export row knows (a cancelled running job, a removed row), once an hour old.
         $known = Export::query()->pluck('public_id')->all();
+        $result['orphans'] += (new ExportShare)->sweep($known);
         foreach ($disk->directories('exports') as $dir) {
             $id = basename($dir);
             if (!in_array($id, $known, true) && $this->modified($dir) < now()->subHour()->getTimestamp()) {
@@ -88,6 +89,7 @@ class ExportRetention
             $freed += $disk->size($file);
         }
         $disk->deleteDirectory($e->directory());
+        (new ExportShare)->remove($e);
         $e->forceFill(['status' => Export::EXPIRED, 'part_files' => null, 'finished_at' => now()])->save();
 
         return $freed;
