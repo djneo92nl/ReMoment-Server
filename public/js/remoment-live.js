@@ -15,12 +15,18 @@
     if (window.RemomentLive) return;
 
     const handlers = new Set();
+    const alertHandlers = new Set();
 
     const live = {
         connected: false,
         on(fn) {
             handlers.add(fn);
             return () => handlers.delete(fn);
+        },
+        // Alert messages: fn({ topic: 'active' | <kind>, data, retained }). See remoment-pwa.js.
+        onAlert(fn) {
+            alertHandlers.add(fn);
+            return () => alertHandlers.delete(fn);
         },
     };
     window.RemomentLive = live;
@@ -50,11 +56,22 @@
         client.on('connect', () => {
             live.connected = true;
             client.subscribe('remoment/player/+/+');
+            client.subscribe('remoment/alerts/+');
         });
         client.on('close', () => { live.connected = false; });
         client.on('error', () => { /* reconnect handles it; polling covers the gap */ });
 
         client.on('message', (topic, payload, packet) => {
+            const alertMatch = topic.match(/^remoment\/alerts\/([\w.-]+)$/);
+            if (alertMatch) {
+                let data = null;
+                try { data = JSON.parse(payload.toString()); } catch (e) { return; }
+                alertHandlers.forEach(fn => {
+                    try { fn({ topic: alertMatch[1], data, retained: !!packet.retain }); } catch (e) { console.error(e); }
+                });
+                return;
+            }
+
             const match = topic.match(/^remoment\/player\/(\d+)\/(\w+)$/);
             if (!match) return;
 

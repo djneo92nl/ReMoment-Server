@@ -47,26 +47,6 @@ class ManagerClient
         $this->send('post', '/restart-all');
     }
 
-    /** Starts the upgrade in the manager (it answers at once and works in the background; poll upgradeStatus()). */
-    public function upgrade(): void
-    {
-        $this->send('post', '/upgrade');
-    }
-
-    /** Starts the rollback of the last failed upgrade. Nothing about it is chosen by the caller. */
-    public function rollback(): void
-    {
-        $this->send('post', '/rollback');
-    }
-
-    /**
-     * @return array{running: bool, mode: string, can_rollback: bool, upgrade: ?array<string, mixed>, rollback: ?array<string, mixed>, log: list<array{t: string, line: string}>, log_next: int}
-     */
-    public function upgradeStatus(int $since = 0): array
-    {
-        return $this->send('get', '/upgrade', ['since' => max(0, $since)])->json();
-    }
-
     /** @return list<array{time: string, action: string, service: ?string, result: string}> */
     public function audit(int $limit = 20): array
     {

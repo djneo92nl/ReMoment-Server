@@ -7,6 +7,7 @@
     <title>{{ $title ?? config('app.name', 'ReMoment') }}</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
     <x-live-scripts />
+    <x-pwa-head />
     @livewireScriptConfig
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>

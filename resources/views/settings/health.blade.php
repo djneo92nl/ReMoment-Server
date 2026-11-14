@@ -16,6 +16,8 @@
             @endforeach
         </div>
 
+        @include('settings.partials.alert-notifications')
+
         <div x-show="tab === 'services'"><livewire:external-services-health /></div>
         <div x-show="tab === 'system'" x-cloak><livewire:system-health /></div>
         <div x-show="tab === 'queue'" x-cloak><livewire:queue-manager /></div>

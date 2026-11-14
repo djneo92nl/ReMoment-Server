@@ -77,7 +77,7 @@ Exit codes: 0 ok, 10 upgrade available (`--check`), 1 blocked/declined, 2 backup
 
 **Ansible:** `upgrade_command` (`ansible/group_vars/all.yml`) is what `deploy.yml` runs after updating the code; the default is `php artisan migrate --force` (unchanged); set it to `php artisan app:upgrade --force --json` to use this command (its exit codes fail the play).
 
-The ReMoment Manager runs this command for the web and the CLI and follows its `rollback` block on request ([manager.md](manager.md), "Upgrade and rollback"). **Not built:** pulling code (you install the new version first), a rollback that runs by itself (the Manager's rollback is an admin's click). Not verified against a real MariaDB or a started stack; the tests use SQLite and an extra migration path.
+**Not built:** an upgrade from the web, pulling images or code (you install the new version first, then run this), a rollback that runs by itself. Not verified against a real MariaDB or a started stack; the tests use SQLite and an extra migration path.
 
 ## Not in the backup: your music files
 

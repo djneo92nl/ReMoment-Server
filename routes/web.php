@@ -30,6 +30,22 @@ Route::get('/stream/{track}', [StreamController::class, 'show'])->where('track',
     \App\Http\Middleware\RedirectToSetupWizard::class,
 ]);
 
+// Installable web app: manifest, service worker (from the root, so its scope is the whole site), offline page. No session, cookies or setup redirect.
+foreach ([
+    ['/manifest.webmanifest', 'manifest', 'pwa.manifest'],
+    ['/sw.js', 'serviceWorker', 'pwa.sw'],
+    ['/offline', 'offline', 'pwa.offline'],
+] as [$uri, $method, $name]) {
+    Route::get($uri, [\App\Http\Controllers\PwaController::class, $method])->name($name)->withoutMiddleware([
+        \Illuminate\Cookie\Middleware\EncryptCookies::class,
+        \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+        \Illuminate\Session\Middleware\StartSession::class,
+        \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+        \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
+        \App\Http\Middleware\RedirectToSetupWizard::class,
+    ]);
+}
+
 // The same with a file extension (/stream/12.flac): renderers such as TVs decide the format from it.
 Route::get('/stream/{track}.{extension}', [StreamController::class, 'show'])->where(['track' => '[0-9]+', 'extension' => '[A-Za-z0-9]+'])->name('stream.file')->withoutMiddleware([
     \Illuminate\Cookie\Middleware\EncryptCookies::class,

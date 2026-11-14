@@ -18,13 +18,7 @@ const MAX_TAIL = 2000;
 const DEFAULT_TAIL = 200;
 const EXEC_TIMEOUT_MS = 120_000;
 const START_TIMEOUT_MS = 900_000; // `up -d` may build an image first
-const UPGRADE_TIMEOUT_MS = 900_000; // image build or pull, and one `app:upgrade` run
 const HISTORY_POINTS = 240;
-const APP_SERVICE = 'app';
-const IMAGE_RE = /^[A-Za-z0-9][A-Za-z0-9._\/:@-]*$/;
-const ARCHIVE_RE = /^\/?[A-Za-z0-9_][A-Za-z0-9_.\/-]*$/;
-// What `php artisan app:upgrade --force --json` exits with (docs/architecture/backup-restore.md).
-const UPGRADE_EXIT = { 0: 'ok', 1: 'blocked', 2: 'backup_failed', 3: 'migration_failed', 4: 'health_failed', 10: 'upgrade_available' };
 const OPTIMIZE_TRIES = 10;
 const CHANGE_HEADER = 'x-remoment-manager';
 const SESSION_COOKIE = 'rm_session';
@@ -41,9 +35,6 @@ function loadConfig(env = process.env) {
     tokenFile: path.join(home, 'token'),
     auditFile: path.join(home, 'audit.log'),
     featuresFile: path.join(home, 'features.json'),
-    upgradeFile: path.join(home, 'upgrade.json'),
-    // How a new app image comes in: `build` (compose build, the code is already on disk) or `pull` (registry image).
-    upgradeMode: env.REMOMENT_UPGRADE_MODE === 'pull' ? 'pull' : 'build',
     envFile: path.join(projectDir, '.env'),
     port: Number(env.REMOMENT_MANAGER_PORT || 8099),
     // 127.0.0.1 unless the admin opts in to the LAN (0.0.0.0 or one address): then the web page is reachable from other machines.
@@ -575,210 +566,6 @@ function createManager(cfg) {
     } finally { busy = null; }
   }
 
-  // --- Upgrade and rollback ------------------------------------------------------------------------------------------
-  // One job at a time, run in the background; the page and the CLI poll GET /upgrade. Nothing here takes a value from the
-  // request: the service is the constant `app` (checked against the compose file), the image comes from the compose file,
-  // the backup archive from the last upgrade's own answer (and is checked against ARCHIVE_RE before it reaches a command).
-  const jobLog = []; // { t, line }, the current or last job, capped
-  let job = null; // the record being written while a job runs
-  let saved = readSaved();
-
-  function readSaved() {
-    let o = {};
-    try { o = JSON.parse(fs.readFileSync(cfg.upgradeFile, 'utf8')); } catch { /* none yet */ }
-    // A record still "running" belongs to a manager that was stopped mid-job.
-    for (const k of ['upgrade', 'rollback']) if (o[k] && o[k].state === 'running') { o[k].state = 'failed'; o[k].exit_reason = 'interrupted'; }
-    return o;
-  }
-  function persist() {
-    try { fs.writeFileSync(cfg.upgradeFile, JSON.stringify(saved, null, 2) + '\n', { mode: 0o600 }); } catch { /* never break a job over the file */ }
-  }
-  function log(line) {
-    jobLog.push({ t: new Date().toISOString(), line: String(line).slice(0, 500) });
-    while (jobLog.length > 500) jobLog.shift();
-  }
-  const canRollback = () => !!(saved.upgrade && saved.upgrade.state === 'failed' && !saved.upgrade.rolled_back);
-
-  async function step(name, fn) {
-    const t0 = Date.now();
-    log(`${name}…`);
-    let out;
-    try { out = await fn(); } catch (e) { out = { ok: false, note: 'internal error' }; }
-    const result = out.skipped ? 'skipped' : (out.ok ? 'ok' : 'failed');
-    job.steps.push({ name, result, seconds: Math.round((Date.now() - t0) / 100) / 10 });
-    log(`${name}: ${result}${out.note ? ` (${out.note})` : ''}`);
-    persist();
-    return out;
-  }
-  const tail = (r) => (r.stderr || r.stdout || '').trim().slice(-300);
-
-  async function appImage() {
-    const r = await compose('config', '--format', 'json');
-    let image = null;
-    try { image = JSON.parse(r.stdout).services[APP_SERVICE].image; } catch { /* not there */ }
-    if (!image) image = `${cfg.project}-${APP_SERVICE}`;
-    return IMAGE_RE.test(image) ? image : null;
-  }
-  const imageRepo = (image) => (/:[^/]+$/.test(image) ? image.replace(/:[^/:]+$/, '') : image);
-  const execApp = (args, timeout = UPGRADE_TIMEOUT_MS) => composeWith({ timeout }, 'exec', '-T', '-u', 'sail', APP_SERVICE, 'php', 'artisan', ...args);
-
-  function parseJsonObject(text) {
-    const t = String(text || '').trim();
-    for (const candidate of [t, t.slice(t.indexOf('{'), t.lastIndexOf('}') + 1)]) {
-      try { const o = JSON.parse(candidate); if (o && typeof o === 'object') return o; } catch { /* next */ }
-    }
-    return null;
-  }
-
-  async function startJob(res, kind, body) {
-    if (busy) return send(res, 409, { error: 'busy', message: `Another change is running: ${busy}` });
-    if (kind === 'rollback' && !canRollback()) return send(res, 422, { error: 'nothing_to_roll_back', message: 'There is no failed upgrade to roll back.' });
-    let known;
-    try { known = await services(); } catch { return send(res, 502, { error: 'docker_failed', message: 'Cannot read the compose services.' }); }
-    if (!known.includes(APP_SERVICE)) return send(res, 422, { error: 'no_app_service', message: 'The compose file has no app service.' });
-    busy = kind;
-    jobLog.length = 0;
-    job = { id: crypto.randomBytes(6).toString('hex'), kind, state: 'running', started_at: new Date().toISOString(), finished_at: null, steps: [], exit_code: null, exit_reason: null, message: null };
-    saved[kind] = job;
-    persist();
-    audit(kind, APP_SERVICE, 'started');
-    const finish = (state, reason, message) => {
-      job.state = state; job.exit_reason = reason; job.message = message || null; job.finished_at = new Date().toISOString();
-      persist();
-      audit(kind, APP_SERVICE, state === 'ok' ? 'ok' : `failed (${reason})`);
-      lastStatus = null;
-      busy = null;
-    };
-    body(finish).catch(() => finish('failed', 'internal', 'The manager hit an internal error.'));
-    send(res, 202, { status: 'started', kind, id: job.id });
-  }
-
-  async function upgradeJob(finish) {
-    lastStatus = null;
-    const image = await appImage();
-    if (!image) return finish('failed', 'bad_image', 'The compose file names no usable app image.');
-    job.image = image;
-    // Keep the running image under a `previous` tag, so a rollback can bring it back.
-    const have = await run('docker', ['image', 'inspect', '--format', '{{.Id}}', image]);
-    const snap = await step('Keep the current image', async () => {
-      if (!have.ok) return { skipped: true, note: 'no image to keep yet' };
-      const r = await run('docker', ['tag', image, `${imageRepo(image)}:previous`]);
-      return { ok: r.ok, note: r.ok ? null : tail(r) };
-    });
-    if (!snap.ok && !snap.skipped) return finish('failed', 'tag_failed', 'The current image could not be kept for a rollback; nothing was changed.');
-    job.previous_image = have.ok && snap.ok;
-
-    const fetch = await step(cfg.upgradeMode === 'pull' ? 'Pull the new image' : 'Build the new image', async () => {
-      const r = await composeWith({ timeout: UPGRADE_TIMEOUT_MS }, cfg.upgradeMode === 'pull' ? 'pull' : 'build', APP_SERVICE);
-      return { ok: r.ok, note: r.ok ? null : tail(r) };
-    });
-    if (!fetch.ok) return finish('failed', 'image_failed', fetch.note || 'The new image could not be fetched; the running one is untouched.');
-
-    const up = await step('Start the new image', async () => {
-      const r = await composeWith({ timeout: UPGRADE_TIMEOUT_MS }, 'up', '-d', '--no-build', APP_SERVICE);
-      return { ok: r.ok, note: r.ok ? null : tail(r) };
-    });
-    if (!up.ok) return finish('failed', 'start_failed', up.note);
-
-    // The container may still be starting: retry until the command answers with its JSON object.
-    let r; let json = null;
-    const ran = await step('Run app:upgrade', async () => {
-      for (let attempt = 0; attempt < OPTIMIZE_TRIES; attempt++) {
-        r = await execApp(['app:upgrade', '--force', '--json']);
-        json = parseJsonObject(r.stdout);
-        if (json) break;
-        await new Promise((done) => setTimeout(done, cfg.optimizeRetryMs));
-      }
-      const reason = json ? json.exit_reason || UPGRADE_EXIT[r.code] : null;
-      return { ok: r.code === 0 && !!json, note: json ? `exit ${r.code}${reason ? `, ${reason}` : ''}` : 'no answer from the app container' };
-    });
-    job.exit_code = r ? r.code : null;
-    if (json) {
-      job.backup = typeof json.backup === 'string' ? json.backup : null;
-      job.migrations_run = Array.isArray(json.migrations_run) ? json.migrations_run : [];
-      job.app_steps = Array.isArray(json.steps) ? json.steps : [];
-      job.problems = Array.isArray(json.problems) ? json.problems.slice(0, 20) : [];
-      job.reasons = Array.isArray(json.reasons) ? json.reasons.slice(0, 20) : [];
-      job.health = json.health || null;
-      job.rollback = json.rollback && typeof json.rollback === 'object' ? { previous_version: json.rollback.previous_version ?? null, backup: json.rollback.backup ?? null, commands: Array.isArray(json.rollback.commands) ? json.rollback.commands : [], note: json.rollback.note ?? null } : null;
-      job.version_code = json.version_code ?? null;
-      job.version_recorded = json.version_recorded ?? null;
-    }
-    if (ran.ok) return finish('ok', 'ok');
-    const reason = (json && json.exit_reason) || (r && UPGRADE_EXIT[r.code]) || 'app_upgrade_failed';
-    const hint = { migration_failed: 'The app is left in maintenance mode: roll back (restores the backup and the previous image).', health_failed: 'The app is up but failed its health check: roll back, or look at /settings/health.', backup_failed: 'The backup failed, nothing was migrated.', blocked: 'The pre-flight blocked the upgrade, nothing was migrated.' }[reason];
-    return finish('failed', reason, hint || null);
-  }
-
-  async function rollbackJob(finish) {
-    const up = saved.upgrade;
-    const archive = up.backup || (up.rollback && up.rollback.backup) || null;
-    // Only a failed migration or health check changed the database; before that the image alone goes back.
-    const restoreDb = ['migration_failed', 'health_failed'].includes(up.exit_reason) && !!archive;
-    if (restoreDb && !(ARCHIVE_RE.test(archive) && !archive.includes('..'))) return finish('failed', 'bad_backup_path', 'The backup path of the failed upgrade does not look safe; restore it by hand.');
-    const image = await appImage();
-    if (!image) return finish('failed', 'bad_image', 'The compose file names no usable app image.');
-    job.image = image;
-    job.backup = restoreDb ? archive : null;
-
-    if (up.previous_image) {
-      const prev = `${imageRepo(image)}:previous`;
-      const have = await run('docker', ['image', 'inspect', '--format', '{{.Id}}', prev]);
-      if (!have.ok) return finish('failed', 'no_previous_image', 'The previous image is gone (pruned?); install the previous version by hand.');
-      const tag = await step('Bring the previous image back', async () => {
-        const r = await run('docker', ['tag', prev, image]);
-        return { ok: r.ok, note: r.ok ? null : tail(r) };
-      });
-      if (!tag.ok) return finish('failed', 'tag_failed', tag.note);
-      const start = await step('Start the previous image', async () => {
-        const r = await composeWith({ timeout: UPGRADE_TIMEOUT_MS }, 'up', '-d', '--no-build', APP_SERVICE);
-        return { ok: r.ok, note: r.ok ? null : tail(r) };
-      });
-      if (!start.ok) return finish('failed', 'start_failed', start.note);
-    } else {
-      job.steps.push({ name: 'Bring the previous image back', result: 'skipped', seconds: 0 });
-    }
-
-    const wait = async (args) => {
-      let r;
-      for (let attempt = 0; attempt < OPTIMIZE_TRIES; attempt++) {
-        r = await execApp(args);
-        if (r.ok) break;
-        await new Promise((done) => setTimeout(done, cfg.optimizeRetryMs));
-      }
-      return r;
-    };
-    if (restoreDb) {
-      // backup:restore takes the archive as one argument; it is not a flag (ARCHIVE_RE), and `--force` skips the prompt.
-      const restore = await step('Restore the backup', async () => {
-        const r = await wait(['backup:restore', archive, '--force']);
-        return { ok: r.ok, note: r.ok ? null : tail(r) };
-      });
-      if (!restore.ok) return finish('failed', 'restore_failed', restore.note);
-    } else {
-      job.steps.push({ name: 'Restore the backup', result: 'skipped', seconds: 0 });
-    }
-    for (const [name, args] of [['Lift maintenance mode', ['up']], ['Clear caches', ['optimize:clear']], ['Restart the workers', ['queue:restart']]]) {
-      const s = await step(name, async () => { const r = await wait(args); return { ok: r.ok, note: r.ok ? null : tail(r) }; });
-      if (!s.ok) return finish('failed', 'finish_failed', s.note);
-    }
-    up.rolled_back = true;
-    finish('ok', 'ok', restoreDb ? 'The backup is restored and the previous image runs. Anything saved after the backup is lost.' : 'The previous image runs; the database was not changed.');
-  }
-
-  function upgradeView(since) {
-    const from = Math.max(0, Number.isFinite(since) ? since : 0);
-    return {
-      running: busy === 'upgrade' || busy === 'rollback',
-      mode: cfg.upgradeMode,
-      can_rollback: canRollback(),
-      upgrade: saved.upgrade || null,
-      rollback: saved.rollback || null,
-      log: jobLog.slice(from),
-      log_next: jobLog.length,
-    };
-  }
-
   async function handle(req, res) {
     if (!hostAllowed(req.headers.host)) return send(res, 403, { error: 'bad_host' });
 
@@ -801,18 +588,6 @@ function createManager(cfg) {
     }
 
     if (!authorized(req)) return send(res, 401, { error: 'unauthorized' });
-
-    if (p === '/upgrade') {
-      if (method === 'GET') return send(res, 200, upgradeView(parseInt(url.searchParams.get('since') || '0', 10)));
-      if (method !== 'POST') return send(res, 405, { error: 'method_not_allowed' });
-      if (req.headers[CHANGE_HEADER] !== '1') return send(res, 403, { error: `missing ${CHANGE_HEADER} header` });
-      return startJob(res, 'upgrade', upgradeJob);
-    }
-    if (p === '/rollback') {
-      if (method !== 'POST') return send(res, 405, { error: 'method_not_allowed' });
-      if (req.headers[CHANGE_HEADER] !== '1') return send(res, 403, { error: `missing ${CHANGE_HEADER} header` });
-      return startJob(res, 'rollback', rollbackJob);
-    }
 
     if (p === '/features') {
       if (method !== 'GET') return send(res, 405, { error: 'method_not_allowed' });
