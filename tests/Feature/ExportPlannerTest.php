@@ -61,7 +61,7 @@ class ExportPlannerTest extends TestCase
                 $item = $this->decide($this->file($codec, 900), $profile);
                 $this->assertSame(ExportPlanner::TRANSCODE, $item->action);
                 $this->assertSame('lossless', $item->reason);
-                $this->assertSame(['codec' => 'mp3', 'bitrate' => $rate, 'sample_rate' => null, 'stereo' => false], $item->target);
+                $this->assertSame(['codec' => 'mp3', 'bitrate' => $rate, 'sample_rate' => null, 'stereo' => false, 'gain_db' => null], $item->target);
                 $this->assertSame(200 * $rate * 125, $item->estimatedBytes);
             }
         }
@@ -74,6 +74,9 @@ class ExportPlannerTest extends TestCase
 
         // A 128 kbit/s MP3 stays 128 on every profile: copied, not re-encoded.
         foreach (ExportPlanner::profiles() as $profile) {
+            if (str_starts_with($profile, 'opus-')) {
+                continue; // Opus profiles keep only Opus (ExportFormatsTest)
+            }
             $this->assertSame(ExportPlanner::COPY, $this->decide($this->file('mp3', 128), $profile)->action, $profile);
         }
     }

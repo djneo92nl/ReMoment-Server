@@ -37,13 +37,16 @@ class ExportService
             'selection_id' => $entity && $id ? $aliases->resolve($entity, $id) : null,
             'track_ids' => $type === 'tracks' ? array_values(array_unique(array_map('intval', $trackIds ?? []))) : null,
             'profile' => $profile ?: config('export.default_profile'),
-            'options' => array_filter(['layout' => $options['layout'] ?? null]) ?: null,
+            'options' => array_filter([
+                'layout' => $options['layout'] ?? null,
+                'loudness' => in_array($options['loudness'] ?? null, ['album', 'track'], true) ? $options['loudness'] : null,
+            ]) ?: null,
         ]);
     }
 
     public function plan(Export $draft): ExportPlan
     {
-        return $this->planner->plan(ExportSelection::tracks($draft), $draft->profile);
+        return $this->planner->plan(ExportSelection::tracks($draft), $draft->profile, $draft->option('loudness'));
     }
 
     /** @return array<string, mixed> */
@@ -55,6 +58,7 @@ class ExportService
             'title' => ExportSelection::title($draft),
             'selection' => $this->selectionBody($draft),
             'totals' => $plan->totals(),
+            'format' => $this->format($draft->profile),
             'skipped' => $this->skipped($draft, $plan),
             'limits' => ['max_gb' => (float) config('export.max_gb'), 'part_gb' => (float) config('export.part_gb'), 'dir_max_gb' => (float) config('export.dir_max_gb')],
         ];
@@ -79,6 +83,10 @@ class ExportService
         if (!Tools::available(Tools::ffmpeg())) {
             throw new ExportRefused('not_available', 'ffmpeg is not available on this server, so an export cannot run.', 409);
         }
+        $format = ExportFormats::ofProfile($draft->profile);
+        if ($plan->transcoded > 0 && $format && ExportFormats::missing($format)) {
+            throw new ExportRefused('encoder_unavailable', "This server's ffmpeg has no encoder for ".config("export.formats.{$format}.label").', so files cannot be converted to it. Choose another quality.', 422, $estimate);
+        }
 
         $draft->forceFill([
             'status' => Export::QUEUED, 'tracks' => $plan->tracks, 'copied' => $plan->copied, 'transcoded' => $plan->transcoded,
@@ -102,6 +110,14 @@ class ExportService
         }
 
         return in_array($status, [Export::QUEUED, Export::RUNNING], true) ? 'cancelled' : 'removed';
+    }
+
+    /** The format a profile transcodes to (null for `highest`), with extension, compatibility note and whether ffmpeg can make it. @return array<string, mixed>|null */
+    public function format(string $profile): ?array
+    {
+        $format = ExportFormats::ofProfile($profile);
+
+        return $format ? ExportFormats::describe($format) : null;
     }
 
     /** @return list<array{track_id: int, name: ?string, reason: ?string}> */

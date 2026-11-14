@@ -527,6 +527,6 @@ class StemsDeepAnalysisTest extends TestCase
     /** `features.export` is there when this machine has ffmpeg (ExportApiTest covers it). */
     private function exportFeature(): array
     {
-        return \App\Domain\Analysis\Tools::available(\App\Domain\Analysis\Tools::ffmpeg()) ? ['export' => true] : [];
+        return \App\Domain\Analysis\Tools::available(\App\Domain\Analysis\Tools::ffmpeg()) ? ['export' => true, 'export_formats' => \App\Domain\Export\ExportFormats::availableIds()] : [];
     }
 }

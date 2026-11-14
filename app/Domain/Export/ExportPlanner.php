@@ -31,15 +31,37 @@ final class ExportPlanner
     /**
      * @param  iterable<Track>  $tracks  in export order
      */
-    public function plan(iterable $tracks, ?string $profile = null): ExportPlan
+    public function plan(iterable $tracks, ?string $profile = null, ?string $loudness = null): ExportPlan
     {
+        $mode = ExportLoudness::normalise($loudness ?? 'off');
         $items = [];
+        $entries = [];
         foreach ($tracks as $track) {
             $file = Proxies::original($track);
             $items[] = $file ? $this->decide($file, $profile, $track->id) : new ExportItem($track->id, null, self::SKIP, 'no_own_file', null, 0);
+            if ($file && end($items)->action === self::TRANSCODE) {
+                $entries[$track->id] = ['track' => $track, 'file' => $file];
+            }
         }
 
-        return $this->summarise($items, $this->profile($profile)['key']);
+        // Loudness is only baked in where a file is transcoded; a copy stays bit-exact.
+        $leveled = 0;
+        $unleveled = 0;
+        if ($mode !== 'off') {
+            $gains = (new ExportLoudness)->gains($entries, $mode);
+            foreach ($items as $i => $item) {
+                if ($item->action !== self::TRANSCODE) {
+                    continue;
+                }
+                $gain = $gains[$item->trackId] ?? null;
+                $gain === null ? $unleveled++ : $leveled++;
+                if ($gain !== null) {
+                    $items[$i] = $item->withGain($gain);
+                }
+            }
+        }
+
+        return $this->summarise($items, $this->profile($profile)['key'], $mode, $leveled, $unleveled);
     }
 
     /** The decision for one file; `$trackId` only labels the result. */
@@ -57,11 +79,11 @@ final class ExportPlanner
         }
 
         $target = fn (int $rate): array => [
-            'codec' => $p['target'], 'bitrate' => $rate, 'sample_rate' => $p['sample_rate'], 'stereo' => $p['stereo'],
+            'codec' => $p['target'], 'bitrate' => $rate, 'sample_rate' => $p['sample_rate'], 'stereo' => $p['stereo'], 'gain_db' => null,
         ];
         $transcode = fn (string $reason, int $rate): ExportItem => new ExportItem(
             $trackId, $file->id, self::TRANSCODE, $reason, $target($rate),
-            $this->estimate($file, $rate), $codec, $kbps,
+            $this->estimate($file, $rate, (string) $p['target']), $codec, $kbps,
         );
 
         if ($lossless) {
@@ -88,7 +110,7 @@ final class ExportPlanner
     }
 
     /** @param list<ExportItem> $items */
-    private function summarise(array $items, string $profile): ExportPlan
+    private function summarise(array $items, string $profile, string $loudness = 'off', int $leveled = 0, int $unleveled = 0): ExportPlan
     {
         $part = (int) round((float) config('export.part_gb') * 1024 ** 3);
         $parts = 0;
@@ -120,7 +142,7 @@ final class ExportPlanner
 
         return new ExportPlan(
             $profile, $items, count($items), $count(self::COPY), $count(self::TRANSCODE), $count(self::SKIP),
-            $total, $parts, $exceeds,
+            $total, $parts, $exceeds, $loudness, $leveled, $unleveled,
         );
     }
 
@@ -144,6 +166,7 @@ final class ExportPlanner
             in_array($codec, ['mp3', 'mp2', 'lame', 'mpeg'], true) => 'mp3',
             in_array($codec, ['aac', 'm4a', 'mp4'], true) => 'aac',
             $codec === 'ogg' => 'vorbis',
+            $codec === 'libopus' => 'opus',
             default => $codec,
         };
     }
@@ -158,11 +181,11 @@ final class ExportPlanner
         return $bitrate > 10000 ? (int) round($bitrate / 1000) : $bitrate;
     }
 
-    /** Bytes of a CBR result: duration × bitrate; without a duration, the size of the source as the next best guess. */
-    private function estimate(File $file, int $kbps): int
+    /** Bytes of a CBR result: duration × bitrate (× the container overhead of the format); without a duration, the size of the source as the next best guess. */
+    private function estimate(File $file, int $kbps, string $format = 'mp3'): int
     {
         if ($file->duration) {
-            return (int) round($file->duration * $kbps * 125);
+            return (int) round($file->duration * $kbps * 125 * ExportFormats::overhead($format));
         }
 
         return (int) $file->size;

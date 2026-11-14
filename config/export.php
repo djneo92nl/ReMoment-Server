@@ -26,7 +26,34 @@ return [
         'mp3-128' => ['label' => 'MP3, max 128 kbit/s', 'ceiling' => 128, 'copy_codecs' => ['mp3', 'aac'], 'sample_rate' => null, 'stereo' => false, 'id3v23' => false, 'target' => 'mp3'],
         // Older head units: only MP3 is kept, 44.1 kHz stereo, ID3v2.3.
         'compat' => ['label' => 'Compatibility (older head units)', 'ceiling' => 320, 'copy_codecs' => ['mp3'], 'sample_rate' => 44100, 'stereo' => true, 'id3v23' => true, 'target' => 'mp3'],
+        // AAC (.m4a): MP3 and AAC files at or below the ceiling are copied (no lossy-to-lossy generation loss).
+        'aac-256' => ['label' => 'AAC (m4a), max 256 kbit/s', 'ceiling' => 256, 'copy_codecs' => ['aac', 'mp3'], 'sample_rate' => null, 'stereo' => false, 'id3v23' => false, 'target' => 'aac'],
+        'aac-192' => ['label' => 'AAC (m4a), max 192 kbit/s', 'ceiling' => 192, 'copy_codecs' => ['aac', 'mp3'], 'sample_rate' => null, 'stereo' => false, 'id3v23' => false, 'target' => 'aac'],
+        'aac-128' => ['label' => 'AAC (m4a), max 128 kbit/s', 'ceiling' => 128, 'copy_codecs' => ['aac', 'mp3'], 'sample_rate' => null, 'stereo' => false, 'id3v23' => false, 'target' => 'aac'],
+        // Opus (.opus, Ogg): only Opus files are kept; Opus is efficient, so its ceilings are lower than MP3's.
+        'opus-160' => ['label' => 'Opus, max 160 kbit/s', 'ceiling' => 160, 'copy_codecs' => ['opus'], 'sample_rate' => null, 'stereo' => false, 'id3v23' => false, 'target' => 'opus'],
+        'opus-128' => ['label' => 'Opus, max 128 kbit/s', 'ceiling' => 128, 'copy_codecs' => ['opus'], 'sample_rate' => null, 'stereo' => false, 'id3v23' => false, 'target' => 'opus'],
+        'opus-96' => ['label' => 'Opus, max 96 kbit/s', 'ceiling' => 96, 'copy_codecs' => ['opus'], 'sample_rate' => null, 'stereo' => false, 'id3v23' => false, 'target' => 'opus'],
+        'opus-64' => ['label' => 'Opus, max 64 kbit/s', 'ceiling' => 64, 'copy_codecs' => ['opus'], 'sample_rate' => null, 'stereo' => false, 'id3v23' => false, 'target' => 'opus'],
     ],
+
+    /*
+    | Transcode formats (`target` of a profile): the ffmpeg encoders that may make them (first available wins),
+    | file extension, MIME type, container overhead on top of duration x bitrate (for the estimate) and a
+    | compatibility note shown in the dialog and the estimate. `App\Domain\Export\ExportFormats` probes
+    | `ffmpeg -encoders` (cached) to see which are really there. AAC uses ffmpeg's native `aac` encoder;
+    | `EXPORT_AAC_ENCODER=libfdk_aac` prefers libfdk_aac when ffmpeg has it (it is rarely built in).
+    */
+    'formats' => [
+        'mp3' => ['label' => 'MP3', 'encoders' => ['libmp3lame'], 'extension' => 'mp3', 'mime' => 'audio/mpeg', 'overhead' => 1.0, 'note' => 'Plays everywhere: cars, old and new MP3 players.'],
+        'aac' => ['label' => 'AAC', 'encoders' => [env('EXPORT_AAC_ENCODER', 'aac'), 'aac'], 'extension' => 'm4a', 'mime' => 'audio/mp4', 'overhead' => 1.01, 'note' => 'Plays on phones, Apple devices and most newer players and cars; some older MP3 players and head units do not play .m4a.'],
+        'opus' => ['label' => 'Opus', 'encoders' => ['libopus'], 'extension' => 'opus', 'mime' => 'audio/ogg', 'overhead' => 1.02, 'note' => 'Best quality for its size, but many cars and MP3 players do not play Opus. Use it for phones and players you know support it.'],
+    ],
+
+    /** Loudness levelling at transcode (`options.loudness`): the target of ReplayGain 2 in LUFS, and the safety left below 0 dBFS in dB. */
+    'loudness_reference_lufs' => -18.0,
+    'loudness_margin_db' => 0.3,
+    'loudness_max_gain_db' => 12.0,
 
     /** Most one export may hold, in GB; above it the export is refused with its estimate. */
     'max_gb' => (float) env('EXPORT_MAX_GB', 8),

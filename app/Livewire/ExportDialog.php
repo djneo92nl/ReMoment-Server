@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Domain\Export\ExportFormats;
 use App\Domain\Export\ExportRefused;
 use App\Domain\Export\ExportService;
 use App\Domain\Profile\Profile;
@@ -35,6 +36,9 @@ class ExportDialog extends Component
     public string $profile = '';
 
     public string $layout = '';
+
+    /** off | album | track: levelling baked into transcoded files only. */
+    public string $loudness = 'off';
 
     #[Locked]
     public ?string $exportId = null;
@@ -88,7 +92,10 @@ class ExportDialog extends Component
     {
         $profile = array_key_exists($this->profile, config('export.profiles')) ? $this->profile : config('export.default_profile');
 
-        return app(ExportService::class)->draft($this->type, $this->selectionId, $this->trackIds, $profile, ['layout' => in_array($this->layout, ['tree', 'flat'], true) ? $this->layout : null]);
+        return app(ExportService::class)->draft($this->type, $this->selectionId, $this->trackIds, $profile, [
+            'layout' => in_array($this->layout, ['tree', 'flat'], true) ? $this->layout : null,
+            'loudness' => in_array($this->loudness, ['album', 'track'], true) ? $this->loudness : null,
+        ]);
     }
 
     public function render(): View
@@ -100,6 +107,8 @@ class ExportDialog extends Component
         return view('livewire.export-dialog', [
             'visible' => $visible,
             'profiles' => collect(config('export.profiles'))->map(fn ($p) => $p['label'])->all(),
+            // A profile whose format ffmpeg cannot encode stays listed but cannot be chosen.
+            'unavailable' => collect(config('export.profiles'))->filter(fn ($p) => $p['target'] && !ExportFormats::available($p['target']))->keys()->all(),
             'estimate' => $visible && $this->open && !$export ? $service->estimate($this->draft()) : null,
             'export' => $export ? $service->resource($export) : null,
         ]);

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Domain\Analysis\Tools;
+use App\Domain\Export\ExportFormats;
 use App\Domain\Export\ExportRetention;
 use App\Jobs\ExportLibrarySelection;
 use App\Livewire\ExportDialog;
@@ -16,6 +17,7 @@ use App\Models\StorageLocation;
 use App\Models\TrackFile;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -64,6 +66,26 @@ class ExportDialogTest extends TestCase
         Livewire::test(ExportDialog::class, ['type' => 'album', 'id' => $album->id])->call('toggle')->assertForbidden();
         Livewire::test(ExportDialog::class, ['type' => 'album', 'id' => $album->id])->call('start')->assertForbidden();
         $this->assertSame(0, Export::count());
+    }
+
+    public function test_formats_loudness_and_encoder_availability(): void
+    {
+        Queue::fake();
+        Process::fake(['*' => Process::result(output: " A....D libmp3lame           libmp3lame MP3\n A....D aac                  AAC\n")]);
+        ExportFormats::forget();
+        $album = $this->album();
+        $this->actingAs(User::factory()->create());
+
+        $c = Livewire::test(ExportDialog::class, ['type' => 'album', 'id' => $album->id])->call('toggle')
+            ->assertSeeHtml('data-test="export-loudness"')->assertSee('stay bit-exact')
+            ->assertSee('Opus, max 128 kbit/s (not available on this server)')->assertDontSee('AAC (m4a), max 128 kbit/s (not available');
+
+        $c->set('profile', 'aac-128')->set('loudness', 'track')
+            ->assertSeeText('converted to AAC')->assertSee('older MP3 players')->assertSeeHtml('data-test="loudness-summary"');
+        $c->call('start');
+        $this->assertSame('aac-128', Export::first()->profile);
+        $this->assertSame(['loudness' => 'track'], Export::first()->options);
+        ExportFormats::forget();
     }
 
     public function test_estimate_start_progress_download_and_cancel(): void

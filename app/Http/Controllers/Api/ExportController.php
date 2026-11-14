@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Export\ExportLoudness;
 use App\Domain\Export\ExportRefused;
 use App\Domain\Export\ExportService;
 use App\Domain\Library\IdAliases;
@@ -108,6 +109,7 @@ class ExportController extends Controller
             'profile' => ['nullable', Rule::in(array_keys(config('export.profiles')))],
             'options' => ['nullable', 'array'],
             'options.layout' => ['nullable', Rule::in(['tree', 'flat'])],
+            'options.loudness' => ['nullable', Rule::in(ExportLoudness::MODES)],
         ]);
 
         return $this->exports->draft($data['type'], $table ? (int) $data['id'] : null, $data['track_ids'] ?? null, $data['profile'] ?? null, $data['options'] ?? null);

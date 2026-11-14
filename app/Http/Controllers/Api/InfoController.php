@@ -6,6 +6,7 @@ use App\Domain\Analysis\AudioAnalysis;
 use App\Domain\Analysis\DeepAnalysis;
 use App\Domain\Analysis\Tools;
 use App\Domain\Artwork\NowPlayingArtwork;
+use App\Domain\Export\ExportFormats;
 use App\Domain\Profile\Profile;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
@@ -60,7 +61,7 @@ class InfoController extends Controller
             ]
             + ($deepKinds !== [] ? ['deep_analysis_kinds' => $deepKinds] : [])
             // Export from the library as zip (docs/api/export.md): the profile has the library and own files, and ffmpeg can transcode.
-            + (Profile::allows('library') && Profile::allows('file_storage') && Tools::available(Tools::ffmpeg()) ? ['export' => true] : []),
+            + (Profile::allows('library') && Profile::allows('file_storage') && Tools::available(Tools::ffmpeg()) ? ['export' => true, 'export_formats' => ExportFormats::availableIds()] : []),
         ]);
     }
 }
