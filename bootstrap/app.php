@@ -27,8 +27,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withEvents(discover: false)
     ->withMiddleware(function (Middleware $middleware): void {
         // EnforceProfile is prepended: it must answer before route model binding turns a gated URL into a 404.
-        $middleware->web(prepend: [EnforceProfile::class], append: [RedirectToSetupWizard::class]);
-        $middleware->api(prepend: [EnforceProfile::class], append: [NowHumming::class]);
+        $middleware->web(prepend: [EnforceProfile::class, \App\Http\Middleware\WarnWhenExposed::class], append: [RedirectToSetupWizard::class]);
+        $middleware->api(prepend: [EnforceProfile::class, \App\Http\Middleware\WarnWhenExposed::class], append: [NowHumming::class]);
         $middleware->alias(['admin.token' => AuthenticateAdminToken::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

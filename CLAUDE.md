@@ -212,7 +212,7 @@ Base URL: `/api` — no authentication required.
 
 ### Alerts
 
-`App\Domain\Alerts\Alerts::raise($kind, $key, $severity, $title, $message, $deviceId, $data)` / `resolve($kind, $key)` is the one place conditions become alerts (stuck queue, silent scheduler, stale backup, unreachable storage, offline device, down listener; `php artisan alerts:check` every minute). One active alert per `(kind, key)`; MQTT `remoment/alerts/{kind}` (not retained) and retained `remoment/alerts/active`; shown on `/settings/health`; MCP tool `alerts`. See `docs/architecture/alerts.md`.
+`App\Domain\Alerts\Alerts::raise($kind, $key, $severity, $title, $message, $deviceId, $data)` / `resolve($kind, $key)` is the one place conditions become alerts (stuck queue, silent scheduler, stale backup, unreachable storage, offline device, down listener, and the warn-only `network.exposed` when a request or `APP_URL` looks public, see `docs/architecture/network-exposure.md`; `php artisan alerts:check` every minute). One active alert per `(kind, key)`; MQTT `remoment/alerts/{kind}` (not retained) and retained `remoment/alerts/active`; shown on `/settings/health`; MCP tool `alerts`. See `docs/architecture/alerts.md`.
 
 ```
 GET  /api/alerts?since=&state=active|resolved|all&limit=   → { data: [Alert], summary }   newest first, `since` = id cursor

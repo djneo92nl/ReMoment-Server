@@ -24,7 +24,7 @@ final class AlertChecks
 {
     public function runAll(): void
     {
-        foreach (['scheduler', 'queues', 'backup', 'storage', 'devices'] as $check) {
+        foreach (['scheduler', 'queues', 'backup', 'storage', 'devices', 'exposure'] as $check) {
             try {
                 $this->{$check}();
             } catch (\Throwable $e) {
@@ -68,6 +68,12 @@ final class AlertChecks
                 default => null,   // busy and unknown: leave an active alert as it is
             };
         }
+    }
+
+    /** network.exposed: APP_URL or a recent request looks public (warn only, docs/architecture/network-exposure.md). */
+    public function exposure(): void
+    {
+        \App\Domain\Network\ExposureAlert::sweep();
     }
 
     /** backup.stale: no backup, or none newer than backup.stale_hours (BackupStatus). */

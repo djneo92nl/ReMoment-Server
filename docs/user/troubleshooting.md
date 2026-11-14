@@ -45,6 +45,10 @@ The web UI gets pushes from the Mosquitto broker over **MQTT-over-WebSocket on p
 
 A page that redirects to `/not-in-profile/…`, or an API call that answers `422 not_available_in_profile`, needs a bigger profile than the one running, for example the library under Control. Set `PROFILE` in `.env` (and `COMPOSE_PROFILES`) and restart, or use `php artisan profile:upgrade` to move Control to Standard or Full. See [README.md](README.md#profiles).
 
+## "ReMoment may be reachable from the internet"
+
+A warning on `/settings/health`. A request reached the server through a public host name or address, from a public client address, or `APP_URL` is a public name. The API and MQTT have no login, so check your router has no port forwarding to the server, and prefer a VPN; see [reverse-proxy.md](reverse-proxy.md). It resolves itself an hour after the last such request, or acknowledge it if you proxy on purpose.
+
 ## Other
 
 - **Jobs stuck, enrichment never finishes:** the Queue tab at `/settings/health` shows pending and failed jobs and can restart the workers.

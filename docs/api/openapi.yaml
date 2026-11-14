@@ -3537,7 +3537,7 @@ components:
       type: object
       properties:
         id: { type: integer, description: Monotonic }
-        kind: { type: string, example: queue.stuck, description: "queue.stuck, scheduler.silent, backup.stale, storage.unreachable, device.offline, listener.down (more later: container.crashed, disk.low)" }
+        kind: { type: string, example: queue.stuck, description: "queue.stuck, scheduler.silent, backup.stale, storage.unreachable, device.offline, listener.down, network.exposed (more later: container.crashed, disk.low)" }
         key: { type: string, description: "Dedupe key within the kind: a queue name, a device or location id, '' for a single condition" }
         severity: { type: string, enum: [info, warning, critical] }
         title: { type: string }

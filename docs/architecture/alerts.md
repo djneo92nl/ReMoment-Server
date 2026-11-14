@@ -26,6 +26,7 @@ Code: `App\Domain\Alerts\Alerts` (the API), `AlertChecks` (the checks), `App\Mod
 | `storage.unreachable` | location id | critical | `AlertChecks::storage` | the storage probe of `/settings/health` fails (probed every 5 min; a deleted location resolves) |
 | `device.offline` | device id | warning | `AlertChecks::devices` | cached state `unreachable` for 10 minutes in a row (`ALERTS_DEVICE_OFFLINE_MINUTES`); standby never raises |
 | `listener.down` | device id | warning | `AlertChecks::devices` | a device whose driver has a listener (`DeviceListeners::for()` not null) has no `listener_running_{id}` heartbeat for 3 minutes (`ALERTS_LISTENER_DOWN_MINUTES`) |
+| `network.exposed` | | warning | `ExposureAlert` (middleware `WarnWhenExposed`; `AlertChecks::exposure`) | a request came through a public host name or address, from a public client address, on a public server address, or `APP_URL` is public; resolves when nothing public was seen for an hour and `APP_URL` is private. Warn only, never blocks. See [network-exposure.md](network-exposure.md) |
 
 Reserved for later: `container.crashed` and `disk.low` (the Manager, workstream 10).
 
