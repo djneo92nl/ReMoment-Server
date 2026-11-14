@@ -127,6 +127,13 @@ class AppUpgrade extends Command
         $problems = [];
         foreach ((array) config('upgrade.after_migrate', []) as $cmd) {
             $t = microtime(true);
+            $only = config("upgrade.only_in.{$cmd}");
+            if (is_array($only) && !app()->environment($only)) {
+                $this->step($cmd, 'skipped', $t);
+                $this->say("Skipped `{$cmd}`: it only runs in ".implode(', ', $only).' (this is '.app()->environment().').');
+
+                continue;
+            }
             try {
                 Artisan::call($cmd);
                 $this->step($cmd, 'ok', $t);

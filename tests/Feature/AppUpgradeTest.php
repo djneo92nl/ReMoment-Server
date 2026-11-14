@@ -175,6 +175,27 @@ class AppUpgradeTest extends TestCase
         @rmdir($this->migDir);
     }
 
+    public function test_optimize_is_skipped_outside_production_and_runs_in_production(): void
+    {
+        config(['upgrade.after_migrate' => ['optimize']]);
+        $this->extraMigration("Schema::create('upgrade_probe', fn (Blueprint \$t) => \$t->id());");
+        InstalledVersion::record();
+        config(['app.version' => '1.1.0']);
+        $this->beat();
+
+        // The testing environment must not write bootstrap/cache (it froze a test config once).
+        [$code, $json] = $this->run_();
+        $this->runTearDownExtras();
+
+        $this->assertSame(0, $code);
+        $steps = array_column($json['steps'], 'result', 'name');
+        $this->assertSame('skipped', $steps['optimize']);
+        $this->assertFileDoesNotExist(base_path('bootstrap/cache/config.php'));
+        $this->assertSame(['production'], config('upgrade.only_in.optimize'));
+        @unlink($this->migDir.'/2099_01_01_000000_upgrade_probe.php');
+        @rmdir($this->migDir);
+    }
+
     public function test_failing_migration_leaves_app_down_and_exits_three(): void
     {
         $this->extraMigration("throw new \\RuntimeException('boom');");
