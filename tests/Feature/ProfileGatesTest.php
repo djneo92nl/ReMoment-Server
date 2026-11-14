@@ -44,7 +44,7 @@ class ProfileGatesTest extends TestCase
         $scheduled = $this->scheduled();
 
         foreach (['library:warm', 'library:analyze', 'catalogue:sync', 'catalogue:new-releases', 'catalogue:availability', 'catalogue:reconcile',
-            'library:enrich', 'artwork:backfill', 'artwork:prerender', 'playlists:refresh-smart', 'library:merge-duplicates --force', 'library:scan-files --queue'] as $gated) {
+            'library:enrich', 'artwork:backfill', 'artwork:prerender', 'playlists:refresh-smart', 'library:merge-duplicates --force', 'library:scan-files --queue', 'export:prune'] as $gated) {
             $this->assertNotContains($gated, $scheduled, "{$gated} must not run in Control");
         }
         foreach (self::BASE as $base) {
@@ -57,7 +57,7 @@ class ProfileGatesTest extends TestCase
         $this->profile('standard');
         $scheduled = $this->scheduled();
 
-        foreach (['library:warm', 'catalogue:sync', 'library:enrich', 'library:scan-files --queue', 'artwork:prerender'] as $command) {
+        foreach (['library:warm', 'catalogue:sync', 'library:enrich', 'library:scan-files --queue', 'export:prune', 'artwork:prerender'] as $command) {
             $this->assertContains($command, $scheduled);
         }
         $this->assertNotContains('library:analyze', $scheduled);

@@ -932,6 +932,7 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 - `/settings/devices` — discovered-devices list (scan, add, ignore) on top, drivers grouped by brand below, add by IP (see `docs/architecture/device-discovery.md`); `/devices/discover` redirects here
 - `/settings/dlna` — discover DLNA servers, trigger library scans
 - `/settings/storage` — Files & Import: file browser, upload and inbox import, storage locations (local/S3) with queued scan/reorganize and live status, and the Library tab (leading source, played tracks) (see `docs/architecture/file-storage.md`)
+- `/settings/storage` also has an Exports tab (`Livewire\ExportList`) and the album, artist and playlist pages an admin-only Export button (`Livewire\ExportDialog`); both use `Domain\Export\ExportService`, the API's implementation (see `docs/architecture/export.md`); `php artisan export:prune` (hourly) is the retention
 - `/settings/services` — Services & keys: every external service's credentials from one registry (`docs/architecture/credentials.md`)
 - `/settings/spotify-connect` — map Spotify Connect speaker names to local devices
 - `/settings/clients` — manage client device registrations; approve/reject pending, assign devices, view tokens; build/download the SD card artwork zips, one per screen size (see `docs/architecture/sd-card-export.md`)

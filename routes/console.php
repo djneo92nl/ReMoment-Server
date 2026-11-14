@@ -44,6 +44,8 @@ Schedule::command('library:analyze-stems')->dailyAt('02:00')->when(fn () => Prof
 
 // Picks up files added, changed or removed outside the app in the storage locations (queued; see docs/architecture/file-storage.md).
 Schedule::command('library:scan-files --queue')->dailyAt('03:30')->when(fn () => Profile::allows('file_storage'));
+// Finished exports older than EXPORT_KEEP_HOURS and the exports/ directory over EXPORT_DIR_MAX_GB (docs/architecture/export.md)
+Schedule::command('export:prune')->hourly()->withoutOverlapping(30)->when(fn () => Profile::allows('file_storage'));
 
 // Folds duplicate artists/albums/tracks together (ids of merged records disappear), so weekly and off-hours.
 Schedule::command('library:merge-duplicates --force')->weeklyOn(0, '04:00')->withoutOverlapping(240)->when(fn () => Profile::allows('library'));

@@ -3,7 +3,7 @@
         <x-page-header title="Files" subtitle="Your own music: browse, import, locations and which source leads" :back="route('settings.index')" />
     </x-slot>
 
-    @php($tabs = ['files' => ['Files', 'fa-folder-tree'], 'import' => ['Import', 'fa-cloud-arrow-up'], 'locations' => ['Locations & tasks', 'fa-hard-drive'], 'library' => ['Library', 'fa-compact-disc']])
+    @php($tabs = ['files' => ['Files', 'fa-folder-tree'], 'import' => ['Import', 'fa-cloud-arrow-up'], 'locations' => ['Locations & tasks', 'fa-hard-drive'], 'exports' => ['Exports', 'fa-file-zipper'], 'library' => ['Library', 'fa-compact-disc']])
     <div class="max-w-6xl space-y-6"
          x-data="{ tab: (new URLSearchParams(location.search).get('tab') || 'files'), pick(t) { this.tab = t; const u = new URL(location); u.searchParams.set('tab', t); history.replaceState(null, '', u); } }">
         <div class="flex flex-wrap gap-1 p-1 bg-gray-100 dark:bg-stone-800/60 rounded-2xl w-fit" role="tablist">
@@ -22,6 +22,7 @@
             <livewire:library-uploader />
         </div>
         <div x-show="tab === 'locations'" x-cloak><livewire:storage-manager /></div>
+        <div x-show="tab === 'exports'" x-cloak class="max-w-3xl"><livewire:export-list /></div>
         <div x-show="tab === 'library'" x-cloak class="max-w-2xl">@include('settings.partials.library-form')</div>
     </div>
 </x-app-layout>

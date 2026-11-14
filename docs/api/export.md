@@ -40,3 +40,5 @@ GET    /api/library/exports/{id}/download/{part}?expires=&signature=   → the z
 Every `GET /api/library/exports/{id}` makes a fresh `url` per part: a **path** with `expires` and `signature` (Laravel signed URL, `signed:relative`, so it holds behind any proxy host). **Valid 900 seconds**; poll again for a new one. The signature is the authorization, so a browser downloads it without the token header; a missing, tampered or expired signature is `403`. The file is sent as `application/zip` with `Content-Disposition` and answers `Range` requests (resumable). A part that is not finished, expired or removed is `404`. Clients prefix the server address (`base_url` of `GET /api/info`).
 
 MCP: tool `export` (estimate, start, status, list, cancel); see [mcp.md](mcp.md).
+
+The web dialog and the retention (`export:prune`, finished exports removed after `EXPORT_KEEP_HOURS`, status `expired`) are described in [export.md](../architecture/export.md).

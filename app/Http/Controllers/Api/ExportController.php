@@ -2,18 +2,14 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Domain\Analysis\Tools;
-use App\Domain\Export\ExportPlan;
-use App\Domain\Export\ExportPlanner;
-use App\Domain\Export\ExportSelection;
+use App\Domain\Export\ExportRefused;
+use App\Domain\Export\ExportService;
 use App\Domain\Library\IdAliases;
 use App\Http\Controllers\Controller;
-use App\Jobs\ExportLibrarySelection;
 use App\Models\Export;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -25,60 +21,38 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 class ExportController extends Controller
 {
     /** Seconds a signed download URL stays valid; every GET of the export makes a fresh one. */
-    public const URL_TTL = 900;
+    public const URL_TTL = ExportService::URL_TTL;
 
-    public function estimate(Request $request, ExportPlanner $planner): JsonResponse
+    public function __construct(private readonly ExportService $exports) {}
+
+    public function estimate(Request $request): JsonResponse
     {
-        $export = $this->selection($request);
-        $plan = $planner->plan(ExportSelection::tracks($export), $export->profile);
-
-        return response()->json($this->estimateBody($export, $plan));
+        return response()->json($this->exports->estimate($this->selection($request)));
     }
 
-    public function store(Request $request, ExportPlanner $planner): JsonResponse
+    public function store(Request $request): JsonResponse
     {
-        $export = $this->selection($request);
-        $plan = $planner->plan(ExportSelection::tracks($export), $export->profile);
-        $estimate = $this->estimateBody($export, $plan);
+        $draft = $this->selection($request);
 
-        if ($plan->exceedsLimits()) {
-            return response()->json([
-                'error' => 'export_too_large',
-                'message' => 'The export is over the limit ('.implode(', ', $plan->exceeds).'): about '.round($plan->estimatedBytes / 1024 ** 3, 2).' GB. Choose less, or a lower profile.',
-                'estimate' => $estimate,
-            ], 422);
-        }
-        if ($plan->exportable() === 0) {
-            return response()->json([
-                'error' => 'nothing_to_export',
-                'message' => 'None of the tracks has an own file on this server, so there is nothing to export.',
-                'estimate' => $estimate,
-            ], 422);
-        }
-        if (!Tools::available(Tools::ffmpeg())) {
-            return response()->json(['error' => 'not_available', 'message' => 'ffmpeg is not available on this server, so an export cannot run.'], 409);
+        try {
+            $export = $this->exports->start($draft);
+        } catch (ExportRefused $e) {
+            return response()->json(['error' => $e->errorCode, 'message' => $e->getMessage()] + ($e->estimate ? ['estimate' => $e->estimate] : []), $e->status);
         }
 
-        $export->forceFill([
-            'status' => Export::QUEUED, 'tracks' => $plan->tracks, 'copied' => $plan->copied, 'transcoded' => $plan->transcoded,
-            'skipped_count' => $plan->skipped, 'estimated_bytes' => $plan->estimatedBytes, 'planned_parts' => $plan->parts,
-            'files_total' => $plan->exportable(), 'files_done' => 0, 'skipped' => $this->skipped($export, $plan),
-        ])->save();
-        ExportLibrarySelection::dispatch($export);
-
-        return response()->json(['id' => $export->public_id, 'status' => $export->status, 'estimate' => $estimate], 202);
+        return response()->json(['id' => $export->public_id, 'status' => $export->status, 'estimate' => $this->exports->estimate($export)], 202);
     }
 
     public function index(Request $request): JsonResponse
     {
         $limit = max(1, min(100, (int) $request->query('limit', 20)));
 
-        return response()->json(['data' => Export::query()->latest('id')->limit($limit)->get()->map(fn (Export $e) => $this->resource($e))->all()]);
+        return response()->json(['data' => Export::query()->latest('id')->limit($limit)->get()->map(fn (Export $e) => $this->exports->resource($e))->all()]);
     }
 
     public function show(string $id): JsonResponse
     {
-        return response()->json($this->resource($this->find($id)));
+        return response()->json($this->exports->resource($this->find($id)));
     }
 
     /** The signed, temporary download: the signature is the authorization, no token header needed. */
@@ -101,18 +75,8 @@ class ExportController extends Controller
     public function destroy(string $id): JsonResponse
     {
         $export = $this->find($id);
-        $status = $export->status;
 
-        // A running job notices that its row is gone at the next file and removes its own output.
-        $export->delete();
-        if ($status !== Export::RUNNING) {
-            Storage::disk(config('export.disk'))->deleteDirectory($export->directory());
-        }
-
-        return response()->json([
-            'status' => 'ok', 'id' => $export->public_id,
-            'result' => in_array($status, [Export::QUEUED, Export::RUNNING], true) ? 'cancelled' : 'removed',
-        ]);
+        return response()->json(['status' => 'ok', 'id' => $export->public_id, 'result' => $this->exports->cancel($export)]);
     }
 
     private function find(string $id): Export
@@ -146,77 +110,6 @@ class ExportController extends Controller
             'options.layout' => ['nullable', Rule::in(['tree', 'flat'])],
         ]);
 
-        return new Export([
-            'selection_type' => $data['type'],
-            'selection_id' => $table ? (int) $data['id'] : null,
-            'track_ids' => $type === 'tracks' ? array_values(array_unique(array_map('intval', $data['track_ids']))) : null,
-            'profile' => $data['profile'] ?? config('export.default_profile'),
-            'options' => array_filter(['layout' => $data['options']['layout'] ?? null]) ?: null,
-        ]);
-    }
-
-    /** @return list<array{track_id: int, name: ?string, reason: ?string}> */
-    private function skipped(Export $export, ExportPlan $plan): array
-    {
-        $names = ExportSelection::tracks($export)->pluck('name', 'id');
-        $skipped = [];
-        foreach ($plan->items as $item) {
-            if ($item->action === ExportPlanner::SKIP) {
-                $skipped[] = ['track_id' => $item->trackId, 'name' => $names[$item->trackId] ?? null, 'reason' => $item->reason];
-            }
-        }
-
-        return $skipped;
-    }
-
-    /** @return array<string, mixed> */
-    private function estimateBody(Export $export, ExportPlan $plan): array
-    {
-        return [
-            'title' => ExportSelection::title($export),
-            'selection' => $this->selectionBody($export),
-            'totals' => $plan->totals(),
-            'skipped' => $this->skipped($export, $plan),
-            'limits' => ['max_gb' => (float) config('export.max_gb'), 'part_gb' => (float) config('export.part_gb'), 'dir_max_gb' => (float) config('export.dir_max_gb')],
-        ];
-    }
-
-    /** @return array<string, mixed> */
-    private function selectionBody(Export $export): array
-    {
-        return ['type' => $export->selection_type, 'id' => $export->selection_id] + ($export->selection_type === 'tracks' ? ['track_ids' => $export->track_ids] : []);
-    }
-
-    /** @return array<string, mixed> */
-    private function resource(Export $e): array
-    {
-        $done = $e->status === Export::DONE;
-        $parts = [];
-        foreach ($done ? ($e->part_files ?? []) : [] as $i => $part) {
-            $parts[] = $part + ['part' => $i + 1, 'url' => URL::temporarySignedRoute('api.library.exports.download', now()->addSeconds(self::URL_TTL), ['id' => $e->public_id, 'part' => $i + 1], absolute: false)];
-        }
-        $total = (int) $e->files_total;
-
-        return [
-            'id' => $e->public_id,
-            'status' => $e->status,
-            'title' => ExportSelection::title($e),
-            'selection' => $this->selectionBody($e),
-            'profile' => $e->profile,
-            'options' => $e->options ?? (object) [],
-            'progress' => ['files_done' => (int) $e->files_done, 'files_total' => $total, 'percent' => $done ? 100 : ($total > 0 ? (int) floor($e->files_done / $total * 100) : 0)],
-            'totals' => [
-                'tracks' => $e->tracks, 'copied' => $e->copied, 'transcoded' => $e->transcoded, 'skipped' => $e->skipped_count,
-                'estimated_bytes' => $e->estimated_bytes, 'planned_parts' => $e->planned_parts,
-            ],
-            'skipped' => $e->skipped ?? [],
-            'parts' => $parts,
-            'bytes' => $e->bytes,
-            'error' => $e->error,
-            'created_at' => $e->created_at?->toIso8601String(),
-            'started_at' => $e->started_at?->toIso8601String(),
-            'finished_at' => $e->finished_at?->toIso8601String(),
-            'expires_at' => $e->expires_at?->toIso8601String(),
-        ];
+        return $this->exports->draft($data['type'], $table ? (int) $data['id'] : null, $data['track_ids'] ?? null, $data['profile'] ?? null, $data['options'] ?? null);
     }
 }

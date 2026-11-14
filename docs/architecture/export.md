@@ -1,6 +1,6 @@
 # Export from the library (workstream 13)
 
-Status: **steps 1 to 3 built** (the decision logic; the job, zip, naming, m3u8; the API, MCP tool and OpenAPI, see [docs/api/export.md](../api/export.md)). The web dialog and retention are not built; see the roadmap, "13. Export from the library".
+Status: **steps 1 to 5 built** (the decision logic; the job, zip, naming, m3u8; the API, MCP tool and OpenAPI, see [docs/api/export.md](../api/export.md); the web dialog; retention). Only the docs sweep (step 6) and the unverified items remain; see the roadmap, "13. Export from the library".
 
 ## ExportPlanner
 
@@ -43,6 +43,26 @@ A run that fails (or whose row is deleted or no longer `running`: that is how a 
 
 Not verified: zip64 above 4 GB (written to the spec, not exercised: tests use small files), transcode speed on a Pi, the extraction on a real head unit. Tests: `tests/Feature/ExportJobTest.php` (real ffmpeg, skipped without `libmp3lame`).
 
+## ExportService (shared by API and web)
+
+`App\Domain\Export\ExportService` is the one implementation of `draft()` (selection, alias ids resolved), `estimate()`, `start()` (throws `ExportRefused` with code, message and estimate: over the limits, nothing exportable, ffmpeg missing), `cancel()` and `resource()` (the shape in docs/api/export.md, with fresh signed part URLs). `Api\ExportController` only validates and maps `ExportRefused` to JSON; the Livewire components call the service directly.
+
+## Web (step 4)
+
+Admin login only, gated with the `library` and `file_storage` features (Control: no button; `/settings/storage` redirects to `/not-in-profile`).
+
+- `Livewire\ExportDialog` (`<livewire:export-dialog type="album|artist|playlist" :id="…" />`): an **Export** button on the album, artist and playlist pages, visible to the logged-in admin only. It opens a panel with quality (every profile of `config/export.php`, default `mp3-320`) and folder layout, shows the estimate live (tracks exportable, size, zips, copied, converted, skipped with reasons, a warning over the limits) before anything starts, then **Start export**. It polls every 2 s for progress, shows a download button per signed part (the signed URL of the API, valid 15 minutes, renewed on every render), Cancel while queued or running, Remove when finished. A refusal (`ExportRefused`) is shown in the panel. A `tracks` selection works too (`:track-ids`), no page uses it yet.
+- `Livewire\ExportList`: the **Exports** tab of Settings › Files (`/settings/storage?tab=exports`): the last 20 exports with the same status block (`livewire/partials/export-status`), the space used of `EXPORT_DIR_MAX_GB`, polling every 3 s while one runs.
+
+## Retention (step 5)
+
+`php artisan export:prune` (`Domain\Export\ExportRetention`), scheduled hourly, gated with `Profile::allows('file_storage')` (a scheduler test fails for an ungated task):
+
+1. A `done` export past `expires_at` (`EXPORT_KEEP_HOURS`, default 24) loses its files and becomes `expired`; `finished_at` is then the expiry time.
+2. `failed` and `expired` rows are forgotten (row and directory deleted) one keep period after they ended.
+3. A directory under `exports/` without a row, not modified for an hour, is removed.
+4. While `exports/` is over `EXPORT_DIR_MAX_GB`, the oldest `done` exports are expired first. Queued and running exports are never touched.
+
 ## Not decided here
 
-Option `loudness` (baking ReplayGain into the files), the API, MCP tool, OpenAPI entry, web dialog and retention (deleting expired exports, the `exports/` size cap) are the next steps. A copied MP3 other than in `compat` may still carry ID3v2.4 tags.
+Option `loudness` (baking ReplayGain into the files) is not built. A copied MP3 other than in `compat` may still carry ID3v2.4 tags.

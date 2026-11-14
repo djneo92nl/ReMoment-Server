@@ -18,6 +18,8 @@
         </x-page-header>
     </x-slot>
 
+    <div class="mb-6"><livewire:export-dialog type="playlist" :id="$playlist->id" :key="'export-playlist-'.$playlist->id" /></div>
+
     <div class="grid gap-6 lg:grid-cols-3">
         <div class="lg:col-span-2 space-y-6">
             @if($playlist->isEditable())

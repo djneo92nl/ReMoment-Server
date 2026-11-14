@@ -16,6 +16,7 @@
 
     <div class="space-y-8">
         <x-artist-hero :artist="$artist" :devices="$playableDevices" :total-plays="$totalPlays" :total-seconds="$totalSeconds" :album-count="$albums->count()" :track-count="$trackCount" :source="$source" />
+        <livewire:export-dialog type="artist" :id="$artist->id" :key="'export-artist-'.$artist->id" />
 
         {{-- Source: streaming is never merged with local; with several, this picks what the albums, the popular tracks and Play show --}}
         @if(count($sources) > 1)
