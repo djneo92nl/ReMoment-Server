@@ -45,11 +45,15 @@ jobs:
       run: |
         mkdir -p database
         touch database/database.sqlite
+    - name: Install ffmpeg (export and announcement tests skip without libmp3lame)
+      run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
     - name: Execute tests (Unit and Feature tests) via PHPUnit/Pest
       env:
         DB_CONNECTION: sqlite
         DB_DATABASE: database/database.sqlite
-      run: php artisan test
+      # The display flags print what PHPUnit counts besides failures (deprecations, warnings, notices, risky tests, skips),
+      # so an exit code 1 with every test passing shows its cause in the log.
+      run: php artisan test --display-deprecations --display-phpunit-deprecations --display-warnings --display-notices --display-skipped
 
   frontend-build:
 
