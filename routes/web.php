@@ -71,6 +71,9 @@ Route::post('/devices/{device}/hidden', [DeviceController::class, 'toggleHidden'
 Route::get('/history', [HistoryController::class, 'index'])->name('history.index');
 Route::get('/stats', [StatsController::class, 'index'])->name('stats.index');
 Route::get('/multiroom', fn () => view('multiroom.index'))->name('multiroom.index');
+Route::get('/scenes', fn () => view('scenes.index'))->name('scenes.index');
+Route::get('/scenes/create', fn () => view('scenes.edit', ['sceneId' => null]))->name('scenes.create');
+Route::get('/scenes/{scene}/edit', fn (\App\Models\Scene $scene) => view('scenes.edit', ['sceneId' => $scene->id]))->name('scenes.edit');
 Route::get('/receiver', fn () => view('receiver'))->name('receiver');
 Route::get('/player', fn () => view('player'))->name('player');
 Route::get('/artists', [ArtistController::class, 'index'])->name('artists.index');

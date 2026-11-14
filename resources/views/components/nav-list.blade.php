@@ -28,6 +28,7 @@
         </li>
         @endif
         <li><x-nav-item :href="route('multiroom.index')" icon="layer-group" :active="$on('multiroom.*')">Multiroom</x-nav-item></li>
+        <li><x-nav-item :href="route('scenes.index')" icon="wand-magic-sparkles" :active="$on('scenes.*')">Scenes</x-nav-item></li>
         {{-- Its own tab: this browser plays the sound while the tab stays open --}}
         <li><x-nav-item :href="route('player')" icon="headphones" target="_blank" rel="noopener">Web player</x-nav-item></li>
         <li><x-nav-item :href="route('stats.index')" icon="chart-simple" :active="$on('stats.*')">Insights</x-nav-item></li>

@@ -930,6 +930,7 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 - `/history` — full play history browser on the same domain code as `GET /api/library/history` (`Domain\Stats\PlayHistory`): search, device, source, dates, library vs unknown plays, `?albumId=`/`?artistId=` from the album and artist pages, cursor paging; the admin sets the retention (months, default forever) at the bottom; see `docs/api/history.md`
 - `/stats` — listening statistics (top artists, devices, hourly heatmap)
 - `/multiroom` — multiroom session management and presets
+- `/scenes`, `/scenes/create`, `/scenes/{id}/edit` — scenes: list with Run, and the editor built from the operations' schemas (`Livewire\SceneList`, `Livewire\SceneEditor`; see `docs/api/scenes.md`)
 - `/receiver` — full-screen now-playing display; fetches `GET /api/devices`, lets user pick device (or auto-selects if only one); re-fetches `GET /api/devices/{id}` on MQTT push (polling every 3s without a broker) and supports play/pause/next/previous, seek and mute via the REST API. Accepts `?device={id}` query parameter to skip the picker.
 - `/library` — listening hub: hero + Shuffle, section chips, shelves (recently played/added, most played artists, playlists, genres, favourites, discover), library at a glance (see `docs/frontend/library.md`); `/library/favorites`; `/library/tracks` — all tracks with Shuffle all
 - `/artists` — artist library browser
