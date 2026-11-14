@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Domain\Artwork\ArtworkBackgrounds;
 use App\Domain\Artwork\ArtworkCache;
+use App\Domain\Artwork\CoverFacts;
 use App\Domain\Artwork\LocalCover;
 use App\Domain\Artwork\LogoRenderer;
 use App\Domain\Artwork\PlaylistArtwork;
@@ -116,6 +117,7 @@ class ProcessArtwork implements ShouldQueue
         ArtworkCache::put($this->originalUrl, $payload);
 
         $this->applyColorsToAlbums($colors);
+        $this->recordCoverFacts($imageData);
         $this->republishNowPlaying();
     }
 
@@ -211,23 +213,42 @@ class ProcessArtwork implements ShouldQueue
 
     private function applyColorsToAlbums(array $colors): void
     {
-        if (empty($colors) || SourceLogo::isLogoUrl($this->originalUrl) || PlaylistArtwork::isCompositeUrl($this->originalUrl)) {
+        if (empty($colors)) {
             return;
+        }
+
+        $this->albumsUsingThisCover()->each(fn (Album $album) => $album->update(['colors' => $colors]));
+    }
+
+    /** The size and hash of the original, for the cover health report (CoverFacts). */
+    private function recordCoverFacts(string $imageData): void
+    {
+        try {
+            $this->albumsUsingThisCover()->each(fn (Album $album) => CoverFacts::record($album, $imageData));
+        } catch (\Throwable $e) {
+            Log::warning("ProcessArtwork: cover facts of {$this->originalUrl} not kept: {$e->getMessage()}");
+        }
+    }
+
+    /** @return \Illuminate\Support\Collection<int, Album> */
+    private function albumsUsingThisCover(): \Illuminate\Support\Collection
+    {
+        if (SourceLogo::isLogoUrl($this->originalUrl) || PlaylistArtwork::isCompositeUrl($this->originalUrl)) {
+            return collect();
         }
 
         // json_encode() (used by Eloquent's array cast) escapes "/" as "\/",
         // so the LIKE pattern must match the escaped form actually stored.
         $likeValue = str_replace('/', '\/', $this->originalUrl);
 
-        Album::whereNotNull('images')
+        return Album::whereNotNull('images')
             ->where('images', 'like', '%'.$likeValue.'%')
             ->get(['id', 'images'])
             ->filter(fn (Album $album) => in_array(
                 $this->originalUrl,
                 array_map(fn ($image) => is_array($image) ? ($image['url'] ?? null) : $image, $album->images ?? []),
                 true
-            ))
-            ->each(fn (Album $album) => $album->update(['colors' => $colors]));
+            ));
     }
 
     private function ensureL(string $hex, float $minL): string

@@ -6,6 +6,7 @@ use App\Domain\Analysis\AudioAnalysis;
 use App\Domain\Library\Enrichment;
 use App\Domain\Storage\FileStore;
 use App\Domain\Storage\LibraryFiles;
+use App\Domain\Storage\PlaybackLoudness;
 use App\Domain\Storage\StorageTasks;
 use App\Http\Controllers\Controller;
 use App\Jobs\AnalyzeAudioFile;
@@ -230,5 +231,19 @@ class StorageController extends Controller
             'size' => $file->size, 'mime_type' => $file->mime_type, 'codec' => $file->codec, 'bitrate' => $file->bitrate,
             'sample_rate' => $file->sample_rate, 'bit_depth' => $file->bit_depth, 'duration' => $file->duration, 'status' => $file->status,
         ];
+    }
+
+    /** Loudness-normalised playback of converted streams (default off); see docs/architecture/audio-analysis.md. */
+    public function playbackLoudness(): JsonResponse
+    {
+        return response()->json(['enabled' => PlaybackLoudness::enabled()]);
+    }
+
+    public function setPlaybackLoudness(Request $request): JsonResponse
+    {
+        $data = $request->validate(['enabled' => ['required', 'boolean']]);
+        PlaybackLoudness::set((bool) $data['enabled']);
+
+        return response()->json(['enabled' => PlaybackLoudness::enabled()]);
     }
 }

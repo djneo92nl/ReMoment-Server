@@ -23,6 +23,7 @@ if (config('devices.auto_discover')) {
 }
 
 Schedule::command('artwork:backfill')->daily()->when(fn () => Profile::allows('library'));
+Schedule::command('artwork:measure-covers')->daily()->when(fn () => Profile::allows('library'));
 Schedule::command('artwork:prerender')->daily()->when(fn () => Profile::allows('library'));
 Schedule::command('library:enrich')->daily()->when(fn () => Profile::allows('enrichment'));
 Schedule::command('playlists:refresh-smart')->daily()->when(fn () => Profile::allows('library'));

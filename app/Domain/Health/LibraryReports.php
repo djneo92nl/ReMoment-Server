@@ -2,6 +2,8 @@
 
 namespace App\Domain\Health;
 
+use App\Domain\Artwork\CoverFacts;
+use App\Domain\Artwork\LibraryArtwork;
 use App\Models\Media\Album;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
@@ -38,6 +40,7 @@ final class LibraryReports
             'incomplete' => ['title' => 'Incomplete albums', 'description' => 'Albums with fewer tracks than the MusicBrainz release lists. It may be a different edition (deluxe, regional).'],
             'unlinked' => ['title' => 'Files without a track', 'description' => 'Files in storage that no track plays.'],
             'missing' => ['title' => 'Missing files', 'description' => 'Files that were indexed and are no longer on disk.'],
+            'covers' => ['title' => 'Cover problems', 'description' => 'Albums with no cover, a tiny or non-square cover, or an embedded cover that differs from the one in use. Needs the cover size, recorded when a cover is processed (artwork:measure-covers fills older ones).'],
         ];
     }
 
@@ -65,6 +68,7 @@ final class LibraryReports
         return match ($key) {
             'duplicates' => DB::query()->fromSub(self::duplicateGroups(), 'groups')->count(),
             'incomplete' => self::incomplete()->count(),
+            'covers' => count(self::coverProblems()),
             default => self::query($key)->count(),
         };
     }
@@ -82,6 +86,11 @@ final class LibraryReports
                 'title' => "{$r->artist} · {$r->album}",
                 'detail' => "{$r->have} of {$r->total} tracks",
                 'url' => route('albums.show', $r->album_id),
+            ]),
+            'covers' => collect(array_slice(self::coverProblems(), 0, $limit))->map(fn ($r) => [
+                'title' => "{$r['artist']} · {$r['album']}",
+                'detail' => implode('; ', $r['reasons']),
+                'url' => route('albums.show', $r['album_id']),
             ]),
             'unlinked', 'missing' => self::query($key)->orderBy('files.path')->limit($limit)->get(['files.path', 'files.size'])->map(fn ($r) => [
                 'title' => $r->path,
@@ -104,6 +113,8 @@ final class LibraryReports
         $findings = match ($key) {
             'duplicates' => self::duplicateFindings($limit, $offset),
             'incomplete' => self::incomplete()->orderByRaw('(have - total) asc')->orderBy('albums.id')->offset($offset)->limit($limit)->get()->map(fn ($r) => self::finding($key, 'album', "{$r->artist} · {$r->album}", "{$r->have} of {$r->total} tracks", albumId: (int) $r->album_id))->all(),
+            'covers' => array_map(fn ($r) => self::finding($key, 'album', "{$r['artist']} · {$r['album']}", implode('; ', $r['reasons']), albumId: $r['album_id'], artistId: $r['artist_id']),
+                array_slice(self::coverProblems(), $offset, $limit)),
             'unlinked', 'missing' => self::query($key)->orderBy('files.path')->orderBy('files.id')->offset($offset)->limit($limit)
                 ->get(['files.path', 'files.size', 'files.extension'])->map(fn ($r) => self::finding($key, 'file', $r->path, self::size((int) $r->size), file: ['path' => $r->path, 'extension' => $r->extension, 'size' => (int) $r->size]))->all(),
             default => self::trackFindings($key, $limit, $offset),
@@ -309,6 +320,71 @@ final class LibraryReports
             ->whereRaw('cast(metadata.value as integer) > '.$have)
             ->whereRaw($have.' > 0')
             ->select('albums.id as album_id', 'albums.name as album', 'artists.name as artist', DB::raw($have.' as have'), DB::raw('cast(metadata.value as integer) as total'));
+    }
+
+    /**
+     * Albums with own files whose cover is missing, tiny, not square, or differs from the picture embedded in the
+     * files; one entry per album with every reason, worst first (no cover, then the smallest side, then the
+     * most crooked, then a differing embedded cover), ties by album id. Thresholds: config/artwork.php. A cover
+     * whose size was never recorded (CoverFacts) is not judged for size, only for being absent.
+     *
+     * @return list<array{album_id: int, artist_id: int|null, album: string, artist: string, reasons: list<string>}>
+     */
+    private static function coverProblems(): array
+    {
+        $morph = (new Album)->getMorphClass();
+        $meta = fn (string $key) => '(select value from metadata where metadata.metadatable_id = albums.id and metadata.metadatable_type = \''.$morph.'\' and metadata.key = \''.$key.'\' limit 1)';
+
+        $rows = DB::table('albums')
+            ->join('artists', 'artists.id', '=', 'albums.artist_id')
+            ->whereExists(fn ($q) => $q->selectRaw('1')->from('tracks')
+                ->join('track_files', 'track_files.track_id', '=', 'tracks.id')
+                ->join('files', 'files.id', '=', 'track_files.file_id')
+                ->whereColumn('tracks.album_id', 'albums.id')->where('files.status', 'present')->whereNull('files.hidden_at'))
+            ->select('albums.id', 'albums.name', 'albums.artist_id', 'albums.images', 'artists.name as artist')
+            ->selectRaw($meta('cover_size').' as cover_size')
+            ->selectRaw($meta('cover_sha1').' as cover_sha1')
+            ->selectRaw($meta('embedded_cover_sha1').' as embedded_sha1')
+            ->orderBy('albums.id')
+            ->get();
+
+        $min = (int) config('artwork.min_cover_px');
+        $tolerance = (float) config('artwork.square_tolerance');
+        $problems = [];
+
+        foreach ($rows as $r) {
+            $reasons = [];
+            $rank = [9, 0];
+            $images = json_decode((string) $r->images, true);
+
+            if (LibraryArtwork::coverUrl(is_array($images) ? $images : null) === null) {
+                $reasons[] = 'No cover';
+                $rank = [0, 0];
+            } elseif ($size = CoverFacts::parse($r->cover_size)) {
+                [$w, $h] = $size;
+                if (min($w, $h) < $min) {
+                    $reasons[] = "Cover is {$w}×{$h} px, under {$min} px";
+                    $rank = [1, min($w, $h)];
+                }
+                if (abs($w - $h) / max($w, $h) > $tolerance) {
+                    $reasons[] = "Cover is {$w}×{$h} px, not square";
+                    $rank = $rank[0] < 2 ? $rank : [2, -round(abs($w - $h) / max($w, $h) * 1000)];
+                }
+            }
+
+            if ($r->cover_sha1 && $r->embedded_sha1 && $r->cover_sha1 !== $r->embedded_sha1) {
+                $reasons[] = 'The cover embedded in the files differs from the one in use';
+                $rank = $rank[0] < 3 ? $rank : [3, 0];
+            }
+
+            if ($reasons !== []) {
+                $problems[] = ['rank' => $rank, 'album_id' => (int) $r->id, 'artist_id' => $r->artist_id ? (int) $r->artist_id : null, 'album' => $r->name, 'artist' => $r->artist, 'reasons' => $reasons];
+            }
+        }
+
+        usort($problems, fn ($a, $b) => [$a['rank'][0], $a['rank'][1], $a['album_id']] <=> [$b['rank'][0], $b['rank'][1], $b['album_id']]);
+
+        return array_map(fn ($p) => array_diff_key($p, ['rank' => 1]), $problems);
     }
 
     private static function size(int $bytes): string

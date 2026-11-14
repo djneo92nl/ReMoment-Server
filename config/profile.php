@@ -72,6 +72,7 @@ return [
         'file_storage' => ['label' => 'Own files: storage locations, indexing, import, streaming to speakers', 'profiles' => ['standard', 'full']],
         'catalogue' => ['label' => 'Catalogue sync, wishlist, new releases, physical collection', 'profiles' => ['standard', 'full']],
 
+        'cover_health' => ['label' => 'Cover health report (albums with no, tiny or non-square cover); needs no analysis', 'profiles' => ['standard', 'full']],
         'analysis' => ['label' => 'Audio analysis (loudness, fingerprints, Essentia) and library health reports', 'profiles' => ['full']],
         'deep_analysis' => ['label' => 'Deep analysis of one track: sections (structure) and stems', 'profiles' => ['full']],
         'rip_upload' => ['label' => 'Rip upload from the ripper app', 'profiles' => ['full']],
@@ -89,6 +90,7 @@ return [
         'history' => ['api/library/stats', 'api/library/history', 'api/devices/*/history'],
         'deep_analysis' => ['api/library/tracks/*/deep-analysis', 'api/library/tracks/*/deep-analysis/*'],
         'rip_upload' => ['api/admin/files'],
+        'cover_health' => ['api/library/health/covers', 'settings/library-health/covers'],
         'analysis' => ['api/library/tracks/*/mixes-with', 'settings/analysis', 'settings/analysis/*', 'settings/library-health', 'settings/library-health/*', 'api/library/health', 'api/library/health/*'],
         'catalogue' => [
             'api/library/wishlist', 'api/library/new-releases', 'api/library/wanted-tracks', 'api/library/wanted-tracks/*',

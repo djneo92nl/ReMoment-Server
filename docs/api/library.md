@@ -95,7 +95,7 @@ Tracks are in best-effort album order (by id — there is no track number column
 
 ### `GET /api/library/health`
 
-`{ "data": [ { "key": "transcodes", "title": "Suspected transcodes", "description": "…", "count": 3 }, … ] }` — how many findings each library health report has, in a fixed order: `transcodes`, `damaged`, `clipping`, `duplicates`, `lossy`, `incomplete`, `unlinked`, `missing`. Counts only (cached 10 minutes, zero until audio analysis has run); the findings are on the web page `/settings/library-health`. See `docs/architecture/library-health.md` and [sound-and-quality.md](sound-and-quality.md#library-health).
+`{ "data": [ { "key": "transcodes", "title": "Suspected transcodes", "description": "…", "count": 3 }, … ] }` — how many findings each library health report has, in a fixed order: `transcodes`, `damaged`, `clipping`, `duplicates`, `lossy`, `incomplete`, `unlinked`, `missing`, `covers`. Counts only (cached 10 minutes, zero until audio analysis has run); the findings are on the web page `/settings/library-health`. See `docs/architecture/library-health.md` and [sound-and-quality.md](sound-and-quality.md#library-health).
 
 ### `GET /api/library/listening-modes`
 

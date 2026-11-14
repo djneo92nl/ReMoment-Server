@@ -79,8 +79,11 @@ final class Proxies
     public static function path(File $original, string $profile): string
     {
         $extension = self::profiles()[$profile]['extension'];
+        // A levelled proxy has its own file, so switching the setting or a new analysis never serves a stale level.
+        $gain = PlaybackLoudness::gainFor($original, $profile);
+        $level = $gain === null ? '' : '_'.sprintf('%+.1f', $gain).'dB';
 
-        return config('proxies.directory')."/{$profile}/".substr($original->hash ?: sha1($original->path), 0, 32).".{$extension}";
+        return config('proxies.directory')."/{$profile}/".substr($original->hash ?: sha1($original->path), 0, 32).$level.".{$extension}";
     }
 
     /** The path of the ready proxy of this track on the proxy disk, or null when there is none yet. */
@@ -133,13 +136,15 @@ final class Proxies
         }
 
         $profileConfig = self::profiles()[$profile];
+        $gain = PlaybackLoudness::gainFor($original, $profile);
+        $args = $gain === null ? $profileConfig['args'] : [...$profileConfig['args'], '-af', 'volume='.number_format($gain, 1, '.', '').'dB'];
 
-        (new FileStore($original->location))->withLocalPath($original->path, function (string $source) use ($profileConfig, $target, $disk) {
+        (new FileStore($original->location))->withLocalPath($original->path, function (string $source) use ($profileConfig, $args, $target, $disk) {
             $temp = tempnam(sys_get_temp_dir(), 'remoment-proxy-').'.'.$profileConfig['extension'];
 
             try {
                 $result = Process::timeout((int) config('proxies.timeout'))
-                    ->run([Tools::ffmpeg(), '-y', '-nostdin', '-v', 'error', '-i', $source, ...$profileConfig['args'], $temp]);
+                    ->run([Tools::ffmpeg(), '-y', '-nostdin', '-v', 'error', '-i', $source, ...$args, $temp]);
 
                 if (!$result->successful() || !is_file($temp) || filesize($temp) === 0) {
                     throw new \RuntimeException('ffmpeg failed: '.trim($result->errorOutput() ?: 'no output'));

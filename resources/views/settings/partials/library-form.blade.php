@@ -2,6 +2,7 @@
     $mode = \App\Domain\Library\LeadingSource::mode();
     $leading = \App\Domain\Library\LeadingSource::leading();
     $addPlayed = \App\Domain\Library\LibrarySettings::addPlayedTracks();
+    $levelOn = \App\Domain\Storage\PlaybackLoudness::enabled();
     $ntsOn = \App\Domain\Radio\RadioSettings::ntsEnabled();
 @endphp
 <div class="space-y-6">
@@ -32,6 +33,14 @@
                 <span>
                     <span class="block text-sm font-medium text-gray-900 dark:text-gray-100">Add played tracks to the library</span>
                     <span class="block text-xs text-gray-500">Off (default): plays are still logged in the history, with their cover, but tracks that aren't in the library stay out of it.</span>
+                </span>
+            </label>
+
+            <label class="flex items-start gap-3 cursor-pointer pt-5 border-t border-gray-100 dark:border-stone-800">
+                <input type="checkbox" name="playback_loudness" value="1" @checked($levelOn) class="mt-1 rounded text-gray-900 dark:text-stone-500 focus:ring-gray-400">
+                <span>
+                    <span class="block text-sm font-medium text-gray-900 dark:text-gray-100">Level the loudness of converted streams</span>
+                    <span class="block text-xs text-gray-500">When the server converts a file for a speaker that cannot play the original, it evens out the volume from the analysed loudness (never louder than the track's peak allows). Files streamed as they are, such as direct DLNA playback, are not touched, and nothing is written to your files or to the speaker's volume. Needs audio analysis. Off by default.</span>
                 </span>
             </label>
 

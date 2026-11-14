@@ -255,6 +255,8 @@ Route::middleware('admin.token')->group(function () {
     Route::post('/admin/storage/locations/{location}/test', [StorageController::class, 'testLocation']);
     Route::post('/admin/storage/locations/{location}/scan', [StorageController::class, 'scan']);
     Route::post('/admin/storage/import', [StorageController::class, 'import']);
+    Route::get('/admin/storage/playback-loudness', [StorageController::class, 'playbackLoudness']);
+    Route::put('/admin/storage/playback-loudness', [StorageController::class, 'setPlaybackLoudness']);
     Route::post('/admin/storage/reorganize', [StorageController::class, 'reorganize']);
     Route::post('/admin/files', [StorageController::class, 'upload']);
     Route::get('/admin/tracks/{track}/files', [StorageController::class, 'trackFiles']);

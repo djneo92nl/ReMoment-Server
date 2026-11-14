@@ -33,9 +33,10 @@ final class ExportLoudness
 
     /**
      * @param  array<int, array{track: Track, file: File}>  $entries  track id => track and its file (the ones that may be transcoded)
+     * @param  array{reference?: float, margin?: float, max?: float}  $limits  override the export config (playback uses `proxies.loudness`)
      * @return array<int, ?float> track id => gain in dB (0.0 = leave as it is), null = nothing known to level with
      */
-    public function gains(array $entries, string $mode): array
+    public function gains(array $entries, string $mode, array $limits = []): array
     {
         $mode = self::normalise($mode);
         if ($mode === 'off' || $entries === []) {
@@ -43,9 +44,9 @@ final class ExportLoudness
         }
 
         $analyses = FileAnalysis::query()->whereIn('file_id', array_map(fn ($e) => $e['file']->id, $entries))->get()->keyBy('file_id');
-        $margin = (float) config('export.loudness_margin_db');
-        $reference = (float) config('export.loudness_reference_lufs');
-        $max = (float) config('export.loudness_max_gain_db');
+        $margin = (float) ($limits['margin'] ?? config('export.loudness_margin_db'));
+        $reference = (float) ($limits['reference'] ?? config('export.loudness_reference_lufs'));
+        $max = (float) ($limits['max'] ?? config('export.loudness_max_gain_db'));
 
         $albums = [];
         foreach ($entries as $trackId => $e) {

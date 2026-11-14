@@ -2188,12 +2188,12 @@ paths:
         "422": { description: "Invalid cursor or filter", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
   /library/health/{report}:
     parameters:
-      - { name: report, in: path, required: true, schema: { type: string, enum: [transcodes, damaged, clipping, duplicates, lossy, incomplete, unlinked, missing] } }
+      - { name: report, in: path, required: true, schema: { type: string, enum: [transcodes, damaged, clipping, duplicates, lossy, incomplete, unlinked, missing, covers] } }
     get:
       tags: [Library]
       summary: The findings of one library health report
       operationId: getLibraryHealthReport
-      description: "Full profile only. Each finding names the track, album and artist (where there is one), a one-line `reason` in the server's own wording ('suspected', cutoff in kHz) and, for albums with a physical-collection item, that item (medium, ripped, shelf): the re-rip list for CDs the household owns. The physical collection is closed to client tokens, so `physical` is null with `?client=`. Paged by `cursor`, 100 per page by default, in the report's own order. See docs/api/library-health.md."
+      description: "Full profile only, except `covers` (albums with no cover, a cover under `config/artwork.php` min_cover_px, a non-square cover or an embedded cover that differs from the one in use: one finding per album, kind `album`, every reason in `reason`), which Standard has too. Each finding names the track, album and artist (where there is one), a one-line `reason` in the server's own wording ('suspected', cutoff in kHz) and, for albums with a physical-collection item, that item (medium, ripped, shelf): the re-rip list for CDs the household owns. The physical collection is closed to client tokens, so `physical` is null with `?client=`. Paged by `cursor`, 100 per page by default, in the report's own order. See docs/api/library-health.md."
       parameters:
         - { $ref: "#/components/parameters/cursor" }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 100 } }
@@ -3057,6 +3057,32 @@ paths:
                   error: { type: string }
                   message: { type: string }
                   retry_after: { type: integer }
+  /admin/storage/playback-loudness:
+    get:
+      tags: [Admin]
+      summary: Whether converted streams are levelled to a common loudness
+      operationId: getPlaybackLoudness
+      security: [{ adminToken: [] }]
+      description: "Admin only; Standard and Full (own files). Loudness-normalised playback is off by default and only touches audio the server converts for a renderer that cannot play the original (a proxy of `config/proxies.php`): the gain comes from the stored ReplayGain tag or measured loudness and never passes the true peak. Original files streamed as they are (direct DLNA playback) are never changed, nothing is written to files, no device volume is moved. See docs/architecture/audio-analysis.md."
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PlaybackLoudness" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/NotAvailableInProfile" }
+    put:
+      tags: [Admin]
+      summary: Switch loudness levelling of converted streams on or off
+      operationId: setPlaybackLoudness
+      security: [{ adminToken: [] }]
+      description: "Admin only. Takes effect for proxies made from now on (a levelled proxy has its own file); proxies already made without gain are not touched."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [enabled], properties: { enabled: { type: boolean } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PlaybackLoudness" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/NotAvailableInProfile" }
   /admin/me:
     get:
       tags: [Admin]
@@ -4068,11 +4094,15 @@ components:
         message: { type: string, nullable: true, description: "Why the last run failed (shown while state is failed)" }
         stale: { type: boolean, description: "A stored result exists from an older stage version; state is then none until it is requested again" }
         available: { type: boolean, description: "This kind's service is configured and healthy right now" }
+    PlaybackLoudness:
+      type: object
+      properties:
+        enabled: { type: boolean }
     HealthFinding:
       type: object
       properties:
         report: { type: string }
-        kind: { type: string, enum: [track, album, file, group], description: "`track`: one track's file; `album`: an incomplete album; `file`: a file without a track, or missing; `group`: duplicate recordings (see `copies`)" }
+        kind: { type: string, enum: [track, album, file, group], description: "`track`: one track's file; `album`: an incomplete album, or an album with a cover problem (`covers`); `file`: a file without a track, or missing; `group`: duplicate recordings (see `copies`)" }
         title: { type: string, description: "`Artist · Track`, `Artist · Album` or a file path" }
         reason: { type: string, description: "One line, in the server's wording: `FLAC, spectrum ends at 16.5 kHz (95% sure)`, `3 of 12 tracks`. A transcode is only ever suspected." }
         track_id: { type: integer, nullable: true }

@@ -37,6 +37,7 @@ Kept in step with `config/profile.php` by `tests/Unit/ProfileDocsTest.php`.
 | `dlna` | DLNA servers and scan | – | yes | yes |
 | `file_storage` | Own files: storage locations, indexing, import, streaming to speakers | – | yes | yes |
 | `catalogue` | Catalogue sync, wishlist, new releases, physical collection | – | yes | yes |
+| `cover_health` | Cover health report (albums with no, tiny or non-square cover); needs no analysis | – | yes | yes |
 | `analysis` | Audio analysis (loudness, fingerprints, Essentia) and library health reports | – | – | yes |
 | `deep_analysis` | Deep analysis of one track: sections (structure) and stems | – | – | yes |
 | `rip_upload` | Rip upload from the ripper app | – | – | yes |

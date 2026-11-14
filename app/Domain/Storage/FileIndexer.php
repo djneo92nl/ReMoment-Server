@@ -2,6 +2,7 @@
 
 namespace App\Domain\Storage;
 
+use App\Domain\Artwork\CoverFacts;
 use App\Domain\Catalogue\CatalogueLinker;
 use App\Domain\Library\Enrichment;
 use App\Domain\Library\LibraryIdentity;
@@ -96,6 +97,7 @@ class FileIndexer
             $released ? ['released_at' => $released] : []);
 
         app(CoverExtractor::class)->apply($album, $tags['picture'] ?? null);
+        CoverFacts::recordEmbedded($album, $tags['picture'] ?? null);
 
         $track = LibraryIdentity::track($artist, $album, $tags['title'] ?? $fallbackTitle, 'local:file:'.$file->id, 'files', [
             'duration' => $tags['duration'],

@@ -36,7 +36,7 @@ docs/
     insights.md             Listening insights GET /api/library/insights (`?days=`, default 90, max 365): skip rate per artist (finished play under half the track), new vs repeat per week, mood/tempo by part of the day, late-night listening; Control 422, mood/tempo need Full, cached 5 min, timezone; MCP tool `listening_insights`
     history.md              Play history lists: GET /api/library/history, /devices/{id}/history, /albums/{id}/plays, /artists/{id}/plays; entry shape, cursor, filters (`source_type`, `match`), retention (`history:prune`), MCP tool `playback_history`
     overview.md             GET /api/library/overview: glance, decades, coverage, sound buckets, formats, analysis progress per stage
-    library-health.md       GET /api/library/health/{report}: findings with ids, reason, duplicate copies and the physical-collection link
+    library-health.md       GET /api/library/health/{report}: findings with ids, reason, duplicate copies and the physical-collection link; the `covers` report (no/tiny/non-square/differing embedded cover, also in Standard)
     sound-query.md          Sound filters on GET /api/library/tracks (bpm, camelot, arousal, mood, plr …), include=analysis, count_only, sort=plr|bpm|arousal, `filter` on play-listening-mode
     openapi.yaml            OpenAPI 3 contract for native clients (info, devices, playback, radio, multiroom, library, clients); update it when an endpoint's shape changes
     device-settings.md      Sound adjustment (bass/treble/loudness), Bluetooth pairing, device name: endpoints, shapes, per-platform support
@@ -215,6 +215,9 @@ php artisan library:verify-files
 
 # Queue missing artwork for playlist covers and the last N played albums (scheduled daily)
 php artisan artwork:prerender [--limit=500] [--max-jobs=100]
+
+# Record the pixel size and hash of covers processed before the cover health report existed (daily, 200 per run; `config/artwork.php` holds the report's thresholds); see docs/architecture/library-health.md
+php artisan artwork:measure-covers [--limit=200]
 
 # Build the SD card artwork zip for the touch client (also on /settings/clients)
 php artisan artwork:export-sd [--size=1024x600|320x480|480x480] [--limit=500] [--queue]
@@ -799,6 +802,10 @@ All JPEGs are encoded baseline (`JpegEncoder(progressive: false)`; Intervention'
 **SD card export:** `php artisan artwork:export-sd [--size=1024x600|320x480|480x480]` or `/settings/clients` (size selector) builds `storage/app/private/exports/remoment-sd-artwork-{size}.zip` (queued `BuildSdCardExport`, one zip per size): `remoment/covers/{hash}.jpg` (320.jpg) and `remoment/backgrounds/{hash}.jpg` (`bg_{size}.jpg`, the client's single backgrounds folder) byte copies for the recent albums and the source logos, plus a README.txt; extract at the SD card root. See `docs/architecture/sd-card-export.md`.
 
 **Logos for playback without an image** (`app/Domain/Artwork/`): `NowPlayingArtwork` picks the image for a `NowPlaying` (cover → radio station `image_url` from `/radio` → generated logo) and adds `kind`; it is used by both `PublishNowPlayingToMqtt` and `DeviceDetailResource`. `SourceLogo` maps the source's `sourceType`/`name`/`connector`/`category` to a logo key (`spotify`, `radio`, `line_in`, `bluetooth`, `tv`, `cast`, `cd`, default `music`) and addresses it by a pseudo URL `remoment:logo/v{VERSION}/{key}`, so its hash is the same on every server. `LogoRenderer` draws the glyph (off-white line icon on a #181818 square, GD, 4× supersampled, deterministic); `ProcessArtwork` renders it instead of downloading. Missing logo entries are rendered synchronously (~0.2s, a handful of logos). Bump `SourceLogo::VERSION` when a glyph changes so clients' hash-keyed caches pick it up.
+
+**Cover health** (`App\Domain\Artwork\CoverFacts`): `ProcessArtwork` records the original's `cover_size` and `cover_sha1` as album metadata and `FileIndexer` the embedded picture's `embedded_cover_sha1`; the library health report `covers` reads them (thresholds `artwork.min_cover_px`, `artwork.square_tolerance`; profile feature `cover_health`, Standard and Full). See `docs/architecture/library-health.md`.
+
+**Loudness-normalised playback** (opt-in Setting `playback_loudness`, `App\Domain\Storage\PlaybackLoudness`, admin toggle on `/settings/storage` › Library and `GET|PUT /api/admin/storage/playback-loudness`): a gain in the proxies the server converts for a limited renderer (`Upnp\StreamProfile`), never for direct DLNA playback, Spotify or radio, never past the stored true peak; no file tags written, no device volume moved. See `docs/architecture/audio-analysis.md`.
 
 **Playlist covers** (`app/Domain/Artwork/PlaylistArtwork.php`): a 2×2 mosaic of the covers of the 4 albums with the most tracks in the playlist (ties by playlist order; distinct cover URLs), drawn by `PlaylistCompositeRenderer` (1024² PNG from each cover's processed 512 proxy, else downloaded directly) and processed by `ProcessArtwork` like any cover under the pseudo URL `remoment:playlist/v{VERSION}/{md5 of the 4 cover URLs}`. The URL is a hash, so the job is dispatched with its 4 source URLs (`new ProcessArtwork($url, $sources)`; a composite without matching sources is skipped). 1–3 distinct covers → the first album's cover; none → the playlist's own image. The mosaic is used even when the playlist has its own image, for a consistent look. `artwork:prerender` queues missing playlist covers first (they share `--max-jobs`), `artwork:backfill` queues missing/outdated ones; a changed playlist gets a new URL, so a new composite. Bump `PlaylistArtwork::VERSION` when the layout changes.
 

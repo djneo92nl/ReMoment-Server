@@ -240,4 +240,91 @@ class LibraryHealthTest extends TestCase
 
         $this->getJson('/api/library/health/transcodes')->assertStatus(422)->assertJsonPath('error', 'not_available_in_profile');
     }
+
+    /** @param array{images?: array|null, size?: string, sha?: string, embedded?: string} $cover */
+    private function coverAlbum(string $name, array $cover): Album
+    {
+        $album = Album::create(['artist_id' => $this->album->artist_id, 'name' => $name, 'source' => 'dlna', 'images' => $cover['images'] ?? [['url' => "https://img.test/{$name}.jpg"]]]);
+        foreach (['cover_size' => ['size', 'artwork'], 'cover_sha1' => ['sha', 'artwork'], 'embedded_cover_sha1' => ['embedded', 'local']] as $key => [$field, $source]) {
+            if (isset($cover[$field])) {
+                Metadata::create(['metadatable_type' => $album->getMorphClass(), 'metadatable_id' => $album->id, 'key' => $key, 'value' => $cover[$field], 'type' => 'string', 'source' => $source]);
+            }
+        }
+        $this->file("{$name} track", album: $album);
+
+        return $album;
+    }
+
+    public function test_cover_findings(): void
+    {
+        config(['artwork.min_cover_px' => 500]);
+        $none = $this->coverAlbum('None', ['images' => []]);
+        $tiny = $this->coverAlbum('Tiny', ['size' => '300x300']);
+        $crooked = $this->coverAlbum('Crooked', ['size' => '800x600']);
+        $differs = $this->coverAlbum('Differs', ['size' => '600x600', 'sha' => 'aaa', 'embedded' => 'bbb']);
+        $this->coverAlbum('Fine', ['size' => '600x600', 'sha' => 'aaa', 'embedded' => 'aaa']);
+        $this->coverAlbum('Unmeasured', []);
+        $both = $this->coverAlbum('Both', ['size' => '400x300']);
+
+        $found = collect($this->getJson('/api/library/health/covers')->assertOk()->json('data'));
+
+        // Worst first: no cover, then smallest side (Tiny 300, Both 300), then not square, then a differing embedded cover.
+        $this->assertSame([$none->id, $tiny->id, $both->id, $crooked->id, $differs->id], $found->pluck('album_id')->all());
+        $this->assertSame(5, $this->getJson('/api/library/health/covers')->json('count'));
+        $this->assertSame('album', $found[0]['kind']);
+        $this->assertSame('No cover', $found[0]['reason']);
+        $this->assertSame('Cover is 300×300 px, under 500 px', $found[1]['reason']);
+        $this->assertSame('Cover is 400×300 px, under 500 px; Cover is 400×300 px, not square', $found[2]['reason']);
+        $this->assertSame('Cover is 800×600 px, not square', $found[3]['reason']);
+        $this->assertSame('The cover embedded in the files differs from the one in use', $found[4]['reason']);
+        $this->assertSame(['Band · None'], array_slice($this->titles('covers'), 0, 1));
+    }
+
+    public function test_cover_threshold_is_the_config_value_and_albums_without_files_are_left_out(): void
+    {
+        $this->coverAlbum('Mid', ['size' => '450x450']);
+        Album::create(['artist_id' => $this->album->artist_id, 'name' => 'Streaming only', 'source' => 'dlna', 'images' => []]);
+
+        config(['artwork.min_cover_px' => 400]);
+        $this->assertSame(0, LibraryReports::count('covers'));
+
+        config(['artwork.min_cover_px' => 500]);
+        $this->assertSame(1, LibraryReports::count('covers'));
+        $this->assertSame(1, LibraryReports::counts()['covers']);
+    }
+
+    public function test_cover_report_works_in_standard_but_the_other_reports_do_not(): void
+    {
+        config(['profile.current' => 'standard']);
+        $this->coverAlbum('None', ['images' => []]);
+
+        $this->getJson('/api/library/health/covers')->assertOk()->assertJsonPath('data.0.reason', 'No cover');
+        $this->getJson('/api/library/health/lossy')->assertStatus(422);
+
+        config(['profile.current' => 'control']);
+        $this->getJson('/api/library/health/covers')->assertStatus(422);
+    }
+
+    public function test_cover_facts_are_recorded_by_the_measure_command_and_the_indexer_hook(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        $png = (function () {
+            ob_start();
+            imagepng(imagecreatetruecolor(320, 240));
+
+            return ob_get_clean();
+        })();
+        $url = \App\Domain\Artwork\LocalCover::store($png);
+        $album = $this->coverAlbum('Local', ['images' => [['url' => $url]]]);
+
+        $this->artisan('artwork:measure-covers')->assertSuccessful();
+
+        $this->assertSame('320x240', $album->metadata()->where('key', 'cover_size')->value('value'));
+        $this->assertSame(sha1($png), $album->metadata()->where('key', 'cover_sha1')->value('value'));
+
+        \App\Domain\Artwork\CoverFacts::recordEmbedded($album, ['data' => 'other bytes']);
+        $this->assertSame(sha1('other bytes'), $album->metadata()->where('key', 'embedded_cover_sha1')->value('value'));
+        LibraryReports::forget();
+        $this->assertStringContainsString('differs', LibraryReports::rows('covers')->first()['detail']);
+    }
 }

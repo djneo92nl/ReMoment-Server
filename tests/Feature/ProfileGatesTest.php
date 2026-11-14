@@ -44,7 +44,7 @@ class ProfileGatesTest extends TestCase
         $scheduled = $this->scheduled();
 
         foreach (['library:warm', 'library:analyze', 'catalogue:sync', 'catalogue:new-releases', 'catalogue:availability', 'catalogue:reconcile',
-            'library:enrich', 'artwork:backfill', 'artwork:prerender', 'playlists:refresh-smart', 'library:merge-duplicates --force', 'library:scan-files --queue', 'export:prune'] as $gated) {
+            'library:enrich', 'artwork:backfill', 'artwork:measure-covers', 'artwork:prerender', 'playlists:refresh-smart', 'library:merge-duplicates --force', 'library:scan-files --queue', 'export:prune'] as $gated) {
             $this->assertNotContains($gated, $scheduled, "{$gated} must not run in Control");
         }
         foreach (self::BASE as $base) {

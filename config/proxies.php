@@ -33,6 +33,18 @@ return [
     /** Size the proxies may take together; the least recently made ones go first. 0 = no limit. */
     'max_mb' => (int) env('PROXIES_MAX_MB', 2048),
 
+    /*
+    | Loudness-normalised playback (Setting `playback_loudness`, default off; App\Domain\Storage\PlaybackLoudness): the gain
+    | baked into a proxy that is made for a player anyway, from the stored ReplayGain tag or measured loudness. Never
+    | on a direct stream (the original goes out untouched). `margin_db` is the room left below 0 dBFS under the stored
+    | true peak: more than the export's, because a lossy proxy overshoots its source slightly.
+    */
+    'loudness' => [
+        'reference_lufs' => (float) env('PROXIES_LOUDNESS_REFERENCE_LUFS', -18.0),
+        'margin_db' => 1.0,
+        'max_gain_db' => 9.0,
+    ],
+
     'profiles' => [
         // Mono, 22 kHz, 48 kbit/s: for handhelds and microcontrollers with a small MP3 decoder.
         'mp3-lo' => [
