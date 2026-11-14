@@ -77,3 +77,9 @@ Run `php artisan device:sync-sources` after discovery to populate sources and mu
 Devices can be added through the web UI at `/devices/create` — the form presents brand and product as selectable options populated from `config/devices.php` and auto-fills the driver class.
 
 The `device_brand_name` + `device_product_type` combination must match an entry in `config/devices.php` for the driver to resolve correctly.
+
+## Listener status, restart and address changes
+
+`App\Domain\Device\ListenerStatus` (cache) holds per device why its listener is not running and since when: `device:listen` writes `running` / `retrying` (child exited, exit code, run time, failures in a row, retry time) / `stopped`, and each listener reports its last error (`error()`, cleared by `recovered()`). `/settings/health` shows it under every device, with a **Restart listener** button (admin; `requestRestart()` sets a cache flag that `device:listen` picks up within a second, stops the child and starts it with no backoff).
+
+Changing a device's `ip_address` (edit form or discovery) forgets its `upnp_*` meta (control URLs of the old address), records `from → to` in Setting `device_ip_changes` (last 50, the five newest on the health page) and restarts the listener. Without clearing the meta, the UPnP listener kept calling the old address after an edit. Discovery already moves a known device to its new address when the identifier (UPnP uuid, Sonos uuid, ase_jid) matches.

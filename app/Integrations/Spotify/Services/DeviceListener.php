@@ -3,6 +3,7 @@
 namespace App\Integrations\Spotify\Services;
 
 use App\Domain\Device\DeviceCache;
+use App\Domain\Device\ListenerStatus;
 use App\Domain\Device\PlaybackModes;
 use App\Domain\Device\SpotifyRouting;
 use App\Domain\Device\State;
@@ -88,6 +89,7 @@ class DeviceListener implements DeviceListenerInterface
 
                 $this->stopPlayback((int) $deviceId);
                 Log::error("Spotify listener [{$deviceId}] API error: {$e->getMessage()}", ['exception' => $e]);
+                ListenerStatus::error($deviceId, $e);
                 DeviceCache::forgetListener($deviceId);
                 DeviceCache::updateState($deviceId, State::Unreachable);
                 sleep($backoff->next(failed: true));
@@ -95,6 +97,7 @@ class DeviceListener implements DeviceListenerInterface
             } catch (\Throwable $e) {
                 $this->stopPlayback((int) $deviceId);
                 Log::error("Spotify listener [{$deviceId}] error: {$e->getMessage()}", ['exception' => $e]);
+                ListenerStatus::error($deviceId, $e);
                 DeviceCache::forgetListener($deviceId);
                 DeviceCache::updateState($deviceId, State::Unreachable);
                 sleep($backoff->next(failed: true));

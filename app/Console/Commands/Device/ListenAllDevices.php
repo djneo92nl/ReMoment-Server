@@ -3,6 +3,7 @@
 namespace App\Console\Commands\Device;
 
 use App\Domain\Device\DeviceListeners;
+use App\Domain\Device\ListenerStatus;
 use App\Integrations\Spotify\SpotifyDevice;
 use App\Models\Device;
 use App\Services\SpotifyTokenService;
@@ -56,6 +57,7 @@ class ListenAllDevices extends Command
                 $nextScan = time() + max(1, (int) $this->option('rescan'));
             }
 
+            $this->handleRestartRequests();
             $this->reap();
             $this->restartDue();
 
@@ -79,14 +81,17 @@ class ListenAllDevices extends Command
             if ($device === null) {
                 $this->warn("[{$child['label']}] device is gone or has no listener, stopping it.");
                 $this->stop($id);
+                ListenerStatus::transition($id, ListenerStatus::STOPPED, 'The device was removed or its driver has no listener.');
                 unset($this->restarts[$id]);
             } elseif ($device->ip_address !== $child['ip']) {
                 $this->info("[{$child['label']}] address changed, restarting its listener.");
                 $this->stop($id);
+                $this->restarts[$id] = ['failures' => 0, 'at' => 0];
             } elseif ($device->device_driver !== $child['driver']) {
                 // E.g. a TV paired with philips:pair moves from the UPnP driver to its own.
                 $this->info("[{$child['label']}] driver changed, restarting its listener.");
                 $this->stop($id);
+                $this->restarts[$id] = ['failures' => 0, 'at' => 0];
             }
         }
 
@@ -137,6 +142,28 @@ class ListenAllDevices extends Command
             'started' => time(),
         ];
         $this->info("[{$device->device_name}] listener started (pid {$pid}).");
+        ListenerStatus::transition($device->id, ListenerStatus::RUNNING, null, [
+            'pid' => $pid,
+            'ip' => $device->ip_address,
+            'failures' => $this->restarts[$device->id]['failures'] ?? 0,
+        ]);
+    }
+
+    /** The health page's restart button: stop the child (or skip its backoff) and start it again right away. */
+    private function handleRestartRequests(): void
+    {
+        $ids = ListenerStatus::pullRestartRequests(array_unique([...array_keys($this->children), ...array_keys($this->restarts)]));
+
+        foreach ($ids as $id) {
+            $label = $this->children[$id]['label'] ?? "device {$id}";
+            $this->info("[{$label}] restart requested.");
+
+            if (isset($this->children[$id])) {
+                $this->stop($id);
+            }
+
+            $this->restarts[$id] = ['failures' => 0, 'at' => 0];
+        }
     }
 
     /** Runs in the forked child and never returns. */
@@ -156,6 +183,7 @@ class ListenAllDevices extends Command
             exit(0);
         } catch (\Throwable $e) {
             Log::error("Listener for [{$device->device_name}] crashed: {$e->getMessage()}", ['exception' => $e]);
+            ListenerStatus::error($device->id, $e);
             exit(1);
         }
     }
@@ -177,6 +205,11 @@ class ListenAllDevices extends Command
 
             $code = pcntl_wifexited($status) ? pcntl_wexitstatus($status) : 'signal '.pcntl_wtermsig($status);
             $this->warn("[{$child['label']}] listener exited ({$code}), restarting in {$delay}s.");
+            ListenerStatus::transition($id, ListenerStatus::RETRYING, "The listener process ended ({$code}) after ".(time() - $child['started']).'s.', [
+                'ip' => $child['ip'],
+                'failures' => $failures + 1,
+                'retry_at' => time() + $delay,
+            ]);
         }
     }
 

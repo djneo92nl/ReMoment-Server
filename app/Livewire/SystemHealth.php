@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Domain\Backup\BackupStatus;
 use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\DeviceCache;
+use App\Domain\Device\ListenerStatus;
 use App\Domain\Health\Heartbeat;
 use App\Models\Device;
 use Illuminate\Support\Facades\DB;
@@ -35,6 +36,7 @@ class SystemHealth extends Component
             'upgrade' => \App\Domain\System\UpgradeHistory::latest(),
             'devices' => $this->devices(),
             'alerts' => \App\Domain\Alerts\Alerts::active(),
+            'ipChanges' => array_slice(ListenerStatus::ipChanges(), 0, 5),
         ]);
     }
 
@@ -45,6 +47,16 @@ class SystemHealth extends Component
 
         if ($alert = \App\Models\Alert::find($alertId)) {
             \App\Domain\Alerts\Alerts::acknowledge($alert);
+        }
+    }
+
+    /** Admin only: asks `device:listen` to stop this device's listener and start it again at once (skips any backoff). */
+    public function restartListener(int $deviceId): void
+    {
+        abort_unless(auth()->check(), 403);
+
+        if (Device::whereKey($deviceId)->exists()) {
+            ListenerStatus::requestRestart($deviceId);
         }
     }
 
@@ -118,6 +130,7 @@ class SystemHealth extends Component
             return [
                 'device' => $device,
                 'listener_running' => DeviceCache::isListenerRunning($device->id),
+                'listener' => ListenerStatus::get($device->id),
                 'state' => DeviceCache::getState($device->id),
                 'last_seen' => $lastSeen ?: null,
                 'volume' => Volume::getVolume($device->id),

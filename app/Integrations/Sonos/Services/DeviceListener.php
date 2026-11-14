@@ -3,6 +3,7 @@
 namespace App\Integrations\Sonos\Services;
 
 use App\Domain\Device\DeviceCache;
+use App\Domain\Device\ListenerStatus;
 use App\Domain\Device\PlaybackModes;
 use App\Domain\Device\State;
 use App\Domain\Media\AlbumData;
@@ -141,6 +142,7 @@ class DeviceListener implements DeviceListenerInterface
 
                 $backoff->next(failed: false);
                 $lastError = null;
+                ListenerStatus::recovered($deviceId);
                 sleep($this->pollIntervalSeconds);
             } catch (\Throwable $e) {
                 // Logged once per distinct message, so an unreachable speaker does not flood the log.
@@ -148,6 +150,7 @@ class DeviceListener implements DeviceListenerInterface
                     Log::warning("Sonos listener {$deviceId} ({$this->ip}): ".get_class($e).': '.$e->getMessage());
                     $lastError = $e->getMessage();
                 }
+                ListenerStatus::error($deviceId, $e);
                 DeviceCache::forgetListener($deviceId);
                 DeviceCache::updateState($deviceId, State::Unreachable);
                 $this->controller = null;

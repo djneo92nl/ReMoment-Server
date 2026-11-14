@@ -5,6 +5,7 @@ namespace App\Integrations\BangOlufsen\Ase\Services;
 use App\Domain\Artwork\LibraryArtwork;
 use App\Domain\Device\Cache\MultiRoom;
 use App\Domain\Device\DeviceCache;
+use App\Domain\Device\ListenerStatus;
 use App\Domain\Device\State;
 use App\Domain\Library\LibraryIdentity;
 use App\Domain\Media\AlbumData;
@@ -64,6 +65,7 @@ class DeviceListener implements DeviceListenerInterface
                 // Connection established — device is reachable. Assume standby until
                 // a playing event arrives.
                 DeviceCache::updateState($deviceId, State::Standby);
+                ListenerStatus::recovered($deviceId);
 
                 $buffer = '';
                 $lastMultiRoomCheck = 0;
@@ -106,6 +108,7 @@ class DeviceListener implements DeviceListenerInterface
                 }
             } catch (\Throwable $e) {
                 $hadError = true;
+                ListenerStatus::error($deviceId, $e);
                 Log::error("ASE listener [{$deviceId}] error: {$e->getMessage()}", [
                     'exception' => $e,
                     'url' => $this->url,

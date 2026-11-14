@@ -37,6 +37,21 @@ class Device extends Model
         'hidden' => 'boolean',
     ];
 
+    protected static function booted(): void
+    {
+        // An address changed by hand or by discovery: what was looked up at the old address (a UPnP renderer's
+        // control URLs) points nowhere now, so forget it; the listener looks the device up again at the new one.
+        static::updated(function (self $device) {
+            if (!$device->wasChanged('ip_address')) {
+                return;
+            }
+
+            $device->meta()->where('key', 'like', 'upnp%')->delete();
+            \App\Domain\Device\ListenerStatus::recordIpChange($device->id, (string) $device->device_name, $device->getOriginal('ip_address'), $device->ip_address);
+            \App\Domain\Device\ListenerStatus::requestRestart($device->id);
+        });
+    }
+
     public function toArray(): array
     {
         return [
