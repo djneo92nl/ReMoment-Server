@@ -185,6 +185,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/settings/history', [SettingsController::class, 'historySave'])->name('settings.history.save');
 
     Route::get('/settings/mqtt', [SettingsController::class, 'mqtt'])->name('settings.mqtt');
+    Route::post('/settings/mqtt/home-assistant', [SettingsController::class, 'homeAssistantSave'])->name('settings.mqtt.home-assistant');
+    Route::post('/settings/mqtt/home-assistant/publish', [SettingsController::class, 'homeAssistantPublish'])->name('settings.mqtt.home-assistant.publish');
 
     Route::get('/settings/services', fn () => view('settings.services'))->name('settings.services');
     Route::get('/settings/spotify', [SettingsController::class, 'spotify'])->name('settings.spotify');

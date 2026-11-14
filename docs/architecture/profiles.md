@@ -30,6 +30,7 @@ Kept in step with `config/profile.php` by `tests/Unit/ProfileDocsTest.php`.
 | `history` | Play history and insights | yes | yes | yes |
 | `radio` | Radio | yes | yes | yes |
 | `scenes` | Scenes: step lists run through the API, optionally on a schedule | yes | yes | yes |
+| `home_assistant` | Home Assistant MQTT discovery (opt-in) | yes | yes | yes |
 | `alerts` | Alerts, health and backup | yes | yes | yes |
 | `library` | Library browsing, playlists, library cache, artwork prerender, Spotify browse | – | yes | yes |
 | `enrichment` | Metadata enrichment (MusicBrainz, Wikipedia, Last.fm, lyrics ...) | – | yes | yes |

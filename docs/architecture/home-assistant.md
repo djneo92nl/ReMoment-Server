@@ -1,10 +1,26 @@
 # Home Assistant MQTT Discovery (plan)
 
-> **Status:** plan, nothing built. Written 2026-10-13. **In scope for 1.0** (decided 2026-10-26), see workstream 8a in [v1-roadmap.md](v1-roadmap.md); the sections "Automations" below were added then.
+> **Status:** the MQTT discovery part is built (2026-11-14, see [What is built](#what-is-built-2026-11-14)); the `ha:package` REST commands were built earlier. Plan written 2026-10-13. **In scope for 1.0** (decided 2026-10-26), see workstream 8a in [v1-roadmap.md](v1-roadmap.md); the sections "Automations" below were added then.
 
 Expose ReMoment's own data to Home Assistant (HA) through MQTT discovery: library and play stats, client devices, sources and server health, and give HA what it needs to build automations on them.
 
 **Deliberately not exposed: players.** HA already has every speaker through its own integrations (ASE, DLNA, Chromecast, Sonos), so a ReMoment `media_player` would show the same speaker a second, third or fourth time. No `media_player`, no transport, volume, seek or queue entities. The `remoment/player/{id}/…` topics stay as they are; HA automations can still use them as plain MQTT triggers.
+
+## What is built (2026-11-14)
+
+Code in `App\Domain\HomeAssistant\` (`HomeAssistant` settings, `EntityCatalog`, `DiscoveryPublisher`, `StatsSnapshot`, `Hooks`) and `Listeners\Device\PublishHomeAssistantEvents`; tests in `tests/Feature/HomeAssistant/`.
+
+- **Opt-in.** Setting `ha_discovery_enabled` (falls back to `HA_DISCOVERY_ENABLED`, default off) and `ha_discovery_prefix` (`HA_DISCOVERY_PREFIX`, default `homeassistant`), both in `config/mqtt.php`. A switch, the prefix and "Publish now" are on `/settings/mqtt`; switching off (or changing the prefix) clears the retained configs under the old prefix.
+- **Command** `php artisan ha:discovery [--remove]`: publishes every config and state (retained, no dedupe), or clears every config this server ever published (list kept in Setting `ha_discovery_topics`, so a deleted client is reached too) and sets `remoment/ha/status` to `offline`. Works whether or not the setting is on.
+- **Republish.** The scheduler task `ha-discovery` (every five minutes, only while discovery is on; gate `home_assistant`, all profiles) publishes the states each time and the configs through `publishIfChanged` with `mqtt_published_ha_*` keys, whose one-hour TTL makes them go out hourly. The server never subscribes, so HA's `homeassistant/status` birth message is not used: a restarted HA reads the retained configs from the broker, and a broker without persistence gets them back within the hour (run `ha:discovery` or "Publish now" to be quicker). It is not run on boot.
+- **Entities** (all with `unique_id` `remoment_*`, one `availability` entry on `remoment/ha/status`, `expire_after` 900 s on sensors):
+  - Hub device **ReMoment Server**: sensors `plays_today`, `plays_7d`, `plays_total`, `devices_playing` (state `remoment/ha/stats`); with the `library` profile also `library_artists/albums/tracks`, `favorites`, `top_artist_30d`, `top_album_30d`, `top_track_30d` (top 10 in the `top` attribute); `binary_sensor` `problem` for scheduler (alert `scheduler.silent`), queue (`queue.stuck`) and external services (any cached probe in `error`, names in `failing`) from `remoment/ha/health`; `enrichment_backlog` (profile `enrichment`) and `analysis_backlog` (profile `analysis`) diagnostics; `active_alerts` reading the existing retained `remoment/alerts/active`; `pending_clients` from `remoment/ha/hub`. No per-alert binary sensors: alerts are an event entity instead.
+  - Each approved client: a child device (`via_device` = the server) with `online` (`last_seen_at` within 10 minutes), `battery`, `charging`, and diagnostic `firmware`, `build`, `ip` (state `remoment/ha/client/{id}`, published on every client save, deduplicated).
+  - One sensor per device, "{name} source": state is the source in the cached now playing (never `in_use`), attributes the visible sources, `input` and `device_id` (`remoment/ha/sources/{deviceId}`). Attached to the server device, not the speaker's own HA device (no MAC lookup; open question 3 stays open).
+  - `event` entities, non-retained payloads `{"event_type": …, …}` on `remoment/ha/events/{entity}`: `alert` (`raised`/`resolved`, bridged from `Alerts::publish`), `scene_activated` (`activated`, with `status` and `source`), `client_pending`, `track_started`, `state_changed` (event type is the new state, with `previous`), `source_changed` (with `source` and `input` for a TV). Playback events carry `device_id` and `device`. They are only published while discovery is on, and `track_started`/`source_changed` are deduplicated per device (`ha_track_*`, `ha_source_*`; the first source seen is not an event).
+- **Differences from the plan:** `StatsSnapshot` was written new instead of moving the queries out of `StatsController` (the stats page is untouched); one aggregate `external_services` sensor instead of one per service; no `ha:publish-discovery` name (it is `ha:discovery`); the settings page has no download of the `ha:package` YAML yet.
+- **Never:** `media_player` entities, command topics, or a subscriber.
+- **Unverified in a real Home Assistant:** the whole thing was tested with a fake publisher only. Not yet seen: that HA accepts the `object_id` + `unique_id` pair and the `device` block, that the `none` rendered for a missing battery or top item shows as unknown, that `event` entities fire from the payload shape, that `expire_after` and the availability topic together behave as intended, and the HA minimum version (`event` entities need 2023.8). The broker must be the one HA uses (open question 1).
 
 ## What is exposed
 
@@ -75,7 +91,7 @@ rest_command:
 
 **Still not exposed:** players as `media_player` entities (HA has its own integrations for every speaker). A TV is the same: its power, input and now playing reach HA as the source sensor and events above, not as a second TV entity.
 
-## Phases
+## Phases (1 to 6 built; 7 is `ha:package`)
 
 1. Plumbing: setting, `DiscoveryPublisher`, hub device with a few health entities. Verify in HA.
 2. Stats sensors and the `StatsSnapshot` refactor.

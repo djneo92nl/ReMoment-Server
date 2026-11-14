@@ -80,5 +80,9 @@ Schedule::call(fn () => \App\Domain\Device\VolumeLimits::enforceDue())->everyMin
 Schedule::command('alerts:check')->everyMinute()->withoutOverlapping(5)->name('alerts-check');
 Schedule::call(fn () => \App\Domain\Alerts\Alerts::prune())->dailyAt('04:45')->name('alerts-prune');
 
+// Home Assistant discovery (opt-in, docs/architecture/home-assistant.md): states every five minutes, configs hourly through their dedupe key, so a restarted HA gets them again; the server never subscribes to HA's birth message.
+Schedule::call(fn () => app(\App\Domain\HomeAssistant\DiscoveryPublisher::class)->publishAll())->everyFiveMinutes()->name('ha-discovery')
+    ->when(fn () => Profile::allows('home_assistant') && \App\Domain\HomeAssistant\HomeAssistant::enabled());
+
 // Scenes with a schedule that say now (docs/api/scenes.md); each is queued, so a scene with delays never holds the scheduler.
 Schedule::call(fn () => app(\App\Domain\Scenes\SceneRunner::class)->runDue())->everyMinute()->name('scenes-run-due')->when(fn () => Profile::allows('scenes'));

@@ -178,6 +178,7 @@ final class Alerts
                 'raised_at' => $alert->raised_at->toIso8601String(), 'state' => $alert->isActive() ? 'raised' : 'resolved',
             ]));
             $mqtt->publishIfChanged(self::SUMMARY_TOPIC, json_encode(self::summary()), self::SUMMARY_DEDUPE_KEY);
+            \App\Domain\HomeAssistant\Hooks::alert($alert);
         } catch (\Throwable $e) {
             Log::warning("Alert publish failed: {$e->getMessage()}");
         }

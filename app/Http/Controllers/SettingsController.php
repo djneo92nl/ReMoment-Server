@@ -142,6 +142,41 @@ class SettingsController extends Controller
         return view('settings.mqtt');
     }
 
+    /** Switches Home Assistant MQTT discovery on or off (off clears every entity) and sets its discovery prefix. */
+    public function homeAssistantSave(Request $request)
+    {
+        $validated = $request->validate(['prefix' => ['nullable', 'string', 'max:64', 'regex:/^[A-Za-z0-9_\-\/]+$/']]);
+        $publisher = app(\App\Domain\HomeAssistant\DiscoveryPublisher::class);
+        $wasOn = \App\Domain\HomeAssistant\HomeAssistant::enabled();
+        $newPrefix = trim($validated['prefix'] ?? '', '/') ?: 'homeassistant';
+
+        // A changed prefix would orphan the retained configs under the old one: clear them first.
+        if ($wasOn && $newPrefix !== \App\Domain\HomeAssistant\HomeAssistant::prefix()) {
+            $publisher->remove();
+        }
+        \App\Domain\HomeAssistant\HomeAssistant::setPrefix($newPrefix);
+
+        $on = $request->boolean('enabled');
+        \App\Domain\HomeAssistant\HomeAssistant::setEnabled($on);
+        if ($on) {
+            $publisher->publishAll(force: true);
+        } elseif ($wasOn) {
+            $publisher->remove();
+        }
+
+        return redirect()->route('settings.mqtt')->with('success', $on ? 'Home Assistant discovery is on.' : 'Home Assistant discovery is off.');
+    }
+
+    public function homeAssistantPublish()
+    {
+        if (!\App\Domain\HomeAssistant\HomeAssistant::enabled()) {
+            return redirect()->route('settings.mqtt')->with('error', 'Switch Home Assistant discovery on first.');
+        }
+        $count = app(\App\Domain\HomeAssistant\DiscoveryPublisher::class)->publishAll(force: true);
+
+        return redirect()->route('settings.mqtt')->with('success', "Published {$count} entities to Home Assistant.");
+    }
+
     public function users()
     {
         $appTokens = \App\Models\AdminToken::orderByDesc('last_used_at')->orderByDesc('id')->get();

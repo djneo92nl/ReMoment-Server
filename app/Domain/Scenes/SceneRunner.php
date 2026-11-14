@@ -120,6 +120,7 @@ class SceneRunner
             'last_run_source' => $source,
             'last_run_results' => $outcome['results'],
         ])->save();
+        \App\Domain\HomeAssistant\Hooks::scene($scene, $outcome['status'], $source);
 
         return $outcome;
     }

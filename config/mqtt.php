@@ -17,5 +17,10 @@ return [
     'public_port' => (int) env('MQTT_PUBLIC_PORT', env('MQTT_PORT', 1883)),
 
     // WebSocket listener port as clients should reach it (GET /api/info `mqtt.ws_port`).
+    // Home Assistant MQTT discovery (docs/architecture/home-assistant.md): opt-in. The admin's switch on /settings/mqtt
+    // (Setting ha_discovery_enabled) wins over this default; the prefix is Home Assistant's discovery prefix.
+    'ha_discovery_enabled' => (bool) env('HA_DISCOVERY_ENABLED', false),
+    'ha_discovery_prefix' => env('HA_DISCOVERY_PREFIX', 'homeassistant'),
+
     'public_ws_port' => (int) env('MQTT_PUBLIC_WS_PORT', 9001),
 ];

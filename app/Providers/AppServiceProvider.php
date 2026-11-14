@@ -113,6 +113,14 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(DeviceStateChanged::class, SyncNowPlayingDataWithState::class);
         Event::listen(DeviceStateChanged::class, SwitchToDefaultSource::class);
         Event::listen(DeviceStateChanged::class, SyncGroupMirror::class);
+
+        // Home Assistant discovery (opt-in): playback events, and the client and device entities that follow the records.
+        Event::listen(NowPlayingUpdated::class, [\App\Listeners\Device\PublishHomeAssistantEvents::class, 'handleNowPlaying']);
+        Event::listen(DeviceStateChanged::class, [\App\Listeners\Device\PublishHomeAssistantEvents::class, 'handleState']);
+        \App\Models\Client::saved(fn (\App\Models\Client $client) => \App\Domain\HomeAssistant\Hooks::client($client));
+        \App\Models\Client::deleted(fn () => \App\Domain\HomeAssistant\Hooks::clientDeleted());
+        \App\Models\Device::saved(fn (\App\Models\Device $device) => $device->wasRecentlyCreated || $device->wasChanged('device_name') ? \App\Domain\HomeAssistant\Hooks::device() : null);
+        \App\Models\Device::deleted(fn () => \App\Domain\HomeAssistant\Hooks::device());
     }
 
     /**
