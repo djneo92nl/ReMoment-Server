@@ -8,6 +8,7 @@ use App\Integrations\Spotify\SpotifyDevice;
 use App\Models\Device;
 use App\Services\SpotifyTokenService;
 use Illuminate\Console\Command;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -52,14 +53,23 @@ class ListenAllDevices extends Command
         $nextScan = 0;
 
         while (!$this->stopping) {
-            if (time() >= $nextScan) {
-                $this->reconcile();
-                $nextScan = time() + max(1, (int) $this->option('rescan'));
-            }
+            try {
+                if (time() >= $nextScan) {
+                    $this->reconcile();
+                    $nextScan = time() + max(1, (int) $this->option('rescan'));
+                }
 
-            $this->handleRestartRequests();
-            $this->reap();
-            $this->restartDue();
+                $this->handleRestartRequests();
+                $this->reap();
+                $this->restartDue();
+            } catch (QueryException $e) {
+                // "Too many connections" or a restarting database must not take the parent down: that
+                // stops every running listener and supervisor then restarts it in a loop. Try again later.
+                Log::warning("Listener supervisor could not reach the database: {$e->getMessage()}");
+                $this->releaseConnections();
+                $nextScan = time() + max(5, (int) $this->option('rescan'));
+                sleep(2);
+            }
 
             usleep(200000);
         }
@@ -272,7 +282,17 @@ class ListenAllDevices extends Command
     private function releaseConnections(): void
     {
         DB::disconnect();
-        app('redis')->purge();
-        app('cache')->forgetDriver();
+        // purge() without a name only drops `default`; the cache store runs on its own `cache` connection,
+        // and a socket left open here is shared with the child (replies read by the wrong process show up
+        // as "unserialize(): Error at offset 0 of 2 bytes" in RedisStore).
+        foreach (array_keys((array) config('database.redis')) as $name) {
+            if (is_array(config("database.redis.{$name}"))) {
+                app('redis')->purge($name);
+            }
+        }
+
+        foreach (array_keys((array) config('cache.stores')) as $store) {
+            app('cache')->forgetDriver($store);
+        }
     }
 }

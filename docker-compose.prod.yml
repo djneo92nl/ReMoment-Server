@@ -57,6 +57,9 @@ services:
     mariadb:
         profiles: [db]
         image: 'mariadb:11.4'
+        # The default of 151 ran out: every queue worker, web worker, the scheduler and one forked listener
+        # per device each hold a connection ("SQLSTATE[HY000] [1040] Too many connections").
+        command: ['--max-connections=500']
         environment:
             MARIADB_ROOT_PASSWORD: '${DB_PASSWORD}'
             MARIADB_DATABASE: '${DB_DATABASE:-remoment}'
