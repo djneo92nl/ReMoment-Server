@@ -45,10 +45,12 @@ POST   /api/scenes/{id}/activate    → 200 { status, results, data } | 202 { st
 - Alarm clock (a scene that ramps volume) and sleep timer.
 - Per-step conditions, parameters passed at activation, results over MQTT (a scene-activated event for Home Assistant).
 - Multiroom presets are a web-only feature and not a step operation.
-- Web UI extras: duplicate a scene, a run history, an "add to scene" action from album, artist and playlist pages.
+- Web UI extras: duplicate a scene, a run history.
 
 ## Web
 
 `/scenes` lists the scenes (icon, colour, step count, schedule time, last status) with Run, Edit and Delete; `/scenes/create` and `/scenes/{id}/edit` are the editor (`Livewire\SceneList`, `Livewire\SceneEditor`). Guest-accessible like `/multiroom`. The editor builds each step's fields from the operation's request schema (`SceneOperations::all()`: enums and booleans as selects, other values as text cast to the input's type on save, lists and objects as JSON; the inputs `playlist_id`/`playlist` and `station` are pickers by name, playlists only where the profile has the library, and `album_id`, `artist_id` and `track_id` are a search box plus a short result list (20 matches by name, albums and tracks also by artist; Full library profiles only); a deleted record stays visible as "Missing (#id)"), moves and removes steps, adds waits, and saves through the same `SceneRunner::validate` as the API, showing a step's errors under it. A Run on a scene with waits is queued, as in the API. Icons and colours are a fixed set (the API accepts any word and any `#rrggbb`; an unknown value is kept and shown as "Custom").
+
+**Add to scene.** The album, artist and playlist pages have an "Add to scene" button (`Livewire\AddToScene`, next to Export): choose a scene or "New scene…", a device that can play library items, and optionally Shuffle. It appends a `playAlbum`, `playArtist` or `playPlaylist` step, checked by the same `SceneRunner::validate` (a scene of 50 steps refuses it), and links to the editor.
 
 MCP: tool `scenes` (list, get, activate, create, update, delete), see [mcp.md](mcp.md).
