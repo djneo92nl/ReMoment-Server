@@ -346,6 +346,7 @@
                                     </div>
                                 @endforeach
                             </div>
+                    <a href="{{ route('history.index', ['albumId' => $album->id]) }}" data-test="all-plays-link" class="mt-4 inline-block text-xs text-gray-900 underline dark:text-gray-100">All {{ number_format($page->totalPlays) }} {{ Str::plural('play', $page->totalPlays) }} in the history</a>
                         </x-tabs.panel>
                     @endisset
         </x-tabs>

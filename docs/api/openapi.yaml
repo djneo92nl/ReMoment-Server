@@ -2079,6 +2079,8 @@ paths:
         - { name: from, in: query, schema: { type: string, format: date }, description: "First day (Y-m-d, server timezone)" }
         - { name: to, in: query, schema: { type: string, format: date }, description: "Last day, inclusive" }
         - { name: q, in: query, schema: { type: string, maxLength: 100 }, description: "Matches title, artist, album, station or source name" }
+        - { name: source_type, in: query, schema: { type: string, maxLength: 50 }, description: "Only plays logged for this source type (`spotify`, `radio`, `dlna`, `source` …)" }
+        - { name: match, in: query, schema: { type: string, enum: [library, unknown] }, description: "`library`: plays of a track in the library; `unknown`: plays that match none (logged as text, or a radio stub)" }
         - { name: device_id, in: query, schema: { type: integer }, description: "Only plays on this device" }
         - { $ref: "#/components/parameters/client" }
         - { $ref: "#/components/parameters/scope" }
@@ -2100,6 +2102,8 @@ paths:
         - { name: from, in: query, schema: { type: string, format: date }, description: "First day (Y-m-d, server timezone)" }
         - { name: to, in: query, schema: { type: string, format: date }, description: "Last day, inclusive" }
         - { name: q, in: query, schema: { type: string, maxLength: 100 }, description: "Matches title, artist, album, station or source name" }
+        - { name: source_type, in: query, schema: { type: string, maxLength: 50 }, description: "Only plays logged for this source type (`spotify`, `radio`, `dlna`, `source` …)" }
+        - { name: match, in: query, schema: { type: string, enum: [library, unknown] }, description: "`library`: plays of a track in the library; `unknown`: plays that match none (logged as text, or a radio stub)" }
         - { $ref: "#/components/parameters/client" }
         - { $ref: "#/components/parameters/scope" }
       responses:
@@ -2120,6 +2124,8 @@ paths:
         - { name: from, in: query, schema: { type: string, format: date }, description: "First day (Y-m-d, server timezone)" }
         - { name: to, in: query, schema: { type: string, format: date }, description: "Last day, inclusive" }
         - { name: q, in: query, schema: { type: string, maxLength: 100 }, description: "Matches title, artist, album, station or source name" }
+        - { name: source_type, in: query, schema: { type: string, maxLength: 50 }, description: "Only plays logged for this source type (`spotify`, `radio`, `dlna`, `source` …)" }
+        - { name: match, in: query, schema: { type: string, enum: [library, unknown] }, description: "`library`: plays of a track in the library; `unknown`: plays that match none (logged as text, or a radio stub)" }
         - { name: device_id, in: query, schema: { type: integer }, description: "Only plays on this device" }
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PlayHistoryPage" } } } }
@@ -2139,6 +2145,8 @@ paths:
         - { name: from, in: query, schema: { type: string, format: date }, description: "First day (Y-m-d, server timezone)" }
         - { name: to, in: query, schema: { type: string, format: date }, description: "Last day, inclusive" }
         - { name: q, in: query, schema: { type: string, maxLength: 100 }, description: "Matches title, artist, album, station or source name" }
+        - { name: source_type, in: query, schema: { type: string, maxLength: 50 }, description: "Only plays logged for this source type (`spotify`, `radio`, `dlna`, `source` …)" }
+        - { name: match, in: query, schema: { type: string, enum: [library, unknown] }, description: "`library`: plays of a track in the library; `unknown`: plays that match none (logged as text, or a radio stub)" }
         - { name: device_id, in: query, schema: { type: integer }, description: "Only plays on this device" }
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PlayHistoryPage" } } } }

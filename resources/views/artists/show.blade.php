@@ -162,6 +162,7 @@
                     <div class="mt-5 border-t border-gray-100 pt-4 dark:border-stone-800">
                         <a href="{{ route('history.index') }}" class="text-xs text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-600 dark:hover:text-gray-400">Full history &rarr;</a>
                     </div>
+                    <a href="{{ route('history.index', ['artistId' => $artist->id]) }}" data-test="all-plays-link" class="mt-4 inline-block text-xs text-gray-900 underline dark:text-gray-100">All {{ number_format($totalPlays) }} {{ Str::plural('play', $totalPlays) }} in the history</a>
                 </x-tabs.panel>
             @endisset
         </x-tabs>

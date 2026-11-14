@@ -32,7 +32,7 @@ docs/
     mcp.md                  MCP server at /mcp for AI agents: tools, admin-token gating, how tools reuse the REST API
     admin-auth.md           Token login of the single admin for apps: POST /api/admin/login, bearer tokens, revocation, what it gates
     stats.md                Listening statistics GET /api/library/stats (by hour/weekday/day/source/device, top lists), `plays` and `last_played_at` on details, what the numbers mean
-    history.md              Play history lists: GET /api/library/history, /devices/{id}/history, /albums/{id}/plays, /artists/{id}/plays; entry shape, cursor, filters
+    history.md              Play history lists: GET /api/library/history, /devices/{id}/history, /albums/{id}/plays, /artists/{id}/plays; entry shape, cursor, filters (`source_type`, `match`), retention (`history:prune`), MCP tool `playback_history`
     overview.md             GET /api/library/overview: glance, decades, coverage, sound buckets, formats, analysis progress per stage
     library-health.md       GET /api/library/health/{report}: findings with ids, reason, duplicate copies and the physical-collection link
     sound-query.md          Sound filters on GET /api/library/tracks (bpm, camelot, arousal, mood, plr …), include=analysis, count_only, sort=plr|bpm|arousal, `filter` on play-listening-mode
@@ -167,6 +167,9 @@ php artisan library:analyze-stems [--hours=4] [--dry-run]
 
 # Home Assistant rest_command package (YAML) for the scene-capable operations of config/scene-operations.php, generated from docs/api/openapi.yaml; unverified in a running HA; see docs/architecture/home-assistant.md
 php artisan ha:package [--output=remoment.yaml] [--base-url=http://remoment.local]
+
+# Delete plays older than the history retention (Setting `history_keep_months`, set on /history; default keep forever = no-op); only `plays` rows go, scheduled daily; --dry-run counts; see docs/api/history.md
+php artisan history:prune [--months=N] [--dry-run]
 
 # Re-select the tracks of smart (rule-based) playlists (scheduled daily)
 php artisan playlists:refresh-smart [--playlist=ID]
@@ -915,7 +918,7 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 - `/devices/create` — add device with cascading brand→product→driver form (Alpine.js)
 - `/devices/{id}` — device detail: nowplaying + up next queue + source manager + info panel
 - `/devices/{id}/edit` — edit device name, IP, brand, product
-- `/history` — full play history browser
+- `/history` — full play history browser on the same domain code as `GET /api/library/history` (`Domain\Stats\PlayHistory`): search, device, source, dates, library vs unknown plays, `?albumId=`/`?artistId=` from the album and artist pages, cursor paging; the admin sets the retention (months, default forever) at the bottom; see `docs/api/history.md`
 - `/stats` — listening statistics (top artists, devices, hourly heatmap)
 - `/multiroom` — multiroom session management and presets
 - `/receiver` — full-screen now-playing display; fetches `GET /api/devices`, lets user pick device (or auto-selects if only one); re-fetches `GET /api/devices/{id}` on MQTT push (polling every 3s without a broker) and supports play/pause/next/previous, seek and mute via the REST API. Accepts `?device={id}` query parameter to skip the picker.

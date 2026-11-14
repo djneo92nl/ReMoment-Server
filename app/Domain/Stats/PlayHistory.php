@@ -15,6 +15,10 @@ class PlayHistory
 {
     public const PAGE = 50;
 
+    public const MATCH_LIBRARY = 'library';
+
+    public const MATCH_UNKNOWN = 'unknown';
+
     /** Plays of library tracks outside the scope are left out; plays without a library track always stay. Filters by day (server timezone) and text. */
     public static function filtered(?string $from, ?string $to, ?string $q, ?array $hidden): Builder
     {
@@ -44,8 +48,46 @@ class PlayHistory
         return $query;
     }
 
-    /** @return array{data: list<array>, next_cursor: string|null} newest first, keyset-paged on (played_at, id) */
-    public static function page(Builder $plays, ?string $cursor, int $limit = self::PAGE): array
+    /** Only the plays on this device. */
+    public static function onDevice(Builder $plays, int $deviceId): Builder
+    {
+        return $plays->where('plays.device_id', $deviceId);
+    }
+
+    /** Only the plays logged for this source type (`dlna`, `spotify`, `radio`, `source` …). */
+    public static function ofSourceType(Builder $plays, string $sourceType): Builder
+    {
+        return $plays->where('plays.source_type', $sourceType);
+    }
+
+    /** Plays of a track in the own library (`library`) versus plays that match none: logged as text, or a radio stub (`unknown`). */
+    public static function ofMatch(Builder $plays, string $match): Builder
+    {
+        $stubs = Track::query()->select('tracks.id')->where('tracks.source', 'radio');
+
+        return $match === self::MATCH_LIBRARY
+            ? $plays->whereNotNull('plays.track_id')->whereNotIn('plays.track_id', $stubs)
+            : $plays->where(fn ($w) => $w->whereNull('plays.track_id')->orWhereIn('plays.track_id', $stubs));
+    }
+
+    /** Every play of the album's tracks. */
+    public static function ofAlbum(Builder $plays, int $albumId): Builder
+    {
+        return $plays->whereIn('plays.track_id', Track::query()->select('tracks.id')->where('tracks.album_id', $albumId));
+    }
+
+    /** Every play of the artist's tracks. */
+    public static function ofArtist(Builder $plays, int $artistId): Builder
+    {
+        return $plays->whereIn('plays.track_id', Track::query()->select('tracks.id')->where('tracks.artist_id', $artistId));
+    }
+
+    /**
+     * One page of plays as models, newest first, keyset-paged on (played_at, id): the list the API and the /history page share.
+     *
+     * @return array{plays: \Illuminate\Support\Collection<int, Play>, next_cursor: string|null}
+     */
+    public static function fetch(Builder $plays, ?string $cursor, int $limit = self::PAGE): array
     {
         if ($cursor !== null && $cursor !== '') {
             [$at, $id] = self::decode($cursor);
@@ -54,10 +96,22 @@ class PlayHistory
         }
 
         $rows = $plays
-            ->with(['device', 'radioStation', 'track.artist', 'track.album', 'track.metadata' => fn ($q) => $q->whereIn('key', LibrarySources::SOURCE_METADATA)])
+            ->with(['device', 'radioStation', 'track' => fn ($q) => $q->withExists('trackFiles'), 'track.artist', 'track.album', 'track.metadata' => fn ($q) => $q->whereIn('key', LibrarySources::SOURCE_METADATA)])
             ->orderByDesc('plays.played_at')->orderByDesc('plays.id')
             ->limit($limit + 1)->get();
-        $page = $rows->take($limit);
+        $page = $rows->take($limit)->values();
+        $last = $page->last();
+
+        return [
+            'plays' => $page,
+            'next_cursor' => $rows->count() > $limit && $last ? self::encode($last) : null,
+        ];
+    }
+
+    /** @return array{data: list<array>, next_cursor: string|null} the API shape of fetch() */
+    public static function page(Builder $plays, ?string $cursor, int $limit = self::PAGE): array
+    {
+        ['plays' => $page, 'next_cursor' => $next] = self::fetch($plays, $cursor, $limit);
 
         LibraryItemArtwork::preload([
             ...LibraryItemArtwork::urlsOfAlbums($page->map(fn (Play $p) => $p->track?->album)->filter()),
@@ -65,11 +119,9 @@ class PlayHistory
             ...$page->map(fn (Play $p) => $p->radioStation?->image_url)->filter()->all(),
         ]);
 
-        $last = $page->last();
-
         return [
             'data' => $page->map(fn (Play $p) => self::entry($p))->values()->all(),
-            'next_cursor' => $rows->count() > $limit && $last ? self::encode($last) : null,
+            'next_cursor' => $next,
         ];
     }
 

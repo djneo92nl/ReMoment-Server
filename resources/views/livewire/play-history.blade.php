@@ -24,18 +24,24 @@
             <span class="text-xs text-gray-300 dark:text-stone-600">–</span>
             <x-text-input size="sm" wire:model.live="dateTo" type="date" />
 
-            @if($search !== '' || $deviceId || $sourceFilter !== null || $dateFrom !== '' || $dateTo !== '')
+            @if($search !== '' || $deviceId || $sourceFilter !== null || $dateFrom !== '' || $dateTo !== '' || $match !== null || $albumId || $artistId)
                 <button wire:click="clearFilters" class="text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors whitespace-nowrap">
                     <i class="fa-solid fa-xmark mr-1"></i>Clear
                 </button>
             @endif
 
-            @if($plays->total() > 0)
-                <span class="ml-auto text-xs text-gray-400 dark:text-gray-600 whitespace-nowrap">
-                    {{ number_format($plays->total()) }} {{ Str::plural('play', $plays->total()) }}
-                </span>
-            @endif
+            <x-select size="sm" wire:model.live="match" data-test="match-filter">
+                <option value="">All plays</option>
+                <option value="library">In the library</option>
+                <option value="unknown">Not in the library</option>
+            </x-select>
         </div>
+
+        @if($album || $artist)
+            <p class="text-xs text-gray-500" data-test="record-filter">
+                Plays of {{ $album ? 'the album '.$album->name.($album->artist ? ' by '.$album->artist->name : '') : $artist->name }}
+            </p>
+        @endif
 
         {{-- Row 2: Source type filter pills --}}
         <div class="flex flex-wrap gap-2">
@@ -80,7 +86,7 @@
     @else
         {{-- Group plays by day --}}
         @php
-            $grouped = $plays->getCollection()->groupBy(fn($play) => $play->played_at->format('Y-m-d'));
+            $grouped = $plays->groupBy(fn($play) => $play->played_at->format('Y-m-d'));
         @endphp
 
         <div class="space-y-8">
@@ -310,13 +316,13 @@
         </div>
 
         {{-- Pagination --}}
-        @if($plays->hasPages())
+        @if($previousCursors !== [] || $nextCursor !== null)
             <div class="mt-8 flex items-center justify-between">
                 <div class="text-xs text-gray-400 dark:text-gray-600">
-                    Showing {{ $plays->firstItem() }}–{{ $plays->lastItem() }} of {{ number_format($plays->total()) }}
+                    {{ $plays->count() }} {{ Str::plural('play', $plays->count()) }} on this page, newest first
                 </div>
                 <div class="flex gap-2">
-                    @if($plays->onFirstPage())
+                    @if($previousCursors === [])
                         <span class="px-4 py-2 text-sm rounded-xl bg-gray-100 dark:bg-stone-800 text-gray-300 dark:text-stone-600 cursor-not-allowed">
                             &larr; Previous
                         </span>
@@ -326,7 +332,7 @@
                         </button>
                     @endif
 
-                    @if($plays->hasMorePages())
+                    @if($nextCursor !== null)
                         <button wire:click="nextPage" class="px-4 py-2 text-sm rounded-xl bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-gray-200 transition-colors">
                             Next &rarr;
                         </button>

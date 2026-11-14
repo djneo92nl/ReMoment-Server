@@ -26,6 +26,8 @@ Schedule::command('artwork:backfill')->daily()->when(fn () => Profile::allows('l
 Schedule::command('artwork:prerender')->daily()->when(fn () => Profile::allows('library'));
 Schedule::command('library:enrich')->daily()->when(fn () => Profile::allows('enrichment'));
 Schedule::command('playlists:refresh-smart')->daily()->when(fn () => Profile::allows('library'));
+// Plays older than the retention setting (default: keep forever, so a no-op); only rows of `plays` go.
+Schedule::command('history:prune')->dailyAt('04:20')->when(fn () => Profile::allows('history'));
 Schedule::command('radio:refresh')->weekly();
 Schedule::command('radio:fix-artwork')->weekly();
 Schedule::call(fn () => \App\Domain\Radio\RadioPlayLog::prune())->daily()->name('radio-plays-prune');

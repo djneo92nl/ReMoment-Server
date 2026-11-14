@@ -5,20 +5,43 @@ namespace App\Livewire;
 use App\Domain\Catalogue\WantedTracks;
 use App\Domain\Library\Normalizer;
 use App\Domain\Library\PlayedTrackAdder;
+use App\Domain\Stats\PlayHistory as PlayLog;
 use App\Models\Device;
+use App\Models\Media\Album;
+use App\Models\Media\Artist;
 use App\Models\Media\Track;
 use App\Models\Media\WantedTrack;
 use App\Models\Play;
+use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Url;
 use Livewire\Component;
-use Livewire\WithPagination;
 
 class PlayHistory extends Component
 {
-    use WithPagination;
-
+    #[Url(as: 'device')]
     public ?int $deviceId = null;
 
+    #[Url(as: 'source')]
     public ?string $sourceFilter = null;
+
+    /** `library` (plays of a track in the library) or `unknown` (logged as text, or a radio stub); null = all. */
+    #[Url]
+    public ?string $match = null;
+
+    /** Only the plays of this album or artist (the links on those pages). */
+    #[Url]
+    public ?int $albumId = null;
+
+    #[Url]
+    public ?int $artistId = null;
+
+    /** Keyset cursor of the page shown (null = newest) and the cursors of the pages before it. */
+    public ?string $cursor = null;
+
+    /** @var list<string|null> */
+    public array $previousCursors = [];
+
+    public ?string $nextCursor = null;
 
     public string $search = '';
 
@@ -40,27 +63,61 @@ class PlayHistory extends Component
 
     public function updatedDeviceId(): void
     {
-        $this->resetPage();
+        $this->resetPaging();
     }
 
     public function updatedSourceFilter(): void
     {
-        $this->resetPage();
+        $this->resetPaging();
     }
 
     public function updatedSearch(): void
     {
-        $this->resetPage();
+        $this->resetPaging();
     }
 
     public function updatedDateFrom(): void
     {
-        $this->resetPage();
+        $this->resetPaging();
     }
 
     public function updatedDateTo(): void
     {
-        $this->resetPage();
+        $this->resetPaging();
+    }
+
+    public function updatedMatch(): void
+    {
+        $this->match = $this->match === '' ? null : $this->match;
+        $this->resetPaging();
+    }
+
+    private function resetPaging(): void
+    {
+        $this->cursor = null;
+        $this->previousCursors = [];
+    }
+
+    /** The next (older) page: the same keyset cursor the API hands out. */
+    public function nextPage(?string $cursor = null): void
+    {
+        $cursor ??= $this->nextCursor;
+
+        if ($cursor === null) {
+            return;
+        }
+
+        $this->previousCursors[] = $this->cursor;
+        $this->cursor = $cursor;
+    }
+
+    public function previousPage(): void
+    {
+        if ($this->previousCursors === []) {
+            return;
+        }
+
+        $this->cursor = array_pop($this->previousCursors);
     }
 
     /** Opens the match modal for a play that was logged as text, searched by its name and artist. */
@@ -180,7 +237,7 @@ class PlayHistory extends Component
     public function setSource(?string $source): void
     {
         $this->sourceFilter = $source;
-        $this->resetPage();
+        $this->resetPaging();
     }
 
     public function clearFilters(): void
@@ -190,47 +247,40 @@ class PlayHistory extends Component
         $this->search = '';
         $this->dateFrom = '';
         $this->dateTo = '';
-        $this->resetPage();
+        $this->match = null;
+        $this->albumId = null;
+        $this->artistId = null;
+        $this->resetPaging();
     }
 
     public function render()
     {
-        $query = Play::query()
-            ->with(['device', 'track' => fn ($q) => $q->withExists('trackFiles'), 'track.artist', 'track.album', 'radioStation'])
-            ->orderByDesc('played_at');
+        $query = PlayLog::filtered($this->dateFrom ?: null, $this->dateTo ?: null, $this->search, null);
 
         if ($this->deviceId) {
-            $query->where('device_id', $this->deviceId);
+            PlayLog::onDevice($query, $this->deviceId);
         }
-
         if ($this->sourceFilter !== null) {
-            $query->where('source_type', $this->sourceFilter);
+            PlayLog::ofSourceType($query, $this->sourceFilter);
+        }
+        if (in_array($this->match, [PlayLog::MATCH_LIBRARY, PlayLog::MATCH_UNKNOWN], true)) {
+            PlayLog::ofMatch($query, $this->match);
+        }
+        if ($this->albumId) {
+            PlayLog::ofAlbum($query, $this->albumId);
+        }
+        if ($this->artistId) {
+            PlayLog::ofArtist($query, $this->artistId);
         }
 
-        if ($this->search !== '') {
-            $search = $this->search;
-            $query->where(function ($q) use ($search) {
-                $q->whereHas('track', function ($tq) use ($search) {
-                    $tq->where('name', 'like', "%{$search}%")
-                        ->orWhereHas('artist', fn ($aq) => $aq->where('name', 'like', "%{$search}%"))
-                        ->orWhereHas('album', fn ($aq) => $aq->where('name', 'like', "%{$search}%"));
-                })->orWhere('track_name', 'like', "%{$search}%")
-                    ->orWhere('artist_name', 'like', "%{$search}%")
-                    ->orWhere('album_name', 'like', "%{$search}%")
-                    ->orWhere('radio_name', 'like', "%{$search}%")
-                    ->orWhere('source_name', 'like', "%{$search}%");
-            });
+        try {
+            ['plays' => $plays, 'next_cursor' => $next] = PlayLog::fetch($query, $this->cursor);
+        } catch (ValidationException) {
+            // A stale or hand-edited cursor: start again from the newest.
+            $this->resetPaging();
+            ['plays' => $plays, 'next_cursor' => $next] = PlayLog::fetch($query, null);
         }
-
-        if ($this->dateFrom !== '') {
-            $query->whereDate('played_at', '>=', $this->dateFrom);
-        }
-
-        if ($this->dateTo !== '') {
-            $query->whereDate('played_at', '<=', $this->dateTo);
-        }
-
-        $plays = $query->paginate(50);
+        $this->nextCursor = $next;
 
         $devices = Device::orderBy('device_name')->get();
 
@@ -241,7 +291,7 @@ class PlayHistory extends Component
             ->pluck('source_type');
 
         // Which songs of this page are wished for (one query; the keys decide), for the star.
-        $titles = $plays->getCollection()->map(fn (Play $p) => $p->trackTitle())->filter()->map(fn ($t) => Normalizer::track($t))->unique()->all();
+        $titles = $plays->map(fn (Play $p) => $p->trackTitle())->filter()->map(fn ($t) => Normalizer::track($t))->unique()->all();
         $wished = WantedTrack::whereIn('title_key', $titles)->whereNull('fulfilled_at')->get()
             ->mapWithKeys(fn (WantedTrack $w) => [$w->artist_key.'|'.$w->title_key => true])->all();
 
@@ -250,6 +300,8 @@ class PlayHistory extends Component
             'plays' => $plays,
             'devices' => $devices,
             'sourceTypes' => $sourceTypes,
+            'album' => $this->albumId ? Album::with('artist')->find($this->albumId) : null,
+            'artist' => $this->artistId ? Artist::find($this->artistId) : null,
         ]);
     }
 }

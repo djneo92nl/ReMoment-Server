@@ -127,6 +127,16 @@ class SettingsController extends Controller
         return redirect()->route('settings.storage', ['tab' => 'library'])->with('success', 'Library settings saved.');
     }
 
+    /** How many months of play history to keep (empty = forever); the daily `history:prune` applies it. */
+    public function historySave(Request $request)
+    {
+        $validated = $request->validate(['keep_months' => ['nullable', 'integer', 'min:1', 'max:'.\App\Domain\Stats\PlayRetention::MAX_MONTHS]]);
+
+        \App\Domain\Stats\PlayRetention::setMonths(isset($validated['keep_months']) ? (int) $validated['keep_months'] : null);
+
+        return redirect()->route('history.index')->with('success', 'History retention saved.');
+    }
+
     public function mqtt()
     {
         return view('settings.mqtt');

@@ -162,6 +162,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/settings/library', [SettingsController::class, 'library'])->name('settings.library');
     Route::post('/settings/library', [SettingsController::class, 'librarySave'])->name('settings.library.save');
+    Route::post('/settings/history', [SettingsController::class, 'historySave'])->name('settings.history.save');
 
     Route::get('/settings/mqtt', [SettingsController::class, 'mqtt'])->name('settings.mqtt');
 

@@ -22,35 +22,31 @@ class PlayHistoryController extends Controller
         $request->validate(['device_id' => ['nullable', 'integer', 'exists:devices,id']]);
         $plays = $this->query($request, true);
 
-        if ($request->filled('device_id')) {
-            $plays->where('plays.device_id', $request->integer('device_id'));
-        }
-
-        return $this->respond($request, $plays);
+        return $this->respond($request, $request->filled('device_id') ? PlayHistory::onDevice($plays, $request->integer('device_id')) : $plays);
     }
 
     /** GET /api/devices/{device}/history */
     public function device(Request $request, Device $device): JsonResponse
     {
-        return $this->respond($request, $this->query($request, true)->where('plays.device_id', $device->id));
+        return $this->respond($request, PlayHistory::onDevice($this->query($request, true), $device->id));
     }
 
     /** GET /api/library/albums/{album}/plays */
     public function album(Request $request, Album $album): JsonResponse
     {
         $request->validate(['device_id' => ['nullable', 'integer', 'exists:devices,id']]);
-        $plays = $this->query($request, false)->whereIn('plays.track_id', $album->tracks()->select('tracks.id'));
+        $plays = PlayHistory::ofAlbum($this->query($request, false), $album->id);
 
-        return $this->respond($request, $request->filled('device_id') ? $plays->where('plays.device_id', $request->integer('device_id')) : $plays);
+        return $this->respond($request, $request->filled('device_id') ? PlayHistory::onDevice($plays, $request->integer('device_id')) : $plays);
     }
 
     /** GET /api/library/artists/{artist}/plays */
     public function artist(Request $request, Artist $artist): JsonResponse
     {
         $request->validate(['device_id' => ['nullable', 'integer', 'exists:devices,id']]);
-        $plays = $this->query($request, false)->whereIn('plays.track_id', $artist->tracks()->select('tracks.id'));
+        $plays = PlayHistory::ofArtist($this->query($request, false), $artist->id);
 
-        return $this->respond($request, $request->filled('device_id') ? $plays->where('plays.device_id', $request->integer('device_id')) : $plays);
+        return $this->respond($request, $request->filled('device_id') ? PlayHistory::onDevice($plays, $request->integer('device_id')) : $plays);
     }
 
     /** @param bool $scoped apply `scope` / `client` (the household list); the album and artist lists show every play of the record */
@@ -62,6 +58,8 @@ class PlayHistoryController extends Controller
             'from' => ['nullable', 'date_format:Y-m-d'],
             'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
             'q' => ['nullable', 'string', 'max:100'],
+            'source_type' => ['nullable', 'string', 'max:50'],
+            'match' => ['nullable', 'in:'.PlayHistory::MATCH_LIBRARY.','.PlayHistory::MATCH_UNKNOWN],
             'client' => ['nullable', 'string', 'max:100'],
             'scope' => ['nullable', 'in:'.implode(',', LeadingSource::apiScopes())],
         ]);
@@ -72,7 +70,16 @@ class PlayHistoryController extends Controller
             $hidden = LibrarySources::hiddenForRequest($client, $request->query('scope'));
         }
 
-        return PlayHistory::filtered($request->query('from'), $request->query('to'), $request->query('q'), $hidden);
+        $plays = PlayHistory::filtered($request->query('from'), $request->query('to'), $request->query('q'), $hidden);
+
+        if ($request->filled('source_type')) {
+            PlayHistory::ofSourceType($plays, (string) $request->query('source_type'));
+        }
+        if ($request->filled('match')) {
+            PlayHistory::ofMatch($plays, (string) $request->query('match'));
+        }
+
+        return $plays;
     }
 
     private function respond(Request $request, $plays): JsonResponse
