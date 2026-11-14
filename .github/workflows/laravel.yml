@@ -53,7 +53,14 @@ jobs:
         DB_DATABASE: database/database.sqlite
       # The display flags print what PHPUnit counts besides failures (deprecations, warnings, notices, risky tests, skips),
       # so an exit code 1 with every test passing shows its cause in the log.
-      run: php artisan test --display-deprecations --display-phpunit-deprecations --display-warnings --display-notices --display-skipped
+      # PHPUnit is run directly (not through `artisan test`): the run ended with every test passing and exit code 1, and
+      # PHPUnit's own verdict ("OK" or "OK, but there were issues") and exit code show whether the wrapper or PHPUnit set it.
+      run: |
+        set +e
+        ./vendor/bin/phpunit --no-progress --display-deprecations --display-phpunit-deprecations --display-warnings --display-notices --display-skipped
+        code=$?
+        echo "phpunit exit code: $code"
+        exit $code
 
   frontend-build:
 
