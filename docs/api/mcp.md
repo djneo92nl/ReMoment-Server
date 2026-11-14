@@ -36,7 +36,7 @@ Device and library tools do not re-implement anything: `ApiBridge` dispatches an
 | `move_playback` | move what plays to another device (`POST /devices/{id}/move`): same queue and position for library tracks, station for radio, Spotify transfer; local inputs are refused; see `docs/api/playback-move.md` |
 | `sync_group` | sync groups ("fake multiroom"): list, create, add, remove, offset, dissolve; see `docs/api/sync-groups.md` |
 | `device_settings` | sound-adjustment, bluetooth, info (rename), sleep-timer (`docs/api/device-settings.md`) |
-| `search_library`, `browse_library` | search; lists and details of artists, albums, tracks, genres, playlists, recent, favorites; kind `mixes-with` (with `id`): tracks that mix well with a track |
+| `search_library`, `browse_library` | search; lists and details of artists, albums, tracks, genres, playlists, recent, favorites; kind `mixes-with` (with `id`): tracks that mix well with a track; kind `tracks` also takes the sound filters (`bpm_min`/`bpm_max`, `camelot`, `arousal_*`, `valence_*`, `danceability_min`, `instrumental_min`, `plr_min`, `mood`, `lossless_suspect_max`, `measured_bit_depth_min`, `clipping`), `include=analysis`, `count_only` and `sort=plr\|bpm\|arousal` (`docs/api/sound-query.md`) |
 | `set_favorite` | favorite an album, artist or track |
 | `play_from_library` | play a track (or a Spotify track by `spotify_track_id`), an album (optionally limited to a `source`), artist or playlist on a device, or `type: tracks` to shuffle the whole library |
 | `physical` | the physical collection (CDs, records, tapes): `list`, `lookup` a barcode on MusicBrainz, `add`, `update` (also `ripped`), `remove`; an item makes its album owned; see `docs/api/physical.md` |
@@ -54,6 +54,9 @@ Device and library tools do not re-implement anything: `ApiBridge` dispatches an
 | `export` | **ADMIN**: `estimate` (type album/playlist/artist/tracks, id or track_ids, profile) plans an export of tracks with an own file and queues nothing; `start` queues it (refused with the estimate over the limits); `status` (id) progress and signed download urls (a path, valid 15 minutes); `list`; `cancel` (id) cancels or removes; see `docs/api/export.md` |
 | `alerts` | `list` the server's alerts (stuck queue, silent scheduler, stale backup, unreachable storage, offline device, down listener; `state`, `since`, `limit`), open to everyone; `ack` an alert needs the admin token; see `docs/architecture/alerts.md` |
 | `playback_history` | What was played, newest first, household-wide (`GET /api/library/history`, or the plays of one `album_id` / `artist_id`): `device_id`, `from`/`to` (Y-m-d), `q`, `source_type`, `match` (`library` or `unknown`), `limit`, `cursor` (the `next_cursor` of the page before); open to everyone; see `docs/api/history.md` |
+| `library_overview` | the library at a glance: totals, decades, coverage, sound buckets, formats, analysis progress (`GET /api/library/overview`, optional `scope`); open; Control answers `not_available_in_profile`; see `docs/api/overview.md` |
+| `library_health` | library health reports: without `report` the finding counts of all (`GET /api/library/health`), with `report` (transcodes, damaged, clipping, duplicates, lossy, incomplete, unlinked, missing) its findings, `limit`, `cursor`; open; findings need the Full profile (`not_available_in_profile` below it); see `docs/api/library-health.md` |
+| `listening_stats` | household listening statistics from the play log (`GET /api/library/stats`): `from`/`to` (Y-m-d), `limit` of the top lists, `scope`; open; works in every profile; see `docs/api/stats.md` |
 
 Destructive actions answer `confirmation_required (422)` until `confirm=true`. Queued actions need the queue worker.
 

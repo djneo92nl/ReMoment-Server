@@ -2180,6 +2180,7 @@ paths:
                   data: { type: array, items: { $ref: "#/components/schemas/HealthFinding" } }
                   next_cursor: { type: string, nullable: true }
         "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/NotAvailableInProfile" }
   /library/overview:
     get:
       tags: [Library]
@@ -2191,6 +2192,7 @@ paths:
         - { $ref: "#/components/parameters/scope" }
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/LibraryOverview" } } } }
+        "422": { $ref: "#/components/responses/NotAvailableInProfile" }
   /library/stats:
     get:
       tags: [Library]
@@ -3463,6 +3465,17 @@ components:
           schema: { $ref: "#/components/schemas/Error" }
     NotFound:
       description: Unknown id (also a record merged away by library:merge-duplicates)
+    NotAvailableInProfile:
+      description: "`not_available_in_profile`: the feature is not part of the profile this server runs (`GET /api/info` `features.profile`); the body also has `profile`, `required_profile` and `message`"
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: { type: string, enum: [not_available_in_profile] }
+              message: { type: string }
+              profile: { type: string, enum: [control, standard, full] }
+              required_profile: { type: string, enum: [standard, full] }
     DeviceError:
       description: unreachable (503), unsupported / not_playable / invalid (422), driver_error (502)
       content:
