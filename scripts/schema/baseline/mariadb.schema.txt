@@ -250,6 +250,41 @@ TABLE dlna_servers [engine=InnoDB collation=utf8mb4_unicode_ci]
   idx PRIMARY UNIQUE BTREE (id)
   idx dlna_servers_ip_port_unique UNIQUE BTREE (ip,port)
 
+TABLE exports [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col bytes bigint(20) unsigned NOT NULL default=0
+  col copied int(10) unsigned NOT NULL default=0
+  col created_at timestamp NULL default=NULL
+  col error text NULL default=NULL collate=utf8mb4_unicode_ci
+  col estimated_bytes bigint(20) unsigned NOT NULL default=0
+  col expires_at timestamp NULL default=NULL
+  col files_done int(10) unsigned NOT NULL default=0
+  col files_total int(10) unsigned NOT NULL default=0
+  col finished_at timestamp NULL default=NULL
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col options longtext NULL default=NULL collate=utf8mb4_bin
+  col part_files longtext NULL default=NULL collate=utf8mb4_bin
+  col planned_parts smallint(5) unsigned NOT NULL default=0
+  col profile varchar(32) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col public_id uuid NOT NULL default=-
+  col selection_id bigint(20) unsigned NULL default=NULL
+  col selection_type varchar(12) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col skipped longtext NULL default=NULL collate=utf8mb4_bin
+  col skipped_count int(10) unsigned NOT NULL default=0
+  col started_at timestamp NULL default=NULL
+  col status varchar(12) NOT NULL default='queued' collate=utf8mb4_unicode_ci
+  col tracks int(10) unsigned NOT NULL default=0
+  col track_ids longtext NULL default=NULL collate=utf8mb4_bin
+  col transcoded int(10) unsigned NOT NULL default=0
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx exports_expires_at_index INDEX BTREE (expires_at)
+  idx exports_public_id_unique UNIQUE BTREE (public_id)
+  idx exports_status_index INDEX BTREE (status)
+  check options json_valid(`options`)
+  check part_files json_valid(`part_files`)
+  check skipped json_valid(`skipped`)
+  check track_ids json_valid(`track_ids`)
+
 TABLE failed_jobs [engine=InnoDB collation=utf8mb4_unicode_ci]
   col connection text NOT NULL default=- collate=utf8mb4_unicode_ci
   col exception longtext NOT NULL default=- collate=utf8mb4_unicode_ci
@@ -529,6 +564,22 @@ TABLE plays [engine=InnoDB collation=utf8mb4_unicode_ci]
   fk plays_device_id_foreign (device_id) -> devices(id) ON DELETE CASCADE ON UPDATE RESTRICT
   fk plays_radio_station_id_foreign (radio_station_id) -> radio_stations(id) ON DELETE SET NULL ON UPDATE RESTRICT
   fk plays_track_id_foreign (track_id) -> tracks(id) ON DELETE SET NULL ON UPDATE RESTRICT
+
+TABLE play_tags [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col created_at timestamp NULL default=NULL
+  col device_id bigint(20) unsigned NULL default=NULL
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col label varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci
+  col last_used_at timestamp NULL default=NULL
+  col shuffle tinyint(1) NOT NULL default=0
+  col target_id bigint(20) unsigned NOT NULL default=-
+  col target_type varchar(16) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col uid varchar(64) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx play_tags_device_id_foreign INDEX BTREE (device_id)
+  idx play_tags_uid_unique UNIQUE BTREE (uid)
+  fk play_tags_device_id_foreign (device_id) -> devices(id) ON DELETE SET NULL ON UPDATE RESTRICT
 
 TABLE radio_plays [engine=InnoDB collation=utf8mb4_unicode_ci]
   col artist varchar(255) NULL default=NULL collate=utf8mb4_unicode_ci

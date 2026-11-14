@@ -228,6 +228,36 @@ TABLE dlna_servers [autoincrement]
   col updated_at datetime NULL default=-
   idx dlna_servers_ip_port_unique UNIQUE (ip,port)
 
+TABLE exports [autoincrement]
+  col bytes integer NOT NULL default='0'
+  col copied integer NOT NULL default='0'
+  col created_at datetime NULL default=-
+  col error text NULL default=-
+  col estimated_bytes integer NOT NULL default='0'
+  col expires_at datetime NULL default=-
+  col files_done integer NOT NULL default='0'
+  col files_total integer NOT NULL default='0'
+  col finished_at datetime NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col options text NULL default=-
+  col part_files text NULL default=-
+  col planned_parts integer NOT NULL default='0'
+  col profile varchar NOT NULL default=-
+  col public_id varchar NOT NULL default=-
+  col selection_id integer NULL default=-
+  col selection_type varchar NOT NULL default=-
+  col skipped text NULL default=-
+  col skipped_count integer NOT NULL default='0'
+  col started_at datetime NULL default=-
+  col status varchar NOT NULL default='queued'
+  col track_ids text NULL default=-
+  col tracks integer NOT NULL default='0'
+  col transcoded integer NOT NULL default='0'
+  col updated_at datetime NULL default=-
+  idx exports_expires_at_index INDEX (expires_at)
+  idx exports_public_id_unique UNIQUE (public_id)
+  idx exports_status_index INDEX (status)
+
 TABLE failed_jobs [autoincrement]
   col connection text NOT NULL default=-
   col exception text NOT NULL default=-
@@ -425,6 +455,20 @@ TABLE physical_items [autoincrement]
   idx physical_items_release_group_mbid_index INDEX (release_group_mbid)
   fk (album_id) -> albums(id) ON DELETE SET NULL ON UPDATE NO ACTION
   fk (file_id) -> files(id) ON DELETE SET NULL ON UPDATE NO ACTION
+
+TABLE play_tags [autoincrement]
+  col created_at datetime NULL default=-
+  col device_id integer NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col label varchar NULL default=-
+  col last_used_at datetime NULL default=-
+  col shuffle tinyint(1) NOT NULL default='0'
+  col target_id integer NOT NULL default=-
+  col target_type varchar NOT NULL default=-
+  col uid varchar NOT NULL default=-
+  col updated_at datetime NULL default=-
+  idx play_tags_uid_unique UNIQUE (uid)
+  fk (device_id) -> devices(id) ON DELETE SET NULL ON UPDATE NO ACTION
 
 TABLE playlist_track [autoincrement]
   col created_at datetime NULL default=-

@@ -41,7 +41,7 @@ foreign keys (129 vs 82 indexes), SQLite types are affinity names, SQLite has no
 `baseline/mariadb.schema.txt` and `baseline/sqlite.schema.txt` are the dumps of the 62 pre-squash migrations (2026-11-01):
 **44 tables (43 + `migrations`), 419 columns, 33 foreign keys, 129 indexes on MariaDB, 82 on SQLite**. Schema only, no data and no
 secrets (the word "password" appears only as a column name). Never regenerate them to make `check` pass after the squash; they
-are the thing the squash is proven against. Regenerate only when a pre-squash fix from the plan lands (then the fix and the new
+are the thing the squash is proven against. Additive migrations that land before the squash (a new table, column or index) are added to the baseline in the same commit as the migration, or the CI job fails: 2026-11-14 added `exports`, `play_tags` and the `plays` played_at index (46 tables incl. `migrations`, 454 columns, 137 MariaDB indexes). Regenerate only when a pre-squash fix from the plan lands (then the fix and the new
 baseline go in one commit).
 
 ## Comparing with a live database (read-only, owner runs it)
