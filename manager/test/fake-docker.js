@@ -17,12 +17,17 @@ const read = (f) => { try { return fs.readFileSync(path.join(dir, f), 'utf8'); }
 let rest = args;
 if (args[0] === 'compose') { const i = args.indexOf('-p'); rest = args.slice(i + 2); if (rest[0] === '--profile') rest = rest.slice(2); }
 const cmd = args[0] === 'compose' ? 'compose ' + rest[0] : args[0];
-if (cmd === 'compose config') process.stdout.write(read('services.txt'));
+if (cmd === 'compose config') process.stdout.write(rest.includes('--format') ? read('config.json') : read('services.txt'));
+else if (cmd === 'compose pull' || cmd === 'compose build') { if (read('fetch-fail')) { process.stderr.write('no such image'); process.exit(1); } }
+else if (cmd === 'image') process.exit(read('no-image') ? 1 : 0);
+else if (cmd === 'tag') process.exit(0);
 else if (cmd === 'compose ps') process.stdout.write(read('ps.ndjson'));
 else if (cmd === 'inspect') process.stdout.write(read('inspect.json'));
 else if (cmd === 'stats') process.stdout.write(read('stats.ndjson'));
 else if (cmd === 'compose logs') { const n = Number(rest[rest.indexOf('--tail') + 1]); for (let i = 1; i <= n; i++) console.log('line ' + i); }
 else if (cmd === 'compose up' || cmd === 'compose stop') process.exit(read('start-fail') ? 1 : 0);
+else if (cmd === 'compose exec' && rest.includes('app:upgrade')) { const left = Number(read('upgrade-silent') || 0); if (left > 0) { fs.writeFileSync(path.join(dir, 'upgrade-silent'), String(left - 1)); process.exit(1); } process.stdout.write(read('upgrade.json')); process.exit(Number(read('upgrade-exit') || 0)); }
+else if (cmd === 'compose exec' && rest.includes('backup:restore')) process.exit(read('restore-fail') ? 1 : 0);
 else if (cmd === 'compose exec') process.exit(read('exec-fail') ? 1 : 0);
 else if (cmd === 'compose restart') {
   const ms = Number(read('restart-sleep-ms') || 0);
