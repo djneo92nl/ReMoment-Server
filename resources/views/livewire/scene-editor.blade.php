@@ -92,7 +92,19 @@
                             @php($schema = $input['schema'])
                             <div>
                                 <x-input-label :value="\Illuminate\Support\Str::headline($name).($input['required'] ? '' : ' (optional)')" class="mb-1.5" />
-                                @if(isset($schema['enum']))
+                                @php($list = isset(\App\Livewire\SceneEditor::PICKERS[$name]) ? $pickLists[\App\Livewire\SceneEditor::PICKERS[$name]] : null)
+                                @if($list !== null)
+                                    @php($current = (string) ($step['params'][$name] ?? ''))
+                                    <x-select wire:model="steps.{{ $i }}.params.{{ $name }}" class="w-full">
+                                        <option value="">{{ $input['required'] ? 'Choose…' : '—' }}</option>
+                                        @if($current !== '' && !isset($list[(int) $current]))
+                                            <option value="{{ $current }}">Missing (#{{ $current }})</option>
+                                        @endif
+                                        @foreach($list as $id => $label)
+                                            <option value="{{ $id }}">{{ $label }}</option>
+                                        @endforeach
+                                    </x-select>
+                                @elseif(isset($schema['enum']))
                                     <x-select wire:model="steps.{{ $i }}.params.{{ $name }}" class="w-full">
                                         <option value="">{{ $input['required'] ? 'Choose…' : '—' }}</option>
                                         @foreach($schema['enum'] as $option)

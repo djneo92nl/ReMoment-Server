@@ -188,4 +188,44 @@ class SceneWebTest extends TestCase
 
         $c->call('removeStep', 0)->assertCount('steps', 1);
     }
+
+    public function test_playlist_and_station_pickers_list_names_and_save_the_id(): void
+    {
+        $playlist = \App\Models\Media\Playlist::create(['name' => 'Sunday jazz']);
+        $station = \App\Models\RadioStation::create(['name' => 'Radio Test']);
+
+        $c = Livewire::test(SceneEditor::class)
+            ->set('name', 'Radio')
+            ->call('addOperation')
+            ->set('steps.0.operation', 'playPlaylist')
+            ->assertSee('Sunday jazz')
+            ->set('steps.0.device_id', (string) $this->device->id)
+            ->set('steps.0.params.playlist_id', (string) $playlist->id)
+            ->call('addOperation')
+            ->set('steps.1.operation', 'playRadio')
+            ->assertSee('Radio Test')
+            ->set('steps.1.device_id', (string) $this->device->id)
+            ->set('steps.1.params.station', (string) $station->id)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $steps = Scene::firstOrFail()->steps;
+        $this->assertSame($playlist->id, $steps[0]['params']['playlist_id']);
+        $this->assertSame($station->id, $steps[1]['params']['station']);
+    }
+
+    public function test_a_picker_keeps_a_deleted_record_visible(): void
+    {
+        $scene = $this->scene([['operation' => 'playRadio', 'device_id' => $this->device->id, 'params' => ['station' => 4242]]]);
+
+        Livewire::test(SceneEditor::class, ['sceneId' => $scene->id])->assertSee('Missing (#4242)');
+    }
+
+    public function test_control_has_no_playlist_picker(): void
+    {
+        \App\Models\Media\Playlist::create(['name' => 'Sunday jazz']);
+        config(['profile.current' => 'control']);
+
+        Livewire::test(SceneEditor::class)->call('addOperation')->set('steps.0.operation', 'playPlaylist')->assertDontSee('Sunday jazz');
+    }
 }

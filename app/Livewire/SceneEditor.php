@@ -2,9 +2,12 @@
 
 namespace App\Livewire;
 
+use App\Domain\Profile\Profile;
 use App\Domain\Scenes\SceneOperations;
 use App\Domain\Scenes\SceneRunner;
 use App\Models\Device;
+use App\Models\Media\Playlist;
+use App\Models\RadioStation;
 use App\Models\Scene;
 use Livewire\Component;
 
@@ -22,6 +25,9 @@ class SceneEditor extends Component
     public const COLORS = ['red' => '#dc2626', 'orange' => '#ea580c', 'amber' => '#d97706', 'green' => '#059669', 'sky' => '#0284c7', 'indigo' => '#4f46e5', 'violet' => '#7c3aed', 'stone' => '#57534e'];
 
     public const DAYS = [1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => 'Fri', 6 => 'Sat', 7 => 'Sun'];
+
+    /** Inputs that take a record id, picked by name: input name => list. Anything else stays a plain field. */
+    public const PICKERS = ['playlist_id' => 'playlists', 'playlist' => 'playlists', 'station' => 'stations'];
 
     public ?int $sceneId = null;
 
@@ -208,6 +214,11 @@ class SceneEditor extends Component
 
         return view('livewire.scene-editor', [
             'operations' => $all,
+            'pickLists' => [
+                // Control has no library, so no playlists: the field stays a plain id there.
+                'playlists' => Profile::allows('library') ? Playlist::orderBy('name')->limit(1000)->pluck('name', 'id')->all() : null,
+                'stations' => RadioStation::orderBy('name')->limit(1000)->pluck('name', 'id')->all(),
+            ],
             'devices' => Device::orderBy('device_name')->get(['id', 'device_name']),
             'icons' => self::ICONS + ($this->icon !== '' && !isset(self::ICONS[$this->icon]) ? [$this->icon => $this->icon] : []),
             'colors' => array_flip(self::COLORS) + ($this->color !== '' && !in_array($this->color, self::COLORS, true) ? [$this->color => 'Custom'] : []),
