@@ -143,7 +143,7 @@ Devices are returned as `DeviceListResource` collection (same shape as `GET /api
 
 ## Nodes
 
-A node is a client with `kind = 'node'`. `register` takes `kind`, `roles` and `capabilities` (validated against `NodeRoles`; `hardware_id` required; `kind_mismatch` on a known id of the other kind); the approved `status` answer and the heartbeat answer carry the active roles; the heartbeat takes `status` and stores it in `node_status` for nodes only. `resolveDevices()` skips the all-devices rule for a node. In `ClientManager` the approve form pre-ticks the declared roles and the edit form changes `enabled_roles`; both intersect with `roles`. No jobs, routes or MQTT topics for nodes exist yet; see [node-agent.md](node-agent.md).
+A node is a client with `kind = 'node'`. `register` takes `kind`, `roles` and `capabilities` (validated against `NodeRoles`; `hardware_id` required; `kind_mismatch` on a known id of the other kind); the approved `status` answer and the heartbeat answer carry the active roles; the heartbeat takes `status` and stores it in `node_status` for nodes only. `resolveDevices()` skips the all-devices rule for a node. In `ClientManager` the approve form pre-ticks the declared roles and the edit form changes `enabled_roles`; both intersect with `roles`. Jobs, the node routes and the `node.offline` alert are described in [node-agent.md](node-agent.md) ("N1 as built").
 
 ---
 

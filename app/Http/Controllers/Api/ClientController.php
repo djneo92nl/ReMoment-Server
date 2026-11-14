@@ -103,7 +103,7 @@ class ClientController extends Controller
             'type' => $client->type,
             'api_token' => $client->api_token,
             'devices' => DeviceListResource::collection($devices),
-        ], $client->isNode() ? ['kind' => 'node', 'roles' => $client->activeRoles()] : []));
+        ], $client->isNode() ? ['kind' => 'node', 'client_id' => $client->id, 'roles' => $client->activeRoles()] : []));
     }
 
     public function devices(string $apiToken): JsonResponse

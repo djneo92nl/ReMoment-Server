@@ -3,6 +3,7 @@
 // Thresholds of the alert checks (docs/architecture/alerts.md). Minutes unless noted.
 return [
     // A device whose state is `unreachable` this long raises device.offline (standby never does).
+    'node_offline_seconds' => (int) env('ALERTS_NODE_OFFLINE_SECONDS', 90),
     'device_offline_minutes' => (int) env('ALERTS_DEVICE_OFFLINE_MINUTES', 10),
 
     // A device that should have a listener but has no listener heartbeat this long raises listener.down.

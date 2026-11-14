@@ -109,6 +109,7 @@ Route::get('/devices/{device}/radio', [DeviceController::class, 'radioStations']
 Route::get('/radio/{station}/now', [DeviceController::class, 'radioNow']);
 Route::put('/radio/{station}/favorite', [DeviceController::class, 'favoriteRadio']);
 Route::post('/devices/{device}/radio/{station}', [DeviceController::class, 'playRadio']);
+Route::get('/radio/relays', [\App\Http\Controllers\Api\RadioRelayController::class, 'index']);
 
 Route::get('/devices/{device}/multiroom', [DeviceController::class, 'multiroom']);
 Route::post('/devices/{device}/multiroom/join', [DeviceController::class, 'multiroomJoin']);
@@ -172,6 +173,7 @@ Route::get('/library/albums/{album}/plays', [\App\Http\Controllers\Api\PlayHisto
 Route::get('/library/artists/{artist}/plays', [\App\Http\Controllers\Api\PlayHistoryController::class, 'artist']);
 Route::get('/library/stats', [\App\Http\Controllers\Api\ListeningStatsController::class, 'index']);
 Route::get('/library/overview', [LibraryController::class, 'overview']);
+Route::get('/library/insights', [\App\Http\Controllers\Api\ListeningInsightsController::class, 'index']);
 Route::get('/library/health', [LibraryController::class, 'health']);
 Route::get('/library/health/{report}', [LibraryController::class, 'healthReport']);
 Route::get('/library/genres', [LibraryController::class, 'genres']);
@@ -207,6 +209,14 @@ Route::post('/tags/{uid}/play', [TagController::class, 'play']);
 Route::get('/announcements/clips', [AnnouncementController::class, 'clips']);
 Route::post('/announcements', [AnnouncementController::class, 'store']);
 
+// Node routes: what a ReMoment Node calls itself, with its own client token as Bearer (docs/architecture/node-agent.md)
+Route::prefix('nodes')->group(function () {
+    Route::get('/job', [\App\Http\Controllers\Api\NodeController::class, 'next']);
+    Route::post('/jobs/{job}/accept', [\App\Http\Controllers\Api\NodeController::class, 'accept']);
+    Route::post('/jobs/{job}/progress', [\App\Http\Controllers\Api\NodeController::class, 'progress']);
+    Route::post('/jobs/{job}/result', [\App\Http\Controllers\Api\NodeController::class, 'result']);
+});
+
 // Admin token login for apps. Routes that change configuration go in the `admin.token` group (see docs/api/admin-auth.md).
 Route::post('/admin/login', [AdminAuthController::class, 'login']);
 // Signed, temporary download of one export part: the signature is the authorization (docs/api/export.md)
@@ -214,6 +224,11 @@ Route::get('/library/exports/{id}/download/{part}', [ExportController::class, 'd
     ->middleware('signed:relative')->whereNumber('part')->name('api.library.exports.download');
 Route::middleware('admin.token')->group(function () {
     Route::get('/admin/me', [AdminAuthController::class, 'me']);
+
+    // Jobs for a ReMoment Node (docs/architecture/node-agent.md)
+    Route::get('/admin/nodes/{client}/jobs', [\App\Http\Controllers\Api\AdminNodeJobController::class, 'index']);
+    Route::post('/admin/nodes/{client}/jobs', [\App\Http\Controllers\Api\AdminNodeJobController::class, 'store']);
+    Route::post('/admin/nodes/{client}/jobs/{job}/cancel', [\App\Http\Controllers\Api\AdminNodeJobController::class, 'cancel']);
     Route::delete('/admin/token', [AdminAuthController::class, 'logout']);
     Route::post('/admin/alerts/{alert}/ack', [AlertController::class, 'acknowledge']);
 

@@ -30,3 +30,7 @@ Thumbs.db
 
 # Hardware check reports (scripts/hardware-check)
 /scripts/hardware-check/reports/
+
+# ReMoment Node build output
+/node/dist/remoment-node-*
+/node/node

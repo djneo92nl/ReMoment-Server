@@ -24,7 +24,7 @@ final class AlertChecks
 {
     public function runAll(): void
     {
-        foreach (['scheduler', 'queues', 'backup', 'storage', 'devices', 'exposure'] as $check) {
+        foreach (['scheduler', 'queues', 'backup', 'storage', 'devices', 'nodes', 'exposure'] as $check) {
             try {
                 $this->{$check}();
             } catch (\Throwable $e) {
@@ -144,6 +144,34 @@ final class AlertChecks
         // A deleted device's alerts end with it.
         $ids = Device::pluck('id')->map(fn ($id) => (string) $id)->all();
         foreach (Alerts::active()->whereIn('kind', ['device.offline', 'listener.down'])->whereNotIn('key', $ids) as $orphan) {
+            Alerts::resolve($orphan->kind, $orphan->key);
+        }
+    }
+
+    /** node.offline: an approved node with a role switched on has sent no heartbeat for `alerts.node_offline_seconds` (90). */
+    public function nodes(): void
+    {
+        $limit = (int) config('alerts.node_offline_seconds', 90);
+        $ids = [];
+
+        foreach (\App\Models\Client::where('kind', 'node')->where('status', 'approved')->get() as $node) {
+            if ($node->activeRoles() === []) {
+                continue;
+            }
+            $key = (string) $node->id;
+            $ids[] = $key;
+            $silent = $node->last_seen_at === null || $node->last_seen_at->diffInSeconds(now()) >= $limit;
+
+            if ($silent) {
+                Alerts::raise('node.offline', $key, 'warning', ($node->name ?? "Node #{$node->id}").' is offline',
+                    'No heartbeat for '.($node->last_seen_at ? $node->last_seen_at->diffForHumans(null, true) : 'ever').'; its jobs wait.',
+                    data: ['node_id' => $node->id]);
+            } else {
+                Alerts::resolve('node.offline', $key);
+            }
+        }
+
+        foreach (Alerts::active()->where('kind', 'node.offline')->whereNotIn('key', $ids) as $orphan) {
             Alerts::resolve($orphan->kind, $orphan->key);
         }
     }

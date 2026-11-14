@@ -426,6 +426,28 @@ TABLE multiroom_presets [autoincrement]
   col name varchar NOT NULL default=-
   col updated_at datetime NULL default=-
 
+TABLE node_jobs
+  col accepted_at datetime NULL default=-
+  col cancel_requested tinyint(1) NOT NULL default='0'
+  col client_id integer NOT NULL default=-
+  col created_at datetime NULL default=-
+  col deadline_at datetime NULL default=-
+  col error varchar NULL default=-
+  col finished_at datetime NULL default=-
+  col id varchar NOT NULL default=- pk=1
+  col idempotency_key varchar NULL default=-
+  col lease_until datetime NULL default=-
+  col params text NULL default=-
+  col result text NULL default=-
+  col role varchar NULL default=-
+  col state varchar NOT NULL default='queued'
+  col type varchar NOT NULL default=-
+  col updated_at datetime NULL default=-
+  idx auto(pk) UNIQUE (id)
+  idx node_jobs_client_id_idempotency_key_unique UNIQUE (client_id,idempotency_key)
+  idx node_jobs_client_id_state_index INDEX (client_id,state)
+  fk (client_id) -> clients(id) ON DELETE CASCADE ON UPDATE NO ACTION
+
 TABLE password_reset_tokens
   col created_at datetime NULL default=-
   col email varchar NOT NULL default=- pk=1

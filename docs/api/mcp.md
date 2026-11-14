@@ -29,7 +29,7 @@ Device and library tools do not re-implement anything: `ApiBridge` dispatches an
 | `sources` | list/activate sources; list/run source controls (CD, FM presets) |
 | `jellyfin` | Jellyfin on a TV: list continue watching and next up, or start an `item_id` (optional `position_ticks`) in the Jellyfin app on the TV; `GET /devices/{id}/jellyfin`, `POST …/jellyfin/play` |
 | `remote_keys` | a TV's remote keys (`remote_control`): list the supported keys, or press one (`key`, e.g. `ok`, `up`, `volume_up`); `GET/POST /devices/{id}/keys` |
-| `radio` | list stations, play one, favorite one |
+| `radio` | list stations, play one, favorite one; `relays: true` shows the radio relay (`GET /api/radio/relays`: on, manager running, running and restarting relays), no device needed |
 | `beolink_stream` | the BeoLink stream (a B&O source's audio through the server): address, which B&O device it listens to, who plays it; with `device_id` play it there (`stream_url`, optional `host_device_id` = the B&O device to carry), `stop` stops it |
 | `spotify_stream` | the Spotify stream's address and receiver name; with `device_id` start it on that device (`stream_url`) |
 | `multiroom` | get, join, leave |
@@ -57,6 +57,7 @@ Device and library tools do not re-implement anything: `ApiBridge` dispatches an
 | `library_overview` | the library at a glance: totals, decades, coverage, sound buckets, formats, analysis progress (`GET /api/library/overview`, optional `scope`); open; Control answers `not_available_in_profile`; see `docs/api/overview.md` |
 | `library_health` | library health reports: without `report` the finding counts of all (`GET /api/library/health`), with `report` (transcodes, damaged, clipping, duplicates, lossy, incomplete, unlinked, missing) its findings, `limit`, `cursor`; open; findings need the Full profile (`not_available_in_profile` below it); see `docs/api/library-health.md` |
 | `listening_stats` | household listening statistics from the play log (`GET /api/library/stats`): `from`/`to` (Y-m-d), `limit` of the top lists, `scope`; open; works in every profile; see `docs/api/stats.md` |
+| `listening_insights` | listening insights from the play log and the analysis (`GET /api/library/insights`): skip rate per artist, new against repeat per week, mood and tempo by part of the day, late-night listening; `days` (1-365, default 90), `scope`; open; Control answers `not_available_in_profile`, mood/tempo blocks need the Full profile; see `docs/api/insights.md` |
 
 Destructive actions answer `confirmation_required (422)` until `confirm=true`. Queued actions need the queue worker.
 

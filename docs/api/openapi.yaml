@@ -813,6 +813,39 @@ paths:
                 properties:
                   status: { type: string }
                   station: { type: string }
+                  relay:
+                    type: boolean
+                    description: Present and true when the station was started through the radio relay (converted to MP3 by this server) because the device cannot play it itself. See docs/architecture/radio-relay.md.
+  /radio/relays:
+    get:
+      tags: [Radio]
+      summary: The radio relay - whether it is on, whether its manager runs, and the relays running or waiting to restart
+      operationId: listRadioRelays
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled: { type: boolean, description: "RADIO_RELAY_ENABLED" }
+                  manager: { type: boolean, description: "The `radio:relay` manager reported in the last 15 seconds" }
+                  max: { type: integer, description: "Relays allowed at once" }
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        station_id: { type: integer }
+                        station: { type: string, nullable: true }
+                        state: { type: string, enum: [running, restarting] }
+                        since: { type: string, format: date-time, nullable: true, description: "When the running relay started" }
+                        listeners: { type: integer, nullable: true, description: "Renderers on the mount, null while unknown" }
+                        failures: { type: integer, description: "Deaths in a row soon after starting (0 once it ran healthy)" }
+                        retry_at: { type: string, format: date-time, nullable: true, description: "When a restarting relay starts again" }
+                        mount: { type: string }
+                        url: { type: string }
   /spotify-stream:
     get:
       tags: [Radio]
@@ -2208,6 +2241,19 @@ paths:
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ListeningStats" } } } }
         "422": { description: "Bad date, `to` before `from`, or a range over 731 days", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /library/insights:
+    get:
+      tags: [Library]
+      summary: Listening insights of the household (skip rate per artist, new against repeat per week, mood and tempo by part of the day, late listening)
+      operationId: getListeningInsights
+      description: "Read from the play log joined with audio analysis of the own files; household-wide, never per person. The last `days` days ending today (default 90, at most 365), hours and dates in the server's timezone (`timezone`). Cached for five minutes. Standard and Full only (Control: 422 not_available_in_profile); `parts_of_day` and `late.moods` need the Full profile's analysis and are empty or null-valued without it, and every block degrades to empty when nothing is analysed. See docs/api/insights.md for the skip rule."
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 365, default: 90 }, description: "Window in days ending today" }
+        - { $ref: "#/components/parameters/client" }
+        - { $ref: "#/components/parameters/scope" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ListeningInsights" } } } }
+        "422": { description: "Bad `days`, or not available in the Control profile (`not_available_in_profile`)", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
   /library/health:
     get:
       tags: [Library]
@@ -3237,6 +3283,147 @@ paths:
         "404": { description: Source not known for this device (list sources first) }
         "422": { description: Invalid body }
 
+  /nodes/job:
+    get:
+      tags: [Clients]
+      summary: The next job for this node (called by the node, Bearer = its client api_token)
+      description: |
+        A node's own token, not the admin token. `job` is the oldest queued job for a role that is switched on, a job this node already
+        accepted (a retry after a lost answer), or null. Counts as a sign of life. See docs/architecture/node-agent.md.
+      operationId: nodeNextJob
+      security: [{ nodeToken: [] }]
+      responses:
+        "200":
+          description: A job or null
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job: { nullable: true, allOf: [{ $ref: "#/components/schemas/NodeJob" }] }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+  /nodes/jobs/{job}/accept:
+    post:
+      tags: [Clients]
+      summary: Accept a queued job (atomic; a second accept after the first is idempotent for the same node)
+      operationId: nodeAcceptJob
+      security: [{ nodeToken: [] }]
+      parameters: [{ $ref: "#/components/parameters/nodeJob" }]
+      responses:
+        "200":
+          description: The job, now accepted
+          content:
+            application/json:
+              schema: { type: object, properties: { job: { $ref: "#/components/schemas/NodeJob" } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "The job is no longer queued (expired, cancelled, ...)" }
+  /nodes/jobs/{job}/progress:
+    post:
+      tags: [Clients]
+      summary: Renew the lease of a running job; the answer says whether the admin cancelled it
+      operationId: nodeJobProgress
+      security: [{ nodeToken: [] }]
+      parameters: [{ $ref: "#/components/parameters/nodeJob" }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, properties: { cancel_requested: { type: boolean } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "The job is not running (any more)" }
+  /nodes/jobs/{job}/result:
+    post:
+      tags: [Clients]
+      summary: Report the outcome of a job (idempotent, the first result wins)
+      operationId: nodeJobResult
+      security: [{ nodeToken: [] }]
+      parameters: [{ $ref: "#/components/parameters/nodeJob" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ok]
+              properties:
+                ok: { type: boolean }
+                result: { type: object, additionalProperties: true }
+                error: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: The job with its final state
+          content:
+            application/json:
+              schema: { type: object, properties: { job: { $ref: "#/components/schemas/NodeJob" } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: Invalid body }
+  /admin/nodes/{client}/jobs:
+    parameters: [{ name: client, in: path, required: true, schema: { type: integer } }]
+    get:
+      tags: [Clients]
+      summary: The last 50 jobs of a node
+      operationId: listNodeJobs
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/NodeJob" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [Clients]
+      summary: Create a job for a node (fixed types only; the same idempotency_key returns the same job)
+      operationId: createNodeJob
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type]
+              properties:
+                type: { type: string, enum: [ping] }
+                params: { type: object, additionalProperties: true }
+                idempotency_key: { type: string, maxLength: 100 }
+      responses:
+        "200": { description: The existing job of that idempotency key }
+        "201":
+          description: Created and the node nudged over MQTT (`remoment/node/{id}/cmd/job`, only the id)
+          content:
+            application/json:
+              schema: { type: object, properties: { job: { $ref: "#/components/schemas/NodeJob" } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "Unknown type, bad params, role not switched on, not an approved node" }
+  /admin/nodes/{client}/jobs/{job}/cancel:
+    post:
+      tags: [Clients]
+      summary: Cancel a job (a queued one ends at once, a running one is told on its next progress call)
+      operationId: cancelNodeJob
+      security: [{ adminToken: [] }]
+      parameters:
+        - { name: client, in: path, required: true, schema: { type: integer } }
+        - { $ref: "#/components/parameters/nodeJob" }
+      responses:
+        "200":
+          description: The job
+          content:
+            application/json:
+              schema: { type: object, properties: { job: { $ref: "#/components/schemas/NodeJob" } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /clients/register:
     post:
       tags: [Clients]
@@ -3516,7 +3703,16 @@ components:
       type: http
       scheme: bearer
       description: "Token from POST /admin/login (rmt_…). Only routes marked with security need it; the rest of the API is open."
+    nodeToken:
+      type: http
+      scheme: bearer
+      description: The api_token of an approved node client. Reaches only the /nodes routes.
   parameters:
+    nodeJob:
+      name: job
+      in: path
+      required: true
+      schema: { type: string, description: ULID }
     device:
       name: device
       in: path
@@ -4034,6 +4230,70 @@ components:
       properties:
         data: { type: array, items: { $ref: "#/components/schemas/PlayHistoryEntry" } }
         next_cursor: { type: string, nullable: true }
+    ListeningInsights:
+      type: object
+      properties:
+        range:
+          type: object
+          properties:
+            from: { type: string, format: date }
+            to: { type: string, format: date, description: Inclusive }
+            days: { type: integer }
+        timezone: { type: string, example: UTC, description: "Timezone of every hour and date here (config app.timezone)" }
+        analysis: { type: boolean, description: "False when the profile has no audio analysis (Standard): parts_of_day and late.moods are then empty" }
+        skips:
+          type: object
+          properties:
+            rule:
+              type: object
+              properties:
+                fraction: { type: number, example: 0.5, description: "A finished play of a track with a known length that lasted less than this fraction is a skip" }
+                min_plays: { type: integer, example: 3, description: "Measured plays an artist needs to be listed" }
+            plays: { type: integer, description: "Measured plays: finished, track length known" }
+            skipped: { type: integer }
+            rate: { type: number, nullable: true, description: "skipped / plays, null when nothing was measured" }
+            artists:
+              type: array
+              description: "Highest skip rate first, at most 10"
+              items:
+                type: object
+                properties:
+                  id: { type: integer }
+                  name: { type: string }
+                  plays: { type: integer }
+                  skipped: { type: integer }
+                  rate: { type: number }
+        weekly:
+          type: array
+          description: "Every week (Monday start) touching the window, oldest first, zero-filled; the first and last may be partial. Plays without a library track are not counted."
+          items:
+            type: object
+            properties:
+              week: { type: string, format: date, description: "The Monday" }
+              new: { type: integer, description: "Plays that were their track's first logged play ever" }
+              repeat: { type: integer }
+        parts_of_day:
+          type: array
+          description: "night, morning, afternoon, evening, always all four"
+          items:
+            type: object
+            properties:
+              part: { type: string, enum: [night, morning, afternoon, evening] }
+              hours: { type: object, properties: { from: { type: integer }, until: { type: integer, description: Exclusive } } }
+              plays: { type: integer }
+              analysed_plays: { type: integer }
+              bpm: { type: number, nullable: true, description: "Mean BPM of the analysed plays" }
+              arousal: { type: number, nullable: true, description: "Mean arousal, raw 0-1" }
+              tempos: { type: object, properties: { slow: { type: integer }, steady: { type: integer }, fast: { type: integer } }, description: "Plays per tempo bucket (below 90, 90-125, from 125 BPM)" }
+              moods: { type: array, items: { type: object, properties: { name: { type: string }, plays: { type: integer } } }, description: "Most plays first, at most 10; a play counts for each of its moods" }
+        late:
+          type: object
+          properties:
+            hours: { type: object, properties: { from: { type: integer, example: 22 }, until: { type: integer, example: 5, description: "Exclusive, from midnight" } } }
+            plays: { type: integer }
+            artists: { type: array, items: { type: object, properties: { id: { type: integer }, name: { type: string }, plays: { type: integer } } } }
+            tracks: { type: array, items: { type: object, properties: { id: { type: integer }, name: { type: string }, artist: { type: string }, plays: { type: integer } } } }
+            moods: { type: array, items: { type: object, properties: { name: { type: string }, plays: { type: integer } } } }
     ListeningStats:
       type: object
       properties:
@@ -4421,6 +4681,7 @@ components:
             name: { type: string }
             genre: { type: string, nullable: true }
             images: { type: array, items: { type: string } }
+            relay: { type: boolean, description: "Present and true while the station plays through the radio relay (converted to MP3 by this server)" }
         source:
           type: object
           nullable: true
@@ -4887,6 +5148,7 @@ components:
         api_token: { type: string }
         type: { type: string, enum: [single, multi] }
         kind: { type: string, enum: [node], description: Present for a node only }
+        client_id: { type: integer, description: "Present for a node only; the id in its MQTT topics remoment/node/{client_id}/..." }
         roles:
           type: array
           description: Present for a node only; the roles the admin has switched on
@@ -4894,6 +5156,21 @@ components:
         devices:
           type: array
           items: { $ref: "#/components/schemas/DeviceList" }
+    NodeJob:
+      type: object
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [ping] }
+        role: { type: string, nullable: true }
+        params: { type: object, additionalProperties: true }
+        state: { type: string, enum: [queued, accepted, running, succeeded, failed, cancelled, expired, lost] }
+        cancel_requested: { type: boolean }
+        deadline_at: { type: string, format: date-time, nullable: true }
+        lease_until: { type: string, format: date-time, nullable: true }
+        result: { type: object, nullable: true, additionalProperties: true }
+        error: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time, nullable: true }
     NodeRole:
       type: string
       enum: [ripper, line-in, player, sync-target]

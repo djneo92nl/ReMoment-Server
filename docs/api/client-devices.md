@@ -168,7 +168,7 @@ Polls approval status. Call this after registration until `status` is `approved`
 
 `devices` is the complete list of devices this client is allowed to control. For `single` clients this is always one entry; for `multi` clients it may be many. Store the `api_token` immediately to persistent storage — this is the only place it is returned alongside the approval notification.
 
-For a node the approved answer also has `kind: "node"` and `roles`: the roles the admin switched on (never more than it declared). Plain clients get neither key.
+For a node the approved answer also has `kind: "node"`, `client_id` (the id in its MQTT topics `remoment/node/{client_id}/…`) and `roles`: the roles the admin switched on (never more than it declared). Plain clients get neither key.
 
 Returns `HTTP 404` if the `registration_token` is unknown.
 
@@ -399,4 +399,4 @@ while (true) {
 
 ## Nodes
 
-`/settings/clients` shows a node with a **node** badge, its declared roles (a role the admin has not switched on is marked "off") and, in the approve and edit forms, one checkbox per declared role. A node has no players unless the admin assigns some, and never gets the "all devices" rule of a `multi` client. Jobs, the MQTT command channel and the node's own token routes are planned in [node-agent.md](../architecture/node-agent.md) (phase N1); nothing here sends a node any work yet.
+`/settings/clients` shows a node with a **node** badge, its declared roles (a role the admin has not switched on is marked "off") and, in the approve and edit forms, one checkbox per declared role. A node has no players unless the admin assigns some, and never gets the "all devices" rule of a `multi` client. Jobs run over the node's own Bearer-token routes (`GET /api/nodes/job`, `POST /api/nodes/jobs/{id}/accept|progress|result`; the admin creates them with `POST /api/admin/nodes/{id}/jobs`) with an MQTT doorbell `remoment/node/{id}/cmd/job`; see [node-agent.md](../architecture/node-agent.md). Only the job type `ping` exists (phase N1); the Go agent is in `node/`.

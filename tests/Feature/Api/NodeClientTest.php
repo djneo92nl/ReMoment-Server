@@ -107,7 +107,7 @@ class NodeClientTest extends TestCase
         $client = $this->approve(Client::first(), ['line-in', 'player']); // player was not declared
 
         $this->getJson('/api/clients/status/'.$client->registration_token)
-            ->assertOk()->assertJsonPath('kind', 'node')->assertJsonPath('roles', ['line-in']);
+            ->assertOk()->assertJsonPath('kind', 'node')->assertJsonPath('client_id', $client->id)->assertJsonPath('roles', ['line-in']);
 
         $this->putJson("/api/clients/{$client->api_token}/heartbeat", [])
             ->assertOk()->assertJsonPath('roles', ['line-in']);

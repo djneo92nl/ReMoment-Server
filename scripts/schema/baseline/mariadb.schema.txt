@@ -477,6 +477,30 @@ TABLE multiroom_presets [engine=InnoDB collation=utf8mb4_unicode_ci]
   idx PRIMARY UNIQUE BTREE (id)
   check device_ids json_valid(`device_ids`)
 
+TABLE node_jobs [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col accepted_at timestamp NULL default=NULL
+  col cancel_requested tinyint(1) NOT NULL default=0
+  col client_id bigint(20) unsigned NOT NULL default=-
+  col created_at timestamp NULL default=NULL
+  col deadline_at timestamp NULL default=NULL
+  col error varchar(500) NULL default=NULL collate=utf8mb4_unicode_ci
+  col finished_at timestamp NULL default=NULL
+  col id varchar(26) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col idempotency_key varchar(100) NULL default=NULL collate=utf8mb4_unicode_ci
+  col lease_until timestamp NULL default=NULL
+  col params longtext NULL default=NULL collate=utf8mb4_bin
+  col result longtext NULL default=NULL collate=utf8mb4_bin
+  col role varchar(20) NULL default=NULL collate=utf8mb4_unicode_ci
+  col state varchar(20) NOT NULL default='queued' collate=utf8mb4_unicode_ci
+  col type varchar(40) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx node_jobs_client_id_idempotency_key_unique UNIQUE BTREE (client_id,idempotency_key)
+  idx node_jobs_client_id_state_index INDEX BTREE (client_id,state)
+  fk node_jobs_client_id_foreign (client_id) -> clients(id) ON DELETE CASCADE ON UPDATE RESTRICT
+  check params json_valid(`params`)
+  check result json_valid(`result`)
+
 TABLE password_reset_tokens [engine=InnoDB collation=utf8mb4_unicode_ci]
   col created_at timestamp NULL default=NULL
   col email varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
