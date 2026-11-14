@@ -56,7 +56,7 @@ class DeviceController extends Controller
             'ip_address' => $isVirtual ? ['nullable', 'string', 'max:255'] : ['required', 'string', 'max:255'],
             'device_brand_name' => ['required', 'string', 'max:255'],
             'device_product_type' => ['required', 'string', 'max:255'],
-            'device_driver' => ['required', 'string', 'max:500'],
+            'device_driver' => ['required', 'string', 'max:500', fn ($attribute, $value, $fail) => class_exists($value) ?: $fail('That driver class does not exist.')],
             'device_driver_name' => ['nullable', 'string', 'max:255'],
         ]);
 
@@ -136,7 +136,7 @@ class DeviceController extends Controller
             'ip_address' => $isVirtual ? ['nullable', 'string', 'max:255'] : ['required', 'string', 'max:255'],
             'device_brand_name' => ['required', 'string', 'max:255'],
             'device_product_type' => ['required', 'string', 'max:255'],
-            'device_driver' => ['required', 'string', 'max:500'],
+            'device_driver' => ['required', 'string', 'max:500', fn ($attribute, $value, $fail) => class_exists($value) ?: $fail('That driver class does not exist.')],
             'device_driver_name' => ['nullable', 'string', 'max:255'],
         ]);
 

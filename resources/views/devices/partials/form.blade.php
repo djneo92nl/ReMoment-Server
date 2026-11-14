@@ -17,10 +17,10 @@
 
 <div
     x-data="{
-        brand: '{{ old('device_brand_name', $device?->device_brand_name ?? '') }}',
-        product: '{{ old('device_product_type', $device?->device_product_type ?? '') }}',
-        driver: '{{ old('device_driver', $device?->device_driver ?? '') }}',
-        driver_name: '{{ old('device_driver_name', $device?->device_driver_name ?? '') }}',
+        brand: @js(old('device_brand_name', $device?->device_brand_name ?? '')),
+        product: @js(old('device_product_type', $device?->device_product_type ?? '')),
+        driver: @js(old('device_driver', $device?->device_driver ?? '')),
+        driver_name: @js(old('device_driver_name', $device?->device_driver_name ?? '')),
         virtual: false,
         options: {{ json_encode($driverOptions) }},
         get brands() {
