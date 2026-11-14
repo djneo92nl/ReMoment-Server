@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\PhysicalController;
 use App\Http\Controllers\Api\PlayerController;
 use App\Http\Controllers\Api\QueueController;
 use App\Http\Controllers\Api\RemoteKeysController;
+use App\Http\Controllers\Api\SceneController;
 use App\Http\Controllers\Api\SourceControlsController;
 use App\Http\Controllers\Api\SpotifyStreamController;
 use App\Http\Controllers\Api\StorageController;
@@ -184,6 +185,14 @@ Route::get('/clients/status/{registrationToken}', [ClientController::class, 'sta
 Route::get('/clients/{apiToken}/devices', [ClientController::class, 'devices']);
 Route::put('/clients/{apiToken}/heartbeat', [ClientController::class, 'heartbeat']);
 Route::get('/clients/{apiToken}/artwork', [ClientController::class, 'artwork']);
+
+// Scenes: household-wide step lists, open like playlists and multiroom presets (docs/api/scenes.md)
+Route::get('/scenes', [SceneController::class, 'index']);
+Route::post('/scenes', [SceneController::class, 'store']);
+Route::get('/scenes/{scene}', [SceneController::class, 'show']);
+Route::put('/scenes/{scene}', [SceneController::class, 'update']);
+Route::delete('/scenes/{scene}', [SceneController::class, 'destroy']);
+Route::post('/scenes/{scene}/activate', [SceneController::class, 'activate']);
 
 // Tap to play: NFC tags and QR codes (docs/api/tags.md); managing them is in the admin group
 Route::get('/tags/{uid}', [TagController::class, 'show']);

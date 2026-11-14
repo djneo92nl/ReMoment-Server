@@ -22,12 +22,14 @@
 |
 | The same list feeds the Home Assistant `rest_command` package (`php artisan ha:package`).
 |
-| Not here yet: multiroom presets (web only, no REST operation) and scene activation (scenes are not built).
+| Not here yet: multiroom presets (web only, no REST operation). Scene operations are excluded (no recursion).
 */
 
 return [
     'exclude' => [
         'adminLogin', 'registerClient', 'registerPlayer', 'putPlayerState', 'clientHeartbeat', 'removePhysical',
+        // A scene may not create, change or run scenes (no recursion)
+        'createScene', 'updateScene', 'deleteScene', 'activateScene',
     ],
 
     'operations' => [

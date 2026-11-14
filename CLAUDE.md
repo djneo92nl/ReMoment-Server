@@ -25,6 +25,7 @@ docs/
     library.md              Library browse (artists, albums, playlists), favorites, play album/artist/playlist on a device (DLNA or Spotify), playlist artwork
     source-controls.md      Per-source controls (change disc, FM presets) from control profiles: GET/POST /api/devices/{id}/controls, resolution, transports
     physical.md             Physical collection (CDs, records, tapes): items by barcode or by hand, MusicBrainz barcode lookup, `physical` availability provider, wishes closed by owning it
+    scenes.md               Scenes (8.1): household-wide step lists (operationId + device + params, or delay) run through the REST API; GET/POST /api/scenes, activate, schedule, `last_run`, `features.scenes`; MCP tool `scenes`
     sync-groups.md          Sync groups (fake multiroom) REST API: leader + members, offsets, errors
     playback-move.md        Move playback to another device: POST /api/devices/{id}/move, what moves (library queue, radio, Spotify transfer), what is refused (local inputs)
     queue.md                Editing the queue: add, play next, remove, move, clear (queue_add/next/remove/move/clear), positions, `expect`, per-platform support
@@ -207,7 +208,7 @@ Base URL: `/api` — no authentication required.
 
 ### Server Info
 
-**`GET /api/info`** — bootstrap info for client devices: `{ name, version, api_version, base_url, api_base_url, artwork_base_url, mqtt: { host, port, ws_port, ws_url, topic_prefix }, placeholder }`. `placeholder` is a full artwork object (`kind: "source"`, the music-note logo, rendered on the spot if missing) for clients to show whenever there is no artwork, e.g. while a cover is first processed. `features` is `{ alerts: true, profile: "control"|"standard"|"full", deep_analysis: bool, deep_analysis_kinds?: ["sections", "stems"] }` (only keys true today; `deep_analysis` while a deep-analysis service answers its health check, `deep_analysis_kinds` lists the kinds that can run now, present only when not empty). Addresses are as the client reached the server; `mqtt.host` is `MQTT_PUBLIC_HOST` or the request host (never the Docker-internal `MQTT_HOST`); `mqtt.ws_port`/`ws_url` are the WebSocket listener (`MQTT_PUBLIC_WS_PORT`, default 9001; `MQTT_WS_URL` overrides the URL). See `docs/api/server-info.md`.
+**`GET /api/info`** — bootstrap info for client devices: `{ name, version, api_version, base_url, api_base_url, artwork_base_url, mqtt: { host, port, ws_port, ws_url, topic_prefix }, placeholder }`. `placeholder` is a full artwork object (`kind: "source"`, the music-note logo, rendered on the spot if missing) for clients to show whenever there is no artwork, e.g. while a cover is first processed. `features` is `{ alerts: true, scenes: true, profile: "control"|"standard"|"full", deep_analysis: bool, deep_analysis_kinds?: ["sections", "stems"] }` (only keys true today; `deep_analysis` while a deep-analysis service answers its health check, `deep_analysis_kinds` lists the kinds that can run now, present only when not empty). Addresses are as the client reached the server; `mqtt.host` is `MQTT_PUBLIC_HOST` or the request host (never the Docker-internal `MQTT_HOST`); `mqtt.ws_port`/`ws_url` are the WebSocket listener (`MQTT_PUBLIC_WS_PORT`, default 9001; `MQTT_WS_URL` overrides the URL). See `docs/api/server-info.md`.
 
 ### Alerts
 
@@ -603,6 +604,14 @@ GET /api/library/physical/lookup?barcode=                      → { data: [Rele
 ```
 
 MCP tool `physical`; web `/library/collection` (Livewire `PhysicalCollection`); table `physical_items`, `App\Domain\Catalogue\PhysicalItems`.
+
+### Scenes
+
+`/api/scenes` (open like playlists; no accounts): a scene is a list of steps `{operation, device_id, params}` (an operationId of `docs/api/openapi.yaml` from `SceneOperations`) or `{type: "delay", seconds}`, run in order by `App\Domain\Scenes\SceneRunner` through `ApiBridge`, so each step answers like a client call. Steps are validated on save and again before a run; `stop_on_error` decides whether a failing step ends it; the result per step and `last_run` are stored on the `scenes` row. A scene with delays is queued (`RunScene`, 202), one without runs in the request (200). `schedule_time`/`schedule_days` are run by the every-minute task `scenes-run-due` (profile feature `scenes`). MQTT triggers, alarm and sleep timer are not built. MCP `scenes`. See `docs/api/scenes.md`.
+
+```
+GET|POST /api/scenes     GET|PUT|DELETE /api/scenes/{id}     POST /api/scenes/{id}/activate
+```
 
 ### Announcements, tags and the party page
 

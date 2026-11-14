@@ -36,7 +36,7 @@ class InfoApiTest extends TestCase
                 'ws_port' => 9001,
                 'ws_url' => 'ws://192.168.1.50:9001',
             ],
-            'features' => ['alerts' => true, 'profile' => 'full', 'deep_analysis' => false, 'analysis' => false] + $this->exportFeature(),
+            'features' => ['alerts' => true, 'scenes' => true, 'profile' => 'full', 'deep_analysis' => false, 'analysis' => false] + $this->exportFeature(),
         ], Arr::except($response->json(), 'placeholder'));
     }
 
@@ -60,7 +60,7 @@ class InfoApiTest extends TestCase
         Http::fake(['structure:8091/health' => function () use (&$healthy) {
             return $healthy ? Http::response(['ok' => true, 'version' => 1, 'method' => 'novelty-v1']) : Http::response('', 503);
         }]);
-        $this->getJson('/api/info')->assertJsonPath('features', ['alerts' => true, 'profile' => 'full', 'deep_analysis' => true, 'analysis' => false, 'deep_analysis_kinds' => ['sections']] + $this->exportFeature());
+        $this->getJson('/api/info')->assertJsonPath('features', ['alerts' => true, 'scenes' => true, 'profile' => 'full', 'deep_analysis' => true, 'analysis' => false, 'deep_analysis_kinds' => ['sections']] + $this->exportFeature());
 
         Cache::flush();
         $healthy = false;

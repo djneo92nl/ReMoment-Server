@@ -79,3 +79,6 @@ Schedule::call(fn () => \App\Domain\Device\VolumeLimits::enforceDue())->everyMin
 // Raises and resolves alerts for the conditions above and the devices (docs/architecture/alerts.md); never slows the heartbeat.
 Schedule::command('alerts:check')->everyMinute()->withoutOverlapping(5)->name('alerts-check');
 Schedule::call(fn () => \App\Domain\Alerts\Alerts::prune())->dailyAt('04:45')->name('alerts-prune');
+
+// Scenes with a schedule that say now (docs/api/scenes.md); each is queued, so a scene with delays never holds the scheduler.
+Schedule::call(fn () => app(\App\Domain\Scenes\SceneRunner::class)->runDue())->everyMinute()->name('scenes-run-due')->when(fn () => Profile::allows('scenes'));

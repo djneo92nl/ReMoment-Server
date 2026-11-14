@@ -553,6 +553,25 @@ TABLE radio_stations [autoincrement]
   idx radio_stations_favorited_at_index INDEX (favorited_at)
   idx radio_stations_last_played_at_index INDEX (last_played_at)
 
+TABLE scenes [autoincrement]
+  col color varchar NULL default=-
+  col created_at datetime NULL default=-
+  col icon varchar NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col last_run_at datetime NULL default=-
+  col last_run_results text NULL default=-
+  col last_run_source varchar NULL default=-
+  col last_run_status varchar NULL default=-
+  col name varchar NOT NULL default=-
+  col schedule_days text NULL default=-
+  col schedule_enabled tinyint(1) NOT NULL default='0'
+  col schedule_time varchar NULL default=-
+  col steps text NOT NULL default=-
+  col stop_on_error tinyint(1) NOT NULL default='0'
+  col updated_at datetime NULL default=-
+  idx scenes_name_index INDEX (name)
+  idx scenes_schedule_enabled_schedule_time_index INDEX (schedule_enabled,schedule_time)
+
 TABLE sessions
   col id varchar NOT NULL default=- pk=1
   col ip_address varchar NULL default=-

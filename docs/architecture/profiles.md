@@ -29,6 +29,7 @@ Kept in step with `config/profile.php` by `tests/Unit/ProfileDocsTest.php`.
 | `devices` | Devices, playback, sources, multiroom | yes | yes | yes |
 | `history` | Play history and insights | yes | yes | yes |
 | `radio` | Radio | yes | yes | yes |
+| `scenes` | Scenes: step lists run through the API, optionally on a schedule | yes | yes | yes |
 | `alerts` | Alerts, health and backup | yes | yes | yes |
 | `library` | Library browsing, playlists, library cache, artwork prerender, Spotify browse | – | yes | yes |
 | `enrichment` | Metadata enrichment (MusicBrainz, Wikipedia, Last.fm, lyrics ...) | – | yes | yes |
@@ -63,7 +64,7 @@ Nothing is deleted: the code paths stay, only the entry points are gated. Livewi
 
 | Task | Control | Standard | Full |
 |---|---|---|---|
-| `device:sync-sources`, `device:discover`, `radio:refresh`, `radio:fix-artwork`, radio plays prune, `backup:run`, `queue:prune-failed`, health heartbeat, queue watchdog, `alerts:check`, alerts prune, volume limits | yes | yes | yes |
+| `device:sync-sources`, `device:discover`, `radio:refresh`, `radio:fix-artwork`, radio plays prune, `backup:run`, `queue:prune-failed`, health heartbeat, queue watchdog, `alerts:check`, alerts prune, volume limits, scenes due | yes | yes | yes |
 | `library:warm` (every 5 min), `artwork:backfill`, `artwork:prerender`, `playlists:refresh-smart`, `library:merge-duplicates` (`library`) | – | yes | yes |
 | `library:enrich` (`enrichment`) | – | yes | yes |
 | `library:scan-files` (`file_storage`) | – | yes | yes |

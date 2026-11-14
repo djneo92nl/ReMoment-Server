@@ -48,6 +48,8 @@ class InfoController extends Controller
             // What this server can do beyond the base contract; only keys that are true today, a client treats a missing key as false.
             'features' => [
                 'alerts' => true,
+                // GET /api/scenes: household-wide step lists (docs/api/scenes.md).
+                'scenes' => Profile::allows('scenes'),
                 // The profile this server runs: control | standard | full (docs/architecture/profiles.md).
                 'profile' => Profile::current(),
                 // A deep-analysis service answers its health check (cached for a minute): sections or stems of a track on request;

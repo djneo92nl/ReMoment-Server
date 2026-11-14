@@ -45,6 +45,7 @@ tags:
   - name: Clients
   - name: Players
   - name: Tags
+  - name: Scenes
   - name: Admin
 
 paths:
@@ -2721,6 +2722,116 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AnnouncementResult" }
+  /scenes:
+    get:
+      tags: [Scenes]
+      summary: All scenes (name, icon and colour for shortcuts and widgets)
+      operationId: listScenes
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/SceneItem" }
+    post:
+      tags: [Scenes]
+      summary: Create a scene
+      operationId: createScene
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SceneInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Scene" }
+        "422": { description: "Validation errors, steps as `steps.N.field`" }
+  /scenes/{scene}:
+    parameters:
+      - { name: scene, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Scenes]
+      summary: One scene with its steps and the result of its last run
+      operationId: getScene
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Scene" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Scenes]
+      summary: Change a scene (only the fields given)
+      operationId: updateScene
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SceneInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Scene" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "Validation errors" }
+    delete:
+      tags: [Scenes]
+      summary: Delete a scene
+      operationId: deleteScene
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /scenes/{scene}/activate:
+    parameters:
+      - { name: scene, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Scenes]
+      summary: Run a scene
+      operationId: activateScene
+      description: |
+        A scene without delay steps runs at once (200, per-step `results`). One with delays is queued (202,
+        `status` queued) so the request does not wait; read `last_run` on the scene afterwards. See docs/api/scenes.md.
+      responses:
+        "200":
+          description: Ran; `status` is ok, partial or failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [ok, partial, failed] }
+                  results: { type: array, items: { $ref: "#/components/schemas/SceneStepResult" } }
+                  data: { $ref: "#/components/schemas/SceneItem" }
+        "202":
+          description: Queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: queued }
+                  data: { $ref: "#/components/schemas/SceneItem" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /tags/{uid}:
     parameters:
       - { name: uid, in: path, required: true, schema: { type: string } }
@@ -3358,6 +3469,70 @@ components:
               playlist: { type: string }
 
   schemas:
+    SceneStep:
+      type: object
+      description: "An operation step (operation + device_id + params) or a delay step (type delay + seconds, 1 to 60)"
+      properties:
+        operation: { type: string, description: "An operationId of this contract that a scene may call (docs/api/scenes.md)", example: setVolume }
+        device_id: { type: integer }
+        params: { type: object, additionalProperties: true }
+        type: { type: string, enum: [delay] }
+        seconds: { type: number, minimum: 1, maximum: 60 }
+    SceneInput:
+      type: object
+      required: [name, steps]
+      properties:
+        name: { type: string, maxLength: 120 }
+        icon: { type: string, maxLength: 32, nullable: true }
+        color: { type: string, example: "#4d7cff", nullable: true }
+        steps: { type: array, minItems: 1, maxItems: 50, items: { $ref: "#/components/schemas/SceneStep" } }
+        stop_on_error: { type: boolean, default: false }
+        schedule_enabled: { type: boolean, default: false }
+        schedule_time: { type: string, example: "07:30", nullable: true }
+        schedule_days: { type: array, items: { type: integer, minimum: 1, maximum: 7 }, nullable: true, description: "ISO weekdays, 1 Monday; null is every day" }
+    SceneItem:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        icon: { type: string, nullable: true }
+        color: { type: string, nullable: true }
+        step_count: { type: integer }
+        stop_on_error: { type: boolean }
+        schedule:
+          type: object
+          properties:
+            enabled: { type: boolean }
+            time: { type: string, nullable: true }
+            days: { type: array, items: { type: integer }, nullable: true }
+        last_run:
+          type: object
+          properties:
+            at: { type: string, format: date-time, nullable: true }
+            status: { type: string, enum: [ok, partial, failed, running], nullable: true }
+            source: { type: string, enum: [api, schedule], nullable: true }
+    Scene:
+      allOf:
+        - { $ref: "#/components/schemas/SceneItem" }
+        - type: object
+          properties:
+            steps: { type: array, items: { $ref: "#/components/schemas/SceneStep" } }
+            last_run:
+              type: object
+              properties:
+                results: { type: array, items: { $ref: "#/components/schemas/SceneStepResult" }, nullable: true }
+    SceneStepResult:
+      type: object
+      properties:
+        index: { type: integer, nullable: true }
+        type: { type: string, enum: [operation, delay] }
+        operation: { type: string }
+        device_id: { type: integer, nullable: true }
+        seconds: { type: number }
+        ok: { type: boolean }
+        status: { type: integer, nullable: true, description: "HTTP status of the step; null for a delay or a skipped step" }
+        error: { type: string, nullable: true }
+        skipped: { type: boolean, description: "Present when stop_on_error ended the run before this step" }
     Alert:
       type: object
       properties:
@@ -3427,6 +3602,7 @@ components:
             analysis: { type: boolean, description: "Audio analysis of the own files is enabled (ANALYSIS_ENABLED) and the profile allows it (Full). False: Sound data (TrackAnalysis, waveform, listening modes) will not appear, so explain an empty Sound page instead of showing nothing. Always present." }
             deep_analysis: { type: boolean, description: "A deep-analysis service answers its health check (cached for a minute): POST /library/tracks/{id}/deep-analysis can queue something" }
             deep_analysis_kinds: { type: array, items: { $ref: "#/components/schemas/DeepAnalysisKind" }, description: "The kinds that can run now (sections: structure service; stems: stems service). Present only when not empty." }
+            scenes: { type: boolean, description: "GET /scenes exists (true in every profile)" }
             export: { type: boolean, description: "Export from the library as zip is available: the profile has the library and own files, and ffmpeg can transcode (POST /library/exports). Present only when true." }
 
     ExportRequest:

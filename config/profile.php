@@ -62,6 +62,7 @@ return [
         'devices' => ['label' => 'Devices, playback, sources, multiroom', 'profiles' => ['control', 'standard', 'full']],
         'history' => ['label' => 'Play history and insights', 'profiles' => ['control', 'standard', 'full']],
         'radio' => ['label' => 'Radio', 'profiles' => ['control', 'standard', 'full']],
+        'scenes' => ['label' => 'Scenes: step lists run through the API, optionally on a schedule', 'profiles' => ['control', 'standard', 'full']],
         'alerts' => ['label' => 'Alerts, health and backup', 'profiles' => ['control', 'standard', 'full']],
 
         'library' => ['label' => 'Library browsing, playlists, library cache, artwork prerender, Spotify browse', 'profiles' => ['standard', 'full']],

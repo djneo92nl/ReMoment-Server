@@ -614,6 +614,29 @@ TABLE radio_station_meta [engine=InnoDB collation=utf8mb4_unicode_ci]
   idx radio_station_meta_radio_station_id_key_unique UNIQUE BTREE (radio_station_id,key)
   fk radio_station_meta_radio_station_id_foreign (radio_station_id) -> radio_stations(id) ON DELETE CASCADE ON UPDATE RESTRICT
 
+TABLE scenes [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col color varchar(16) NULL default=NULL collate=utf8mb4_unicode_ci
+  col created_at timestamp NULL default=NULL
+  col icon varchar(32) NULL default=NULL collate=utf8mb4_unicode_ci
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col last_run_at timestamp NULL default=NULL
+  col last_run_results longtext NULL default=NULL collate=utf8mb4_bin
+  col last_run_source varchar(16) NULL default=NULL collate=utf8mb4_unicode_ci
+  col last_run_status varchar(16) NULL default=NULL collate=utf8mb4_unicode_ci
+  col name varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col schedule_days longtext NULL default=NULL collate=utf8mb4_bin
+  col schedule_enabled tinyint(1) NOT NULL default=0
+  col schedule_time varchar(5) NULL default=NULL collate=utf8mb4_unicode_ci
+  col steps longtext NOT NULL default=- collate=utf8mb4_bin
+  col stop_on_error tinyint(1) NOT NULL default=0
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx scenes_name_index INDEX BTREE (name)
+  idx scenes_schedule_enabled_schedule_time_index INDEX BTREE (schedule_enabled,schedule_time)
+  check last_run_results json_valid(`last_run_results`)
+  check schedule_days json_valid(`schedule_days`)
+  check steps json_valid(`steps`)
+
 TABLE sessions [engine=InnoDB collation=utf8mb4_unicode_ci]
   col id varchar(255) NOT NULL default=- collate=utf8mb4_unicode_ci
   col ip_address varchar(45) NULL default=NULL collate=utf8mb4_unicode_ci
