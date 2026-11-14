@@ -6,7 +6,10 @@ use App\Domain\Profile\Profile;
 use App\Domain\Scenes\SceneOperations;
 use App\Domain\Scenes\SceneRunner;
 use App\Models\Device;
+use App\Models\Media\Album;
+use App\Models\Media\Artist;
 use App\Models\Media\Playlist;
+use App\Models\Media\Track;
 use App\Models\RadioStation;
 use App\Models\Scene;
 use Livewire\Component;
@@ -29,7 +32,13 @@ class SceneEditor extends Component
     /** Inputs that take a record id, picked by name: input name => list. Anything else stays a plain field. */
     public const PICKERS = ['playlist_id' => 'playlists', 'playlist' => 'playlists', 'station' => 'stations'];
 
+    /** Inputs that take a library record found by search: input name => album | artist | track (Full library only). */
+    public const SEARCH_PICKERS = ['album_id' => 'album', 'artist_id' => 'artist', 'track_id' => 'track'];
+
     public ?int $sceneId = null;
+
+    /** @var array<int, array<string, string>> search text per step and input */
+    public array $pickerSearch = [];
 
     public string $name = '';
 
@@ -86,6 +95,41 @@ class SceneEditor extends Component
         return ['kind' => 'operation', 'operation' => $step['operation'] ?? '', 'device_id' => (string) ($step['device_id'] ?? ''), 'params' => $params];
     }
 
+    /** The name a picked record is shown with, or null when it no longer exists. */
+    public function pickLabel(string $kind, int $id): ?string
+    {
+        return match ($kind) {
+            'album' => ($r = Album::with('artist:id,name')->find($id)) ? $r->name.($r->artist ? ' — '.$r->artist->name : '') : null,
+            'artist' => Artist::find($id)?->name,
+            default => ($r = Track::with('artist:id,name')->find($id)) ? $r->name.($r->artist ? ' — '.$r->artist->name : '') : null,
+        };
+    }
+
+    /**
+     * Up to 20 records whose name contains the text (artists: their name; albums and tracks also their artist's).
+     *
+     * @return array<int, string> id => label
+     */
+    public function pickSearch(string $kind, string $text): array
+    {
+        $text = trim($text);
+        if (mb_strlen($text) < 2) {
+            return [];
+        }
+        $like = '%'.addcslashes($text, '%_\\').'%';
+
+        if ($kind === 'artist') {
+            return Artist::where('name', 'like', $like)->orderBy('name')->limit(20)->pluck('name', 'id')->all();
+        }
+
+        $model = $kind === 'album' ? Album::class : Track::class;
+
+        return $model::with('artist:id,name')
+            ->where(fn ($q) => $q->where('name', 'like', $like)->orWhereHas('artist', fn ($a) => $a->where('name', 'like', $like)))
+            ->orderBy('name')->limit(20)->get()
+            ->mapWithKeys(fn ($r) => [$r->id => $r->name.($r->artist ? ' — '.$r->artist->name : '')])->all();
+    }
+
     public function addOperation(): void
     {
         $this->steps[] = ['kind' => 'operation', 'operation' => '', 'device_id' => '', 'params' => []];
@@ -100,6 +144,7 @@ class SceneEditor extends Component
     {
         unset($this->steps[$i]);
         $this->steps = array_values($this->steps);
+        $this->pickerSearch = [];
         $this->stepErrors = [];
     }
 
@@ -110,6 +155,7 @@ class SceneEditor extends Component
             return;
         }
         [$this->steps[$i], $this->steps[$j]] = [$this->steps[$j], $this->steps[$i]];
+        $this->pickerSearch = [];
         $this->stepErrors = [];
     }
 
@@ -119,6 +165,7 @@ class SceneEditor extends Component
         if (str_ends_with($key, '.operation')) {
             $i = (int) explode('.', $key)[0];
             $this->steps[$i]['params'] = [];
+            $this->pickerSearch = [];
             if (($op = app(SceneOperations::class)->find((string) $value)) && $op['device_param'] === null) {
                 $this->steps[$i]['device_id'] = '';
             }
@@ -219,6 +266,7 @@ class SceneEditor extends Component
                 'playlists' => Profile::allows('library') ? Playlist::orderBy('name')->limit(1000)->pluck('name', 'id')->all() : null,
                 'stations' => RadioStation::orderBy('name')->limit(1000)->pluck('name', 'id')->all(),
             ],
+            'searchPickers' => Profile::allows('library'),
             'devices' => Device::orderBy('device_name')->get(['id', 'device_name']),
             'icons' => self::ICONS + ($this->icon !== '' && !isset(self::ICONS[$this->icon]) ? [$this->icon => $this->icon] : []),
             'colors' => array_flip(self::COLORS) + ($this->color !== '' && !in_array($this->color, self::COLORS, true) ? [$this->color => 'Custom'] : []),

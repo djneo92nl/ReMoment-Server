@@ -89,18 +89,40 @@
 
                         @foreach($op['inputs'] as $name => $input)
                             @continue($name === $op['device_param'])
-                            @php($schema = $input['schema'])
                             <div>
                                 <x-input-label :value="\Illuminate\Support\Str::headline($name).($input['required'] ? '' : ' (optional)')" class="mb-1.5" />
-                                @php($list = isset(\App\Livewire\SceneEditor::PICKERS[$name]) ? $pickLists[\App\Livewire\SceneEditor::PICKERS[$name]] : null)
+                                @php
+                                    $schema = $input['schema'];
+                                    $list = isset(\App\Livewire\SceneEditor::PICKERS[$name]) ? $pickLists[\App\Livewire\SceneEditor::PICKERS[$name]] : null;
+                                @endphp
                                 @if($list !== null)
-                                    @php($current = (string) ($step['params'][$name] ?? ''))
+                                    @php
+                                        $current = (string) ($step['params'][$name] ?? '');
+                                    @endphp
                                     <x-select wire:model="steps.{{ $i }}.params.{{ $name }}" class="w-full">
                                         <option value="">{{ $input['required'] ? 'Choose…' : '—' }}</option>
                                         @if($current !== '' && !isset($list[(int) $current]))
                                             <option value="{{ $current }}">Missing (#{{ $current }})</option>
                                         @endif
                                         @foreach($list as $id => $label)
+                                            <option value="{{ $id }}">{{ $label }}</option>
+                                        @endforeach
+                                    </x-select>
+                                @elseif($searchPickers && isset(\App\Livewire\SceneEditor::SEARCH_PICKERS[$name]))
+                                    @php
+                                        $kind = \App\Livewire\SceneEditor::SEARCH_PICKERS[$name];
+                                        $current = (string) ($step['params'][$name] ?? '');
+                                        $found = $this->pickSearch($kind, $pickerSearch[$i][$name] ?? '');
+                                        $currentLabel = ctype_digit($current) ? $this->pickLabel($kind, (int) $current) : null;
+                                    @endphp
+                                    <x-text-input wire:model.live.debounce.300ms="pickerSearch.{{ $i }}.{{ $name }}" type="search" size="sm" class="w-full mb-2"
+                                                  :placeholder="'Search '.$kind.'s by name…'" />
+                                    <x-select wire:model="steps.{{ $i }}.params.{{ $name }}" class="w-full">
+                                        <option value="">{{ $input['required'] ? 'Choose…' : '—' }}</option>
+                                        @if($current !== '' && !isset($found[(int) $current]))
+                                            <option value="{{ $current }}">{{ $currentLabel ?? 'Missing (#'.$current.')' }}</option>
+                                        @endif
+                                        @foreach($found as $id => $label)
                                             <option value="{{ $id }}">{{ $label }}</option>
                                         @endforeach
                                     </x-select>

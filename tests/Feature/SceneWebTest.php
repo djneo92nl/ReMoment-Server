@@ -228,4 +228,52 @@ class SceneWebTest extends TestCase
 
         Livewire::test(SceneEditor::class)->call('addOperation')->set('steps.0.operation', 'playPlaylist')->assertDontSee('Sunday jazz');
     }
+
+    public function test_album_artist_and_track_pickers_search_and_save_the_id(): void
+    {
+        $artist = \App\Models\Media\Artist::create(['name' => 'Portishead']);
+        $album = \App\Models\Media\Album::create(['name' => 'Dummy', 'artist_id' => $artist->id]);
+        $track = \App\Models\Media\Track::create(['name' => 'Sour Times', 'artist_id' => $artist->id, 'album_id' => $album->id]);
+        \App\Models\Media\Artist::create(['name' => 'Massive Attack']);
+
+        $c = Livewire::test(SceneEditor::class)
+            ->set('name', 'Trip hop')
+            ->call('addOperation')
+            ->set('steps.0.operation', 'playAlbum')
+            ->set('steps.0.device_id', (string) $this->device->id)
+            ->assertDontSee('Dummy')
+            ->set('pickerSearch.0.album_id', 'dum')
+            ->assertSee('Dummy — Portishead')
+            ->set('steps.0.params.album_id', (string) $album->id)
+            ->call('addOperation')
+            ->set('steps.1.operation', 'playArtist')
+            ->set('steps.1.device_id', (string) $this->device->id)
+            ->set('pickerSearch.1.artist_id', 'portis')
+            ->assertDontSee('Massive Attack')
+            ->set('steps.1.params.artist_id', (string) $artist->id)
+            ->call('addOperation')
+            ->set('steps.2.operation', 'playTrack')
+            ->set('steps.2.device_id', (string) $this->device->id)
+            ->set('pickerSearch.2.track_id', 'sour')
+            ->assertSee('Sour Times — Portishead')
+            ->set('steps.2.params.track_id', (string) $track->id)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $steps = Scene::firstOrFail()->steps;
+        $this->assertSame([$album->id, $artist->id, $track->id], [$steps[0]['params']['album_id'], $steps[1]['params']['artist_id'], $steps[2]['params']['track_id']]);
+
+        // Reopened: the chosen record is shown by name without searching again.
+        Livewire::test(SceneEditor::class, ['sceneId' => Scene::first()->id])->assertSee('Dummy — Portishead')->assertSee('Portishead');
+    }
+
+    public function test_a_search_picker_keeps_a_deleted_record_visible_and_needs_the_library(): void
+    {
+        $scene = $this->scene([['operation' => 'playArtist', 'device_id' => $this->device->id, 'params' => ['artist_id' => 777]]]);
+
+        Livewire::test(SceneEditor::class, ['sceneId' => $scene->id])->assertSee('Missing (#777)')->assertSee('Search artists');
+
+        config(['profile.current' => 'control']);
+        Livewire::test(SceneEditor::class, ['sceneId' => $scene->id])->assertDontSee('Search artists');
+    }
 }
