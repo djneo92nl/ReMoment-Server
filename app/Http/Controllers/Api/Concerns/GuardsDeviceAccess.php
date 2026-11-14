@@ -68,6 +68,8 @@ trait GuardsDeviceAccess
         } catch (\InvalidArgumentException $e) {
             return response()->json(['error' => 'invalid', 'message' => $e->getMessage()], 422);
         } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('Device call failed ('.request()->path().'): '.get_class($e).': '.$e->getMessage());
+
             return response()->json([
                 'error' => 'driver_error',
                 'message' => 'The device did not respond: '.$e->getMessage(),

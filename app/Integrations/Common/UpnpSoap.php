@@ -3,6 +3,7 @@
 namespace App\Integrations\Common;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 /**
  * One UPnP service's control endpoint: calls an action over SOAP and answers its out-arguments as
@@ -48,9 +49,16 @@ class UpnpSoap
         if ($reply['fault'] !== null) {
             [$code, $message] = $reply['fault'];
 
+            // Say which address the renderer was asked to fetch: "the media server has gone away" is the renderer's
+            // complaint about that URL (it could not reach it), not about this server's reply.
+            $uri = $arguments['CurrentURI'] ?? $arguments['NextURI'] ?? null;
+            $text = "{$action}: {$message} ({$code})".($uri ? " for {$uri}" : '');
+
+            Log::warning("UPnP fault at {$this->controlUrl}: {$text}");
+
             throw in_array($code, self::UNSUPPORTED_FAULTS, true)
-                ? new UnsupportedOperationException("{$action}: {$message} ({$code})", $code)
-                : new \RuntimeException("{$action}: {$message} ({$code})", $code);
+                ? new UnsupportedOperationException($text, $code)
+                : new \RuntimeException($text, $code);
         }
 
         if (!$response->successful()) {

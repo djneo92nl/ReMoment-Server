@@ -552,6 +552,8 @@ class LibraryPlayback
         try {
             $call();
         } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Playing on a device failed: '.get_class($e).': '.$e->getMessage());
+
             throw new PlaybackFailedException('The device did not respond: '.$e->getMessage(), previous: $e);
         }
     }
