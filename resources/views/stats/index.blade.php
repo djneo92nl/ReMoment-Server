@@ -286,5 +286,87 @@
             </x-card>
         @endif
 
+        @if($insights)
+            @php
+                $h2 = 'text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600 mb-1';
+                $sub = 'text-xs text-gray-400 dark:text-gray-600 mb-5';
+                $pct = fn ($v) => $v === null ? '—' : round($v * 100).'%';
+                $weekMax = max(1, collect($insights['weekly'])->max(fn ($w) => $w['new'] + $w['repeat']));
+            @endphp
+
+            {{-- New against repeat per week --}}
+            <x-card class="p-6 md:p-8">
+                <h2 class="{{ $h2 }}">New vs Repeat</h2>
+                <p class="{{ $sub }}">Tracks per week, last {{ $insights['range']['days'] }} days: first play ever against played before.</p>
+                <div class="flex items-end gap-1 h-24">
+                    @foreach($insights['weekly'] as $w)
+                        @php $total = $w['new'] + $w['repeat']; @endphp
+                        <div class="flex-1 flex flex-col justify-end h-full" title="Week of {{ $w['week'] }}: {{ number_format($w['new']) }} new, {{ number_format($w['repeat']) }} repeat">
+                            <div class="w-full rounded-t-sm bg-gray-900 dark:bg-gray-300" style="height: {{ round($w['new'] / $weekMax * 100) }}%; min-height: {{ $w['new'] > 0 ? '2px' : '0' }};"></div>
+                            <div class="w-full bg-gray-300 dark:bg-stone-600" style="height: {{ round($w['repeat'] / $weekMax * 100) }}%; min-height: {{ $w['repeat'] > 0 ? '2px' : '0' }};"></div>
+                        </div>
+                    @endforeach
+                </div>
+                <p class="text-[10px] text-gray-400 dark:text-gray-600 mt-2">Dark: new. Light: repeat.</p>
+            </x-card>
+
+            {{-- Skip rate per artist --}}
+            <x-card class="p-6 md:p-8">
+                <h2 class="{{ $h2 }}">Most Skipped Artists</h2>
+                <p class="{{ $sub }}">
+                    Stopped before {{ round($insights['skips']['rule']['fraction'] * 100) }}% of the track; artists with at least {{ $insights['skips']['rule']['min_plays'] }} measured plays.
+                    Overall {{ $pct($insights['skips']['rate']) }}.
+                </p>
+                @forelse($insights['skips']['artists'] as $a)
+                    <div class="flex items-center justify-between py-1.5">
+                        <a href="{{ route('artists.show', $a['id']) }}" class="text-sm text-gray-900 dark:text-gray-100 truncate hover:underline">{{ $a['name'] }}</a>
+                        <span class="text-xs text-gray-400 dark:text-gray-600 ml-2 flex-shrink-0">{{ $pct($a['rate']) }} · {{ $a['skipped'] }}/{{ $a['plays'] }}</span>
+                    </div>
+                @empty
+                    <x-empty-state title="No skips to show" />
+                @endforelse
+            </x-card>
+
+            {{-- Mood and tempo per part of the day --}}
+            <x-card class="p-6 md:p-8">
+                <h2 class="{{ $h2 }}">Mood &amp; Tempo by Time of Day</h2>
+                <p class="{{ $sub }}">From analysed own files only ({{ $insights['timezone'] }} time).</p>
+                @if($insights['analysis'])
+                    @foreach($insights['parts_of_day'] as $p)
+                        <div class="py-1.5 flex items-baseline justify-between gap-3">
+                            <span class="text-sm text-gray-900 dark:text-gray-100 capitalize">{{ $p['part'] }}
+                                <span class="text-[10px] text-gray-400 dark:text-gray-600">{{ sprintf('%02d–%02d', $p['hours']['from'], $p['hours']['until']) }}h</span></span>
+                            <span class="text-xs text-gray-400 dark:text-gray-600 text-right">
+                                @if($p['analysed_plays'] > 0)
+                                    {{ $p['bpm'] !== null ? round($p['bpm']).' BPM' : '' }}{{ $p['moods'] ? ' · '.collect($p['moods'])->take(2)->pluck('name')->implode(', ') : '' }}
+                                @else
+                                    nothing analysed
+                                @endif
+                            </span>
+                        </div>
+                    @endforeach
+                @else
+                    <p class="text-sm text-gray-400 dark:text-gray-600">Needs audio analysis (Full profile).</p>
+                @endif
+            </x-card>
+
+            {{-- What you play when it is late --}}
+            <x-card class="p-6 md:p-8">
+                <h2 class="{{ $h2 }}">Late at Night</h2>
+                <p class="{{ $sub }}">{{ number_format($insights['late']['plays']) }} plays between {{ $insights['late']['hours']['from'] }}:00 and {{ sprintf('%02d', $insights['late']['hours']['until'] - 1) }}:59.</p>
+                @forelse(array_slice($insights['late']['artists'], 0, 5) as $a)
+                    <div class="flex items-center justify-between py-1.5">
+                        <a href="{{ route('artists.show', $a['id']) }}" class="text-sm text-gray-900 dark:text-gray-100 truncate hover:underline">{{ $a['name'] }}</a>
+                        <span class="text-xs text-gray-400 dark:text-gray-600 ml-2 flex-shrink-0">{{ number_format($a['plays']) }}</span>
+                    </div>
+                @empty
+                    <x-empty-state title="Nothing played late" />
+                @endforelse
+                @if($insights['late']['moods'])
+                    <p class="text-xs text-gray-400 dark:text-gray-600 mt-3">Moods: {{ collect($insights['late']['moods'])->take(3)->pluck('name')->implode(', ') }}</p>
+                @endif
+            </x-card>
+        @endif
+
     </div>
 </x-app-layout>

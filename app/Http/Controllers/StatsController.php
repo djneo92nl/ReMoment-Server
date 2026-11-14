@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Library\LibrarySources;
+use App\Domain\Profile\Profile;
+use App\Domain\Stats\ListeningInsights;
 use App\Models\Device;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
@@ -93,7 +96,11 @@ class StatsController extends Controller
         $totalArtists = Artist::count();
         $skippedPlays = Play::where('skipped', true)->count();
 
+        // Listening insights read library tracks, so not in Control (docs/api/insights.md)
+        $insights = Profile::allows('library') ? ListeningInsights::forApi(ListeningInsights::DEFAULT_DAYS, LibrarySources::hiddenForRequest(null)) : null;
+
         return view('stats.index', compact(
+            'insights',
             'topArtists',
             'topAlbums',
             'topTracks',

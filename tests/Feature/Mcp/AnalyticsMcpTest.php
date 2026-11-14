@@ -61,6 +61,15 @@ class AnalyticsMcpTest extends TestCase
         ReMomentServer::tool(Tools\ListeningStats::class, ['from' => 'nonsense'])->assertHasErrors();
     }
 
+    public function test_insights_tool_returns_the_rest_payload_and_validates_days(): void
+    {
+        $rest = $this->getJson('/api/library/insights?days=30')->assertOk()->json();
+        $this->assertSame(30, $rest['range']['days']);
+
+        ReMomentServer::tool(Tools\ListeningInsights::class, ['days' => 30])->assertOk()->assertSee('parts_of_day');
+        ReMomentServer::tool(Tools\ListeningInsights::class, ['days' => 999])->assertHasErrors();
+    }
+
     public function test_health_lists_counts_and_one_report(): void
     {
         config(['profile.current' => 'full']);

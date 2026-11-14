@@ -1,5 +1,7 @@
 # Listening statistics
 
+More from the same log (skip rate per artist, new against repeat per week, mood and tempo by time of day, late-night listening): [insights.md](insights.md).
+
 `GET /api/library/stats?from=&to=&scope=&limit=` is the JSON version of the web `/stats` page: what was played, when, where. Open like the rest of the API; works in every profile (it reads the play log, not the library). Statistics are **per household and per device**, never per person (there are no accounts). Typed in `openapi.yaml` as `ListeningStats`; code in `App\Domain\Stats\ListeningStats`, controller `Api\ListeningStatsController`.
 
 | Parameter | |
