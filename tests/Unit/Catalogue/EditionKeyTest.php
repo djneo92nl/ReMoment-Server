@@ -4,6 +4,7 @@ namespace Tests\Unit\Catalogue;
 
 use App\Domain\Catalogue\EditionKey;
 use App\Domain\Library\Normalizer;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class EditionKeyTest extends TestCase
@@ -25,7 +26,7 @@ class EditionKeyTest extends TestCase
         ];
     }
 
-    /** @dataProvider editions */
+    #[DataProvider('editions')]
     public function test_release_names_get_the_key_of_the_album(string $release, string $album): void
     {
         $this->assertSame(Normalizer::album($album), EditionKey::of($release));
@@ -47,7 +48,7 @@ class EditionKeyTest extends TestCase
         ];
     }
 
-    /** @dataProvider different */
+    #[DataProvider('different')]
     public function test_different_works_keep_different_keys(string $a, string $b): void
     {
         $this->assertNotSame(EditionKey::of($a), EditionKey::of($b));
