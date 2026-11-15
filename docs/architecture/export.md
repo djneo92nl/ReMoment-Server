@@ -87,3 +87,5 @@ Admin login only, gated with the `library` and `file_storage` features (Control:
 ## Not decided here
 
 Not verified: Opus and m4a playback on real head units and players; the native AAC encoder's quality at 128 kbit/s (libfdk_aac is better but is rarely in ffmpeg builds); the album gain computed from a partial selection (it uses the tracks in the export). A copied MP3 other than in `compat` may still carry ID3v2.4 tags.
+
+Repeated, incremental fills of a USB drive, an MP3 player or the iOS offline library are the sync plan in [offline-sync.md](offline-sync.md): it reuses these profiles, the planner's `decide()`, the naming rules and the loudness option, and differs in identity (keys, fingerprints, a manifest on the target) and in sharing transcoded files by fingerprint.
