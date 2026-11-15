@@ -1,0 +1,22 @@
+{
+"preset_num": 3,
+"preset_list": [{
+"number": 1,
+"name": "BBC Radio Norfolk",
+"url": "http://as-hls-ww-live.akamaized.net/pool_904/live/ww/bbc_radio_norfolk/bbc_radio_norfolk.isml/bbc_radio_norfolk-audio%3d96000.norewind.m3u8",
+"source": "Linkplay Radio",
+"picurl": "http://cdn-profiles.tunein.com/s6852/images/logoq.jpg?t=638353933090000000"
+}, {
+"number": 6,
+"name": "Radio Paradise",
+"url": "http://stream.radioparadise.com/flacm",
+"source": "RadioParadise",
+"picurl": "https://cdn-profiles.tunein.com/s13606/images/logod.png?t=637541039930000000"
+}, {
+"number": 8,
+"name": "1. Country Heat",
+"url": "unknow",
+"source": "Prime",
+"picurl": "https://m.media-amazon.com/images/I/51uR6AJUAQL.jpg"
+}]
+}

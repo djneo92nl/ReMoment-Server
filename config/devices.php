@@ -9,6 +9,7 @@ return [
         \App\Integrations\BangOlufsen\Ase\ConverterDiscovery::class,
         \App\Integrations\Sonos\SonosDiscovery::class,
         \Remoment\MozartDriver\MozartDiscovery::class,
+        \App\Integrations\Wiim\WiimDiscovery::class,
         // The fallback, last: any other audio MediaRenderer that none of the dedicated drivers claims.
         \App\Integrations\Upnp\UpnpDiscovery::class,
     ],
@@ -24,6 +25,7 @@ return [
         \Remoment\MozartDriver\MusicPlayerDriver::class => \Remoment\MozartDriver\Services\DeviceListener::class,
         \App\Integrations\Upnp\MusicPlayerDriver::class => \App\Integrations\Upnp\Services\DeviceListener::class,
         \App\Integrations\Philips\VideoPlayerDriver::class => \App\Integrations\Philips\Services\DeviceListener::class,
+        \App\Integrations\Wiim\MusicPlayerDriver::class => \App\Integrations\Wiim\Services\DeviceListener::class,
         \App\Integrations\Philips\Streamium\MusicPlayerDriver::class => \App\Integrations\Philips\Streamium\Services\DeviceListener::class,
     ],
 
@@ -130,6 +132,15 @@ return [
             'driver_name' => 'Sonos',
             'driver' => \App\Integrations\Sonos\MusicPlayerDriver::class,
         ],
+    ],
+    // WiiM / LinkPlay streamers (docs/architecture/wiim.md), found among the UPnP renderers by WiimDiscovery. `manufacturers` are
+    // descriptor manufacturer substrings that also count as this brand, so the generic UPnP driver leaves the device alone.
+    'WiiM' => [
+        'WiiM Mini' => ['driver_name' => 'WiiM', 'driver' => \App\Integrations\Wiim\MusicPlayerDriver::class, 'manufacturers' => ['linkplay']],
+        'WiiM Pro' => ['driver_name' => 'WiiM', 'driver' => \App\Integrations\Wiim\MusicPlayerDriver::class, 'manufacturers' => ['linkplay']],
+        'WiiM Pro Plus' => ['driver_name' => 'WiiM', 'driver' => \App\Integrations\Wiim\MusicPlayerDriver::class, 'manufacturers' => ['linkplay']],
+        'WiiM Amp' => ['driver_name' => 'WiiM', 'driver' => \App\Integrations\Wiim\MusicPlayerDriver::class, 'manufacturers' => ['linkplay']],
+        'WiiM Ultra' => ['driver_name' => 'WiiM', 'driver' => \App\Integrations\Wiim\MusicPlayerDriver::class, 'manufacturers' => ['linkplay']],
     ],
     // Any UPnP/DLNA MediaRenderer without a dedicated driver; discovered with its own manufacturer and model (see UpnpDiscovery).
     'UPnP' => [

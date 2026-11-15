@@ -393,7 +393,7 @@ class UpnpRendererTest extends TestCase
         $this->assertTrue(DedicatedDrivers::claims('Sonos, Inc.', 'Sonos Five'));
         $this->assertTrue(DedicatedDrivers::claims('Bang &amp; Olufsen', 'Beosound Balance'));
         $this->assertTrue(DedicatedDrivers::claims('Bang & Olufsen', 'BeoSound Essence'));
-        $this->assertFalse(DedicatedDrivers::claims('WiiM', 'Mini'));
+        $this->assertFalse(DedicatedDrivers::claims('Acme', 'Mini'));
         $this->assertFalse(DedicatedDrivers::claims('Spotify', 'x'));
     }
 
@@ -404,7 +404,7 @@ class UpnpRendererTest extends TestCase
             .'<service><serviceType>urn:schemas-upnp-org:service:ConnectionManager:1</serviceType><controlURL>/cm</controlURL></service></serviceList></device></root>';
 
         Http::fake([
-            'http://10.0.0.1/*' => Http::response($descriptor('WiiM', 'Mini', 'uuid:wiim')),
+            'http://10.0.0.1/*' => Http::response($descriptor('Acme', 'Mini', 'uuid:acme')),
             'http://10.0.0.2/*' => Http::response($descriptor('Sonos, Inc.', 'Sonos Five', 'uuid:sonos')),
             'http://10.0.0.3/desc' => Http::response($descriptor('Acme', 'TV', 'uuid:tv')),
             'http://10.0.0.3/cm' => Http::response($this->envelope('GetProtocolInfo', ['Sink' => 'http-get:*:video/mp4:*'])),
@@ -419,10 +419,10 @@ class UpnpRendererTest extends TestCase
         $found = (new UpnpDiscovery($ssdp))->discover();
 
         $this->assertCount(1, $found);
-        $this->assertSame('WiiM', $found[0]->device_brand_name);
+        $this->assertSame('Acme', $found[0]->device_brand_name);
         $this->assertSame('UPnP', $found[0]->device_driver_name);
         $this->assertSame(MusicPlayerDriver::class, $found[0]->device_driver);
-        $this->assertSame('uuid:wiim', $found[0]->meta['upnp_uuid']);
+        $this->assertSame('uuid:acme', $found[0]->meta['upnp_uuid']);
         $this->assertSame('http://10.0.0.1/av', $found[0]->meta['upnp_avtransport_url']);
     }
 

@@ -21,6 +21,7 @@ use App\Integrations\ReMoment\PlayerDriver as RemomentPlayer;
 use App\Integrations\Sonos\MusicPlayerDriver as Sonos;
 use App\Integrations\Spotify\MusicPlayerDriver as Spotify;
 use App\Integrations\Upnp\MusicPlayerDriver as Upnp;
+use App\Integrations\Wiim\MusicPlayerDriver as Wiim;
 use Remoment\MozartDriver\MusicPlayerDriver as Mozart;
 
 return [
@@ -41,6 +42,7 @@ return [
         Upnp::class => ['status' => 'verified', 'date' => '2026-10-22', 'note' => 'Verified on a Philips Streamium MCi900 only; other renderers are untested, a WiiM is built from documentation.'],
         PhilipsTv::class => ['status' => 'verified', 'date' => '2026-10-27', 'note' => 'Pairing, apps as sources and standby seen on real TVs; remote keys, other apps and waking from full sleep are not.'],
         Streamium::class => ['status' => 'verified', 'date' => '2026-10-22', 'note' => 'MCi900 web remote (power, radio presets) tested on the unit.'],
+        Wiim::class => ['status' => 'spec', 'date' => '2026-11-15', 'note' => 'Built from the WiiM HTTP API document (1.2) and tested with fakes; no WiiM in the lab. `php artisan wiim:probe` output from a real one would confirm it.'],
     ],
 
     'models' => [

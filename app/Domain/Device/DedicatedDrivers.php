@@ -29,6 +29,15 @@ final class DedicatedDrivers
                 return true;
             }
 
+            // A model may also name manufacturers that count as the brand (a WiiM's descriptor says LinkPlay).
+            foreach ($dedicated as $definition) {
+                foreach ($definition['manufacturers'] ?? [] as $alias) {
+                    if ($manufacturer !== '' && str_contains($manufacturer, mb_strtolower($alias))) {
+                        return true;
+                    }
+                }
+            }
+
             foreach (array_keys($dedicated) as $name) {
                 if ($model !== '' && mb_strtolower($name) === $model) {
                     return true;

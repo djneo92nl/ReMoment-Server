@@ -52,6 +52,16 @@ Status key:
 |---|---|---|---|---|---|
 | Sonos Speaker | Sonos | built against the vendor spec, unverified | 2026-11-14 | Uses the duncan3dc/sonos library; no hardware run is recorded in the repository docs. | `media_controls`, `volume_control`, `radio_control`, `source_control`, `source_activation`, `multi_room`, `library_playback`, `seek`, `queue`, `queue_jump`, `queue_add`, `queue_next`, `queue_remove`, `queue_move`, `queue_clear`, `shuffle`, `repeat`, `sound_adjustment`, `device_info`, `battery`, `stream_url` |
 
+### WiiM
+
+| Model | Driver | Status | Checked | Note | What the server can do |
+|---|---|---|---|---|---|
+| WiiM Mini | WiiM | built against the vendor spec, unverified | 2026-11-15 | Built from the WiiM HTTP API document (1.2) and tested with fakes; no WiiM in the lab. `php artisan wiim:probe` output from a real one would confirm it. | `media_controls`, `volume_control`, `radio_control`, `source_control`, `source_activation`, `library_playback`, `seek`, `queue`, `queue_jump`, `queue_add`, `queue_next`, `queue_remove`, `queue_move`, `queue_clear`, `shuffle`, `repeat`, `power`, `device_info`, `battery`, `stream_url` |
+| WiiM Pro | WiiM | built against the vendor spec, unverified | 2026-11-15 | Built from the WiiM HTTP API document (1.2) and tested with fakes; no WiiM in the lab. `php artisan wiim:probe` output from a real one would confirm it. | `media_controls`, `volume_control`, `radio_control`, `source_control`, `source_activation`, `library_playback`, `seek`, `queue`, `queue_jump`, `queue_add`, `queue_next`, `queue_remove`, `queue_move`, `queue_clear`, `shuffle`, `repeat`, `power`, `device_info`, `battery`, `stream_url` |
+| WiiM Pro Plus | WiiM | built against the vendor spec, unverified | 2026-11-15 | Built from the WiiM HTTP API document (1.2) and tested with fakes; no WiiM in the lab. `php artisan wiim:probe` output from a real one would confirm it. | `media_controls`, `volume_control`, `radio_control`, `source_control`, `source_activation`, `library_playback`, `seek`, `queue`, `queue_jump`, `queue_add`, `queue_next`, `queue_remove`, `queue_move`, `queue_clear`, `shuffle`, `repeat`, `power`, `device_info`, `battery`, `stream_url` |
+| WiiM Amp | WiiM | built against the vendor spec, unverified | 2026-11-15 | Built from the WiiM HTTP API document (1.2) and tested with fakes; no WiiM in the lab. `php artisan wiim:probe` output from a real one would confirm it. | `media_controls`, `volume_control`, `radio_control`, `source_control`, `source_activation`, `library_playback`, `seek`, `queue`, `queue_jump`, `queue_add`, `queue_next`, `queue_remove`, `queue_move`, `queue_clear`, `shuffle`, `repeat`, `power`, `device_info`, `battery`, `stream_url` |
+| WiiM Ultra | WiiM | built against the vendor spec, unverified | 2026-11-15 | Built from the WiiM HTTP API document (1.2) and tested with fakes; no WiiM in the lab. `php artisan wiim:probe` output from a real one would confirm it. | `media_controls`, `volume_control`, `radio_control`, `source_control`, `source_activation`, `library_playback`, `seek`, `queue`, `queue_jump`, `queue_add`, `queue_next`, `queue_remove`, `queue_move`, `queue_clear`, `shuffle`, `repeat`, `power`, `device_info`, `battery`, `stream_url` |
+
 ### UPnP
 
 | Model | Driver | Status | Checked | Note | What the server can do |
