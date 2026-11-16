@@ -59,6 +59,7 @@ export default function mixer(config = {}) {
         similar: [],
         searching: false,
         pickerError: '',
+        pitchCorrection: true, // false in a browser without AudioWorklet (a page over plain http): tempo moves the pitch, no key shift
 
         init() {
             for (const side of ['a', 'b']) {
@@ -146,6 +147,8 @@ export default function mixer(config = {}) {
             try {
                 engine ??= await ENGINE();
                 audio ??= new engine.MixerAudio();
+                await audio.ensure();
+                this.pitchCorrection = audio.pitchCorrection;
                 decks[side] = new engine.Deck(audio);
                 decks[side].onEnded = () => {
                     this.deck[side].playing = false;

@@ -6,8 +6,9 @@
 // tempo AND pitch; the SoundTouch worklet (playbackRate mirrored) puts the pitch back, and its `pitchSemitones` moves
 // the key on purpose. One SoundTouch per deck, not per stem: the stems are summed first (gains are applied before it).
 
-import { SoundTouchNode } from '@soundtouchjs/audio-worklet';
-import processorUrl from '@soundtouchjs/audio-worklet/processor?url';
+// SoundTouch is imported only when the browser has AudioWorklet: that exists in a secure context only (https or
+// localhost), and a module that extends AudioWorkletNode throws on import without it. Without it the mixer still
+// plays; tempo then moves the pitch along and the key shift is off (`pitchCorrection` is false).
 import { STEMS, clamp, stemGains } from './math.js';
 
 const FADE = 0.006; // seconds of fade at a start/stop, so a seek or nudge does not click
@@ -17,11 +18,25 @@ const SMOOTH = 0.015; // seconds of smoothing on a fader
 export class MixerAudio {
     ctx = null;
     master = null;
+    SoundTouchNode = null;
+    pitchCorrection = false;
 
     async ensure() {
         if (!this.ctx) {
             this.ctx = new AudioContext({ latencyHint: 'playback' });
-            await SoundTouchNode.register(this.ctx, processorUrl);
+            if (typeof AudioWorkletNode !== 'undefined' && this.ctx.audioWorklet) {
+                try {
+                    const [{ SoundTouchNode }, { default: processorUrl }] = await Promise.all([
+                        import('@soundtouchjs/audio-worklet'),
+                        import('@soundtouchjs/audio-worklet/processor?url'),
+                    ]);
+                    await SoundTouchNode.register(this.ctx, processorUrl);
+                    this.SoundTouchNode = SoundTouchNode;
+                    this.pitchCorrection = true;
+                } catch (e) {
+                    console.warn('Pitch correction is not available:', e);
+                }
+            }
             this.master = this.ctx.createGain();
             this.master.connect(this.ctx.destination);
         }
@@ -82,8 +97,10 @@ export class Deck {
         this.offset = 0;
 
         this.mix = ctx.createGain();
-        this.stretch = new SoundTouchNode({ context: ctx });
-        this.stretch.pitch.value = 1;
+        this.stretch = this.audio.pitchCorrection ? new this.audio.SoundTouchNode({ context: ctx }) : ctx.createGain();
+        if (this.audio.pitchCorrection) {
+            this.stretch.pitch.value = 1;
+        }
         this.out = ctx.createGain();
         this.analyser = ctx.createAnalyser();
         this.analyser.fftSize = 512;
@@ -160,14 +177,14 @@ export class Deck {
             }
         }
         this.rate = next;
-        if (this.stretch) {
+        if (this.stretch && this.audio.pitchCorrection) {
             this.stretch.playbackRate.value = next;
         }
     }
 
     /** Moves the key without changing the tempo: -12..12 semitones. */
     setSemitones(semitones) {
-        if (this.stretch) {
+        if (this.stretch && this.audio.pitchCorrection) {
             this.stretch.pitchSemitones.value = clamp(semitones, -12, 12);
         }
     }

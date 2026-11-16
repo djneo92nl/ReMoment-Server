@@ -72,6 +72,7 @@
                 <x-secondary-button size="sm" @click="sync('{{ $side }}')" x-bind:disabled="!canSync('{{ $side }}')" title="Match the tempo of the other deck">Sync</x-secondary-button>
                 <x-secondary-button size="sm" @click="setRate('{{ $side }}', 1)" aria-label="Reset the tempo"><i class="fa-solid fa-rotate-left text-xs"></i></x-secondary-button>
             </div>
+            <p x-show="!pitchCorrection" x-cloak class="mt-2 text-xs text-amber-700 dark:text-amber-400">This page is not on https, so the browser has no pitch correction: tempo changes the pitch too and the key shift is off.</p>
             <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
                 <div class="flex items-center gap-2">
                     <span class="text-sm text-gray-500">Key</span>

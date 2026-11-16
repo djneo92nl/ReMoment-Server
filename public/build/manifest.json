@@ -1,7 +1,22 @@
 {
+  "node_modules/@soundtouchjs/audio-worklet/.dist/index.js": {
+    "file": "assets/index-CHfJwlN0.js",
+    "name": "index",
+    "src": "node_modules/@soundtouchjs/audio-worklet/.dist/index.js",
+    "isDynamicEntry": true
+  },
   "node_modules/@soundtouchjs/audio-worklet/.dist/soundtouch-processor.js": {
     "file": "assets/soundtouch-processor-BKTidsbT.js",
     "src": "node_modules/@soundtouchjs/audio-worklet/.dist/soundtouch-processor.js"
+  },
+  "node_modules/@soundtouchjs/audio-worklet/.dist/soundtouch-processor.js?url": {
+    "file": "assets/soundtouch-processor-rG0bsBwF.js",
+    "name": "soundtouch-processor",
+    "src": "node_modules/@soundtouchjs/audio-worklet/.dist/soundtouch-processor.js?url",
+    "isDynamicEntry": true,
+    "assets": [
+      "assets/soundtouch-processor-BKTidsbT.js"
+    ]
   },
   "resources/css/app.css": {
     "file": "assets/app-DkxR-30k.css",
@@ -13,7 +28,7 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-C1wWSPhZ.js",
+    "file": "assets/app-NDj0SMeU.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
@@ -22,15 +37,16 @@
     ]
   },
   "resources/js/mixer/engine.js": {
-    "file": "assets/engine-hwRMvfqK.js",
+    "file": "assets/engine-DLmjbmE9.js",
     "name": "engine",
     "src": "resources/js/mixer/engine.js",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.js"
     ],
-    "assets": [
-      "assets/soundtouch-processor-BKTidsbT.js"
+    "dynamicImports": [
+      "node_modules/@soundtouchjs/audio-worklet/.dist/index.js",
+      "node_modules/@soundtouchjs/audio-worklet/.dist/soundtouch-processor.js?url"
     ]
   }
 }
