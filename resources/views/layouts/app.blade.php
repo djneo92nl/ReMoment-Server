@@ -71,6 +71,8 @@
     </main>
 </div>
 
+<livewire:task-tray />
+
 <!-- Sticky player: the pinned device, and the default target of every play button. Sticky (not fixed) at the end of the page, so content ends above it instead of hiding behind it. Geometry: .player-dock in app.css. -->
 <div class="player-dock">
     <livewire:player-bar />

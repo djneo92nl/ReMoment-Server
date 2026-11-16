@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Domain\Analysis\AnalysisActivity;
 use App\Domain\Analysis\DeepAnalysis;
 use App\Domain\Storage\FileStore;
+use App\Domain\Tasks\UserTasks;
 use App\Models\File;
 use App\Models\FileAnalysis;
 use Illuminate\Bus\Queueable;
@@ -54,6 +55,8 @@ class AnalyzeTrackDeep implements ShouldBeUnique, ShouldQueue
         Cache::forget(DeepAnalysis::marker('queued', $file, $this->kind));
 
         if ($file->status !== File::PRESENT) {
+            UserTasks::done(DeepAnalysis::taskKey($file, $this->kind));
+
             return;
         }
 
@@ -64,10 +67,13 @@ class AnalyzeTrackDeep implements ShouldBeUnique, ShouldQueue
         }
 
         if ($analysis->stageVersion($stage->key()) === $stage->version()) {
+            UserTasks::done(DeepAnalysis::taskKey($file, $this->kind));
+
             return;
         }
 
         Cache::put($running, true, $this->timeout + 60);
+        UserTasks::running(DeepAnalysis::taskKey($file, $this->kind));
         AnalysisActivity::start($file, $stage->key());
         $startedAt = microtime(true);
 
@@ -85,6 +91,7 @@ class AnalyzeTrackDeep implements ShouldBeUnique, ShouldQueue
             $analysis->save();
         } finally {
             Cache::forget($running);
+            UserTasks::done(DeepAnalysis::taskKey($file, $this->kind));
             AnalysisActivity::finish();
         }
 
@@ -99,6 +106,7 @@ class AnalyzeTrackDeep implements ShouldBeUnique, ShouldQueue
 
         Cache::forget(DeepAnalysis::marker('queued', $file, $this->kind));
         Cache::forget(DeepAnalysis::marker('running', $file, $this->kind));
+        UserTasks::done(DeepAnalysis::taskKey($file, $this->kind));
 
         $analysis = FileAnalysis::firstOrNew(['file_id' => $file->id]);
         if ($analysis->content_hash !== $file->hash) {

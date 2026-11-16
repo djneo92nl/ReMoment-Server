@@ -6,6 +6,7 @@ use App\Domain\Analysis\AnalysisActivity;
 use App\Domain\Analysis\AnalysisProgress;
 use App\Domain\Analysis\AudioAnalysis;
 use App\Domain\Health\QueueInspector;
+use App\Domain\Tasks\UserTasks;
 use App\Jobs\AnalyzeAudioFile;
 use App\Models\File;
 use App\Models\FileAnalysis;
@@ -23,6 +24,9 @@ class AnalysisStatus extends Component
     {
         $queued = AudioAnalysis::queueBacklog(AudioAnalysis::nightlyLimit());
         AnalysisProgress::forget();
+        if ($queued > 0) {
+            UserTasks::put(AnalyzeAudioFile::BACKLOG_TASK, 'analysis', 'Audio analysis', 'queued', $queued);
+        }
         $this->toast($queued > 0 ? "Queued {$queued} files." : 'Nothing left to analyse.');
     }
 

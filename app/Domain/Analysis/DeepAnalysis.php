@@ -2,6 +2,7 @@
 
 namespace App\Domain\Analysis;
 
+use App\Domain\Tasks\UserTasks;
 use App\Jobs\AnalyzeTrackDeep;
 use App\Models\File;
 use App\Models\FileAnalysis;
@@ -164,6 +165,8 @@ final class DeepAnalysis
 
         foreach ($toQueue as $kind) {
             Cache::put(self::marker('queued', $file, $kind), true, self::QUEUED_TTL);
+            $track = $file->trackFiles()->with('track')->first()?->track;
+            UserTasks::put(self::taskKey($file, $kind), 'deep_analysis', ucfirst(str_replace('_', ' ', $kind)).': '.($track?->name ?? $file->path), 'queued', null, self::estimateSeconds($kind, $track?->duration));
             AnalyzeTrackDeep::dispatch($file, $kind);
         }
 
@@ -189,6 +192,12 @@ final class DeepAnalysis
         $analysis->save();
 
         return true;
+    }
+
+    /** Key of the task-tray entry for one kind of one file. */
+    public static function taskKey(File $file, string $kind): string
+    {
+        return "deep:{$file->id}:{$kind}";
     }
 
     public static function marker(string $name, File $file, string $kind): string

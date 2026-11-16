@@ -7,6 +7,7 @@ use App\Domain\Analysis\AudioAnalysis;
 use App\Domain\Analysis\DecodedStage;
 use App\Domain\Analysis\DecodePass;
 use App\Domain\Storage\FileStore;
+use App\Domain\Tasks\UserTasks;
 use App\Models\File;
 use App\Models\FileAnalysis;
 use Illuminate\Bus\Queueable;
@@ -40,12 +41,30 @@ class AnalyzeAudioFile implements ShouldBeUnique, ShouldQueue
         $this->onQueue(config('analysis.queue'));
     }
 
+    /** Tray task of "Run backlog" on /settings/analysis: one unit per finished file job. */
+    public const BACKLOG_TASK = 'analysis:backlog';
+
     public function uniqueId(): string
     {
         return (string) $this->file->id;
     }
 
     public function handle(): void
+    {
+        try {
+            $this->analyse();
+        } finally {
+            UserTasks::advance(self::BACKLOG_TASK);
+        }
+    }
+
+    /** The worker killed the job (timeout) or something outside the stages threw: still counts for the tray. */
+    public function failed(?\Throwable $e): void
+    {
+        UserTasks::advance(self::BACKLOG_TASK);
+    }
+
+    private function analyse(): void
     {
         $file = $this->file->load('location');
 

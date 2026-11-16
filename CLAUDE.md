@@ -102,6 +102,7 @@ docs/
     components.md           Shared Blade components (x-card, x-page-header, x-alert, x-badge, x-empty-state, x-table, x-shelf, nav ...) and their props; rules in DESIGN.md at the repo root
     stem-lanes.md           Stem lanes (16.4): a lane per stem under the sections in the album page's Track details, own-scale curves, instrumental band, TrackStems states
     pwa.md                  Web app (8.6): manifest, root service worker (offline page and icons only, never API/Livewire/artwork), opt-in alert notifications from the MQTT alert topics, opt-in background Web Push (VAPID, `push_subscriptions`, `push:vapid`, `push:test`)
+    task-tray.md            Floating tray of user-started tasks (export, stems/sections, analysis backlog; sync later): `UserTasks`, measured vs estimated percent, TTL
     library.md              /library hub: LibraryHome data, shelves, shuffle, favourites, tinted cards (ArtworkTint)
 ```
 
