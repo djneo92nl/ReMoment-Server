@@ -36,7 +36,7 @@ class NodeController extends Controller
         $node = $this->node($request);
         $node->update(['last_seen_at' => now()]);
 
-        return response()->json(['job' => NodeJobs::next($node)?->toPayload()]);
+        return response()->json(['job' => ($job = NodeJobs::next($node)) ? NodeJobs::deliver($job) : null]);
     }
 
     public function accept(Request $request, string $job): JsonResponse
@@ -45,13 +45,13 @@ class NodeController extends Controller
         $row = $this->job($node, $job);
 
         if ($row->state === 'accepted' || $row->state === 'running') {
-            return response()->json(['job' => $row->toPayload()]); // a retry after a lost answer
+            return response()->json(['job' => NodeJobs::deliver($row)]); // a retry after a lost answer
         }
         if (!NodeJobs::accept($row)) {
             return response()->json(['error' => 'conflict', 'message' => "Job is {$row->fresh()->state}."], 409);
         }
 
-        return response()->json(['job' => $row->fresh()->toPayload()]);
+        return response()->json(['job' => NodeJobs::deliver($row->fresh())]);
     }
 
     public function progress(Request $request, string $job): JsonResponse

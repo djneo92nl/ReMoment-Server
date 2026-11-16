@@ -20,7 +20,8 @@ docs/
   api/
     client-devices.md       Client device registration flow, all endpoints, firmware guide
     jellyfin.md             Jellyfin on a Philips TV: continue watching / next up and play in the Jellyfin app (GET /api/devices/{id}/jellyfin, POST .../jellyfin/play)
-    deep-analysis.md        Deep analysis of one track on request (admin token): POST/GET/DELETE /api/library/tracks/{id}/deep-analysis, kinds `sections` and `stems`, states, where the result shows
+    deep-analysis.md        Deep analysis of one track on request (admin token): POST/GET/DELETE /api/library/tracks/{id}/deep-analysis, kinds `sections`, `stems` and `stem_audio`, states, where the result shows
+    stems.md                Kept stems of a track for the apps' mixer (kind `stem_audio`, admin token): GET /api/library/tracks/{id}/stems (four signed MP3/FLAC URLs + bpm, key, Camelot), signed Range-capable download, storage `stems/{file id}`, cleanup (`stems:prune`), MCP `deep_analysis` action `stems`
     export.md               Export from the library as zip for an MP3 player/car radio (admin token; MP3, AAC m4a, Opus profiles, loudness option): estimate, start, poll, signed 15-minute download, cancel/remove; MCP tool `export`, `features.export`
     library.md              Library browse (artists, albums, playlists), favorites, play album/artist/playlist on a device (DLNA or Spotify), playlist artwork
     source-controls.md      Per-source controls (change disc, FM presets) from control profiles: GET/POST /api/devices/{id}/controls, resolution, transports
@@ -43,7 +44,9 @@ docs/
   architecture/
     profiles.md             Profiles (workstream 1a): Control / Standard / Full, `PROFILE`, the gate table in config/profile.php, how scheduler, workers, routes, nav and containers are gated, SQLite for Control and its conditions, `profile:stress-sqlite`, `profile:upgrade`, what is unverified
     client-devices.md       DB schema, model, controller, admin UI internals
+    line-in.md              Line-in as a stream source (18.2, N3): a node's ffmpeg pushes MP3 to Icecast `linein-{node}.mp3`, `GET /api/line-ins`, `POST /api/devices/{id}/line-in`, idle stop, 2 to 5 s latency, unverified on hardware
     node-agent.md           ReMoment Node (workstream 18, 1.1): Go agent plan, `kind: node` registration with roles, MQTT-as-doorbell command channel, job lifecycle, security, phases N0-N5; N0 and N1 built (`node/`)
+    offline-sync.md         Sync to offline targets (workstream 18.3, plan; S0 `SyncDiff` built): targets (app, node volume, helper), rules (selections, export profile, budget, fill), key+fingerprint manifest on the target and stateless plan API, artifacts, node job types, iOS pull, deletion rules, phases S0-S6, owner questions
     backup-restore.md       backup:run / backup:restore: archive contents, secrets excluded by default, fresh-install restore, SQLite and SD-card note, upgrade flow
     schema-plan.md          Schema review before the migration squash (14.3): table inventory, findings, data vs schema migrations, squash design with the `schema:baseline` mechanism, pre-squash fix-list; rehearsal harness in scripts/schema/ (`schema.sh check` diffs the schema against committed MariaDB and SQLite baselines)
     availability-layer.md   Availability layer design (workstream 3): providers, catalogue_albums/album_availability, MusicBrainz discography sync, wishlist, API/UI, build order (plan, not built)
@@ -57,6 +60,7 @@ docs/
     hardware-table.md       Generated supported-hardware table (9b): `hardware:table`, config/hardware-status.php statuses, the stale-page test
     device-drivers.md       Driver contracts, existing drivers, guide for adding a new brand
     beovision-tv.md         BeoVision / Beoplay V1 TV controls design: V1 API findings, one-way remote commands, TV screens (list, detail, remote), probe plan, phases; mostly unbuilt
+    wiim.md                 WiiM (LinkPlay) driver on the vendor HTTP API (1.2) on top of UPnP: what is mapped, listener, discovery, quirks, wiim:probe; built from the document, unverified
     philips-tv.md           Philips Android TV on top of the UPnP driver (Jointspace v6): pairing command, standby, apps as sources, active app as now playing; what is unverified
     tv-devices.md           How a TV is modelled: sources/inputs, playback, power, RemoteControlInterface (remote keys); what the TV phase still has to do (Philips, BeoVision)
     upnp-renderer.md        Generic UPnP MediaRenderer fallback driver: server-managed queue, polling listener, discovery precedence, future research (native queues, radio, OpenHome)
@@ -71,7 +75,7 @@ docs/
     metadata-enrichment.md  Per-source enrichment jobs (MusicBrainz track/artist/album, Wikipedia, Cover Art Archive, lyrics, Spotify, Last.fm, TheAudioDB, Discogs), DLNA tags, canonical genres: markers, retries, rate limits, library:enrich
     artist-settings.md      Admin page per artist: photo/backdrop choice, MusicBrainz/Spotify/Last.fm mappings, details overrides, files, default source; the `manual` metadata source
     structure-service.md    Structure service (workstream 16.2): docker/structure, librosa novelty sections of one track on demand, contract, RAM/time measured, compose profile `structure`
-    stems-service.md        Stems service (workstream 16.4): docker/stems, Demucs htdemucs in 60 s windows, per-stem loudness curves + vocal ratio + instrumental ranges of one track on demand, contract, own `stems` queue/worker, measured numbers, weights licence unclear, compose profile `stems`
+    stems-service.md        Stems service (workstream 16.4): docker/stems, Demucs htdemucs in 60 s windows, per-stem loudness curves + vocal ratio + instrumental ranges of one track on demand, optionally the four stems kept as MP3/FLAC (`?audio=`, kind `stem_audio`), contract, own `stems` queue/worker, measured numbers, weights licence unclear, compose profile `stems`
     track-stems-spike.md    Spike for 16.4: htdemucs vs htdemucs_ft vs Spleeter on nine tracks, RAM (windowing), licences of code and weights, the owner's verdicts, recommendation
     file-storage.md          Own music files: storage locations (local/S3), files + track_files tables, indexer, organizer, management, /stream, admin API
     radio.md                Radio: station-level now playing (providers: ICY, NTS), poll chain lifecycle, NTS import
@@ -162,6 +166,9 @@ php artisan device:sync-sources
 # Map a B&O ASE device's (or NetworkLink/MasterLink converter's) REST API — GET-only crawl; --compare diffs two devices
 php artisan ase:map {device id|ip} [--seed=BeoZone/Zone/Video] [--compare=storage/app/ase-maps/other.json]
 
+# Ask a WiiM the read-only commands of its HTTP API (getStatusEx, getPlayerStatus, getMetaInfo, getPresetInfo, EQ list ...), GET only, and record the answers to storage/app/wiim-probes; see docs/architecture/wiim.md
+php artisan wiim:probe {ip} [--out=]
+
 # Listen to a Master Link Gateway (IP protocol + bus log), read-only, and record to storage/app/mlgw-probes; see docs/architecture/masterlink-gateway.md
 php artisan mlgw:probe {ip} [--user=admin] [--seconds=120] [--no-http|--no-api|--no-bus]
 
@@ -173,6 +180,9 @@ php artisan library:enrich [--only=metadata --only=artist-images] [--limit=200] 
 
 # Audio analysis of the own files (loudness, fingerprint + AcoustID, BPM/key/mood via the optional Essentia sidecar); needs ANALYSIS_ENABLED=true, runs on the `analysis` queue (scheduled nightly). --now with --file runs inline
 php artisan library:analyze [--limit=100] [--stage=loudness|waveform|quality|fingerprint|acoustid|essentia] [--file=ID --now] [--dry-run]
+
+# Remove kept stem audio (`stems/{file id}`, kind `stem_audio`) of files that were removed or changed (scheduled daily 03:30, Full profile); --dry-run counts; see docs/api/stems.md
+php artisan stems:prune [--dry-run]
 
 # Opt-in nightly stems (STEMS_NIGHTLY=true, 02:00): queue stems for tracks that have none, newest first, within STEMS_NIGHT_HOURS (default 4) of estimated work on the single `stems` worker; --hours overrides, --dry-run counts; see docs/architecture/stems-service.md
 php artisan library:analyze-stems [--hours=4] [--dry-run]
@@ -750,6 +760,9 @@ All drivers implement interfaces from `app/Integrations/Contracts/`:
 **Philips Android TV** (`app/Integrations/Philips/`)
 - `VideoPlayerDriver` extends the UPnP driver for a TV paired with `php artisan philips:pair {id}`: standby (no wake), apps as sources, the app in front as now playing. Opt-in; an unpaired Philips TV stays generic UPnP. See `docs/architecture/philips-tv.md`
 
+**WiiM** (`app/Integrations/Wiim/`)
+- `MusicPlayerDriver` extends the UPnP driver (server queue over UPnP) and adds the LinkPlay HTTP API: volume/seek, transport and loop mode for the WiiM's own playback, inputs and presets as sources, info, standby, battery, EQ presets (methods only). `WiimDiscovery`, polling listener. Built from the vendor document, unverified. See `docs/architecture/wiim.md`
+
 **Spotify** (`app/Integrations/Spotify/`)
 - Virtual device — polls Spotify Web API every 3 seconds
 - Capabilities: media controls, seek, queue, shuffle, repeat, like (cloud-controlled). While routed to a mapped speaker, its modes are reported for, and its playback commands accepted on, that speaker (see [Spotify routing](#spotify-routing))
@@ -903,7 +916,7 @@ See `docs/api/client-devices.md` for the firmware integration guide and full end
 
 ### Nodes (workstream 18, 1.1)
 
-A **node** is a client with `clients.kind = 'node'` (headless agent for a Pi: CD ripper, line-in later), registered through the same flow with `kind`, `roles` and `capabilities`; the admin switches declared roles on (`enabled_roles`, `Client::activeRoles()`) in `/settings/clients`, where nodes carry a badge. Built (N0, N1): the server side (columns, register/heartbeat fields, UI, `App\Domain\Node\NodeRoles`; `node_jobs`, `App\Domain\Node\NodeJobs`, node routes `/api/nodes/job` and `/api/nodes/jobs/{id}/accept|progress|result` with the node's own Bearer token, admin job routes `/api/admin/nodes/{id}/jobs`, the `node.offline` alert, MQTT nudge `remoment/node/{id}/cmd/job`) and the Go agent in `node/` (`make test`, `make build`; job type `ping` only). Not built: roles (ripper, line-in), the upload for a node, the other `remoment/node/{id}/…` topics. Plan and decisions (Go binary first, REST authoritative with MQTT only as a doorbell on the open broker, fixed job types, separate from the Manager and the Ripper desktop app): `docs/architecture/node-agent.md`.
+A **node** is a client with `clients.kind = 'node'` (headless agent for a Pi: CD ripper, line-in later), registered through the same flow with `kind`, `roles` and `capabilities`; the admin switches declared roles on (`enabled_roles`, `Client::activeRoles()`) in `/settings/clients`, where nodes carry a badge. Built (N0, N1, and N3 line-in against fakes): the server side (columns, register/heartbeat fields, UI, `App\Domain\Node\NodeRoles`; `node_jobs`, `App\Domain\Node\NodeJobs`, node routes `/api/nodes/job` and `/api/nodes/jobs/{id}/accept|progress|result` with the node's own Bearer token, admin job routes `/api/admin/nodes/{id}/jobs`, the `node.offline` alert, MQTT nudge `remoment/node/{id}/cmd/job`) and the Go agent in `node/` (`make test`, `make build`; job types `ping`, `line_in.start`, `line_in.stop`). **Line-in** (18.2, `docs/architecture/line-in.md`): a node with the `line-in` role runs `nice ffmpeg` (ALSA device from its own config, never a job param) pushing MP3 to Icecast `linein-{node id}.mp3`; `App\Domain\LineIn\LineIns` offers it as a `stream_url` source: `GET /api/line-ins`, `POST /api/devices/{id}/line-in {node_id?}` (`listLineIns`, `playLineIn`, MCP `line_in`, Line-in card on the device page), 2 to 5 s latency (not for TV), one encode per line-in, idle stop by the `line-in-sweep` task (`LINE_IN_IDLE_SECONDS`), Icecast port and source password handed to the node only when it fetches the job; unverified on hardware. Not built: the ripper role, the upload for a node, the other `remoment/node/{id}/…` topics. Plan and decisions (Go binary first, REST authoritative with MQTT only as a doorbell on the open broker, fixed job types, separate from the Manager and the Ripper desktop app): `docs/architecture/node-agent.md`.
 
 ### Source Management
 

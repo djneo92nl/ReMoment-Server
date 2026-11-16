@@ -291,7 +291,7 @@ class DeepAnalysisTest extends TestCase
 
         $this->postJson("/api/library/tracks/{$track->id}/deep-analysis", ['kinds' => ['sections']], $this->auth())
             ->assertStatus(202)
-            ->assertExactJson(['status' => 'queued', 'queued' => ['sections'], 'estimate' => ['sections_seconds' => 5, 'stems_seconds' => 105, 'stems_ram_mb' => 1500]]);
+            ->assertExactJson(['status' => 'queued', 'queued' => ['sections'], 'estimate' => ['sections_seconds' => 5, 'stems_seconds' => 105, 'stem_audio_seconds' => 115, 'stems_ram_mb' => 1500]]);
 
         Queue::assertPushedOn('analysis', AnalyzeTrackDeep::class, fn ($job) => $job->file->is($file) && $job->kind === 'sections');
         $this->getJson("/api/library/tracks/{$track->id}/deep-analysis", $this->auth())

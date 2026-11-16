@@ -80,6 +80,39 @@
                     <livewire:device-source-manager :device="$device" :key="'srcs-'.$device->id" />
                 @endif
 
+                @if(in_array('stream_url', $capabilities) && ($lineIns = \App\Domain\LineIn\LineIns::nodes())->isNotEmpty())
+                    <section x-data="{ busy: null, done: null, error: null,
+                        async play(nodeId) {
+                            this.busy = nodeId; this.done = null; this.error = null;
+                            try {
+                                const r = await fetch('{{ url('/api/devices/'.$device->id.'/line-in') }}', { method: 'POST', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ node_id: nodeId }) });
+                                const body = await r.json();
+                                if (r.ok) { this.done = nodeId; } else { this.error = body.message || 'The line-in did not start.'; }
+                            } catch (e) { this.error = 'The server could not be reached.'; }
+                            this.busy = null;
+                        } }">
+                        <h2 class="{{ $label }}">Line-in</h2>
+                        <div class="space-y-3 text-sm">
+                            @foreach($lineIns as $lineIn)
+                                <div class="flex items-center justify-between gap-4">
+                                    <span class="text-gray-900 dark:text-gray-100">{{ \App\Domain\LineIn\LineIns::label($lineIn) }}
+                                        @unless(\App\Domain\LineIn\LineIns::online($lineIn))<span class="text-xs text-gray-400">(offline)</span>@endunless
+                                    </span>
+                                    <span class="flex items-center gap-3">
+                                        <span x-show="done === {{ $lineIn->id }}" x-cloak class="text-xs text-emerald-600 dark:text-emerald-400">Playing</span>
+                                        <x-secondary-button type="button" x-on:click="play({{ $lineIn->id }})" x-bind:disabled="busy !== null">
+                                            <i class="fa-solid fa-record-vinyl"></i> Play
+                                        </x-secondary-button>
+                                    </span>
+                                </div>
+                            @endforeach
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Plays as a stream with 2 to 5 seconds of delay: fine for a turntable or CD player, not for TV.</p>
+                            <p x-show="busy !== null" x-cloak class="text-xs text-gray-500">Starting the capture on the node...</p>
+                            <p x-show="error" x-cloak x-text="error" class="text-xs text-red-600 dark:text-red-400"></p>
+                        </div>
+                    </section>
+                @endif
+
                 <section>
                     <h2 class="{{ $label }}">Details</h2>
                     <dl class="divide-y divide-gray-200 dark:divide-stone-800 text-sm [&>div]:py-3.5">

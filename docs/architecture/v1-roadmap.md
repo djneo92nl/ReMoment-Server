@@ -25,7 +25,7 @@ Effort: S = days, M = 1–2 weeks, L = several weeks. Feasibility notes come fro
 | 9a | Distribution and upgrades: registry images, compose, Ansible, Pi image, `app:upgrade`, migration squash | L | 1a | **partly built**: web server, version file, `app:upgrade` (check, backup, migrate, health check, rollback text); registry images, the Pi image and the squash to do | Must |
 | 9b | Release readiness: CI, end-user docs, network guardrails, performance budget, diagnostics bundle | M | 1a | design below | Must (diagnostics: Should) |
 | 10 | Manager: host service that controls the running instance (containers, processes, upgrade with rollback, host stats) and SMB shares (serve and mount) for the library and the drop directory; on every install target | L | 1b, 9a, backup | **skeleton built** (read-only status, logs, restart, audit, CLI); its own web page (token login, opt-in LAN mode) and Settings › Manager exist (2026-11-13); upgrade and rollback built (2026-11-14: `POST /upgrade`, `/rollback`, CLI, Settings › Manager card; unverified on real Docker); **SMB serve built (2026-11-14, unverified on a real Samba host)**: `manager/smb.js`, fixed shares library (read-only by default) / exports / inbox, one share user created by an explicit call, dry run, Settings › Manager card; SMB mount and the Pi image to do | Must |
-| 11 | WiiM (LinkPlay) driver: a dedicated driver on the public HTTP API, on top of the generic UPnP fallback | M | | to do | Should |
+| 11 | WiiM (LinkPlay) driver: a dedicated driver on the public HTTP API, on top of the generic UPnP fallback | M | | built (2026-11-15), unverified: no WiiM in the lab | Should |
 | 13 | Export from the library: download a playlist, album or artist as a zip, transcoded to a chosen maximum quality, for an MP3 player or a car radio | M | 1b | **built (2026-11-14)**: planner, job (zip, naming, playlist file, covers, limits), admin API and MCP tool, web dialog (album, artist and playlist pages, exports list on Settings › Storage) and scheduled retention; **AAC (m4a) and Opus profiles and the loudness option built (2026-11-14, 1.1)**; **the `exports` SMB share built (2026-11-14, unverified on a real Samba host)**: the job's completion step puts the zips in `EXPORT_SHARE_DIR`, the retention removes them; the USB target not built | Should |
 | 14 | Foundations, decided early (phase 2): one alert and event model, stable IDs for clients, a schema review before the migration squash, a shared credentials layer, and an action-layer design spike | M | | **14.1, 14.2 and 14.4 built**; 14.3 (schema review) reviewed, squash pending ([schema-plan.md](schema-plan.md)); 14.5 (spike) done: keep REST + `openapi.yaml` as the single definition, no registry ([action-layer.md](action-layer.md)) | Must (14.1, 14.3), Should (14.2, 14.4, 14.5 spike) |
 | 15 | Media servers: one abstraction for video (and later music) servers (Jellyfin built as a TV-only feature; Plex, Emby, Kodi follow the same contract), linked to the devices that can play them | M | 14.4, 2a | **started** (Jellyfin shelf); abstraction to do | Should |
@@ -423,7 +423,7 @@ Done when: on the Pi image, the Proxmox/Ansible install and a plain compose inst
 
 ## 11. WiiM (LinkPlay) driver
 
-Status: **to do, Should.** Added 2026-10-27. WiiM streamers are built on the LinkPlay platform and have a **public HTTP API** (the LinkPlay/WiiM HTTP API documentation).
+Status: **built 2026-11-15, unverified on hardware (Should).** Added 2026-10-27. Driver, listener, discovery, `wiim:probe`, hardware-table entry and [wiim.md](wiim.md) are in; multiroom, rename and wake stay out (not in the document); equaliser presets are driver methods without a capability. The document (version 1.2) was re-read and matches the table below, except that its examples show the key `" status"` with a leading space. WiiM streamers are built on the LinkPlay platform and have a **public HTTP API** (the LinkPlay/WiiM HTTP API documentation).
 
 **Today.** The generic UPnP MediaRenderer driver already plays on a WiiM ([upnp-renderer.md](upnp-renderer.md) names WiiM as a fallback target and says "WiiM has the LinkPlay HTTP API"): play, pause, volume, a server-managed queue. It has no sources, no multiroom, no presets and no sound adjustment, and its now playing comes from the server's own queue state. A dedicated driver always wins over the fallback (`DedicatedDrivers`, `config/devices.php`).
 
@@ -687,7 +687,7 @@ Done when: 181.FM, NTS 1 and FIP all play on the MCi900 from the web UI and the 
 
 ## 18. 1.1: Node agent, ripper, line-in, sync (ideas, not planned in detail)
 
-Status: **planned; N0 skeleton and N1 hello node built (2026-11-14; Go agent in `node/`, `ping` job, `node.offline` alert); all of it is 1.1, nothing here is in 1.0.** The Node has a plan ([node-agent.md](node-agent.md): language, registration and roles, command channel, job lifecycle, security, phases N0-N5) and the server-side skeleton (`clients.kind/roles/enabled_roles/capabilities/node_status`, register and heartbeat fields, badge and role switches on `/settings/clients`, OpenAPI, tests); no node binary, jobs or MQTT topics yet. 18.3 and 18.4 are still ideas that need their own plan before they are built. The ESP32 microphone idea is in workstream 19 (1.2).
+Status: **planned; N0 skeleton and N1 hello node built (2026-11-14; Go agent in `node/`, `ping` job, `node.offline` alert); all of it is 1.1, nothing here is in 1.0.** The Node has a plan ([node-agent.md](node-agent.md): language, registration and roles, command channel, job lifecycle, security, phases N0-N5) and the server-side skeleton (`clients.kind/roles/enabled_roles/capabilities/node_status`, register and heartbeat fields, badge and role switches on `/settings/clients`, OpenAPI, tests); no node binary, jobs or MQTT topics yet. 18.3 has its plan ([offline-sync.md](offline-sync.md), S0 diff built); 18.4 is still an idea that needs its own plan. The ESP32 microphone idea is in workstream 19 (1.2).
 
 **Foundation: a ReMoment Node.** A small headless daemon for a Pi (or any machine) that registers like a client (the registration flow of [client-devices.md](../api/client-devices.md)) and declares roles: `ripper`, `line-in`, `player`, `sync-target`. The server sends it jobs over MQTT command topics; results come back over REST (the upload endpoint `POST /api/admin/files` exists). It is the headless answer to the open question in workstream 7 (a Tauri GUI is the wrong shape for a Pi). Nodes are devices, not users: the no-accounts rule holds.
 
@@ -698,19 +698,20 @@ Status: **planned; N0 skeleton and N1 hello node built (2026-11-14; Go agent in 
 - *Unverified:* drive passthrough on LXC or Docker; the Pi doing rip, analysis and playback at once (the rule that rip and analysis run one job each and yield to listeners carries over).
 
 ### 18.2 Line-in as a stream source *[S to M]*
+- **Status (2026-11-15): built against fakes, unverified on hardware** ([line-in.md](line-in.md)): node jobs `line_in.start/stop`, Go capture supervisor, `GET /api/line-ins`, `POST /api/devices/{id}/line-in`, MCP `line_in`, device page card, idle stop, docs. Not built: fingerprint now playing (a fixed title "Line-in" for now), a stop endpoint, per-mount credentials.
 - The node captures ALSA, encodes with ffmpeg and serves an HTTP stream; the server exposes it as a source that any DLNA, Sonos or B&O speaker can play, the same pattern as [beolink-stream.md](beolink-stream.md) and the radio relay (workstream 17).
 - Latency is 2 to 5 s: fine for a turntable or CD, not for TV. The docs say so.
 - Now playing for a source with no tags: fingerprint the captured audio (Chromaprint and AcoustID already exist for the own files), then scrobble. A clean line-in suits AcoustID well.
 
 ### 18.3 Sync to offline targets *[L; phased]*
-- A **sync target** (USB stick, MP3 player, iPod, phone, a Pi) has a **sync profile**: rules (artists, albums, playlists, smart playlists, re-evaluated on every sync so "unplayed, 120+ BPM, favourites" stays fresh), a capacity budget ("fill 32 GB, ranked by favourites and play count") and a transcode profile reused from the export planner (workstream 13).
-- **Manifest and diff:** the server computes the wanted set with content hashes; the target applies adds and removes, resumably. Pull-based, because the targets are not connected to the server. One protocol for every target:
-  - the iOS app's offline library (downloads to the phone, no extra hardware, first);
-  - a mounted volume written by a node or a Mac helper (folders and relative `.m3u8` playlists);
-  - an iPod: a Rockbox iPod is just folders, a stock iPod needs `libgpod` to write iTunesDB; **last**, a bonus.
-- Syncing back: offline play counts and scrobbles merge into history.
-- Own files only; Spotify and DLNA tracks have no file, as with export.
-- *Open:* iOS background downloads, SD-card wear on a Pi, how a target proves what it holds (hashes or a manifest file).
+Status: **planned in [offline-sync.md](offline-sync.md) (2026-11-15); phase S0 built** (`App\Domain\Sync\SyncDiff`, the pure add/replace/move/keep/remove diff, `tests/Unit/SyncDiffTest.php`). Nothing else exists. The plan settles:
+- **Targets:** `app` (the iOS offline library, the app pulls), `node` (a removable volume on a node with the `sync-target` role: USB stick, MP3 player, Rockbox iPod, a mounted share; a USB drive on the server host is a node on the same machine), `helper` (a folder on a Mac/PC through the same Go apply engine as a CLI). A target belongs to the server, not to a token; a drive is claimed by an explicit admin action and identified by a marker file, never written to otherwise.
+- **Rules:** selections (playlist incl. smart playlists, album, artist, favourites, recently added, most played; anything else is a smart playlist), an export profile and options (reuse of `config/export.php`, loudness, cover rules), a byte budget with a fill strategy (`all`, `priority`, `fill_rest`), sticky placement and a churn limit.
+- **Manifest and diff:** key (canonical track id, survives merges and renames) plus fingerprint (source hash plus profile, computable without transcoding) plus a sticky path; a `.remoment-sync/manifest.json` on the target (no database), the target posts what it holds and the server answers with a stateless plan; only entries of that manifest are ever deleted.
+- **Delivery:** copies straight from the original with `Range`, transcodes as cached artifacts shared by fingerprint (capped, prepare-ahead limit), signed 6 h file URLs or the token route.
+- **Execution:** node job types `sync.probe|claim|apply|eject|verify`, resume by manifest, atomic manifest writes, safe eject; the iOS app pulls with background downloads and reports back; offline plays merge into history later.
+- *Open:* iOS background download behaviour, unprivileged unmount on a Pi, plan time and `have` size on a Pi with 30,000 tracks, Last.fm's age limit for offline scrobbles; ten owner questions at the end of the doc.
+- Phases S0 diff (built), S1 server core and contract (smallest useful server increment), S2 artifacts, S3 Go apply engine and folder CLI, S4 node role, S5 iOS app and sync-back, S6 iPod recipe.
 
 ### 18.4 The Pi as a disconnected node
 With a light SQLite library (the Control profile already uses SQLite), the node pulls a manifest when it can reach the server, keeps the files, plays through its own DAC offline and reports plays when it is back. One box can then be player, ripper, line-in and sync helper. Needs 18.1 and 18.3.
@@ -718,7 +719,7 @@ With a light SQLite library (the Control profile already uses SQLite), the node 
 ### Build order
 1. Node agent and the headless ripper (closes the workstream 7 question, builds the foundation): phases N0 skeleton (done), N1 hello node (done, unverified on a Pi), N2 ripper in [node-agent.md](node-agent.md).
 2. Line-in and CD stream source (small, reuses the stream container pattern).
-3. Sync v1: manifest API, iOS offline library, folder and USB target.
+3. Sync v1 ([offline-sync.md](offline-sync.md)): S1 manifest/plan API and S2 artifacts, then the iOS offline library (S5) and the folder CLI (S3); USB through the node (S4).
 4. Node offline playback and sync-back.
 5. iPod (`libgpod`) and the `exports` SMB share of workstream 13.
 

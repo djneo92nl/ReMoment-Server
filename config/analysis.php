@@ -122,4 +122,22 @@ return [
     /** Tracks longer than this (seconds) are skipped by the nightly batch: the service refuses them (its own STEMS_MAX_DURATION). */
     'stems_max_duration' => (int) env('STEMS_MAX_DURATION', 1200),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Stem audio (kind `stem_audio`)
+    |--------------------------------------------------------------------------
+    | On request for ONE track the stems service also keeps the four stems as audio files (for the apps' mixer), on
+    | `stem_audio_disk` under `stems/{file id}`. `mp3` (about 6 MB per 4 minutes at 192 kbps; the encoder delay is
+    | handled by the LAME header) or `flac` (about 80-120 MB, sample-exact). docs/architecture/stems-service.md.
+    */
+    'stem_audio_disk' => env('STEM_AUDIO_DISK', 'local'),
+    'stem_audio_format' => env('STEM_AUDIO_FORMAT', 'mp3'),
+    'stem_audio_bitrate' => (int) env('STEM_AUDIO_BITRATE', 192),
+
+    /** Seconds a signed stem URL of `GET /api/library/tracks/{id}/stems` stays valid (an app loads the four files once). */
+    'stem_audio_url_ttl' => (int) env('STEM_AUDIO_URL_TTL', 3600),
+
+    /** Extra seconds per second of audio for encoding the stems on top of the separation (four ffmpeg processes). */
+    'stem_audio_seconds_per_second' => (float) env('STEM_AUDIO_SECONDS_PER_SECOND', 0.05),
+
 ];

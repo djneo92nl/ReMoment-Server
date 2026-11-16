@@ -315,7 +315,7 @@ class StemsDeepAnalysisTest extends TestCase
 
         $this->postJson($this->url($track), ['kinds' => ['stems']], $this->auth())
             ->assertStatus(202)
-            ->assertExactJson(['status' => 'queued', 'queued' => ['stems'], 'estimate' => ['sections_seconds' => 5, 'stems_seconds' => 105, 'stems_ram_mb' => 1500]]);
+            ->assertExactJson(['status' => 'queued', 'queued' => ['stems'], 'estimate' => ['sections_seconds' => 5, 'stems_seconds' => 105, 'stem_audio_seconds' => 115, 'stems_ram_mb' => 1500]]);
 
         Queue::assertPushedOn('stems', AnalyzeTrackDeep::class, fn ($job) => $job->file->is($file) && $job->kind === 'stems');
         $this->getJson($this->url($track), $this->auth())
@@ -458,12 +458,12 @@ class StemsDeepAnalysisTest extends TestCase
 
     public function test_features_list_the_kinds_that_can_run(): void
     {
-        $this->getJson('/api/info')->assertJsonPath('features', ['alerts' => true, 'scenes' => true, 'profile' => 'full', 'deep_analysis' => true, 'analysis' => true, 'deep_analysis_kinds' => ['stems']] + $this->exportFeature());
+        $this->getJson('/api/info')->assertJsonPath('features', ['alerts' => true, 'scenes' => true, 'profile' => 'full', 'deep_analysis' => true, 'analysis' => true, 'deep_analysis_kinds' => ['stems', 'stem_audio']] + $this->exportFeature());
 
         config(['analysis.structure_url' => 'http://structure:8091']);
         Http::fake(['structure:8091/health' => Http::response(['ok' => true])]);
         Cache::flush();
-        $this->getJson('/api/info')->assertJsonPath('features.deep_analysis_kinds', ['sections', 'stems']);
+        $this->getJson('/api/info')->assertJsonPath('features.deep_analysis_kinds', ['sections', 'stems', 'stem_audio']);
 
         config(['analysis.stems_url' => null, 'analysis.structure_url' => null]);
         Cache::flush();

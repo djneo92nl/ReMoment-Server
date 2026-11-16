@@ -881,6 +881,69 @@ paths:
                   receiver: { type: string }
         "422":
           description: Stream not enabled, or the device cannot play a stream
+  /line-ins:
+    get:
+      tags: [Radio]
+      summary: Line-ins - one per ReMoment Node with the line-in role on - with the MP3 stream URL, whether the mount is live and which devices were told to play it
+      operationId: listLineIns
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer, description: The node's client id }
+                        name: { type: string, description: 'Line-in on <node name>' }
+                        node_name: { type: string, nullable: true }
+                        title: { type: string, description: The fixed now-playing title }
+                        mount: { type: string }
+                        url: { type: string }
+                        node_online: { type: boolean }
+                        node_state: { type: string, description: "idle, busy, error, absent or unknown (the node's last heartbeat)" }
+                        detail: { type: string, nullable: true }
+                        inputs: { type: array, items: { type: object, properties: { id: { type: string }, label: { type: string } } } }
+                        live: { type: boolean, description: Icecast has a source on the mount }
+                        listeners: { type: integer }
+                        device_ids: { type: array, items: { type: integer } }
+  /devices/{device}/line-in:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    post:
+      tags: [Radio]
+      summary: Play a line-in on this device (capability stream_url); latency 2 to 5 s, not for TV
+      operationId: playLineIn
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                node_id: { type: integer, description: Needed when more than one node has a line-in }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  url: { type: string }
+                  node_id: { type: integer }
+                  title: { type: string }
+        "422":
+          description: No line-in, node_id missing or unknown, or the device cannot play a stream
+        "502":
+          description: The line-in did not come up in time
+        "503":
+          description: The node or the device is offline
   /beolink-stream:
     get:
       tags: [Radio]
@@ -1905,9 +1968,71 @@ paths:
                     properties:
                       sections: { $ref: "#/components/schemas/DeepAnalysisState" }
                       stems: { $ref: "#/components/schemas/DeepAnalysisState" }
+                      stem_audio: { $ref: "#/components/schemas/DeepAnalysisState" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { description: "`no_file`", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /library/tracks/{track}/stems:
+    parameters:
+      - { name: track, in: path, required: true, schema: { type: integer }, description: "Library track id (a merged id resolves to the survivor)" }
+    get:
+      tags: [Library]
+      summary: The kept stems of one track as signed audio URLs, for a mixer
+      description: "Admin only. Available once a `stem_audio` deep analysis finished for the track (POST /library/tracks/{track}/deep-analysis). Four files (vocals, drums, bass, other), MP3 or FLAC as the server is set (`STEM_AUDIO_FORMAT`), all stereo, 44.1 kHz and as long as the track, so they start together; with `bpm` and `camelot` to line tracks up. Each `url` is a path (put the server address in front) signed for `expires_in` seconds; the signature is the authorization, no token header. A download answers Range requests. See docs/api/stems.md."
+      operationId: getTrackStems
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [track_id, format, mime, sample_rate, channels, duration, bytes, expires_in, stems]
+                properties:
+                  track_id: { type: integer, description: The surviving track id }
+                  format: { type: string, enum: [mp3, flac] }
+                  mime: { type: string, enum: [audio/mpeg, audio/flac] }
+                  bitrate: { type: integer, nullable: true, description: "kbps (MP3); null for FLAC" }
+                  sample_rate: { type: integer }
+                  channels: { type: integer }
+                  duration: { type: number, description: Seconds }
+                  bytes: { type: integer, description: Total size of the four files }
+                  expires_in: { type: integer, description: Seconds the URLs stay valid }
+                  bpm: { type: number, nullable: true }
+                  key: { type: string, nullable: true }
+                  mode: { type: string, nullable: true }
+                  camelot: { type: string, nullable: true, description: "Camelot code such as 8A, null without key data" }
+                  stems:
+                    type: object
+                    required: [vocals, drums, bass, other]
+                    additionalProperties:
+                      type: object
+                      required: [url, bytes]
+                      properties:
+                        url: { type: string, description: Signed path of the file }
+                        bytes: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { description: "`not_ready` (not kept yet; `state` says none, queued, running or failed) or `files_missing` (gone from the disk: DELETE kind stem_audio and ask again)", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "422": { description: "`no_file` (the track has no own file)", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /library/tracks/{track}/stems/{stem}:
+    get:
+      tags: [Library]
+      summary: Download one kept stem (signed)
+      description: "The URL comes from GET /library/tracks/{track}/stems, signed and temporary; it needs no admin token. Answers Range requests."
+      operationId: downloadTrackStem
+      security: []
+      parameters:
+        - { name: track, in: path, required: true, schema: { type: integer } }
+        - { name: stem, in: path, required: true, schema: { type: string, enum: [vocals, drums, bass, other] } }
+      responses:
+        "200":
+          description: The audio file
+          content:
+            audio/mpeg: { schema: { type: string, format: binary } }
+            audio/flac: { schema: { type: string, format: binary } }
+        "403": { description: Invalid or expired signature }
+        "404": { description: "Not kept, removed, or the file changed", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
   /library/tracks/{track}/deep-analysis/{kind}:
     delete:
       tags: [Library]
@@ -4069,8 +4194,8 @@ components:
 
     DeepAnalysisKind:
       type: string
-      enum: [sections, stems]
-      description: "`sections` (where the music changes) and `stems` (loudness lanes of vocals, drums, bass, other, and instrumental ranges); `mood` is planned (workstream 16). An unknown kind is a 422."
+      enum: [sections, stems, stem_audio]
+      description: "`sections` (where the music changes), `stems` (loudness lanes of vocals, drums, bass, other, and instrumental ranges) and `stem_audio` (the same separation, and the four stems kept as audio files for a mixer, listed by GET /library/tracks/{track}/stems; it fills `stems` too); `mood` is planned (workstream 16). An unknown kind is a 422."
     DeepAnalysisRequest:
       type: object
       required: [status, queued, estimate]
@@ -4083,6 +4208,7 @@ components:
           properties:
             sections_seconds: { type: integer }
             stems_seconds: { type: integer, description: "5 s + 0.5 s per second of audio by default; 1.5-2.5 s per second on a small PC" }
+            stem_audio_seconds: { type: integer, description: "The stems estimate plus encoding the four files (0.05 s per second of audio by default)" }
             stems_ram_mb: { type: integer, description: "RAM the stems service needs while it works" }
     DeepAnalysisState:
       type: object

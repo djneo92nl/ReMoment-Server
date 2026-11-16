@@ -2,7 +2,7 @@
 app_dir: /opt/remoment
 app_repo: git@github.com:djneo92nl/ReMoment-Server.git   # Change to your repo URL
 app_branch: main
-app_url: http://remoment.local                          # Change to your server's URL or IP
+app_url: http://192.168.1.109                         # Change to your server's URL or IP
 app_port: 80
 
 # Client-facing API contract version, advertised in the mDNS TXT record.

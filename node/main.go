@@ -30,6 +30,7 @@ type Node struct {
 	nudge   chan struct{}
 	mu      sync.Mutex
 	roles   []string
+	lineIn  *lineIn
 }
 
 func (n *Node) logf(f string, a ...any) { log.Printf(f, a...) }
@@ -48,6 +49,8 @@ func main() {
 		log.Fatalf("config: %v", err)
 	}
 	n := &Node{cfg: cfg, api: newAPI(cfg.Server), started: time.Now(), nudge: make(chan struct{}, 1)}
+	n.lineIn = newLineIn(cfg.LineIn, n.logf)
+	defer n.lineIn.Stop()
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
@@ -135,7 +138,7 @@ func (n *Node) run(done <-chan struct{}) error {
 func (n *Node) registerAndWait(done <-chan struct{}) (string, string, error) {
 	var reg *registration
 	for {
-		r, err := n.api.register(n.cfg, map[string]any{})
+		r, err := n.api.register(n.cfg, n.capabilities())
 		if err == nil {
 			reg = r
 			break
@@ -173,6 +176,9 @@ func (n *Node) status() nodeStatus {
 	st := nodeStatus{Roles: map[string]roleState{}, UptimeSeconds: int64(time.Since(n.started).Seconds()), Load: loadAvg(), DiskFree: diskFree(n.cfg.StateDir)}
 	for _, r := range n.roles {
 		st.Roles[r] = roleState{State: "idle"}
+		if r == "line-in" && n.lineIn != nil {
+			st.Roles[r] = n.lineIn.roleState()
+		}
 	}
 	return st
 }
@@ -205,4 +211,17 @@ func (n *Node) drain() error {
 		n.runJob(j)
 	}
 	return nil
+}
+
+// capabilities is what the node declares at registration: informational only, never executed by the server.
+func (n *Node) capabilities() map[string]any {
+	caps := map[string]any{}
+	if n.cfg.LineIn.Device != "" {
+		label := n.cfg.LineIn.Label
+		if label == "" {
+			label = n.cfg.LineIn.Device
+		}
+		caps["line-in"] = map[string]any{"inputs": []map[string]any{{"id": n.cfg.LineIn.Device, "label": label}}}
+	}
+	return caps
 }

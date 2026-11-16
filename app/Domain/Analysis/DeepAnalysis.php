@@ -12,7 +12,8 @@ use Illuminate\Support\Facades\Http;
 
 /**
  * Deep analysis of ONE track on request (workstream 16): per-track results that are too slow or too rare to compute
- * for the whole library, so they are admin-triggered, stored, and never part of the nightly run. Each KIND is backed by
+ * for the whole library, so they are admin-triggered, stored, and never part of the nightly run (`stem_audio` keeps the
+ * stems as audio files for the apps' mixer, see StemAudio). Each KIND is backed by
  * an `OnDemandStage` that says where its result is stored, which service computes it and on which queue it runs;
  * `mood` gets a row in KINDS when it exists. See docs/api/deep-analysis.md.
  *
@@ -23,7 +24,7 @@ use Illuminate\Support\Facades\Http;
 final class DeepAnalysis
 {
     /** kind => the on-demand stage that computes it. */
-    public const KINDS = ['sections' => 'structure', 'stems' => 'stems'];
+    public const KINDS = ['sections' => 'structure', 'stems' => 'stems', 'stem_audio' => 'stem_audio'];
 
     /** How long a `queued` marker lasts: the analysis queue can be busy with the nightly run for hours. */
     private const QUEUED_TTL = 43200;
@@ -174,6 +175,10 @@ final class DeepAnalysis
     {
         $analysis = $file->analysis()->first();
         $stage = self::stage($kind);
+
+        if ($kind === 'stem_audio') {
+            StemAudio::delete($file); // the kept files go with their record
+        }
 
         if ($analysis === null || ($analysis->stages[$stage->key()] ?? null) === null && ($analysis->errors[$stage->key()] ?? null) === null) {
             return false;

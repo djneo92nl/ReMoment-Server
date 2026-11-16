@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\SpotifyStreamController;
 use App\Http\Controllers\Api\StorageController;
 use App\Http\Controllers\Api\SyncGroupController;
 use App\Http\Controllers\Api\TagController;
+use App\Http\Controllers\Api\TrackStemsController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/info', InfoController::class);
@@ -99,6 +100,8 @@ Route::post('/devices/{device}/controls/{control}', [SourceControlsController::c
 
 Route::get('/spotify-stream', [SpotifyStreamController::class, 'show']);
 Route::post('/devices/{device}/spotify-stream', [SpotifyStreamController::class, 'play']);
+Route::get('/line-ins', [\App\Http\Controllers\Api\LineInController::class, 'index']);
+Route::post('/devices/{device}/line-in', [\App\Http\Controllers\Api\LineInController::class, 'play']);
 Route::post('/librespot/event', [SpotifyStreamController::class, 'event']);
 
 Route::get('/beolink-stream', [BeolinkStreamController::class, 'show']);
@@ -222,6 +225,8 @@ Route::post('/admin/login', [AdminAuthController::class, 'login']);
 // Signed, temporary download of one export part: the signature is the authorization (docs/api/export.md)
 Route::get('/library/exports/{id}/download/{part}', [ExportController::class, 'download'])
     ->middleware('signed:relative')->whereNumber('part')->name('api.library.exports.download');
+Route::get('/library/tracks/{track}/stems/{stem}', [TrackStemsController::class, 'download'])
+    ->middleware('signed:relative')->name('api.library.stems.download');
 Route::middleware('admin.token')->group(function () {
     Route::get('/admin/me', [AdminAuthController::class, 'me']);
 
@@ -239,6 +244,9 @@ Route::middleware('admin.token')->group(function () {
     Route::post('/library/tracks/{track}/deep-analysis', [DeepAnalysisController::class, 'store']);
     Route::get('/library/tracks/{track}/deep-analysis', [DeepAnalysisController::class, 'show']);
     Route::delete('/library/tracks/{track}/deep-analysis/{kind}', [DeepAnalysisController::class, 'destroy']);
+
+    // The kept stem audio of a track (kind stem_audio), as signed URLs for the apps' mixer (docs/api/stems.md)
+    Route::get('/library/tracks/{track}/stems', [TrackStemsController::class, 'show']);
 
     // Export from the library as zip parts (docs/api/export.md); admin only, the download itself is signed
     Route::post('/library/exports/estimate', [ExportController::class, 'estimate']);

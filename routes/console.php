@@ -44,6 +44,8 @@ Schedule::command('library:analyze')->dailyAt('02:00')->when(fn () => Profile::a
 
 // Opt-in (STEMS_NIGHTLY): stems for tracks that have none, a time-budgeted batch for the single `stems` worker, in the same night window.
 Schedule::command('library:analyze-stems')->dailyAt('02:00')->when(fn () => Profile::allows('deep_analysis') && config('analysis.stems_nightly'));
+// Kept stem audio of files that were removed or changed (kind `stem_audio`, docs/architecture/stems-service.md).
+Schedule::command('stems:prune')->dailyAt('03:30')->when(fn () => Profile::allows('deep_analysis'));
 
 // Picks up files added, changed or removed outside the app in the storage locations (queued; see docs/architecture/file-storage.md).
 Schedule::command('library:scan-files --queue')->dailyAt('03:30')->when(fn () => Profile::allows('file_storage'));
@@ -87,3 +89,7 @@ Schedule::call(fn () => app(\App\Domain\HomeAssistant\DiscoveryPublisher::class)
 
 // Scenes with a schedule that say now (docs/api/scenes.md); each is queued, so a scene with delays never holds the scheduler.
 Schedule::call(fn () => app(\App\Domain\Scenes\SceneRunner::class)->runDue())->everyMinute()->name('scenes-run-due')->when(fn () => Profile::allows('scenes'));
+
+// Line-in (docs/architecture/line-in.md): stop a node's capture when nobody listens to its mount any more. Only while something is wanted.
+Schedule::call(fn () => \App\Domain\LineIn\LineIns::sweep())->everyMinute()->name('line-in-sweep')
+    ->when(fn () => Profile::allows('line_in') && \App\Domain\LineIn\LineIns::anyWanted());

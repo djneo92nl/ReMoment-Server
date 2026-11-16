@@ -21,7 +21,7 @@ SR = separate.SR
 
 
 def band_split(block):
-    """(n, 2) -> (4, n): ideal FFT band split of the mono mix, standing in for the model."""
+    """(n, 2) -> (4, n, 2): ideal FFT band split of the mono mix (both channels alike), standing in for the model."""
     mono = block.mean(1)
     spec = np.fft.rfft(mono)
     f = np.fft.rfftfreq(len(mono), 1 / SR)
@@ -29,7 +29,7 @@ def band_split(block):
     for lo, hi in ((200, 3000), (3000, SR), (0, 200)):  # vocals, drums, bass
         out.append(np.fft.irfft(np.where((f >= lo) & (f < hi), spec, 0), len(mono)))
     out.append(np.zeros(len(mono)))  # other
-    return np.array(out)
+    return np.array(out)[:, :, None].repeat(2, 2)
 
 
 @pytest.fixture(autouse=True)
@@ -131,6 +131,50 @@ def test_api_returns_the_contract(wav):
     body = r.json()
     assert set(body) == {"version", "duration", "method", "rate_hz", "stems", "vocal_ratio", "instrumental"}
     assert all(isinstance(x, int) for x in body["stems"]["vocals"])
+
+
+needs_ffmpeg = pytest.mark.skipif(not separate.audio_formats(), reason="ffmpeg cannot encode mp3 or flac here")
+
+
+def decode(path):
+    """A file's samples as (n, 2) float32 through ffmpeg."""
+    import subprocess
+
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), "-f", "f32le", "-ac", "2", "-ar", str(SR), "-"], capture_output=True).stdout
+    return np.frombuffer(raw, np.float32).reshape(-1, 2)
+
+
+@needs_ffmpeg
+@pytest.mark.parametrize("fmt", [f for f in ("mp3", "flac") if f in separate.audio_formats()])
+def test_audio_zip_holds_the_curves_and_four_stems(wav, tmp_path, fmt):
+    import io
+    import json
+    import zipfile
+
+    client = TestClient(service.app)
+    assert fmt in client.get("/health").json()["audio_formats"]
+    with open(wav, "rb") as f:
+        r = client.post(f"/stems?audio={fmt}", files={"audio": ("mix.wav", f, "audio/wav")})
+    assert r.status_code == 200 and r.headers["content-type"] == "application/zip"
+    z = zipfile.ZipFile(io.BytesIO(r.content))
+    assert sorted(z.namelist()) == sorted(["stems.json", *[f"{n}.{fmt}" for n in separate.SOURCES]])
+    meta = json.loads(z.read("stems.json"))
+    assert {"version", "duration", "method", "rate_hz", "stems", "vocal_ratio", "instrumental", "audio"} <= set(meta)
+    assert meta["audio"]["format"] == fmt and meta["audio"]["files"]["vocals"] == f"vocals.{fmt}"
+    # the files are the stems: the voice (440 Hz) is only in the middle of the vocals file, the other file is silent, the bass is steady
+    z.extractall(tmp_path)
+    vocals, other, bass = (decode(tmp_path / f"{n}.{fmt}") for n in ("vocals", "other", "bass"))
+    assert len(vocals) / SR == pytest.approx(60, abs=0.2)  # gapless: the encoder delay is not in the file's length
+    rms = lambda a, s, e: float(np.sqrt((a[int(s * SR) : int(e * SR)] ** 2).mean()))  # noqa: E731
+    assert rms(vocals, 22, 38) > 10 * rms(vocals, 2, 18)
+    assert rms(other, 0, 60) < 0.001
+    assert rms(bass, 2, 18) == pytest.approx(rms(bass, 22, 38), rel=0.15)
+
+
+def test_unknown_audio_format_is_422(wav):
+    with open(wav, "rb") as f:
+        r = TestClient(service.app).post("/stems?audio=wma", files={"audio": ("mix.wav", f)})
+    assert r.status_code == 422 and "wma" in r.json()["detail"]
 
 
 def test_too_long_is_413(wav, monkeypatch):

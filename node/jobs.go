@@ -8,8 +8,10 @@ import (
 
 // handlers is the closed list of job types this node runs. A type that is not here fails with unknown_type;
 // nothing is ever executed from a job's params (no shell, no free paths). Roles add their types here in later phases.
-var handlers = map[string]func(params json.RawMessage) (map[string]any, error){
-	"ping": func(params json.RawMessage) (map[string]any, error) {
+var handlers = map[string]func(n *Node, params json.RawMessage) (map[string]any, error){
+	"line_in.start": lineInStart,
+	"line_in.stop":  lineInStop,
+	"ping": func(_ *Node, params json.RawMessage) (map[string]any, error) {
 		var p struct {
 			Message string `json:"message"`
 		}
@@ -40,7 +42,7 @@ func (n *Node) runJob(j *Job) {
 		n.report(j, false, nil, "cancelled")
 		return
 	}
-	res, err := h(j.Params)
+	res, err := h(n, j.Params)
 	if err != nil {
 		n.report(j, false, nil, err.Error())
 		return

@@ -64,6 +64,7 @@ return [
         'radio' => ['label' => 'Radio', 'profiles' => ['control', 'standard', 'full']],
         'scenes' => ['label' => 'Scenes: step lists run through the API, optionally on a schedule', 'profiles' => ['control', 'standard', 'full']],
         'home_assistant' => ['label' => 'Home Assistant MQTT discovery (opt-in)', 'profiles' => ['control', 'standard', 'full']],
+        'line_in' => ['label' => 'Line-in on a node as a stream source (needs a node with the role)', 'profiles' => ['control', 'standard', 'full']],
         'alerts' => ['label' => 'Alerts, health and backup', 'profiles' => ['control', 'standard', 'full']],
 
         'library' => ['label' => 'Library browsing, playlists, library cache, artwork prerender, Spotify browse', 'profiles' => ['standard', 'full']],
@@ -88,7 +89,7 @@ return [
     'routes' => [
         // Play history and statistics work in every profile (the history feature); narrow rows come before `library`.
         'history' => ['api/library/stats', 'api/library/history', 'api/devices/*/history'],
-        'deep_analysis' => ['api/library/tracks/*/deep-analysis', 'api/library/tracks/*/deep-analysis/*'],
+        'deep_analysis' => ['api/library/tracks/*/deep-analysis', 'api/library/tracks/*/deep-analysis/*', 'api/library/tracks/*/stems', 'api/library/tracks/*/stems/*'],
         'rip_upload' => ['api/admin/files'],
         'cover_health' => ['api/library/health/covers', 'settings/library-health/covers'],
         'analysis' => ['api/library/tracks/*/mixes-with', 'settings/analysis', 'settings/analysis/*', 'settings/library-health', 'settings/library-health/*', 'api/library/health', 'api/library/health/*'],

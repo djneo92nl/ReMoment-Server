@@ -19,6 +19,8 @@ type Config struct {
 	Roles []string `json:"roles"`
 	// NoMQTT turns the doorbell off: the node then only polls.
 	NoMQTT bool `json:"no_mqtt"`
+	// LineIn is the capture of the line-in role (device, label, rate, bitrate).
+	LineIn LineInConfig `json:"line_in"`
 }
 
 func loadConfig(path string) (*Config, error) {
@@ -41,6 +43,9 @@ func loadConfig(path string) (*Config, error) {
 	}
 	if v := os.Getenv("REMOMENT_NODE_ROLES"); v != "" {
 		c.Roles = strings.Split(v, ",")
+	}
+	if v := os.Getenv("REMOMENT_NODE_LINEIN_DEVICE"); v != "" {
+		c.LineIn.Device = v
 	}
 	if os.Getenv("REMOMENT_NODE_NO_MQTT") == "1" {
 		c.NoMQTT = true

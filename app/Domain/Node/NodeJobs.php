@@ -24,6 +24,10 @@ final class NodeJobs
      */
     public const TYPES = [
         'ping' => ['role' => null, 'ttl' => 30, 'params' => ['message' => ['nullable', 'string', 'max:100']]],
+        // Line-in (18.2): the capture device is the node's own config, never a param. The Icecast port and source password
+        // are added when the node fetches the job (see deliver()), so the password is never stored or listed.
+        'line_in.start' => ['role' => 'line-in', 'ttl' => 120, 'params' => ['mount' => ['required', 'string', 'regex:/^linein-\d{1,9}\.mp3$/']]],
+        'line_in.stop' => ['role' => 'line-in', 'ttl' => 120, 'params' => []],
     ];
 
     public static function topic(Client $node): string
@@ -67,6 +71,26 @@ final class NodeJobs
         self::nudge($node, $job);
 
         return $job;
+    }
+
+    /**
+     * The job as the node gets it: the stored payload, plus for `line_in.start` the Icecast port and source password
+     * (REST only, Bearer node token, never MQTT, never in the admin listing).
+     *
+     * @return array<string, mixed>
+     */
+    public static function deliver(NodeJob $job): array
+    {
+        $payload = $job->toPayload();
+
+        if ($job->type === 'line_in.start') {
+            $payload['params'] = ((array) ($job->params ?? [])) + [
+                'icecast_port' => (int) config('radio_relay.icecast.port'),
+                'source_password' => (string) config('radio_relay.icecast.source_password'),
+            ];
+        }
+
+        return $payload;
     }
 
     /** A doorbell, not a command: the node fetches the job over REST. A broker that is down only costs latency. */
