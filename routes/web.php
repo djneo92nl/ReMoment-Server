@@ -9,6 +9,7 @@ use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\LastfmAuthController;
 use App\Http\Controllers\LibraryController;
 use App\Http\Controllers\LibraryHealthController;
+use App\Http\Controllers\MixerController;
 use App\Http\Controllers\PlayerController;
 use App\Http\Controllers\PlaylistController;
 use App\Http\Controllers\ProfileController;
@@ -87,6 +88,7 @@ Route::post('/devices/{device}/hidden', [DeviceController::class, 'toggleHidden'
 Route::get('/history', [HistoryController::class, 'index'])->name('history.index');
 Route::get('/stats', [StatsController::class, 'index'])->name('stats.index');
 Route::get('/multiroom', fn () => view('multiroom.index'))->name('multiroom.index');
+Route::get('/mixer', MixerController::class)->name('mixer'); // stem mixer, Full profile (docs/frontend/stem-mixer.md)
 Route::get('/scenes', fn () => view('scenes.index'))->name('scenes.index');
 Route::get('/scenes/create', fn () => view('scenes.edit', ['sceneId' => null]))->name('scenes.create');
 Route::get('/scenes/{scene}/edit', fn (\App\Models\Scene $scene) => view('scenes.edit', ['sceneId' => $scene->id]))->name('scenes.edit');

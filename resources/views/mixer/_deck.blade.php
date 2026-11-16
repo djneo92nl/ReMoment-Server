@@ -1,0 +1,91 @@
+{{-- One deck of the stem mixer. $side is "a" or "b"; every expression reads the Alpine `deck.{side}` of the page's `mixer` component. --}}
+@php($d = "deck.$side")
+<x-card class="p-5 sm:p-6">
+    <div class="flex items-center gap-4">
+        <div class="h-14 w-14 flex-none overflow-hidden rounded-xl bg-gray-100 dark:bg-stone-800">
+            <img x-show="{{ $d }}.track?.artwork?.proxy_120" :src="{{ $d }}.track?.artwork?.proxy_120" alt="" class="h-full w-full object-cover">
+        </div>
+        <div class="min-w-0 flex-1">
+            <p class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-600">Deck {{ strtoupper($side) }}</p>
+            <p class="truncate text-base font-medium text-gray-900 dark:text-gray-100" x-text="{{ $d }}.track?.name ?? 'No track yet'"></p>
+            <p class="truncate text-sm text-gray-500" x-text="{{ $d }}.track ? [{{ $d }}.track.artist_name, {{ $d }}.track.album_name].filter(Boolean).join(' · ') : 'Pick one below'"></p>
+        </div>
+        <x-secondary-button size="sm" x-show="{{ $d }}.track" @click="unload('{{ $side }}')" aria-label="Unload deck {{ strtoupper($side) }}"><i class="fa-solid fa-xmark text-xs"></i></x-secondary-button>
+    </div>
+
+    <div class="mt-5" x-show="['checking', 'loading'].includes({{ $d }}.status)" x-cloak>
+        <p class="text-sm text-gray-500"><i class="fa-solid fa-spinner fa-spin mr-1.5"></i><span x-text="{{ $d }}.status === 'loading' ? 'Loading the four stems' + ({{ $d }}.megabytes ? ' (about ' + {{ $d }}.megabytes + ' MB in memory)' : '') : 'Looking for the stems'"></span></p>
+    </div>
+
+    <div class="mt-5 space-y-3" x-show="{{ $d }}.status === 'needs_stems'" x-cloak>
+        <p class="text-sm text-gray-500">This track has no stems yet. Separating them takes a few minutes of CPU on the server and is kept afterwards.</p>
+        <p class="text-sm text-gray-500" x-show="{{ $d }}.error" x-text="{{ $d }}.error"></p>
+        <x-primary-button type="button" size="md" @click="requestStems('{{ $side }}')" x-bind:disabled="!{{ $d }}.available"><i class="fa-solid fa-wand-magic-sparkles text-xs"></i>Make stems</x-primary-button>
+        <p class="text-xs text-gray-400 dark:text-gray-600" x-show="!{{ $d }}.available">The stems service is not set up on this server (STEMS_URL).</p>
+    </div>
+
+    <div class="mt-5" x-show="{{ $d }}.status === 'processing'" x-cloak>
+        <p class="text-sm text-gray-500"><i class="fa-solid fa-hourglass-half mr-1.5"></i><span x-text="{{ $d }}.jobState === 'running' ? 'Separating the stems' : 'Waiting for the stems queue'"></span><span x-show="{{ $d }}.estimate" x-text="' (an estimate: about ' + Math.max(1, Math.round({{ $d }}.estimate / 60)) + ' min)'"></span></p>
+    </div>
+
+    <div class="mt-5" x-show="{{ $d }}.status === 'error'" x-cloak>
+        <x-alert type="error"><span x-text="{{ $d }}.error"></span></x-alert>
+    </div>
+
+    <div class="mt-5 space-y-5" x-show="{{ $d }}.status === 'ready'" x-cloak>
+        {{-- Transport --}}
+        <div>
+            <div class="flex items-center gap-3">
+                <x-primary-button type="button" size="md" @click="togglePlay('{{ $side }}')" x-bind:aria-label="{{ $d }}.playing ? 'Pause deck {{ strtoupper($side) }}' : 'Play deck {{ strtoupper($side) }}'">
+                    <i class="fa-solid" :class="{{ $d }}.playing ? 'fa-pause' : 'fa-play'"></i>
+                </x-primary-button>
+                <span class="w-24 flex-none text-sm tabular-nums text-gray-500"><span x-text="time({{ $d }}.pos)"></span> / <span x-text="time({{ $d }}.dur)"></span></span>
+                @include('mixer._slider', ['value' => "$d.pos", 'min' => '0', 'max' => "Math.max(1, $d.dur)", 'step' => '0.1', 'input' => "seek('$side', \$event.target.value)", 'label' => "'Position of deck ".strtoupper($side)."'"])
+            </div>
+            <div class="mt-1 h-1 overflow-hidden rounded-full bg-gray-100 dark:bg-stone-800" aria-hidden="true">
+                <div class="h-full rounded-full bg-gray-400 dark:bg-stone-500 transition-[width] duration-100" :style="'width:' + Math.round({{ $d }}.level * 100) + '%'"></div>
+            </div>
+        </div>
+
+        {{-- The four stems --}}
+        <div>
+            <p class="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-600">Stems</p>
+            <template x-for="stem in STEMS" :key="stem">
+                <div class="flex items-center gap-3">
+                    <span class="w-14 flex-none text-sm capitalize text-gray-700 dark:text-gray-300" x-text="stem"></span>
+                    @include('mixer._slider', ['value' => "$d.levels[stem]", 'min' => '0', 'max' => '1', 'step' => '0.01', 'input' => "setLevel('$side', stem, \$event.target.value)", 'label' => "stem + ' level, deck ".strtoupper($side)."'"])
+                    <span class="w-9 flex-none text-right text-xs tabular-nums text-gray-500" x-text="percent({{ $d }}.levels[stem])"></span>
+                    <x-secondary-button size="sm" class="w-8 justify-center" @click="toggle('{{ $side }}', 'muted', stem)" x-bind:aria-pressed="{{ $d }}.muted[stem]" x-bind:aria-label="'Mute ' + stem" x-bind:class="{{ $d }}.muted[stem] ? '!bg-red-600 !border-red-600 !text-white' : ''">M</x-secondary-button>
+                    <x-secondary-button size="sm" class="w-8 justify-center" @click="toggle('{{ $side }}', 'solo', stem)" x-bind:aria-pressed="{{ $d }}.solo[stem]" x-bind:aria-label="'Solo ' + stem" x-bind:class="{{ $d }}.solo[stem] ? '!bg-gray-900 dark:!bg-stone-600 !border-gray-900 dark:!border-stone-600 !text-white' : ''">S</x-secondary-button>
+                </div>
+            </template>
+        </div>
+
+        {{-- Tempo and key --}}
+        <div>
+            <div class="flex items-center justify-between">
+                <p class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-600">Tempo</p>
+                <p class="text-sm tabular-nums text-gray-700 dark:text-gray-300" x-text="tempoLabel('{{ $side }}')"></p>
+            </div>
+            <div class="flex items-center gap-3">
+                @include('mixer._slider', ['value' => "$d.rate", 'min' => 'RATE_MIN', 'max' => 'RATE_MAX', 'step' => '0.001', 'input' => "setRate('$side', \$event.target.value)", 'label' => "'Tempo of deck ".strtoupper($side)."'"])
+                <x-secondary-button size="sm" @click="sync('{{ $side }}')" x-bind:disabled="!canSync('{{ $side }}')" title="Match the tempo of the other deck">Sync</x-secondary-button>
+                <x-secondary-button size="sm" @click="setRate('{{ $side }}', 1)" aria-label="Reset the tempo"><i class="fa-solid fa-rotate-left text-xs"></i></x-secondary-button>
+            </div>
+            <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm text-gray-500">Key</span>
+                    <span class="min-w-8 text-sm font-medium tabular-nums text-gray-700 dark:text-gray-300" x-text="keyLabel('{{ $side }}') ?? '–'"></span>
+                    <x-secondary-button size="sm" @click="setSemitones('{{ $side }}', Math.max(-12, {{ $d }}.semitones - 1))" aria-label="Key down a semitone"><i class="fa-solid fa-minus text-xs"></i></x-secondary-button>
+                    <span class="w-8 text-center text-xs tabular-nums text-gray-500" x-text="({{ $d }}.semitones > 0 ? '+' : '') + {{ $d }}.semitones"></span>
+                    <x-secondary-button size="sm" @click="setSemitones('{{ $side }}', Math.min(12, {{ $d }}.semitones + 1))" aria-label="Key up a semitone"><i class="fa-solid fa-plus text-xs"></i></x-secondary-button>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-sm text-gray-500">Nudge</span>
+                    <x-secondary-button size="sm" @click="nudge('{{ $side }}', -20)" aria-label="Nudge 20 milliseconds back"><i class="fa-solid fa-backward-step text-xs"></i></x-secondary-button>
+                    <x-secondary-button size="sm" @click="nudge('{{ $side }}', 20)" aria-label="Nudge 20 milliseconds forward"><i class="fa-solid fa-forward-step text-xs"></i></x-secondary-button>
+                </div>
+            </div>
+        </div>
+    </div>
+</x-card>

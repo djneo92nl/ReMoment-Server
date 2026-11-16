@@ -190,6 +190,7 @@ class TrackStemsUiTest extends TestCase
         $file->analysis()->first()->update(['waveform' => [10, 50, 100, 50, 10]]);
 
         $this->get(route('albums.show', $track->album_id))->assertOk()
-            ->assertSee('Stems')->assertSee('track-stems', false)->assertSee('track-sections', false);
+            ->assertSee('Stems')->assertSee('track-stems', false)->assertSee('track-sections', false)
+            ->assertSee('Mix stems', false)->assertSee('mixer?a=', false);
     }
 }

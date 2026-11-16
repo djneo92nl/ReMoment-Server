@@ -158,6 +158,9 @@
                                 @if($lyrics)
                                     <x-menu.item icon="align-left" @click="panel = panel === 'lyrics' ? null : 'lyrics'">Lyrics</x-menu.item>
                                 @endif
+                                @if(in_array('files', $track->sources(), true) && \App\Domain\Profile\Profile::allows('deep_analysis'))
+                                    <x-menu.item icon="sliders" @click="window.location = {{ \Illuminate\Support\Js::from(route('mixer', ['a' => $track->id])) }}">Mix stems&hellip;</x-menu.item>
+                                @endif
                                 @if($removable)
                                     <form method="POST" action="{{ route('tracks.destroy', $track) }}" onsubmit="return confirm('Remove this track from the library? Your play history is kept.')">
                                         @csrf

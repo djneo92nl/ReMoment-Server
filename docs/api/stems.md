@@ -1,6 +1,6 @@
 # Kept stems of a track (for a mixer)
 
-The stems of one track (vocals, drums, bass, other) as four audio files an app can mix, kept on the server after someone asked for them. Playback of the mix is done by the app (web: Web Audio, iOS: AVAudioEngine); the server only separates, stores and serves. Design and numbers: [../architecture/stems-service.md](../architecture/stems-service.md), "Kept stem audio".
+The stems of one track (vocals, drums, bass, other) as four audio files an app can mix, kept on the server after someone asked for them. Playback of the mix is done by the app (web: the `/mixer` page, [../frontend/stem-mixer.md](../frontend/stem-mixer.md); iOS: AVAudioEngine, not built); the server only separates, stores and serves. Design and numbers: [../architecture/stems-service.md](../architecture/stems-service.md), "Kept stem audio".
 
 No admin token anywhere: the endpoints are open like the library, and the download URL is signed and temporary. Full profile only (`422 not_available_in_profile` otherwise). Needs a track with an own file on this server.
 

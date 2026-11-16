@@ -1,7 +1,9 @@
 import './bootstrap';
+import mixer from './mixer/component';
 
 import { Livewire, Alpine } from '../../vendor/livewire/livewire/dist/livewire.esm';
 window.Alpine = Alpine;
+Alpine.data('mixer', mixer); // the stem mixer page; its audio engine loads only when a deck loads stems
 Livewire.start();
 
 console.log(

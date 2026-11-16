@@ -1,6 +1,10 @@
 {
+  "node_modules/@soundtouchjs/audio-worklet/.dist/soundtouch-processor.js": {
+    "file": "assets/soundtouch-processor-BKTidsbT.js",
+    "src": "node_modules/@soundtouchjs/audio-worklet/.dist/soundtouch-processor.js"
+  },
   "resources/css/app.css": {
-    "file": "assets/app-DasCcCDN.css",
+    "file": "assets/app-DkxR-30k.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -9,9 +13,24 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-CpHfr9aV.js",
+    "file": "assets/app-C1wWSPhZ.js",
     "name": "app",
     "src": "resources/js/app.js",
-    "isEntry": true
+    "isEntry": true,
+    "dynamicImports": [
+      "resources/js/mixer/engine.js"
+    ]
+  },
+  "resources/js/mixer/engine.js": {
+    "file": "assets/engine-hwRMvfqK.js",
+    "name": "engine",
+    "src": "resources/js/mixer/engine.js",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ],
+    "assets": [
+      "assets/soundtouch-processor-BKTidsbT.js"
+    ]
   }
 }
