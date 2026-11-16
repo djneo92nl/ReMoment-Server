@@ -47,6 +47,22 @@
             </div>
         </div>
 
+        {{-- Waveforms: the full track and each stem on one time axis; click to seek --}}
+        <div>
+            <p class="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-600">Waveforms</p>
+            <div class="relative cursor-pointer select-none space-y-1" data-test="waveforms" @click="seekFromClick('{{ $side }}', $event)">
+                <template x-for="row in ['mix', ...STEMS]" :key="row">
+                    <div class="relative" :class="row === 'mix' ? 'h-14' : 'h-8'" :data-wave="row">
+                        <span class="pointer-events-none absolute left-1 top-0 z-10 text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400" x-text="row === 'mix' ? 'Full track' : row"></span>
+                        <div class="absolute inset-0 rounded bg-gray-50 dark:bg-stone-900/60"></div>
+                        <svg class="absolute inset-0 h-full w-full text-gray-300 dark:text-stone-700 transition-opacity" :class="row !== 'mix' && ({{ $d }}.muted[row] || (Object.values({{ $d }}.solo).some(Boolean) && !{{ $d }}.solo[row])) ? 'opacity-30' : ''" viewBox="0 0 800 100" preserveAspectRatio="none" aria-hidden="true"><path :d="{{ $d }}.wave?.[row]" fill="currentColor"></path></svg>
+                        <svg class="absolute inset-0 h-full w-full text-gray-700 dark:text-stone-300" :style="'clip-path:' + playedClip('{{ $side }}')" viewBox="0 0 800 100" preserveAspectRatio="none" aria-hidden="true"><path :d="{{ $d }}.wave?.[row]" fill="currentColor"></path></svg>
+                    </div>
+                </template>
+                <div class="pointer-events-none absolute inset-y-0 w-px bg-red-500" :style="'left:' + ({{ $d }}.dur > 0 ? ({{ $d }}.pos / {{ $d }}.dur) * 100 : 0) + '%'"></div>
+            </div>
+        </div>
+
         {{-- The four stems --}}
         <div>
             <p class="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-600">Stems</p>

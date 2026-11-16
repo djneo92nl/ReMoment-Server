@@ -9,7 +9,7 @@
 // SoundTouch is imported only when the browser has AudioWorklet: that exists in a secure context only (https or
 // localhost), and a module that extends AudioWorkletNode throws on import without it. Without it the mixer still
 // plays; tempo then moves the pitch along and the key shift is off (`pitchCorrection` is false).
-import { STEMS, clamp, stemGains } from './math.js';
+import { STEMS, binPeaks, clamp, stemGains } from './math.js';
 
 const FADE = 0.006; // seconds of fade at a start/stop, so a seek or nudge does not click
 const SMOOTH = 0.015; // seconds of smoothing on a fader
@@ -116,6 +116,20 @@ export class Deck {
         this.out.connect(this.analyser);
         this.out.connect(this.audio.master);
         this.setRate(this.rate);
+    }
+
+    /** Waveform heights (0..1, `bins` of them) of each stem and of the full track (the stems added together). */
+    waveforms(bins = 800) {
+        if (!this.loaded) {
+            return null;
+        }
+        const channels = (buffer) => Array.from({ length: buffer.numberOfChannels }, (_, c) => buffer.getChannelData(c));
+        const all = STEMS.flatMap((stem) => channels(this.buffers[stem]));
+        const peaks = Object.fromEntries(STEMS.map((stem) => [stem, binPeaks(channels(this.buffers[stem]), bins)]));
+        // The full track is the sum of the stems per channel; added across channels too it is close enough for a picture.
+        peaks.mix = binPeaks(all, bins, true);
+
+        return peaks;
     }
 
     /** Where the deck is, in seconds of the track. */

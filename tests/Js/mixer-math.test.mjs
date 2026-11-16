@@ -1,7 +1,7 @@
 // Run: node --test tests/Js
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { crossfade, decodedMegabytes, effectiveBpm, formatTime, shiftCamelot, stemGains, syncRate } from '../../resources/js/mixer/math.js';
+import { binPeaks, crossfade, decodedMegabytes, effectiveBpm, formatTime, peaksPath, shiftCamelot, stemGains, syncRate } from '../../resources/js/mixer/math.js';
 
 const all = (v) => ({ vocals: v, drums: v, bass: v, other: v });
 const off = () => ({ vocals: false, drums: false, bass: false, other: false });
@@ -56,4 +56,23 @@ test('a pitch shift moves the Camelot code seven steps per semitone', () => {
     assert.equal(shiftCamelot('8A', -1), '1A');
     assert.equal(shiftCamelot('12B', 1), '7B');
     assert.equal(shiftCamelot(null, 2), null);
+});
+
+test('binPeaks takes the loudest sample per bin and scales the loudest bin to 1', () => {
+    const peaks = binPeaks([Float32Array.from([0.1, -0.2, 0.4, 0.1]), Float32Array.from([0, 0, -0.8, 0])], 2);
+    assert.equal(peaks.length, 2);
+    assert.ok(Math.abs(peaks[0] - 0.25) < 1e-6);
+    assert.equal(peaks[1], 1);
+});
+
+test('binPeaks adds the arrays first when summing (opposite samples cancel)', () => {
+    const peaks = binPeaks([Float32Array.from([0.5, 0.5]), Float32Array.from([-0.5, 0.25])], 2, true);
+    assert.equal(peaks[0], 0);
+    assert.equal(peaks[1], 1);
+});
+
+test('binPeaks of silence or nothing is all zeros, and peaksPath is mirrored around the middle', () => {
+    assert.deepEqual([...binPeaks([new Float32Array(10)], 3)], [0, 0, 0]);
+    assert.equal(peaksPath([]), '');
+    assert.match(peaksPath([1, 0], 100), /^M0 0\.0L1 49\.5L1 50\.5L0 100\.0Z$/);
 });

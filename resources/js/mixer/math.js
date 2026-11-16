@@ -74,3 +74,53 @@ export function effectiveBpm(bpm, rate) {
 export function decodedMegabytes(seconds, sampleRate = 44100) {
     return Math.round((4 * seconds * sampleRate * 2 * 4) / 1e6);
 }
+
+/**
+ * Peak height per bin for a waveform. `channels` are Float32Arrays of one length (the channels of one stem, or of all
+ * four stems for the full track). With `sum` the arrays are added sample by sample first (the full track is the sum of
+ * its stems); without it each bin takes the largest absolute sample of any array. Result is scaled so the loudest bin is 1.
+ */
+export function binPeaks(channels, bins, sum = false) {
+    const length = channels.reduce((n, c) => Math.max(n, c.length), 0);
+    const peaks = new Float32Array(bins);
+    if (!length || !bins) {
+        return peaks;
+    }
+    const per = length / bins;
+    for (let b = 0; b < bins; b++) {
+        const from = Math.floor(b * per);
+        const to = Math.max(from + 1, Math.floor((b + 1) * per));
+        let peak = 0;
+        for (let i = from; i < to; i++) {
+            let v = 0;
+            if (sum) {
+                for (const c of channels) v += c[i] ?? 0;
+                v = Math.abs(v);
+            } else {
+                for (const c of channels) v = Math.max(v, Math.abs(c[i] ?? 0));
+            }
+            if (v > peak) peak = v;
+        }
+        peaks[b] = peak;
+    }
+    const max = peaks.reduce((m, p) => Math.max(m, p), 0);
+    if (max > 0) {
+        for (let b = 0; b < bins; b++) peaks[b] /= max;
+    }
+
+    return peaks;
+}
+
+/** A mirrored SVG path (viewBox `0 0 bins height`) for peak heights 0..1; a silent bin keeps a hairline. */
+export function peaksPath(peaks, height = 100) {
+    const mid = height / 2;
+    const up = [];
+    const down = [];
+    peaks.forEach((p, i) => {
+        const h = Math.max(0.5, p * mid).toFixed(1);
+        up.push(`${i} ${(mid - h).toFixed(1)}`);
+        down.push(`${i} ${(mid + Number(h)).toFixed(1)}`);
+    });
+
+    return peaks.length ? `M${up.join('L')}L${down.reverse().join('L')}Z` : '';
+}

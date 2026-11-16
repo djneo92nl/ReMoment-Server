@@ -2,9 +2,10 @@
 // REST API. The audio objects live in this closure, not in the reactive state: Alpine wraps state in proxies, which
 // Web Audio nodes do not survive.
 
-import { STEMS, RATE_MAX, RATE_MIN, crossfade, decodedMegabytes, effectiveBpm, formatTime, shiftCamelot, syncRate } from './math.js';
+import { STEMS, RATE_MAX, RATE_MIN, crossfade, decodedMegabytes, effectiveBpm, formatTime, peaksPath, shiftCamelot, syncRate } from './math.js';
 
 const POLL_MS = 3000;
+export const WAVE_BINS = 800; // the width of the waveform paths (viewBox units)
 const ENGINE = () => import('./engine.js');
 
 const freshDeck = () => ({
@@ -28,6 +29,7 @@ const freshDeck = () => ({
     dur: 0,
     playing: false,
     level: 0,
+    wave: null, // SVG path per stem and `mix` (the full track), see peaksPath
 });
 
 export default function mixer(config = {}) {
@@ -155,6 +157,8 @@ export default function mixer(config = {}) {
                 };
                 await decks[side].load(Object.fromEntries(STEMS.map((s) => [s, stems[s].url])));
                 d.dur = decks[side].duration;
+                const peaks = decks[side].waveforms(WAVE_BINS);
+                d.wave = Object.fromEntries(Object.entries(peaks).map(([key, values]) => [key, peaksPath(values)]));
                 d.status = 'ready';
                 this.apply(side);
                 this.applyCross();
@@ -282,6 +286,20 @@ export default function mixer(config = {}) {
         seek(side, seconds) {
             decks[side]?.seek(Number(seconds));
             this.deck[side].pos = decks[side]?.position() ?? 0;
+        },
+
+        /** A click on the waveforms seeks to that spot. */
+        seekFromClick(side, event) {
+            const box = event.currentTarget.getBoundingClientRect();
+            if (box.width > 0) {
+                this.seek(side, ((event.clientX - box.left) / box.width) * this.deck[side].dur);
+            }
+        },
+
+        playedClip(side) {
+            const d = this.deck[side];
+
+            return `inset(0 ${d.dur > 0 ? Math.max(0, 100 - (d.pos / d.dur) * 100).toFixed(2) : 100}% 0 0)`;
         },
 
         nudge(side, milliseconds) {
