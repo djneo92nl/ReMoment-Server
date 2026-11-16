@@ -1,8 +1,8 @@
 # Kept stems of a track (for a mixer)
 
-The stems of one track (vocals, drums, bass, other) as four audio files an app can mix, kept on the server after the admin asked for them. Playback of the mix is done by the app (web: Web Audio, iOS: AVAudioEngine); the server only separates, stores and serves. Design and numbers: [../architecture/stems-service.md](../architecture/stems-service.md), "Kept stem audio".
+The stems of one track (vocals, drums, bass, other) as four audio files an app can mix, kept on the server after someone asked for them. Playback of the mix is done by the app (web: Web Audio, iOS: AVAudioEngine); the server only separates, stores and serves. Design and numbers: [../architecture/stems-service.md](../architecture/stems-service.md), "Kept stem audio".
 
-Admin token for everything except the download itself, whose signed URL is its own authorization. Full profile only (`422 not_available_in_profile` otherwise). Needs a track with an own file on this server.
+No admin token anywhere: the endpoints are open like the library, and the download URL is signed and temporary. Full profile only (`422 not_available_in_profile` otherwise). Needs a track with an own file on this server.
 
 ## Ask for the files
 
@@ -45,11 +45,11 @@ GET /api/library/tracks/{id}/stems
 ```
 
 - The files are **stereo, 44.1 kHz, as long as the track and start together**; an app lines them up at 0 and plays them with one gain per stem. Their sum is the track, not bit-exact (separation is not lossless).
-- `format` is `mp3` (default, `STEM_AUDIO_FORMAT`) or `flac`. MP3 carries its encoder delay in the LAME header; use a decoder that honours it (browsers and AVFoundation do) or ask the admin for FLAC when sample-exact alignment matters. `bitrate` is `null` for FLAC.
+- `format` is `mp3` (default, `STEM_AUDIO_FORMAT`) or `flac`. MP3 carries its encoder delay in the LAME header; use a decoder that honours it (browsers and AVFoundation do) or set the server to FLAC (`STEM_AUDIO_FORMAT`) when sample-exact alignment matters. `bitrate` is `null` for FLAC.
 - `bpm`, `key`, `mode`, `camelot` come from the track's analysis (`null` when it has none); with `GET /api/library/tracks/{id}/mixes-with` they pick a pair. There is **no beat grid**: bpm and key are enough to choose and roughly align tracks, not to beat-match them.
 - Each `url` is a path: put the server address in front. It is valid for `expires_in` seconds (`STEM_AUDIO_URL_TTL`, default 3600); list again for fresh ones.
 
-Errors: `404 not_ready` (not kept; `state` says none, queued, running or failed), `404 files_missing` (the manifest says done but a file is gone from the disk: `DELETE` the kind and ask again), `422 no_file`, `401` without the admin token.
+Errors: `404 not_ready` (not kept; `state` says none, queued, running or failed), `404 files_missing` (the manifest says done but a file is gone from the disk: `DELETE` the kind and ask again), `422 no_file`.
 
 ## Download
 

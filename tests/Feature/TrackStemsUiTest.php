@@ -92,19 +92,18 @@ class TrackStemsUiTest extends TestCase
         $this->assertStringContainsString('No instrumental section found', $html);
     }
 
-    public function test_stored_stems_show_to_a_guest_without_a_button(): void
+    public function test_stored_stems_show_to_a_guest_with_the_remove_button_and_no_analyse_button(): void
     {
         [, $track] = $this->track(withStems: true);
 
         Livewire::test(TrackStems::class, ['trackId' => $track->id])
-            ->assertSeeHtml('data-test="stem-lanes"')->assertDontSee('Analyse stems')->assertDontSee('Remove');
+            ->assertSeeHtml('data-test="stem-lanes"')->assertDontSee('Analyse stems')->assertSee('Remove');
     }
 
-    public function test_the_admin_can_remove_stored_stems(): void
+    public function test_anyone_can_remove_stored_stems(): void
     {
         [$file, $track] = $this->track(withStems: true);
         $file->analysis()->first()->update(['stages' => ['stems' => ['version' => '1', 'at' => now()->toIso8601String()]]]);
-        $this->actingAs(User::factory()->create());
 
         Livewire::test(TrackStems::class, ['trackId' => $track->id])->assertSee('Remove')->call('remove');
 
@@ -118,13 +117,13 @@ class TrackStemsUiTest extends TestCase
         Livewire::test(TrackStems::class, ['trackId' => $track->id])->assertSeeHtml('data-test="section-strip"')->assertSeeHtml('data-lane="vocals"');
     }
 
-    public function test_a_guest_sees_no_button_and_cannot_request(): void
+    public function test_a_guest_can_request_stems_when_the_service_is_there(): void
     {
         Queue::fake();
         [, $track] = $this->track();
 
-        Livewire::test(TrackStems::class, ['trackId' => $track->id])->assertDontSee('Analyse stems')->assertSee('Not analysed')->call('analyse')->assertForbidden();
-        Queue::assertNothingPushed();
+        Livewire::test(TrackStems::class, ['trackId' => $track->id])->assertSee('Analyse stems')->call('analyse');
+        Queue::assertPushed(\App\Jobs\AnalyzeTrackDeep::class, fn ($job) => $job->kind === 'stems');
     }
 
     public function test_the_admin_requests_stems_with_estimate_and_ram_and_sees_the_states(): void

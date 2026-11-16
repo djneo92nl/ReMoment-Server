@@ -225,6 +225,12 @@ Route::post('/admin/login', [AdminAuthController::class, 'login']);
 // Signed, temporary download of one export part: the signature is the authorization (docs/api/export.md)
 Route::get('/library/exports/{id}/download/{part}', [ExportController::class, 'download'])
     ->middleware('signed:relative')->whereNumber('part')->name('api.library.exports.download');
+// Deep analysis of one track on request (sections, stems, stem_audio) and the kept stem audio: open like the rest of the
+// library, no admin token (docs/api/deep-analysis.md, docs/api/stems.md). The download is signed.
+Route::post('/library/tracks/{track}/deep-analysis', [DeepAnalysisController::class, 'store']);
+Route::get('/library/tracks/{track}/deep-analysis', [DeepAnalysisController::class, 'show']);
+Route::delete('/library/tracks/{track}/deep-analysis/{kind}', [DeepAnalysisController::class, 'destroy']);
+Route::get('/library/tracks/{track}/stems', [TrackStemsController::class, 'show']);
 Route::get('/library/tracks/{track}/stems/{stem}', [TrackStemsController::class, 'download'])
     ->middleware('signed:relative')->name('api.library.stems.download');
 Route::middleware('admin.token')->group(function () {
@@ -239,14 +245,6 @@ Route::middleware('admin.token')->group(function () {
 
     // Redacted diagnostics zip to attach to an issue (docs/architecture/diagnostics.md)
     Route::get('/admin/diagnostics', [\App\Http\Controllers\DiagnosticsController::class, 'download']);
-
-    // Deep analysis of one track on request: sections (docs/api/deep-analysis.md)
-    Route::post('/library/tracks/{track}/deep-analysis', [DeepAnalysisController::class, 'store']);
-    Route::get('/library/tracks/{track}/deep-analysis', [DeepAnalysisController::class, 'show']);
-    Route::delete('/library/tracks/{track}/deep-analysis/{kind}', [DeepAnalysisController::class, 'destroy']);
-
-    // The kept stem audio of a track (kind stem_audio), as signed URLs for the apps' mixer (docs/api/stems.md)
-    Route::get('/library/tracks/{track}/stems', [TrackStemsController::class, 'show']);
 
     // Export from the library as zip parts (docs/api/export.md); admin only, the download itself is signed
     Route::post('/library/exports/estimate', [ExportController::class, 'estimate']);

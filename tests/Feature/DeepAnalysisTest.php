@@ -274,13 +274,15 @@ class DeepAnalysisTest extends TestCase
 
     // --- the endpoints -----------------------------------------------------------
 
-    public function test_the_endpoints_need_the_admin_token(): void
+    public function test_the_endpoints_are_open_without_an_admin_token(): void
     {
+        Queue::fake();
+        $this->serviceUp();
         [, $track] = $this->localTrack();
 
-        $this->postJson("/api/library/tracks/{$track->id}/deep-analysis", ['kinds' => ['sections']])->assertUnauthorized();
-        $this->getJson("/api/library/tracks/{$track->id}/deep-analysis")->assertUnauthorized();
-        $this->deleteJson("/api/library/tracks/{$track->id}/deep-analysis/sections")->assertUnauthorized();
+        $this->postJson("/api/library/tracks/{$track->id}/deep-analysis", ['kinds' => ['sections']])->assertStatus(202);
+        $this->getJson("/api/library/tracks/{$track->id}/deep-analysis")->assertOk()->assertJsonPath('kinds.sections.state', 'queued');
+        $this->deleteJson("/api/library/tracks/{$track->id}/deep-analysis/sections")->assertOk();
     }
 
     public function test_requesting_sections_queues_the_job_and_gives_an_estimate(): void
@@ -418,14 +420,11 @@ class DeepAnalysisTest extends TestCase
 
     // --- MCP ---------------------------------------------------------------------
 
-    public function test_the_mcp_tool_is_admin_only_and_goes_through_the_api(): void
+    public function test_the_mcp_tool_is_open_and_goes_through_the_api(): void
     {
-        ReMomentServer::tool(McpTools\DeepAnalysis::class, ['action' => 'status', 'track_id' => 1])->assertNotRegistered();
-
         Queue::fake();
         $this->serviceUp();
         [, $track] = $this->localTrack();
-        request()->headers->set('Authorization', 'Bearer '.$this->token);
 
         ReMomentServer::tool(McpTools\DeepAnalysis::class, ['action' => 'request', 'track_id' => $track->id])
             ->assertOk()->assertSee('queued')->assertSee('sections_seconds');

@@ -2,9 +2,7 @@
 <div @if(in_array($state, ['queued', 'running'], true)) wire:poll.3s @endif data-test="track-stems" class="text-gray-500 dark:text-gray-400">
     @if($stems)
         <x-stem-lanes :stems="$stems" :instrumental="$instrumental" :duration="$duration" :sections="$sections" :vocal-ratio="$vocalRatio" />
-        @auth
-            <button type="button" wire:click="remove" class="mt-1 text-[11px] text-gray-400 hover:underline">Remove</button>
-        @endauth
+        <button type="button" wire:click="remove" class="mt-1 text-[11px] text-gray-400 hover:underline">Remove</button>
     @elseif($state === 'queued')
         <span data-test="stems-queued"><i class="fa-solid fa-hourglass-half"></i> Waiting for the stems queue ({{ $estimate }} once it runs, an estimate)</span>
     @elseif($state === 'running')

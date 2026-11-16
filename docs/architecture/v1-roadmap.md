@@ -740,6 +740,14 @@ Status: **idea, added 2026-11-14; 1.2, on purpose.** The ESP32 client still need
 - It is only useful for sources the server cannot see (a record player on a plain amplifier, a radio); for a device ReMoment controls, now playing is already known.
 - **First step, a spike before any build:** record 15 s of music with a phone near a speaker and run it through `fpcalc` and AcoustID, then against a small own-library index of a few hundred tracks; the hit rates decide which path is the main one. Size: S to M for the plumbing, M for the own-library index (which also helps a turntable case where AcoustID has no entry).
 
+## 20. Review what sits behind admin *[Should; small; idea added 2026-11-16]*
+
+Status: **idea, from the owner.** The single admin login is only a second layer, a way to know an action was done on purpose. It is not an access boundary for the household. **Only adding or changing services (credentials, Spotify/Last.fm connect, storage locations) and devices (add, edit, remove, approve clients) needs admin.** Everything else is a household action and should be open like the REST API already is for playback and the library.
+
+- **What exists now:** a lot sits behind the `admin.token` group and the web admin checks that does not belong there: for example the heavy-but-harmless per-track actions, exports, tags and announcements, volume limits, source visibility and per-device options. Stems were the first to be opened (deep analysis, the kept stem audio and its signed downloads, 2026-11-16).
+- **Plan:** go through `routes/api.php`'s `admin.token` group, the `RequiresAdmin` MCP tools and the web `abort(403)` / `@auth` checks and sort each into *services and devices (stays)* or *household action (opens)*; open the second group in one pass with the tests and the OpenAPI `security` entries; keep a short list of what stays and why in `docs/api/admin-auth.md`. A heavy job stays safe by being unique per target (already true for deep analysis and exports), not by a login.
+- **Not in scope:** accounts, roles or per-user rules (permanent constraint). This only lowers how many actions ask for the one shared login.
+
 ## Not in 1.0
 
 - 1.1: the node agent, CD ripping from a Pi, line-in streaming and sync to offline targets (workstream 18). 1.2: the ESP32 microphone (workstream 19).
@@ -822,6 +830,7 @@ Status: **idea, added 2026-11-14; 1.2, on purpose.** The ESP32 client still need
 
 - Owner answers (2026-11-08): **schema:** only `device_links` is a planned table that goes into the 1.0 squash; scenes, `media_servers`, podcasts, episodes and `playback_positions` append after it; deleting a device **keeps its plays with no device** (`plays.device_id` becomes nullable with `ON DELETE SET NULL`; stats and history code must cope with a null device); a track **may appear twice** in a playlist (no unique rule); the unused framework tables (`sessions`, `cache`, `jobs` and friends) are **dropped** from the schema; the **hop through the last pre-squash release is accepted**. **Manager:** keep Node in one dependency-free file and a token separate from the admin password. **Scenes:** a scene step may call **any guest-level operation** (this replaces the curated subset the first version of `config/scene-operations.php` implements: the list must become "every operation without admin gating, minus an explicit exclude list"). **Home Assistant:** a downloadable YAML file only, no discovery endpoint. **Licence:** `remoment/mozart-driver` is to be **published**; the AGPL plus CLA decision and the Demucs weights question are **still open** (the owner is unsure). **Spotify purge:** not relevant on production, which never imported Spotify; the dev database is the only one affected.
 - Process (2026-11-08): the `/settings/developer` tools were committed (`39 files`, the owner's own work); `main` was pushed to GitHub for the first time since the early work (47 commits); the first real CI run is the new CI workflow, and it may fail.
+- Admin scope (2026-11-16): the owner's rule is that **only adding or changing services and devices needs the admin login**; it is a deliberate-action layer, not security. Deep analysis, the kept stem audio and its list are open as the first case; the review of everything else is workstream 20.
 
 ## Open questions
 

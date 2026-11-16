@@ -25,8 +25,6 @@ class TrackStems extends Component
 
     public function analyse(): void
     {
-        abort_unless(auth()->check(), 403);
-
         $file = DeepAnalysis::fileFor($this->track());
         if ($file === null) {
             $this->error = 'This track has no own audio file on this server.';
@@ -40,8 +38,6 @@ class TrackStems extends Component
 
     public function remove(): void
     {
-        abort_unless(auth()->check(), 403);
-
         if ($file = DeepAnalysis::fileFor($this->track())) {
             DeepAnalysis::forget($file, 'stems');
         }
@@ -80,7 +76,7 @@ class TrackStems extends Component
             'sections' => $track->sections()['sections'] ?? null,
             'state' => $state['state'] ?? null,
             'message' => $state['message'] ?? null,
-            'canRequest' => auth()->check() && $available,
+            'canRequest' => $available,
             'hint' => auth()->check() && $file !== null && !$available,
             'estimate' => $file ? self::approx(DeepAnalysis::estimateSeconds('stems', (int) $track->duration)) : null,
             'ram' => number_format(($stage->estimateRamMb() ?? 0) / 1000, 1),

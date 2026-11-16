@@ -299,13 +299,14 @@ class StemsDeepAnalysisTest extends TestCase
 
     // --- the endpoints ---------------------------------------------------------------
 
-    public function test_the_endpoints_need_the_admin_token(): void
+    public function test_the_endpoints_are_open_without_an_admin_token(): void
     {
+        Queue::fake();
         [, $track] = $this->localTrack();
 
-        $this->postJson($this->url($track), ['kinds' => ['stems']])->assertUnauthorized();
-        $this->getJson($this->url($track))->assertUnauthorized();
-        $this->deleteJson($this->url($track).'/stems')->assertUnauthorized();
+        $this->postJson($this->url($track), ['kinds' => ['stems']])->assertStatus(202);
+        $this->getJson($this->url($track))->assertOk();
+        $this->deleteJson($this->url($track).'/stems')->assertOk();
     }
 
     public function test_requesting_stems_queues_a_job_on_the_stems_queue_with_an_estimate_and_ram_note(): void

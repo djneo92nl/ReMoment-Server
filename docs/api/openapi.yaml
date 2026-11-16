@@ -1928,9 +1928,9 @@ paths:
     post:
       tags: [Library]
       summary: Ask for a deep analysis of one track (sections, stems), computed in the background
-      description: "Admin only. Queues what is not stored yet for the current file and stage version; a stored result is `already_done`, a missing or unhealthy service of a requested kind (structure service for sections, stems service for stems) `not_available` (409). Poll GET for the state. See docs/api/deep-analysis.md."
+      description: "Open (no admin token). Queues what is not stored yet for the current file and stage version; a stored result is `already_done`, a missing or unhealthy service of a requested kind (structure service for sections, stems service for stems) `not_available` (409). Poll GET for the state. See docs/api/deep-analysis.md."
       operationId: requestDeepAnalysis
-      security: [{ adminToken: [] }]
+      security: []
       requestBody:
         required: true
         content:
@@ -1944,14 +1944,13 @@ paths:
         "200": { description: "`already_done`", content: { application/json: { schema: { $ref: "#/components/schemas/DeepAnalysisRequest" } } } }
         "202": { description: "`queued`", content: { application/json: { schema: { $ref: "#/components/schemas/DeepAnalysisRequest" } } } }
         "409": { description: "`not_available`: STRUCTURE_URL / STEMS_URL unset or the service failed its health check", content: { application/json: { schema: { $ref: "#/components/schemas/DeepAnalysisRequest" } } } }
-        "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { description: "`unknown_kind`, `no_file` (the track has no own file), or a validation error", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
     get:
       tags: [Library]
       summary: State of the deep analysis of one track, per kind
       operationId: getDeepAnalysis
-      security: [{ adminToken: [] }]
+      security: []
       responses:
         "200":
           description: OK
@@ -1969,7 +1968,6 @@ paths:
                       sections: { $ref: "#/components/schemas/DeepAnalysisState" }
                       stems: { $ref: "#/components/schemas/DeepAnalysisState" }
                       stem_audio: { $ref: "#/components/schemas/DeepAnalysisState" }
-        "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { description: "`no_file`", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
   /library/tracks/{track}/stems:
@@ -1978,9 +1976,9 @@ paths:
     get:
       tags: [Library]
       summary: The kept stems of one track as signed audio URLs, for a mixer
-      description: "Admin only. Available once a `stem_audio` deep analysis finished for the track (POST /library/tracks/{track}/deep-analysis). Four files (vocals, drums, bass, other), MP3 or FLAC as the server is set (`STEM_AUDIO_FORMAT`), all stereo, 44.1 kHz and as long as the track, so they start together; with `bpm` and `camelot` to line tracks up. Each `url` is a path (put the server address in front) signed for `expires_in` seconds; the signature is the authorization, no token header. A download answers Range requests. See docs/api/stems.md."
+      description: "Open (no admin token). Available once a `stem_audio` deep analysis finished for the track (POST /library/tracks/{track}/deep-analysis). Four files (vocals, drums, bass, other), MP3 or FLAC as the server is set (`STEM_AUDIO_FORMAT`), all stereo, 44.1 kHz and as long as the track, so they start together; with `bpm` and `camelot` to line tracks up. Each `url` is a path (put the server address in front) signed for `expires_in` seconds; the signature is the authorization, no token header. A download answers Range requests. See docs/api/stems.md."
       operationId: getTrackStems
-      security: [{ adminToken: [] }]
+      security: []
       responses:
         "200":
           description: OK
@@ -2012,14 +2010,13 @@ paths:
                       properties:
                         url: { type: string, description: Signed path of the file }
                         bytes: { type: integer }
-        "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { description: "`not_ready` (not kept yet; `state` says none, queued, running or failed) or `files_missing` (gone from the disk: DELETE kind stem_audio and ask again)", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
         "422": { description: "`no_file` (the track has no own file)", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
   /library/tracks/{track}/stems/{stem}:
     get:
       tags: [Library]
       summary: Download one kept stem (signed)
-      description: "The URL comes from GET /library/tracks/{track}/stems, signed and temporary; it needs no admin token. Answers Range requests."
+      description: "The URL comes from GET /library/tracks/{track}/stems, signed and temporary. Answers Range requests."
       operationId: downloadTrackStem
       security: []
       parameters:
@@ -2039,7 +2036,7 @@ paths:
       summary: Remove the stored result of one kind
       description: "Does not follow a merged id: a stale id answers 404."
       operationId: removeDeepAnalysis
-      security: [{ adminToken: [] }]
+      security: []
       parameters:
         - { name: track, in: path, required: true, schema: { type: integer } }
         - { name: kind, in: path, required: true, schema: { $ref: "#/components/schemas/DeepAnalysisKind" } }
@@ -2053,7 +2050,6 @@ paths:
                 properties:
                   status: { type: string, enum: [ok] }
                   removed: { type: boolean, description: False when nothing was stored }
-        "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { description: "`unknown_kind` or `no_file`", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
   /library/exports/estimate:

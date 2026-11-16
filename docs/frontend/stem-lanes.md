@@ -11,14 +11,14 @@ The stored stems of a track (`file_analyses.stems`, see [../api/deep-analysis.md
 
 | Stored | Shows |
 |---|---|
-| stems | the lanes (admin: "Remove" to recompute) |
+| stems | the lanes ("Remove" to recompute) |
 | nothing, `queued` / `running` | waiting / separating line with the estimate (marked as an estimate); polls every 3 s only while it lasts |
-| nothing, admin, `failed` | the message and "Try again" |
-| nothing, admin, `DeepAnalysis::available('stems')` | "Analyse stems (estimate: about N s, needs about 1.5 GB RAM)" (minutes from 2 minutes up) |
+| nothing, `failed` | the message and "Try again" |
+| nothing, `DeepAnalysis::available('stems')` | "Analyse stems (estimate: about N s, needs about 1.5 GB RAM)" (minutes from 2 minutes up) |
 | nothing, admin, service not set up or unhealthy | a hint: set `STEMS_URL` and start the stems service (`docker compose --profile stems up -d`) |
-| nothing, guest | "Not analysed" |
+| nothing, service not available, not logged in | "Not analysed" |
 
-The request goes through `DeepAnalysis` directly; `analyse` and `remove` abort 403 without the admin login. Guests only see what is stored.
+The request goes through `DeepAnalysis` directly; `analyse` and `remove` are open (no admin login, like the API); only the setup hint for a missing or unhealthy service is for the logged-in admin.
 
 ## Checked
 

@@ -20,8 +20,8 @@ docs/
   api/
     client-devices.md       Client device registration flow, all endpoints, firmware guide
     jellyfin.md             Jellyfin on a Philips TV: continue watching / next up and play in the Jellyfin app (GET /api/devices/{id}/jellyfin, POST .../jellyfin/play)
-    deep-analysis.md        Deep analysis of one track on request (admin token): POST/GET/DELETE /api/library/tracks/{id}/deep-analysis, kinds `sections`, `stems` and `stem_audio`, states, where the result shows
-    stems.md                Kept stems of a track for the apps' mixer (kind `stem_audio`, admin token): GET /api/library/tracks/{id}/stems (four signed MP3/FLAC URLs + bpm, key, Camelot), signed Range-capable download, storage `stems/{file id}`, cleanup (`stems:prune`), MCP `deep_analysis` action `stems`
+    deep-analysis.md        Deep analysis of one track on request: POST/GET/DELETE /api/library/tracks/{id}/deep-analysis (open, no admin token), kinds `sections`, `stems` and `stem_audio`, states, where the result shows
+    stems.md                Kept stems of a track for the apps' mixer (kind `stem_audio`, open): GET /api/library/tracks/{id}/stems (four signed MP3/FLAC URLs + bpm, key, Camelot), signed Range-capable download, storage `stems/{file id}`, cleanup (`stems:prune`), MCP `deep_analysis` action `stems`
     export.md               Export from the library as zip for an MP3 player/car radio (admin token; MP3, AAC m4a, Opus profiles, loudness option): estimate, start, poll, signed 15-minute download, cancel/remove; MCP tool `export`, `features.export`
     library.md              Library browse (artists, albums, playlists), favorites, play album/artist/playlist on a device (DLNA or Spotify), playlist artwork
     source-controls.md      Per-source controls (change disc, FM presets) from control profiles: GET/POST /api/devices/{id}/controls, resolution, transports

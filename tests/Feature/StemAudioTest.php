@@ -246,15 +246,15 @@ class StemAudioTest extends TestCase
             ->assertNotFound()->assertJsonPath('error', 'not_ready')->assertJsonPath('state', 'none');
     }
 
-    public function test_the_list_needs_the_admin_token_and_a_track_with_a_file(): void
+    public function test_the_list_and_the_request_are_open_and_need_a_track_with_a_file(): void
     {
         [$file, $track] = $this->localTrack();
         $this->runJob($file);
 
-        $this->getJson("/api/library/tracks/{$track->id}/stems")->assertUnauthorized();
+        $this->getJson("/api/library/tracks/{$track->id}/stems")->assertOk()->assertJsonPath('format', 'mp3'); // no token
 
         $bare = Track::create(['artist_id' => $track->artist_id, 'name' => 'Streamed', 'source' => 'dlna', 'external_id' => 'x:1']);
-        $this->getJson("/api/library/tracks/{$bare->id}/stems", $this->auth())->assertStatus(422)->assertJsonPath('error', 'no_file');
+        $this->getJson("/api/library/tracks/{$bare->id}/stems")->assertStatus(422)->assertJsonPath('error', 'no_file');
     }
 
     public function test_the_list_gives_signed_urls_and_what_a_mixer_needs_and_each_downloads(): void
