@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Analysis\DeepAnalysis;
 use App\Domain\Artwork\LibraryArtwork;
 use App\Domain\Artwork\LibraryItemArtwork;
 use App\Domain\Artwork\PlaylistArtwork;
@@ -267,11 +268,13 @@ class LibraryController extends Controller
         $page = $matches->slice($offset, self::TRACKS_PAGE_SIZE)->values();
         $tracks = Track::query()->with(['artist', 'album'])->findMany($page->pluck('track_id'))->keyBy('id');
         $this->preloadArtwork(albums: $tracks->map->album->filter());
+        $kept = DeepAnalysis::stemsKept($page->pluck('track_id'));
 
         return response()->json([
             'canonical_id' => $track->id,
             'source' => $source,
             'data' => $page->map(fn (array $match) => $this->searchTrack($tracks[$match['track_id']]) + [
+                'has_stems' => isset($kept[$match['track_id']]),
                 'bpm' => $match['bpm'],
                 'camelot' => $match['camelot'],
                 'key_relation' => $match['key_relation'],
@@ -945,11 +948,12 @@ class LibraryController extends Controller
             ->limit(self::SEARCH_TRACKS)
             ->get();
         $this->preloadArtwork(albums: $albums->concat($tracks->pluck('album')), artists: $artists);
+        $kept = DeepAnalysis::stemsKept($tracks->pluck('id'));
 
         return response()->json([
             'artists' => $artists->map(fn (Artist $artist) => $this->artistItem($artist))->values(),
             'albums' => $albums->map(fn (Album $album) => $this->albumItem($album))->values(),
-            'tracks' => $tracks->map(fn (Track $track) => $this->searchTrack($track))->values(),
+            'tracks' => $tracks->map(fn (Track $track) => $this->searchTrack($track) + ['has_stems' => isset($kept[$track->id])])->values(),
         ]);
     }
 

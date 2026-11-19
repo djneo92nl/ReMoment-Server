@@ -6,7 +6,7 @@
                 <img x-show="row.artwork?.proxy_120" :src="row.artwork?.proxy_120" alt="" class="h-full w-full object-cover" loading="lazy">
             </div>
             <div class="min-w-0 flex-1">
-                <p class="truncate text-sm text-gray-900 dark:text-gray-100" x-text="row.name"></p>
+                <p class="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-100"><span class="truncate" x-text="row.name"></span><x-badge variant="success" x-show="row.has_stems" x-cloak title="The stems of this track are made and kept">Stems</x-badge></p>
                 <p class="truncate text-xs text-gray-500" x-text="[row.artist_name, row.bpm ? Math.round(row.bpm) + ' BPM' : null, row.camelot, row.tempo_relation && row.tempo_relation !== 'same' ? row.tempo_relation + ' time' : null].filter(Boolean).join(' · ')"></p>
             </div>
             <x-secondary-button size="sm" @click="setTrack('a', row)" aria-label="Load into deck A">A</x-secondary-button>

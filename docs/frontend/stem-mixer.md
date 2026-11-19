@@ -21,7 +21,7 @@ A deck loads a track's stems (four, or six with guitar and piano when the server
 - **Nudge** ±20 ms, to line the beats up by ear, and **Beat** ‹‹ ›› to shift by a whole beat.
 - **Beat grid**, **cues** and **loops**: see "Beat grid, sync, cues and loops" below.
 
-Between the decks: an equal-power **crossfader**, a master volume and **Play or pause both** (starts both decks in the same instant). Below: a search box (`GET /api/library/search`) and, once deck A has a track, "Mixes well with …" (`GET /api/library/tracks/{id}/mixes-with`: tempo within 6 % or half/double, same, relative or adjacent key). Each row loads into deck A or B.
+Between the decks: an equal-power **crossfader**, a master volume and **Play or pause both** (starts both decks in the same instant). Below: a search box (`GET /api/library/search`) and, once deck A has a track, "Mixes well with …" (`GET /api/library/tracks/{id}/mixes-with`: tempo within 6 % or half/double, same, relative or adjacent key). Each row loads into deck A or B, and a green **Stems** badge marks the tracks whose stems are already made (`has_stems` of the two endpoints, `DeepAnalysis::stemsKept`, one query per list).
 
 ## How the audio works
 

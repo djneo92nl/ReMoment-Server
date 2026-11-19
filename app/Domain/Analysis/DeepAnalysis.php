@@ -52,6 +52,33 @@ final class DeepAnalysis
         return $link?->file;
     }
 
+    /**
+     * Which of these tracks have their stem audio kept (kind `stem_audio` done for the current content of the primary file):
+     * one query for the whole list, for the mixer's picker. Does not check the files on the disk (`StemAudio::complete` does, when the stems are listed).
+     *
+     * @param  iterable<int, int>  $trackIds
+     * @return array<int, true> track id => true, for the tracks that have them
+     */
+    public static function stemsKept(iterable $trackIds): array
+    {
+        $ids = collect($trackIds)->unique()->values()->all();
+        if ($ids === []) {
+            return [];
+        }
+
+        return TrackFile::query()
+            ->whereIn('track_files.track_id', $ids)
+            ->where('track_files.role', TrackFile::ORIGINAL)->where('track_files.is_primary', true)
+            ->join('files', 'files.id', '=', 'track_files.file_id')
+            ->join('file_analyses', 'file_analyses.file_id', '=', 'files.id')
+            ->where('files.status', File::PRESENT)
+            ->whereColumn('file_analyses.content_hash', 'files.hash')
+            ->whereNotNull('file_analyses.stem_audio')
+            ->pluck('track_files.track_id')
+            ->mapWithKeys(fn ($id) => [(int) $id => true])
+            ->all();
+    }
+
     /** Whether this kind can run now: its service is configured and answers its health check (remembered for a minute). */
     public static function available(string $kind): bool
     {
