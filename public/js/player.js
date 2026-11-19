@@ -61,7 +61,9 @@
         const image = track && track.images && track.images[0];
         setArt(image);
         // The cover may still be processing when the track starts: ask the device for it a few times.
-        if (track && !image && !track.live) fetchArt(track.id, 5);
+        if (track) fetchArt(track.id, 5); else setAccent(null);
+        refreshQueue();
+        if (track) $('quick').style.display = 'none'; else loadQuick();
         document.title = track ? track.name + ' · ReMoment Player' : 'ReMoment Player';
 
         if ('mediaSession' in navigator) {
@@ -74,11 +76,17 @@
 
     function setArt(image) {
         $('art').style.backgroundImage = image ? 'url("' + image + '")' : '';
+        $('bg').style.backgroundImage = image ? 'url("' + image + '")' : '';
+        $('bg').style.opacity = image ? 1 : 0;
         if (current && image) current.images = [image];
         if ('mediaSession' in navigator && navigator.mediaSession.metadata && image) {
             const m = navigator.mediaSession.metadata;
             navigator.mediaSession.metadata = new MediaMetadata({ title: m.title, artist: m.artist, album: m.album, artwork: [{ src: image }] });
         }
+    }
+
+    function setAccent(color) {
+        document.documentElement.style.setProperty('--accent', color || '#ffffff');
     }
 
     function fetchArt(trackId, tries) {
@@ -88,10 +96,13 @@
                 const artwork = r.data && r.data.now_playing && r.data.now_playing.artwork;
                 const path = artwork && (artwork.proxy_512 || artwork.proxy_320);
                 const i = path ? path.indexOf('/storage/') : -1;
-                if (i >= 0) setArt(path.slice(i));
-                else if (tries > 1) fetchArt(trackId, tries - 1);
+                if (i >= 0) {
+                    setArt(path.slice(i));
+                    const pick = (artwork.safe_colors || artwork.colors || [])[1];
+                    setAccent(pick || null);
+                } else if (tries > 1) fetchArt(trackId, tries - 1);
             }).catch(() => {});
-        }, 3000);
+        }, 1500);
     }
 
     function handle(command) {
@@ -133,7 +144,7 @@
 
     function showLocked(locked) {
         $('start').style.display = locked ? 'inline-block' : 'none';
-        if (locked) status('Click anywhere on this page once to allow audio.');
+        if (locked) status('Tap "Allow audio" (or anywhere on the page) once to start playing.');
     }
 
     function unlock() {
@@ -177,8 +188,166 @@
         api('/players/' + token + '/state', { method: 'PUT', body: JSON.stringify(body) })
             .then(() => status('Online as ' + $('name').value))
             .catch(e => status('Server not reachable (' + e.message + ')'));
-        const bar = $('bar').firstElementChild;
-        bar.style.width = (audio.duration ? (audio.currentTime / audio.duration) * 100 : 0) + '%';
+        updateUi();
+    }
+
+    const PLAY_ICON = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+    const PAUSE_ICON = '<svg viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>';
+
+    function fmt(seconds) {
+        seconds = Math.max(0, Math.floor(seconds || 0));
+        return Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0');
+    }
+
+    /** Progress, times, play/pause icon and volume controls follow the audio element. */
+    function updateUi() {
+        const live = current && current.live;
+        const known = Number.isFinite(audio.duration) && audio.duration > 0 && !live;
+        $('bar').firstElementChild.style.width = (known ? (audio.currentTime / audio.duration) * 100 : 0) + '%';
+        $('elapsed').textContent = live ? 'Live' : fmt(audio.currentTime);
+        $('total').textContent = known ? fmt(audio.duration) : (live ? '' : '0:00');
+        const playing = current && !audio.paused && !pendingPlay;
+        $('playpause').innerHTML = playing ? PAUSE_ICON : PLAY_ICON;
+        $('playpause').title = $('playpause').ariaLabel = playing ? 'Pause' : 'Play';
+        const v = audio.muted ? 0 : Math.round(audio.volume * 100);
+        $('vol').value = v;
+        $('vol').style.setProperty('--v', v + '%');
+    }
+
+    /** Standby: offer the latest album, radio station and track to start with one click. */
+    function storagePath(artwork) {
+        const path = artwork && (artwork.proxy_120 || artwork.proxy_320 || artwork.proxy_512);
+        const i = path ? path.indexOf('/storage/') : -1;
+        return i >= 0 ? path.slice(i) : null;
+    }
+
+    function loadQuick() {
+        if (!deviceId) return;
+        Promise.all([
+            api('/library/recent-items?limit=30').then(r => r.data || []).catch(() => []),
+            api('/library/history?match=library&limit=20').then(r => r.data || []).catch(() => []),
+        ]).then(([items, history]) => {
+            if (current) return;
+            const tiles = [];
+            const album = items.find(i => i.type === 'album' && i.album);
+            const radio = items.find(i => i.type === 'radio' && i.station);
+            const track = history.find(h => h.type === 'track' && h.track_id);
+            const post = (path, body) => () => api('/devices/' + deviceId + path, { method: 'POST', body: body ? JSON.stringify(body) : undefined })
+                .catch(e => status('Could not start that (' + e.message + ')'));
+            if (album) tiles.push({ label: 'Album', title: album.album.name, sub: album.album.artist_name, art: storagePath(album.album.artwork), run: post('/library/play-album', { album_id: album.album.id }) });
+            if (track) tiles.push({ label: 'Track', title: track.name, sub: track.artist_name, art: storagePath(track.artwork), run: post('/library/play', { track_id: track.track_id }) });
+            if (radio) tiles.push({ label: 'Radio', title: radio.station.name, sub: radio.station.genre, art: storagePath(radio.station.artwork), run: post('/radio/' + radio.station.id) });
+
+            const box = $('quick');
+            const grid = box.querySelector('.tiles');
+            grid.innerHTML = '';
+            tiles.forEach(t => {
+                const b = document.createElement('button');
+                b.type = 'button'; b.className = 'tile';
+                const img = document.createElement('span'); img.className = 'img';
+                if (t.art) img.style.backgroundImage = 'url("' + t.art + '")';
+                const tag = document.createElement('b'); tag.textContent = t.label; img.appendChild(tag);
+                const title = document.createElement('span'); title.className = 't'; title.textContent = t.title || '';
+                const sub = document.createElement('span'); sub.className = 's'; sub.textContent = t.sub || '\u00a0';
+                b.append(img, title, sub);
+                b.addEventListener('click', () => { unlock(); t.run(); });
+                grid.appendChild(b);
+            });
+            grid.style.gridTemplateColumns = 'repeat(' + Math.max(1, tiles.length) + ', 1fr)';
+            box.style.display = tiles.length ? 'block' : 'none';
+        });
+    }
+
+    let modes = { shuffle: false, repeat: 'off' };
+
+    function refreshModes() {
+        if (!deviceId) return;
+        api('/devices/' + deviceId).then(r => {
+            const caps = r.data.capabilities || [];
+            const m = (r.data.now_playing && r.data.now_playing.modes) || {};
+            modes = { shuffle: !!m.shuffle, repeat: m.repeat || 'off' };
+            $('shuffle').hidden = !caps.includes('shuffle');
+            $('repeat').hidden = !caps.includes('repeat');
+            $('shuffle').classList.toggle('on', modes.shuffle);
+            $('repeat').classList.toggle('on', modes.repeat !== 'off');
+            $('repeat').title = 'Repeat: ' + modes.repeat;
+        }).catch(() => {});
+    }
+
+    function refreshQueue() {
+        if (!deviceId) return;
+        // The server advances its queue a moment after the player reports a track change.
+        setTimeout(() => {
+            api('/devices/' + deviceId + '/queue?limit=5').then(r => {
+                const list = $('queue');
+                list.innerHTML = '';
+                (r.up_next || []).forEach(item => {
+                    const li = document.createElement('li');
+                    const name = document.createElement('span');
+                    name.textContent = item.name + (item.artist ? ' · ' + item.artist : '');
+                    const dur = document.createElement('span');
+                    dur.textContent = item.duration ? fmt(item.duration) : '';
+                    li.append(name, dur);
+                    list.appendChild(li);
+                });
+                $('next-up').style.display = list.children.length ? 'block' : 'none';
+            }).catch(() => { $('next-up').style.display = 'none'; });
+            refreshModes();
+        }, 800);
+    }
+
+    function setupControls() {
+        const act = op => () => { if (deviceId) api('/devices/' + deviceId + '/' + op, { method: 'POST' }).catch(e => status('Could not ' + op + ' (' + e.message + ')')); };
+        $('prev').addEventListener('click', act('previous'));
+        $('next').addEventListener('click', act('next'));
+        $('playpause').addEventListener('click', () => {
+            if (!current) return;
+            if (audio.paused || pendingPlay) {
+                if (current.live) audio.src = current.url;
+                play();
+            } else {
+                audio.pause();
+            }
+            report();
+        });
+        $('vol').addEventListener('input', e => {
+            audio.muted = false;
+            audio.volume = e.target.value / 100;
+        });
+        $('shuffle').addEventListener('click', () => {
+            api('/devices/' + deviceId + '/shuffle', { method: 'PUT', body: JSON.stringify({ shuffle: !modes.shuffle }) }).then(() => { refreshModes(); refreshQueue(); }).catch(() => {});
+        });
+        $('repeat').addEventListener('click', () => {
+            const next = { off: 'all', all: 'one', one: 'off' }[modes.repeat] || 'off';
+            api('/devices/' + deviceId + '/repeat', { method: 'PUT', body: JSON.stringify({ repeat: next }) }).then(refreshModes).catch(() => {});
+        });
+        document.addEventListener('keydown', e => {
+            if (e.metaKey || e.ctrlKey || e.altKey || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) && e.target.type !== 'range') return;
+            const live = current && current.live;
+            const key = e.key.toLowerCase();
+            if (key === ' ') { if (e.target.tagName === 'BUTTON') return; e.preventDefault(); $('playpause').click(); }
+            else if (key === 'n') $('next').click();
+            else if (key === 'p') $('prev').click();
+            else if (key === 'm') $('mute').click();
+            else if (key === 'arrowleft' && current && !live) { e.preventDefault(); audio.currentTime = Math.max(0, audio.currentTime - 10); }
+            else if (key === 'arrowright' && current && !live) { e.preventDefault(); audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 10); }
+            else if (key === 'arrowup') { e.preventDefault(); audio.muted = false; audio.volume = Math.min(1, audio.volume + .05); }
+            else if (key === 'arrowdown') { e.preventDefault(); audio.volume = Math.max(0, audio.volume - .05); }
+        });
+        refreshModes();
+        $('max').addEventListener('click', () => { audio.muted = false; audio.volume = 1; });
+        $('mute').addEventListener('click', () => { audio.muted = !audio.muted; updateUi(); });
+        $('bar-wrap').addEventListener('click', e => {
+            if (!current || current.live || !Number.isFinite(audio.duration)) return;
+            const rect = $('bar').getBoundingClientRect();
+            audio.currentTime = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)) * audio.duration;
+            report();
+        });
+        audio.addEventListener('timeupdate', updateUi);
+        audio.addEventListener('durationchange', updateUi);
+        audio.addEventListener('play', updateUi);
+        audio.addEventListener('pause', updateUi);
+        updateUi();
     }
 
     function setupMediaSession() {
@@ -245,6 +414,9 @@
         lastCommand = info.last_command_id || 0;
         setupMediaSession();
         connectMqtt(info);
+        // The controls are a nicety: if they fail (for example a cached page without one of the elements),
+        // the player must still receive its commands.
+        try { setupControls(); if (!current) loadQuick(); } catch (e) { console.error('player controls', e); }
 
         document.addEventListener('pointerdown', unlock);
         document.addEventListener('keydown', unlock);

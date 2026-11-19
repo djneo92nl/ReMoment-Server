@@ -256,10 +256,10 @@
   .ctrl-btn:hover { background: rgba(255,255,255,0.12); }
   .ctrl-btn:active { transform: scale(0.92); }
   .ctrl-btn svg { display: block; }
-  .ctrl-btn.primary { width: 48px; height: 48px; margin-right: 6px; background: var(--accent, #e8a46b); color: #111; }
-  .ctrl-btn.primary:hover { background: var(--accent, #e8a46b); filter: brightness(1.1); }
+  .ctrl-btn.primary { width: 48px; height: 48px; margin-right: 6px; background: var(--accent, #ffffff); color: #111; }
+  .ctrl-btn.primary:hover { background: var(--accent, #ffffff); filter: brightness(1.1); }
   .ctrl-btn.mode { opacity: 0.6; }
-  .ctrl-btn.mode.on { opacity: 1; color: var(--accent, #e8a46b); }
+  .ctrl-btn.mode.on { opacity: 1; color: var(--accent, #ffffff); }
 
   #progress-wrap {
     order: -1;
@@ -292,12 +292,12 @@
     height: 100%;
     width: 0%;
     border-radius: 2px;
-    background: var(--accent, #e8a46b);
+    background: var(--accent, #ffffff);
     transition: width 1s linear;
   }
   #wf-base, #wf-played { position: absolute; inset: 0; display: none; }
   #wf-played {
-    color: var(--accent, #e8a46b);
+    color: var(--accent, #ffffff);
     -webkit-clip-path: inset(0 100% 0 0);
     clip-path: inset(0 100% 0 0);
     transition: clip-path 1s linear, -webkit-clip-path 1s linear;
@@ -438,7 +438,7 @@
   #btn-fullscreen:hover { color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.08); }
 
   /* ── Up next: a panel floating above the bar, like the sticky bar's ── */
-  #bar-right > .ctrl-btn.active { color: var(--accent, #e8a46b); }
+  #bar-right > .ctrl-btn.active { color: var(--accent, #ffffff); }
   #queue-panel.open, #multi-panel.open, #switch-panel.open { display: flex; }
   #queue-panel, #multi-panel, #switch-panel {
     display: none;
@@ -482,7 +482,7 @@
   #queue-list .q-x { flex: none; width: 30px; height: 30px; border: 0; border-radius: 50%; background: none; color: inherit; opacity: .65; cursor: pointer; font-size: 12px; }
   #queue-list .q-x:hover { opacity: 1; background: rgba(255,255,255,0.12); }
   #queue-list { list-style: none; margin: 0; padding: 0 8px 0 0; overflow-y: auto; min-height: 0; flex: 1 1 auto; }
-  .fpanel .q-row.now .q-name { color: var(--accent, #e8a46b); }
+  .fpanel .q-row.now .q-name { color: var(--accent, #ffffff); }
 
   /* ── Lyrics toggle: a bar button, shown only when the track has lyrics ── */
 
@@ -584,7 +584,7 @@
   .fpanel .q-scroll { overflow-y: auto; min-height: 0; flex: 1 1 auto; padding-right: 8px; }
   .fpanel .q-row.active { opacity: 0.45; cursor: default; }
   .eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; width: 20px; justify-content: center; flex: none; }
-  .eq i { width: 3px; height: 100%; background: var(--accent, #e8a46b); border-radius: 1px; transform-origin: bottom; transform: scaleY(0.5); }
+  .eq i { width: 3px; height: 100%; background: var(--accent, #ffffff); border-radius: 1px; transform-origin: bottom; transform: scaleY(0.5); }
   body.is-playing .eq i { animation: eq-bar 0.9s ease-in-out infinite alternate; }
   .eq i:nth-child(2) { animation-delay: 0.2s; }
   .eq i:nth-child(3) { animation-delay: 0.4s; }
@@ -1285,7 +1285,7 @@ function accentFor(colors, safeColors) {
 
 function setAccent(accent, colors) {
   const root = document.documentElement.style;
-  root.setProperty('--accent', accent || '#e8a46b');
+  root.setProperty('--accent', accent || '#ffffff');
   if (accent) root.setProperty('--title', accent); else root.removeProperty('--title');
   if (colors && colors.length >= 2) root.setProperty('--bar-bg', `linear-gradient(100deg, ${colors[0]} 0%, ${colors[1]} 100%)`);
   else root.removeProperty('--bar-bg');
