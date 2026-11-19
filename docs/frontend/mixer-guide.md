@@ -12,7 +12,7 @@ For someone sitting at `/mixer` who wants to try the DJ features (beat grid, syn
 
 1. Open `/mixer`. Search for a track (two letters or more), press **A** on a result. Press **B** on a second one.
 2. Each deck shows "Loading the 4 stems", then the controls. Under **Beat grid** the deck first says "Finding the beats…" (a second or two), then e.g. `124.00 BPM · beat 3 of 4`.
-3. Blue ticks appear on the **Full track** and **Drums** waveforms; the taller ones open a bar. If the deck says **No steady beat, beat features are off**, that track has no usable grid (live recording, free tempo): cues, In/Out loops and tempo Sync still work, but not Quantize, beat loops, phase sync or Mix now.
+3. Blue ticks appear on the **Full track** and **Drums** waveforms; the taller ones open a bar. If the deck says **No steady beat, beat features are off**, that track has no usable grid (live recording, free tempo, drums stem too weak); **Find the beats again** re-runs it: cues, In/Out loops and tempo Sync still work, but not Quantize, beat loops, phase sync or Mix now.
 
 **Check the grid first**: press play on a deck and watch the red playhead cross the ticks while you listen: a tick should sit on each kick. If all ticks are a bit early or late, use **Grid ‹ 5 ms / 5 ms ›** until they fit. If the tall ticks are not on the first beat of the bar, put the playhead on the right beat and press **Downbeat here**. This is saved in your browser for that track.
 

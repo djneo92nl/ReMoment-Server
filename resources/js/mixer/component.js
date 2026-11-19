@@ -11,7 +11,7 @@ const POLL_MS = 3000;
 export const WAVE_BINS = 800; // the width of the waveform paths (viewBox units)
 const ENGINE = () => import('./engine.js');
 const BEATS = () => import('./beats-client.js');
-const GRID_KEY = 'remoment.mixer.grid.v1.';
+const GRID_KEY = 'remoment.mixer.grid.v2.'; // v2: the analysis changed (v1 remembered "no grid" for real tracks)
 const CUES_KEY = 'remoment.mixer.cues.v1.';
 
 // localStorage is per browser and can be absent or full: everything that touches it is allowed to fail.
@@ -517,6 +517,19 @@ export default function mixer(config = {}) {
                     this.deck[side].gridState = 'error';
                 }
             }
+        },
+
+        /** Forgets the remembered grid of the deck's track and analyses it again. */
+        retryGrid(side) {
+            const print = prints[side];
+            try {
+                if (print) localStorage.removeItem(GRID_KEY + print);
+            } catch {
+                // nothing stored, or no storage
+            }
+            this.deck[side].grid = null;
+            this.deck[side].ticks = { beat: '', bar: '' };
+            this.findGrid(side, this.deck[side].bpm);
         },
 
         setGrid(side, grid) {

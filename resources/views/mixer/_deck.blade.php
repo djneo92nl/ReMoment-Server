@@ -127,6 +127,9 @@
                 <p class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-600">Beat grid</p>
                 <p class="text-sm tabular-nums text-gray-700 dark:text-gray-300" x-text="gridLabel('{{ $side }}')"></p>
             </div>
+            <div class="mt-2" x-show="['nogrid', 'error'].includes({{ $d }}.gridState)" x-cloak>
+                <x-secondary-button size="sm" @click="retryGrid('{{ $side }}')">Find the beats again</x-secondary-button>
+            </div>
             <div class="mt-2 flex flex-wrap items-center gap-2" x-show="{{ $d }}.grid">
                 <x-secondary-button size="sm" @click="{{ $d }}.quantize = !{{ $d }}.quantize" x-bind:aria-pressed="{{ $d }}.quantize" x-bind:class="{{ $d }}.quantize ? '!bg-gray-900 dark:!bg-stone-600 !border-gray-900 dark:!border-stone-600 !text-white' : ''" title="Starts, cues and loops land on the beat">Quantize</x-secondary-button>
                 <span class="ml-2 text-sm text-gray-500">Grid</span>

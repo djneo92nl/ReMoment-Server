@@ -55,7 +55,7 @@ UI: beat ticks on the waveforms (heavier on the downbeat), a "nudge the grid" co
 - **Loops**: loop in and out, and beat loops of 1, 2, 4, 8 beats (and half and quarter). Implemented with `loop`, `loopStart`, `loopEnd` on the four buffer sources, so they stay aligned and cost no extra CPU; the loop points are in track time, so a tempo change needs nothing.
 - **Persistence**: first in `localStorage` per file hash. Then a small `track_cues` table (`track_id`, `slot`, `position`, `label`), `GET|PUT /api/library/tracks/{id}/cues`, open like favourites (household-wide; no accounts), an `openapi.yaml` entry and a tool on the MCP server. Decide before building (Open questions).
 
-**Built:** the localStorage part only (key `remoment.mixer.cues.v1.<fingerprint>`; the grid is `remoment.mixer.grid.v1.<fingerprint>`). Loops are not stored. Main cue: set while stopped, return-and-stop while playing, play while held when stopped on the cue. Pressing the active beat loop leaves it; In sets the point, Out closes the loop and playback returns to In (as on a CDJ).
+**Built:** the localStorage part only (key `remoment.mixer.cues.v1.<fingerprint>`; the grid is `remoment.mixer.grid.v2.<fingerprint>`). Loops are not stored. Main cue: set while stopped, return-and-stop while playing, play while held when stopped on the cue. Pressing the active beat loop leaves it; In sets the point, Out closes the loop and playback returns to In (as on a CDJ).
 
 ### D4 Stem transitions *[M; the part nobody else has]*
 

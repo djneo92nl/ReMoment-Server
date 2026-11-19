@@ -20,10 +20,10 @@ export const GRID = {
     foldMin: 70, // without a seed the tempo is folded into this range by halving or doubling
     foldMax: 180,
     seedWindow: 0.06, // the refined tempo stays within 6 % of the seed's octave
-    minLock: 0.12, // below this the onsets do not sit on a grid at all
-    minSegmentLock: 0.08,
+    minRatio: 2.2, // the best tempo must fold the onsets this many times better than the typical wrong tempo (noise: about 1)
+    minSegmentRatio: 3, // a segment's beat spot must hold this many times what a random spot would (3 bins of the beat)
     segmentSeconds: 8,
-    segmentAgree: 0.6, // the global beat spot must hold this share of what a segment's own best spot holds
+    segmentAgree: 0.8, // the global beat spot must hold this share of what a segment's own best spot holds
     steadyShare: 0.75, // share of the audible segments that must agree
 };
 
@@ -189,23 +189,29 @@ export function foldTempo(bpm, lo = GRID.foldMin, hi = GRID.foldMax) {
     return x;
 }
 
-/** The onsets worth looking at: index and strength of every frame above half the mean positive onset. */
-function sparse(env) {
-    let sum = 0;
-    let n = 0;
-    for (let i = 0; i < env.length; i++) {
-        if (env[i] > 0) {
-            sum += env[i];
-            n++;
-        }
-    }
-    const floor = n ? (sum / n) * 0.5 : 0;
+/**
+ * The onsets worth looking at: the local maxima of the envelope (within 4 frames each way) that stand out above the
+ * average of the surrounding second. Real drums are never silent between hits, so "every frame above the mean" is mostly noise.
+ */
+function sparse(env, fps) {
+    const n = env.length;
+    const radius = 4;
+    const half = Math.round(fps * 0.5);
+    const prefix = new Float64Array(n + 1);
+    for (let i = 0; i < n; i++) prefix[i + 1] = prefix[i] + env[i];
     const idx = [];
     const val = [];
-    for (let i = 0; i < env.length; i++) {
-        if (env[i] > floor) {
+    for (let i = radius; i < n - radius; i++) {
+        const v = env[i];
+        if (v <= 0) continue;
+        let top = true;
+        for (let j = 1; j <= radius && top; j++) top = env[i - j] <= v && env[i + j] < v;
+        if (!top) continue;
+        const a = Math.max(0, i - half);
+        const b = Math.min(n, i + half);
+        if (v > (2 * (prefix[b] - prefix[a])) / (b - a)) {
             idx.push(i);
-            val.push(env[i]);
+            val.push(v);
         }
     }
 
@@ -300,6 +306,18 @@ function findDownbeat(low, fps, bpm, offset) {
 
 // --- the whole analysis --------------------------------------------------------------------------------------------
 
+/** The median fold score of tempi that are not the fit's (not within 2 % of it or of its octaves): what chance gives. */
+function typicalScore(onsets, fps, bpm) {
+    const scores = [];
+    for (let t = bpm * 0.85; t <= bpm * 1.15; t += bpm * 0.003) {
+        const near = [0.5, 1, 2].some((f) => Math.abs(t - bpm * f) < bpm * f * 0.02);
+        if (!near) scores.push(phaseHistogram(onsets, fps, t).score);
+    }
+    scores.sort((a, b) => a - b);
+
+    return scores[scores.length >> 1] || 1e-9;
+}
+
 /** Do the onsets keep the same spot on the beat all the way through the track? */
 function isSteady(onsets, fps, fit, frames) {
     const per = Math.round(GRID.segmentSeconds * fps);
@@ -320,7 +338,7 @@ function isSteady(onsets, fps, fit, frames) {
     const good = audible.filter((h) => {
         const at = (h.hist[(fit.bin + h.bins - 1) % h.bins] + h.hist[fit.bin] + h.hist[(fit.bin + 1) % h.bins]) / h.total;
 
-        return h.score >= GRID.minSegmentLock && at >= GRID.segmentAgree * h.score;
+        return at >= GRID.minSegmentRatio * (3 / h.bins) && at >= GRID.segmentAgree * h.score;
     });
 
     return good.length / audible.length >= GRID.steadyShare;
@@ -338,7 +356,7 @@ export function analyseFeatures(features, seedBpm = null) {
     if (frames < fps * 12) {
         return { grid: null, reason: 'too_short' };
     }
-    const onsets = sparse(env);
+    const onsets = sparse(env, fps);
     const seed = seedBpm > 0 ? seedBpm : null;
 
     let guess = coarseTempo(env, fps);
@@ -361,13 +379,14 @@ export function analyseFeatures(features, seedBpm = null) {
         if (other.score > fit.score) fit = other;
     }
 
-    if (fit.score < GRID.minLock || !isSteady(onsets, fps, fit, frames)) {
-        return { grid: null, reason: 'unsteady', lock: fit.score };
+    const ratio = fit.score / typicalScore(onsets, fps, fit.bpm);
+    if (ratio < GRID.minRatio || !isSteady(onsets, fps, fit, frames)) {
+        return { grid: null, reason: 'unsteady', lock: fit.score, ratio };
     }
     const offset = offsetOf(fit, fps);
     const { downbeat, bar } = findDownbeat(low, fps, fit.bpm, offset);
 
-    return { grid: { bpm: fit.bpm, offset, downbeat, lock: fit.score, bar }, reason: null };
+    return { grid: { bpm: fit.bpm, offset, downbeat, lock: fit.score, bar }, reason: null, ratio };
 }
 
 /** Convenience for tests and the no-worker fallback: stems as arrays of channels -> grid. */
