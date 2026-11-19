@@ -1,7 +1,12 @@
 // The arithmetic of the stem mixer, free of the Web Audio API so `node --test tests/Js` can check it.
 // docs/frontend/stem-mixer.md
 
-export const STEMS = ['vocals', 'drums', 'bass', 'other'];
+// Every stem a model can give, in display order: the four of `htdemucs`, plus guitar and piano with `htdemucs_6s`. A deck
+// uses the stems its track actually has (the keys of the stems API answer), so a 4-stem and a 6-stem track both load.
+export const STEMS = ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'];
+
+/** The names in `names` that are known stems, in display order. */
+export const orderStems = (names) => STEMS.filter((s) => names.includes(s));
 
 /** Tempo range the slider offers (1 = the track's own tempo); SoundTouch sounds cleanest near 1. */
 export const RATE_MIN = 0.7;
@@ -38,9 +43,10 @@ export function crossfade(position) {
  * @param {Record<string, boolean>} solo
  */
 export function stemGains(levels, muted, solo) {
-    const anySolo = STEMS.some((s) => solo[s]);
+    const names = Object.keys(levels);
+    const anySolo = names.some((s) => solo[s]);
 
-    return Object.fromEntries(STEMS.map((s) => {
+    return Object.fromEntries(names.map((s) => {
         const audible = anySolo ? solo[s] && !muted[s] : !muted[s];
 
         return [s, audible ? clamp(levels[s] ?? 1, 0, 1) : 0];
@@ -70,9 +76,9 @@ export function effectiveBpm(bpm, rate) {
     return bpm > 0 ? bpm * rate : null;
 }
 
-/** Decoded float32 stereo stems take about this much memory: 4 stems x seconds x 44.1 kHz x 2 channels x 4 bytes, in MB. */
-export function decodedMegabytes(seconds, sampleRate = 44100) {
-    return Math.round((4 * seconds * sampleRate * 2 * 4) / 1e6);
+/** Decoded float32 stereo stems take about this much memory: stems (4, or 6) x seconds x 44.1 kHz x 2 channels x 4 bytes, in MB. */
+export function decodedMegabytes(seconds, sampleRate = 44100, stems = 4) {
+    return Math.round((stems * seconds * sampleRate * 2 * 4) / 1e6);
 }
 
 /**

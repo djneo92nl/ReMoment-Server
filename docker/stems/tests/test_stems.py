@@ -212,3 +212,20 @@ def test_real_model_runs_the_pipeline(tmp_path, monkeypatch):
     write_wav(p, mixture(seconds=20, vocal=(5, 15)))
     result = separate.analyze(str(p))
     assert len(result["stems"]["vocals"]) == 40 and set(result["stems"]) == set(separate.SOURCES)
+
+
+def test_the_model_setting_decides_the_stems(monkeypatch):
+    import importlib
+
+    monkeypatch.setenv("STEMS_MODEL", "htdemucs_6s")
+    six = importlib.reload(separate)
+    try:
+        assert six.METHOD == "htdemucs_6s"
+        assert six.SOURCES == ("vocals", "drums", "bass", "guitar", "piano", "other")
+        monkeypatch.setenv("STEMS_MODEL", "nope")
+        with pytest.raises(ValueError):
+            importlib.reload(separate)
+    finally:
+        monkeypatch.delenv("STEMS_MODEL", raising=False)
+        importlib.reload(separate)
+    assert separate.SOURCES == ("vocals", "drums", "bass", "other")

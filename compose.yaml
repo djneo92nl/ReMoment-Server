@@ -157,6 +157,7 @@ services:
             - '${STEMS_PORT:-8092}:8092'
         environment:
             STEMS_MAX_DURATION: '${STEMS_MAX_DURATION:-1200}'
+            STEMS_MODEL: '${STEMS_MODEL:-htdemucs}'
         mem_limit: '${STEMS_MEM_LIMIT:-3g}'
         volumes:
             - 'sail-stems-models:/models'

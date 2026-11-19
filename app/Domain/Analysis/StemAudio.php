@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Storage;
 use ZipArchive;
 
 /**
- * The kept audio of the stems of one track (`stem_audio` kind of DeepAnalysis): four files (vocals, drums, bass, other),
+ * The kept audio of the stems of one track (`stem_audio` kind of DeepAnalysis): four files (vocals, drums, bass, other; six with guitar and piano for the `htdemucs_6s` model),
  * MP3 or FLAC, in `stems/{file id}` on `analysis.stem_audio_disk`. They are derived data, not library files: no scan
  * indexes them and no storage location owns them. The manifest in `file_analyses.stem_audio` says what is there; a file
  * whose content changed forgets it (`FileAnalysis::resetFor`) and `stems:prune` removes the directory that is left.
@@ -62,7 +62,12 @@ final class StemAudio
             return false;
         }
 
-        foreach (StemsStage::LANES as $stem) {
+        $stems = array_keys($manifest['files']);
+        if (array_diff(StemsStage::REQUIRED, $stems) !== []) {
+            return false;
+        }
+
+        foreach ($stems as $stem) {
             $name = $manifest['files'][$stem]['name'] ?? null;
             if (!is_string($name) || !self::disk()->exists(self::path($file, $name))) {
                 return false;
@@ -102,7 +107,12 @@ final class StemAudio
             $files = [];
             $bytes = 0;
 
-            foreach (StemsStage::LANES as $stem) {
+            $stems = StemsStage::ordered(array_keys($audio['files']));
+            if (array_diff(StemsStage::REQUIRED, $stems) !== []) {
+                throw new \RuntimeException('The stems service answered without all of the vocals, drums, bass and other files.');
+            }
+
+            foreach ($stems as $stem) {
                 $name = basename((string) ($audio['files'][$stem] ?? ''));
                 $stream = $name === '' ? false : $zip->getStream($name);
                 if ($stream === false) {

@@ -46,7 +46,7 @@ class TrackStemsController extends Controller
         $manifest = $analysis->stem_audio;
         $ttl = max(60, (int) config('analysis.stem_audio_url_ttl'));
         $stems = [];
-        foreach (StemsStage::LANES as $stem) {
+        foreach (StemsStage::ordered(array_keys($manifest['files'])) as $stem) {
             $stems[$stem] = [
                 'url' => URL::temporarySignedRoute('api.library.stems.download', now()->addSeconds($ttl), ['track' => $track->id, 'stem' => $stem], absolute: false),
                 'bytes' => $manifest['files'][$stem]['bytes'],
@@ -74,7 +74,7 @@ class TrackStemsController extends Controller
     /** The signed, temporary download of one stem; BinaryFileResponse answers Range requests by itself. */
     public function download(Track $track, string $stem): BinaryFileResponse|JsonResponse
     {
-        $file = in_array($stem, StemsStage::LANES, true) ? DeepAnalysis::fileFor($track) : null;
+        $file = in_array($stem, StemsStage::KNOWN, true) ? DeepAnalysis::fileFor($track) : null;
         $analysis = $file?->analysis()->first();
         $manifest = $analysis?->stem_audio;
         $name = $manifest['files'][$stem]['name'] ?? null;

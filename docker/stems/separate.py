@@ -1,6 +1,6 @@
 """Stems of ONE track as loudness curves (docs/architecture/stems-service.md).
 
-The track is decoded by ffmpeg to 44.1 kHz stereo and separated by Demucs (htdemucs) window by window: WINDOW seconds
+The track is decoded by ffmpeg to 44.1 kHz stereo and separated by Demucs (htdemucs, or htdemucs_6s) window by window: WINDOW seconds
 of audio plus PAD seconds on each side, the padding is dropped. That keeps the peak RAM flat (about 1.5 GB) for any
 track length (the spike measured 1.2 GB + 3.5 MB per second of audio when the whole track is separated at once). Only a
 loudness curve per stem leaves this module, never audio: an integer dB value (RMS of the stem's mono mix over one
@@ -17,8 +17,16 @@ from functools import lru_cache
 import numpy as np
 
 VERSION = 1
-METHOD = "htdemucs"
-SOURCES = ("vocals", "drums", "bass", "other")
+# STEMS_MODEL picks the model: `htdemucs` (four stems, the default) or `htdemucs_6s` (adds guitar and piano; the piano stem
+# is the weakest, and the weights' licence is likely non-commercial, see docs/architecture/track-stems-spike.md).
+MODELS = {
+    "htdemucs": ("vocals", "drums", "bass", "other"),
+    "htdemucs_6s": ("vocals", "drums", "bass", "guitar", "piano", "other"),
+}
+METHOD = os.environ.get("STEMS_MODEL", "htdemucs").strip() or "htdemucs"
+if METHOD not in MODELS:
+    raise ValueError(f"STEMS_MODEL must be one of {', '.join(MODELS)} (got {METHOD!r})")
+SOURCES = MODELS[METHOD]
 SR = 44100
 RATE_HZ = 2
 HOP = SR // RATE_HZ  # samples per frame
@@ -41,7 +49,7 @@ _model_lock = threading.Lock()
 
 
 def load_model():
-    """The htdemucs model, loaded once (downloads the 84 MB weights into HF_HOME on first use)."""
+    """The configured model (METHOD), loaded once (downloads its weights, 84 MB for htdemucs, into HF_HOME on first use)."""
     global _model
     with _model_lock:
         if _model is None:
@@ -62,7 +70,7 @@ def model_loaded() -> bool:
 
 
 def separate_block(block: np.ndarray) -> np.ndarray:
-    """(n, 2) float32 samples -> (4, n, 2) stereo stems in SOURCES order. Replaced by a fake in the tests."""
+    """(n, 2) float32 samples -> (len(SOURCES), n, 2) stereo stems in SOURCES order. Replaced by a fake in the tests."""
     import torch
     from demucs.apply import apply_model
 
@@ -73,7 +81,7 @@ def separate_block(block: np.ndarray) -> np.ndarray:
     with torch.no_grad():
         out = apply_model(model, ((wav - mu) / sd)[None], shifts=0, split=True, overlap=0.25, progress=False, num_workers=0)[0]
     stereo = (out * sd + mu).numpy()  # (sources, 2, n)
-    return np.stack([stereo[list(model.sources).index(name)].T for name in SOURCES])  # the model's own order is drums, bass, other, vocals
+    return np.stack([stereo[list(model.sources).index(name)].T for name in SOURCES])  # the model's own order differs (htdemucs: drums, bass, other, vocals)
 
 
 AUDIO_FORMATS = {"mp3": ("libmp3lame", "mp3"), "flac": ("flac", "flac")}

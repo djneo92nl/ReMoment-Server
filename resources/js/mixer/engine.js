@@ -9,7 +9,7 @@
 // SoundTouch is imported only when the browser has AudioWorklet: that exists in a secure context only (https or
 // localhost), and a module that extends AudioWorkletNode throws on import without it. Without it the mixer still
 // plays; tempo then moves the pitch along and the key shift is off (`pitchCorrection` is false).
-import { STEMS, binPeaks, clamp, stemGains } from './math.js';
+import { binPeaks, clamp, orderStems, stemGains } from './math.js';
 
 const FADE = 0.006; // seconds of fade at a start/stop, so a seek or nudge does not click
 const SMOOTH = 0.015; // seconds of smoothing on a fader
@@ -65,6 +65,7 @@ export class Deck {
     constructor(audio) {
         this.audio = audio;
         this.buffers = null;
+        this.stems = [];
         this.sources = [];
         this.rate = 1;
         this.offset = 0; // seconds into the track at `anchor`
@@ -78,12 +79,13 @@ export class Deck {
         return this.buffers !== null;
     }
 
-    /** Fetches and decodes the four stems (urls: { vocals, drums, bass, other }). */
+    /** Fetches and decodes the stems of the track (urls: { vocals, drums, bass, other, and guitar and piano when it has six }). */
     async load(urls) {
         const ctx = await this.audio.ensure();
         this.dispose();
 
-        const buffers = await Promise.all(STEMS.map(async (stem) => {
+        const names = orderStems(Object.keys(urls));
+        const buffers = await Promise.all(names.map(async (stem) => {
             const response = await fetch(urls[stem]);
             if (!response.ok) {
                 throw new Error(`The ${stem} stem could not be loaded (HTTP ${response.status}).`);
@@ -92,7 +94,8 @@ export class Deck {
             return ctx.decodeAudioData(await response.arrayBuffer());
         }));
 
-        this.buffers = Object.fromEntries(STEMS.map((stem, i) => [stem, buffers[i]]));
+        this.stems = names;
+        this.buffers = Object.fromEntries(names.map((stem, i) => [stem, buffers[i]]));
         this.duration = Math.min(...buffers.map((b) => b.duration)); // the encoders may pad a stem by a few ms
         this.offset = 0;
 
@@ -105,7 +108,7 @@ export class Deck {
         this.analyser = ctx.createAnalyser();
         this.analyser.fftSize = 512;
         this.levelData = new Float32Array(this.analyser.fftSize);
-        this.gains = Object.fromEntries(STEMS.map((stem) => {
+        this.gains = Object.fromEntries(names.map((stem) => {
             const gain = ctx.createGain();
             gain.connect(this.mix);
 
@@ -124,8 +127,8 @@ export class Deck {
             return null;
         }
         const channels = (buffer) => Array.from({ length: buffer.numberOfChannels }, (_, c) => buffer.getChannelData(c));
-        const all = STEMS.flatMap((stem) => channels(this.buffers[stem]));
-        const peaks = Object.fromEntries(STEMS.map((stem) => [stem, binPeaks(channels(this.buffers[stem]), bins)]));
+        const all = this.stems.flatMap((stem) => channels(this.buffers[stem]));
+        const peaks = Object.fromEntries(this.stems.map((stem) => [stem, binPeaks(channels(this.buffers[stem]), bins)]));
         // The full track is the sum of the stems per channel; added across channels too it is close enough for a picture.
         peaks.mix = binPeaks(all, bins, true);
 
@@ -209,7 +212,7 @@ export class Deck {
             return;
         }
         const gains = stemGains(levels, muted, solo);
-        for (const stem of STEMS) {
+        for (const stem of this.stems) {
             this.gains[stem].gain.setTargetAtTime(gains[stem], this.audio.ctx.currentTime, SMOOTH);
         }
     }
@@ -247,7 +250,7 @@ export class Deck {
     #start(offset) {
         const ctx = this.audio.ctx;
         const when = ctx.currentTime + 0.03; // the same instant for all four, so they stay aligned
-        this.sources = STEMS.map((stem) => {
+        this.sources = this.stems.map((stem) => {
             const source = ctx.createBufferSource();
             source.buffer = this.buffers[stem];
             source.playbackRate.value = this.rate;

@@ -2,7 +2,7 @@
 // REST API. The audio objects live in this closure, not in the reactive state: Alpine wraps state in proxies, which
 // Web Audio nodes do not survive.
 
-import { STEMS, RATE_MAX, RATE_MIN, crossfade, decodedMegabytes, effectiveBpm, formatTime, peaksPath, shiftCamelot, syncRate } from './math.js';
+import { orderStems, RATE_MAX, RATE_MIN, crossfade, decodedMegabytes, effectiveBpm, formatTime, peaksPath, shiftCamelot, syncRate } from './math.js';
 
 const POLL_MS = 3000;
 export const WAVE_BINS = 800; // the width of the waveform paths (viewBox units)
@@ -20,9 +20,10 @@ const freshDeck = () => ({
     camelot: null,
     format: null,
     megabytes: 0,
-    levels: Object.fromEntries(STEMS.map((s) => [s, 1])),
-    muted: Object.fromEntries(STEMS.map((s) => [s, false])),
-    solo: Object.fromEntries(STEMS.map((s) => [s, false])),
+    stems: [], // the stems this track has: four, or six with guitar and piano
+    levels: {},
+    muted: {},
+    solo: {},
     rate: 1,
     semitones: 0,
     pos: 0,
@@ -50,7 +51,6 @@ export default function mixer(config = {}) {
     };
 
     return {
-        STEMS,
         RATE_MIN,
         RATE_MAX,
         deck: { a: freshDeck(), b: freshDeck() },
@@ -124,7 +124,11 @@ export default function mixer(config = {}) {
                 d.key = body.key ? `${body.key}${body.mode === 'minor' ? 'm' : ''}` : null;
                 d.camelot = body.camelot;
                 d.format = body.format;
-                d.megabytes = decodedMegabytes(body.duration, body.sample_rate);
+                d.stems = orderStems(Object.keys(body.stems));
+                d.levels = Object.fromEntries(d.stems.map((s) => [s, 1]));
+                d.muted = Object.fromEntries(d.stems.map((s) => [s, false]));
+                d.solo = Object.fromEntries(d.stems.map((s) => [s, false]));
+                d.megabytes = decodedMegabytes(body.duration, body.sample_rate, d.stems.length);
                 await this.load(side, body.stems);
 
                 return;
@@ -155,7 +159,7 @@ export default function mixer(config = {}) {
                 decks[side].onEnded = () => {
                     this.deck[side].playing = false;
                 };
-                await decks[side].load(Object.fromEntries(STEMS.map((s) => [s, stems[s].url])));
+                await decks[side].load(Object.fromEntries(d.stems.map((s) => [s, stems[s].url])));
                 d.dur = decks[side].duration;
                 const peaks = decks[side].waveforms(WAVE_BINS);
                 d.wave = Object.fromEntries(Object.entries(peaks).map(([key, values]) => [key, peaksPath(values)]));

@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Http;
 
 /**
  * The stems of one track (workstream 16.4) as loudness lanes, found by the stems service (docker/stems, Demucs, see
- * docs/architecture/stems-service.md): one integer dB curve per stem (vocals, drums, bass, other), the vocal ratio and the
+ * docs/architecture/stems-service.md): one integer dB curve per stem (vocals, drums, bass, other; guitar and piano too with the `htdemucs_6s` model), the vocal ratio and the
  * instrumental ranges. ON DEMAND only, on its own `stems` queue: it is not in `AudioAnalysis::stages()`, so no nightly
  * run, backlog or progress total ever counts it. The service reads the original file itself (it decodes with its own
  * ffmpeg), so nothing is decoded here. No stem audio is kept anywhere.
@@ -19,7 +19,17 @@ use Illuminate\Support\Facades\Http;
  */
 class StemsStage implements OnDemandStage
 {
-    public const LANES = ['vocals', 'drums', 'bass', 'other'];
+    /** Every stem a model can give, in display order: `htdemucs` the four required ones, `htdemucs_6s` adds guitar and piano. */
+    public const KNOWN = ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'];
+
+    /** What every model gives; a service that answers without one of these is refused. */
+    public const REQUIRED = ['vocals', 'drums', 'bass', 'other'];
+
+    /** The names of `$names` that are known stems, in display order. */
+    public static function ordered(array $names): array
+    {
+        return array_values(array_filter(self::KNOWN, fn ($stem) => in_array($stem, $names, true)));
+    }
 
     public function key(): string
     {
@@ -105,9 +115,14 @@ class StemsStage implements OnDemandStage
         }
 
         $lanes = [];
-        foreach (self::LANES as $lane) {
+        foreach (self::REQUIRED as $lane) {
             if (!isset($stems[$lane]) || !is_array($stems[$lane]) || $stems[$lane] === []) {
                 throw new \RuntimeException("The stems service answered without the {$lane} lane.");
+            }
+        }
+        foreach (self::ordered(array_keys($stems)) as $lane) {
+            if (!is_array($stems[$lane]) || $stems[$lane] === []) {
+                throw new \RuntimeException("The stems service answered an empty {$lane} lane.");
             }
             $lanes[$lane] = array_map(fn ($v) => max(-80, min(0, (int) round((float) $v))), array_values($stems[$lane]));
         }

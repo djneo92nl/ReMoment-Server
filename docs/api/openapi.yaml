@@ -2003,6 +2003,7 @@ paths:
                   camelot: { type: string, nullable: true, description: "Camelot code such as 8A, null without key data" }
                   stems:
                     type: object
+                    description: "Four stems (vocals, drums, bass, other), or six with guitar and piano when the stems service runs `STEMS_MODEL=htdemucs_6s`. Clients read the keys, they do not assume four."
                     required: [vocals, drums, bass, other]
                     additionalProperties:
                       type: object
@@ -2021,7 +2022,7 @@ paths:
       security: []
       parameters:
         - { name: track, in: path, required: true, schema: { type: integer } }
-        - { name: stem, in: path, required: true, schema: { type: string, enum: [vocals, drums, bass, other] } }
+        - { name: stem, in: path, required: true, schema: { type: string, enum: [vocals, drums, bass, guitar, piano, other] } }
       responses:
         "200":
           description: The audio file
@@ -4619,12 +4620,14 @@ components:
       description: "Per-stem loudness curves of a track, from the stems service (Demucs). Each lane is integer dB (RMS of the stem over one frame, relative to full scale, clamped to -80..0), one value per 1/rate_hz seconds from the start of the file. Draw each lane on its own scale."
       required: [method, rate_hz, vocals, drums, bass, other]
       properties:
-        method: { type: string, example: htdemucs }
+        method: { type: string, example: htdemucs, description: "htdemucs, or htdemucs_6s (then also the guitar and piano lanes)" }
         rate_hz: { type: integer, example: 2 }
         vocals: { type: array, items: { type: integer, minimum: -80, maximum: 0 } }
         drums: { type: array, items: { type: integer, minimum: -80, maximum: 0 } }
         bass: { type: array, items: { type: integer, minimum: -80, maximum: 0 } }
         other: { type: array, items: { type: integer, minimum: -80, maximum: 0 } }
+        guitar: { type: array, items: { type: integer, minimum: -80, maximum: 0 }, description: "Only with the htdemucs_6s model" }
+        piano: { type: array, items: { type: integer, minimum: -80, maximum: 0 }, description: "Only with the htdemucs_6s model; the weakest stem" }
     InstrumentalRanges:
       type: array
       description: "Where the vocals lane stays more than 20 dB under the track's own vocal level for at least 8 s (seconds from the start of the file)."

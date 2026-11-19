@@ -34,3 +34,4 @@ Thumbs.db
 # ReMoment Node build output
 /node/dist/remoment-node-*
 /node/node
+__pycache__/

@@ -14,7 +14,7 @@
     </div>
 
     <div class="mt-5" x-show="['checking', 'loading'].includes({{ $d }}.status)" x-cloak>
-        <p class="text-sm text-gray-500"><i class="fa-solid fa-spinner fa-spin mr-1.5"></i><span x-text="{{ $d }}.status === 'loading' ? 'Loading the four stems' + ({{ $d }}.megabytes ? ' (about ' + {{ $d }}.megabytes + ' MB in memory)' : '') : 'Looking for the stems'"></span></p>
+        <p class="text-sm text-gray-500"><i class="fa-solid fa-spinner fa-spin mr-1.5"></i><span x-text="{{ $d }}.status === 'loading' ? 'Loading the ' + {{ $d }}.stems.length + ' stems' + ({{ $d }}.megabytes ? ' (about ' + {{ $d }}.megabytes + ' MB in memory)' : '') : 'Looking for the stems'"></span></p>
     </div>
 
     <div class="mt-5 space-y-3" x-show="{{ $d }}.status === 'needs_stems'" x-cloak>
@@ -51,7 +51,7 @@
         <div>
             <p class="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-600">Waveforms</p>
             <div class="relative cursor-pointer select-none space-y-1" data-test="waveforms" @click="seekFromClick('{{ $side }}', $event)">
-                <template x-for="row in ['mix', ...STEMS]" :key="row">
+                <template x-for="row in ['mix', ...{{ $d }}.stems]" :key="row">
                     <div class="relative" :class="row === 'mix' ? 'h-14' : 'h-8'" :data-wave="row">
                         <span class="pointer-events-none absolute left-1 top-0 z-10 text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400" x-text="row === 'mix' ? 'Full track' : row"></span>
                         <div class="absolute inset-0 rounded bg-gray-50 dark:bg-stone-900/60"></div>
@@ -66,7 +66,7 @@
         {{-- The four stems --}}
         <div>
             <p class="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-600">Stems</p>
-            <template x-for="stem in STEMS" :key="stem">
+            <template x-for="stem in {{ $d }}.stems" :key="stem">
                 <div class="flex items-center gap-3">
                     <span class="w-14 flex-none text-sm capitalize text-gray-700 dark:text-gray-300" x-text="stem"></span>
                     @include('mixer._slider', ['value' => "$d.levels[stem]", 'min' => '0', 'max' => '1', 'step' => '0.01', 'input' => "setLevel('$side', stem, \$event.target.value)", 'label' => "stem + ' level, deck ".strtoupper($side)."'"])

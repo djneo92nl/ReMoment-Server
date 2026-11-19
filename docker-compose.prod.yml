@@ -177,6 +177,7 @@ services:
         mem_limit: '${STEMS_MEM_LIMIT:-3g}'
         environment:
             STEMS_MAX_DURATION: '${STEMS_MAX_DURATION:-1200}'
+            STEMS_MODEL: '${STEMS_MODEL:-htdemucs}'
             STEMS_THREADS: '${STEMS_THREADS:-2}'
         volumes:
             - 'remoment-stems-models:/models'

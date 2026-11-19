@@ -80,6 +80,21 @@ class TrackStemsUiTest extends TestCase
         $this->assertStringNotContainsString('data-test="section-strip"', $html, 'no strip without sections');
     }
 
+    public function test_a_six_stem_track_gets_guitar_and_piano_lanes_between_bass_and_other(): void
+    {
+        $lanes = $this->stored()['lanes'];
+        $stems = ['rate_hz' => 2] + array_merge(array_slice($lanes, 0, 3), ['guitar' => array_fill(0, 200, -30), 'piano' => array_fill(0, 200, -40)], ['other' => $lanes['other']]);
+
+        $html = Blade::render('<x-stem-lanes :stems="$s" />', ['s' => $stems]);
+
+        $positions = array_map(fn ($lane) => strpos($html, 'data-lane="'.$lane.'"'), ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other']);
+        $this->assertNotContains(false, $positions);
+        $sorted = $positions;
+        sort($sorted);
+        $this->assertSame($sorted, $positions, 'display order');
+        $this->assertSame(6, substr_count($html, '<path d='));
+    }
+
     public function test_sections_sit_on_top_of_the_lanes_when_they_exist(): void
     {
         $html = Blade::render('<x-stem-lanes :stems="$s" :duration="100" :sections="$sec" />', [

@@ -4,6 +4,10 @@ The stems of one track (vocals, drums, bass, other) as four audio files an app c
 
 No admin token anywhere: the endpoints are open like the library, and the download URL is signed and temporary. Full profile only (`422 not_available_in_profile` otherwise). Needs a track with an own file on this server.
 
+## Four or six stems
+
+The `stems` object has the stems the track was separated into: **vocals, drums, bass and other**, or **six** (also `guitar` and `piano`, in the order vocals, drums, bass, guitar, piano, other) when the stems service runs `STEMS_MODEL=htdemucs_6s`. The model is the server owner's choice (opt-in, see [../architecture/stems-service.md](../architecture/stems-service.md)); a track keeps the stems it was separated with, so a library can hold both. Clients must use the keys of the answer and not assume four. To get six for a track that has four, delete kind `stem_audio` (`DELETE /api/library/tracks/{id}/deep-analysis/stem_audio`) and ask for it again.
+
 ## Ask for the files
 
 ```
@@ -54,7 +58,7 @@ Errors: `404 not_ready` (not kept; `state` says none, queued, running or failed)
 ## Download
 
 ```
-GET /api/library/tracks/{id}/stems/{vocals|drums|bass|other}?expires=…&signature=…
+GET /api/library/tracks/{id}/stems/{vocals|drums|bass|guitar|piano|other}?expires=…&signature=…
 ```
 
 No token header: the signature is the authorization. The file with its `Content-Type` (`audio/mpeg` or `audio/flac`); `Range` requests are answered (`206`). `403` for a missing, altered or expired signature, `404` when the stem is not kept any more (removed, or the file changed).

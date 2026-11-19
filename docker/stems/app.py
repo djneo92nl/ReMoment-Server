@@ -50,6 +50,7 @@ def health():
         "ok": ok,
         "version": separate.VERSION,
         "method": separate.METHOD,
+        "stems": list(separate.SOURCES),
         "rate_hz": separate.RATE_HZ,
         "max_duration": MAX_DURATION,
         "audio_formats": separate.audio_formats(),

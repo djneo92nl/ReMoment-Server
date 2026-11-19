@@ -1,10 +1,12 @@
 @props(['stems', 'instrumental' => [], 'duration' => null, 'sections' => null, 'vocalRatio' => null, 'height' => 28])
 
-{{-- One lane per stem (vocals, drums, bass, other) from the stored loudness curves, each on its own scale
+{{-- One lane per stem (vocals, drums, bass, other, and guitar and piano for a 6-stem track) from the stored loudness curves, each on its own scale
      (App\Domain\Analysis\StemLanes), so a quiet stem is as readable as a loud one. The sections strip, when sections
      exist, sits on top in the same column so boundaries line up in time; instrumental ranges are a tint across every lane. --}}
 @php
-    $lanes = ['vocals' => 'Vocals', 'drums' => 'Drums', 'bass' => 'Bass', 'other' => 'Other'];
+    $labels = ['vocals' => 'Vocals', 'drums' => 'Drums', 'bass' => 'Bass', 'guitar' => 'Guitar', 'piano' => 'Piano', 'other' => 'Other'];
+    // The lanes the track has: four, or six when the stems service runs htdemucs_6s.
+    $lanes = collect($labels)->filter(fn ($label, $key) => isset($stems[$key]))->all();
     $rate = max(1, (int) ($stems['rate_hz'] ?? 2));
     $span = max(1, count($stems['vocals'] ?? [])) / $rate;   // seconds the curves cover
     $ranges = collect($instrumental)->map(fn ($r) => [

@@ -83,13 +83,13 @@ class StemAudioTest extends TestCase
     }
 
     /** The zip the stems service answers: stems.json and one file per stem. */
-    private static function zip(string $format, array $drop = [], array $json = []): \Illuminate\Http\Client\PromiseInterface|\GuzzleHttp\Promise\PromiseInterface
+    private static function zip(string $format, array $drop = [], array $json = [], array $names = ['vocals', 'drums', 'bass', 'other']): \Illuminate\Http\Client\PromiseInterface|\GuzzleHttp\Promise\PromiseInterface
     {
         $path = tempnam(sys_get_temp_dir(), 'zip');
         $zip = new ZipArchive;
         $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
         $files = [];
-        foreach (['vocals', 'drums', 'bass', 'other'] as $stem) {
+        foreach ($names as $stem) {
             $files[$stem] = "{$stem}.{$format}";
             if (!in_array($stem, $drop, true)) {
                 $zip->addFromString("{$stem}.{$format}", "audio of {$stem} as {$format}");
@@ -132,6 +132,44 @@ class StemAudioTest extends TestCase
     }
 
     // --- the stage ---------------------------------------------------------------
+
+    /** The six stems of `htdemucs_6s`, in the order the service writes them (the service's lanes follow). */
+    private function sixStemAnswer(): \Closure
+    {
+        $six = ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'];
+        $stems = self::SERVICE['stems'] + ['guitar' => [-30, -30, -31, -30, -29, -30], 'piano' => [-50, -50, -52, -51, -50, -49]];
+
+        return fn (string $format) => self::zip($format, [], ['method' => 'htdemucs_6s', 'stems' => $stems], $six);
+    }
+
+    public function test_a_six_stem_run_keeps_guitar_and_piano_and_the_api_lists_all_six_in_display_order(): void
+    {
+        [$file, $track] = $this->localTrack();
+        $this->answer = $this->sixStemAnswer();
+
+        $this->runJob($file);
+
+        $analysis = $file->analysis()->first();
+        $this->assertSame(['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'], array_keys($analysis->stem_audio['files']));
+        $this->assertSame(['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'], array_keys($analysis->stems['lanes']));
+        $this->assertSame('htdemucs_6s', $analysis->stems['method']);
+
+        $response = $this->getJson("/api/library/tracks/{$track->id}/stems", $this->auth())->assertOk();
+        $this->assertSame(['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'], array_keys($response->json('stems')));
+        $this->get($response->json('stems.piano.url'))->assertOk();
+        $this->assertSame(6, count(Storage::disk('stems')->files("stems/{$file->id}")));
+    }
+
+    public function test_a_service_answer_without_one_of_the_four_required_stems_is_refused_even_with_extras(): void
+    {
+        [$file] = $this->localTrack();
+        $this->answer = fn (string $format) => self::zip($format, ['bass'], [], ['vocals', 'drums', 'bass', 'guitar', 'other']);
+
+        $this->runJob($file);
+
+        $this->assertNull($file->analysis()->first()?->stem_audio);
+        $this->assertSame([], Storage::disk('stems')->files("stems/{$file->id}"));
+    }
 
     public function test_the_job_keeps_the_four_files_the_manifest_and_the_lanes_from_one_run(): void
     {

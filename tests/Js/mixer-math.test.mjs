@@ -1,7 +1,7 @@
 // Run: node --test tests/Js
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { binPeaks, crossfade, decodedMegabytes, effectiveBpm, formatTime, peaksPath, shiftCamelot, stemGains, syncRate } from '../../resources/js/mixer/math.js';
+import { binPeaks, crossfade, decodedMegabytes, effectiveBpm, formatTime, orderStems, peaksPath, shiftCamelot, stemGains, syncRate } from '../../resources/js/mixer/math.js';
 
 const all = (v) => ({ vocals: v, drums: v, bass: v, other: v });
 const off = () => ({ vocals: false, drums: false, bass: false, other: false });
@@ -75,4 +75,14 @@ test('binPeaks of silence or nothing is all zeros, and peaksPath is mirrored aro
     assert.deepEqual([...binPeaks([new Float32Array(10)], 3)], [0, 0, 0]);
     assert.equal(peaksPath([]), '');
     assert.match(peaksPath([1, 0], 100), /^M0 0\.0L1 49\.5L1 50\.5L0 100\.0Z$/);
+});
+
+test('a six-stem track mutes and solos like a four-stem one, and the stem list follows the track', () => {
+    const six = { vocals: 1, drums: 1, bass: 1, guitar: 0.5, piano: 1, other: 1 };
+    const none = Object.fromEntries(Object.keys(six).map((k) => [k, false]));
+    assert.deepEqual(Object.keys(stemGains(six, none, none)), Object.keys(six));
+    assert.deepEqual(stemGains(six, { ...none, other: true }, { ...none, guitar: true, other: true }), { vocals: 0, drums: 0, bass: 0, guitar: 0.5, piano: 0, other: 0 });
+    assert.deepEqual(orderStems(['other', 'piano', 'vocals', 'drums', 'bass', 'guitar', 'strings']), ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other']);
+    assert.deepEqual(orderStems(['other', 'bass', 'drums', 'vocals']), ['vocals', 'drums', 'bass', 'other']);
+    assert.ok(Math.abs(decodedMegabytes(240, 44100, 6) - decodedMegabytes(240, 44100, 4) * 1.5) <= 1); // six stems cost half as much again
 });
