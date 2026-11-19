@@ -101,6 +101,10 @@ docs/
     player-bar.md           Sticky bottom player: pinned device cookie, <x-play-button> default play target
     components.md           Shared Blade components (x-card, x-page-header, x-alert, x-badge, x-empty-state, x-table, x-shelf, nav ...) and their props; rules in DESIGN.md at the repo root
     stem-mixer.md           Stem mixer (`/mixer`): two decks of kept stems mixed in the browser with Web Audio (per-stem fader/mute/solo, tempo with SoundTouch pitch correction, key shift, Sync, crossfader, picker with mixes-with), memory, limits (no beat grid), tests
+    tools-menu.md           Tools menu (`/tools`): one list (`Domain\Tools\Tools`) feeds the menu entry, its sub-entries and the hub page; a tool is shown where its profile feature is on; how to add a tool
+    library-picker.md       Reusable library picker (`Livewire\LibraryPicker`, `Domain\Library\LibraryPicks`): tabs artists/albums/tracks/playlists, drill-down, detail card, basket, `library-picked` event; used by the export page
+    tools-ideas.md          More tools (plan, not built): set builder, library cleanup, loudness matcher, stem practice/export, tag fixer, import, wishlist, announce, sleep and wake, room matcher, party launcher, tag printer, year in review; hub groups, build order, open questions
+    dj-mode.md              Mini DJ mode (plan, not built): beat grid, beat sync and quantize, cues and loops, stem transitions (bass swap), EQ and effects, keyboard/MIDI, record a set, auto-DJ; phases D1-D8, https needed for the key lock, open questions
     stem-lanes.md           Stem lanes (16.4): a lane per stem under the sections in the album page's Track details, own-scale curves, instrumental band, TrackStems states
     pwa.md                  Web app (8.6): manifest, root service worker (offline page and icons only, never API/Livewire/artwork), opt-in alert notifications from the MQTT alert topics, opt-in background Web Push (VAPID, `push_subscriptions`, `push:vapid`, `push:test`)
     task-tray.md            Floating tray of user-started tasks (export, stems/sections, analysis backlog; sync later): `UserTasks`, measured vs estimated percent, TTL
@@ -978,7 +982,8 @@ Blade templates + Livewire 3 for real-time UI. Alpine.js for client-side interac
 - `/devices/{id}` — device detail: nowplaying + up next queue + source manager + info panel
 - `/devices/{id}/edit` — edit device name, IP, brand, product
 - `/history` — full play history browser on the same domain code as `GET /api/library/history` (`Domain\Stats\PlayHistory`): search, device, source, dates, library vs unknown plays, `?albumId=`/`?artistId=` from the album and artist pages, cursor paging; the admin sets the retention (months, default forever) at the bottom; see `docs/api/history.md`
-- `/mixer` — stem mixer (Full profile, open): two decks of kept stems (`?a=&b=` track ids), mixed in the browser; see `docs/frontend/stem-mixer.md`
+- `/tools` — the Tools hub and menu entry (`docs/frontend/tools-menu.md`), one card per tool the profile can run (Mixer; Export at `/tools/export`: the export list and how to start one)
+- `/mixer` — stem mixer (Full profile, open; under Tools in the menu): two decks of kept stems (`?a=&b=` track ids), mixed in the browser; see `docs/frontend/stem-mixer.md`
 - `/stats` — listening statistics (top artists, devices, hourly heatmap)
 - `/multiroom` — multiroom session management and presets
 - `/scenes`, `/scenes/create`, `/scenes/{id}/edit` — scenes: list with Run, and the editor built from the operations' schemas (`Livewire\SceneList`, `Livewire\SceneEditor`, and `Livewire\AddToScene` on the album, artist and playlist pages; see `docs/api/scenes.md`)

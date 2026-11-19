@@ -83,3 +83,15 @@
 .flat [data-card] { background: transparent; border: 0; box-shadow: none; border-radius: 0; padding: 0; }
 .flat [data-card] > h2 { font-size: 0.75rem; line-height: 1rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: #6b7280; margin-bottom: 0.5rem; }
 @media (prefers-color-scheme: dark) { .flat [data-card] > h2 { color: #9ca3af; } }
+
+/* Library picker (docs/frontend/library-picker.md): browse list and detail/basket side by side from md up. */
+.picker-grid { display: grid; }
+@media (min-width: 768px) {
+    .picker-grid { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
+    .picker-grid > * + * { border-left: 1px solid rgb(229 231 235 / 0.7); }
+}
+@media (min-width: 768px) and (prefers-color-scheme: dark) {
+    .picker-grid > * + * { border-left-color: rgb(41 37 36); }
+}
+.picker-scroll { max-height: 34rem; }
+.picker-basket { max-height: 16rem; }

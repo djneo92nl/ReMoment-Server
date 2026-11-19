@@ -88,6 +88,8 @@ Route::post('/devices/{device}/hidden', [DeviceController::class, 'toggleHidden'
 Route::get('/history', [HistoryController::class, 'index'])->name('history.index');
 Route::get('/stats', [StatsController::class, 'index'])->name('stats.index');
 Route::get('/multiroom', fn () => view('multiroom.index'))->name('multiroom.index');
+Route::get('/tools', \App\Http\Controllers\ToolsController::class)->name('tools.index'); // the tools hub (docs/frontend/tools-menu.md)
+Route::view('/tools/export', 'tools.export')->name('tools.export'); // music export: the list of exports, Standard and Full (docs/frontend/tools-menu.md)
 Route::get('/mixer', MixerController::class)->name('mixer'); // stem mixer, Full profile (docs/frontend/stem-mixer.md)
 Route::get('/scenes', fn () => view('scenes.index'))->name('scenes.index');
 Route::get('/scenes/create', fn () => view('scenes.edit', ['sceneId' => null]))->name('scenes.create');

@@ -4,6 +4,8 @@
     $hasLibrary = \App\Domain\Profile\Profile::allows('library');
     $libraryActive = $hasLibrary && $on('library.*', 'artists.*', 'albums.*', 'genres.*', 'radio.*', 'playlists.*');
     $settingsActive = $on('settings.*');
+    $tools = \App\Domain\Tools\Tools::available();
+    $toolsActive = $tools !== [] && ($on('tools.*') || $on(...collect($tools)->pluck('routes')->flatten()->all()));
 @endphp
 <nav class="flex-1 px-4 py-6" aria-label="Main">
     <ul class="space-y-1">
@@ -29,6 +31,19 @@
         @endif
         <li><x-nav-item :href="route('multiroom.index')" icon="layer-group" :active="$on('multiroom.*')">Multiroom</x-nav-item></li>
         <li><x-nav-item :href="route('scenes.index')" icon="wand-magic-sparkles" :active="$on('scenes.*')">Scenes</x-nav-item></li>
+        {{-- Tools (App\Domain\Tools\Tools): a hub plus one sub-entry per tool the profile can run; hidden when there is none --}}
+        @if($tools !== [])
+        <li>
+            <x-nav-item :href="route('tools.index')" icon="screwdriver-wrench" :active="$toolsActive">Tools</x-nav-item>
+            @if($toolsActive)
+                <ul class="mt-1 ml-4 space-y-1">
+                    @foreach($tools as $tool)
+                        <li><x-nav-item sub :href="route($tool['route'])" :icon="$tool['icon']" :active="$on(...$tool['routes'])">{{ $tool['label'] }}</x-nav-item></li>
+                    @endforeach
+                </ul>
+            @endif
+        </li>
+        @endif
         {{-- Its own tab: this browser plays the sound while the tab stays open --}}
         <li><x-nav-item :href="route('player')" icon="headphones" target="_blank" rel="noopener">Web player</x-nav-item></li>
         <li><x-nav-item :href="route('stats.index')" icon="chart-simple" :active="$on('stats.*')">Insights</x-nav-item></li>

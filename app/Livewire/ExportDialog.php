@@ -45,8 +45,9 @@ class ExportDialog extends Component
 
     public ?string $error = null;
 
-    public function mount(string $type = 'album', ?int $id = null, array $trackIds = []): void
+    public function mount(string $type = 'album', ?int $id = null, array $trackIds = [], bool $open = false): void
     {
+        $this->open = $open;
         $this->type = $type;
         $this->selectionId = $id;
         $this->trackIds = array_map('intval', $trackIds);

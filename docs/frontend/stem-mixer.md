@@ -6,11 +6,11 @@ Two decks of kept stems, mixed in the browser. The server separates and stores t
 
 - Album page, a track with an own file: the `…` menu has **Mix stems…**, which opens `/mixer?a={track id}` (deck A).
 - `/mixer?a={id}&b={id}` loads library track ids into the decks; `MixerController` resolves them (an unknown id leaves the deck empty).
-- Nothing is in the sidebar on purpose: it is a tool you open from a track.
+- The sidebar has a **Tools** entry ([tools-menu.md](tools-menu.md)) with **Mixer** under it (Full profile only); it opens `/mixer` with both decks empty and the picker.
 
 ## What a deck does
 
-A deck loads a track's four stems, or offers **Make stems** when none are kept (`POST /api/library/tracks/{id}/deep-analysis {kinds:["stem_audio"]}`, then a poll every 3 s until the kind is `done`; the estimate shown is the API's `stem_audio_seconds`). Per deck:
+A deck loads a track's stems (four, or six with guitar and piano when the server runs `STEMS_MODEL=htdemucs_6s`: the faders, mute, solo and waveforms follow the stems the track has), or offers **Make stems** when none are kept (`POST /api/library/tracks/{id}/deep-analysis {kinds:["stem_audio"]}`, then a poll every 3 s until the kind is `done`; the estimate shown is the API's `stem_audio_seconds`). Per deck:
 
 - Play/pause, a seek bar, a thin level bar.
 - Per stem (vocals, drums, bass, other): a fader, **M**ute and **S**olo. While any stem is soloed only soloed, unmuted stems sound.
@@ -35,7 +35,7 @@ Between the decks: an equal-power **crossfader**, a master volume and **Play or 
 
 ## Limits
 
-- **No beat grid.** BPM and key come from the analysis; Sync matches tempo, the phase of the beats is aligned by ear with Nudge. A mixer that beat-matches by itself needs a beat grid (not planned for 1.0).
+- **No beat grid.** BPM and key come from the analysis; Sync matches tempo, the phase of the beats is aligned by ear with Nudge. A mixer that beat-matches by itself needs a beat grid: the plan to get there and on to cues, loops, stem transitions, EQ and recording is [dj-mode.md](dj-mode.md) (not built, not planned for 1.0).
 - MP3 stems carry the encoder delay in the LAME header; all four are encoded alike, so they stay together even where a decoder ignores it. Set `STEM_AUDIO_FORMAT=flac` when sample-exact alignment matters (and bandwidth and memory use allow).
 - No recording or export of a mix, no more than two decks, no effects, no MIDI or keyboard control.
 - Needs the Web Audio `AudioWorklet` (any current browser; Safari needs a user gesture to start audio, which pressing Play is).
