@@ -16,7 +16,7 @@
                         <span>Deck A</span><span>Crossfader</span><span>Deck B</span>
                     </div>
                     <div class="flex items-center">
-                        @include('mixer._slider', ['value' => 'cross', 'min' => '0', 'max' => '1', 'step' => '0.01', 'input' => 'cross = Number($event.target.value); applyCross()', 'label' => "'Crossfader'"])
+                        @include('mixer._slider', ['value' => 'cross', 'min' => '0', 'max' => '1', 'step' => '0.01', 'input' => 'moveCross($event.target.value)', 'label' => "'Crossfader'"])
                     </div>
                 </div>
                 <div class="flex items-center gap-3">
@@ -28,6 +28,24 @@
                 @include('mixer._slider', ['value' => 'master', 'min' => '0', 'max' => '1', 'step' => '0.01', 'input' => 'setMaster($event.target.value)', 'label' => "'Master volume'"])
                 <span class="w-9 text-right text-xs tabular-nums text-gray-500" x-text="percent(master)"></span>
             </div>
+        </x-card>
+
+        <x-card class="p-5 sm:p-6" data-test="transitions">
+            <x-section-heading title="Transition" />
+            <p class="mb-3 text-sm text-gray-500">Mix from the deck that plays into the other one over a number of bars, starting on the next bar line. The faders and the crossfader move by themselves and stay where they end; touching one stops it. Both decks need a beat grid.</p>
+            <div class="flex flex-wrap items-center gap-3">
+                <x-select x-model="mix.preset" aria-label="Transition">
+                    <template x-for="(preset, key) in PRESETS" :key="key"><option :value="key" x-text="preset.label"></option></template>
+                </x-select>
+                <x-select x-model.number="mix.bars" aria-label="Bars">
+                    <template x-for="n in BARS" :key="n"><option :value="n" x-text="n + ' bars'"></option></template>
+                </x-select>
+                <x-primary-button type="button" size="md" @click="mixNow()" x-bind:disabled="mix.state !== 'idle'"><i class="fa-solid fa-shuffle text-xs"></i>Mix now</x-primary-button>
+                <x-secondary-button type="button" size="md" x-show="mix.state !== 'idle'" x-cloak @click="cancelTransition()">Cancel</x-secondary-button>
+            </div>
+            <p class="mt-2 text-xs text-gray-400 dark:text-gray-600" x-text="PRESETS[mix.preset]?.hint"></p>
+            <p class="mt-2 text-sm tabular-nums text-gray-700 dark:text-gray-300" x-show="mix.info" x-text="mix.info"></p>
+            <p class="mt-2 text-sm text-red-500" x-show="mix.message" x-text="mix.message"></p>
         </x-card>
 
         <x-card class="p-5 sm:p-6">

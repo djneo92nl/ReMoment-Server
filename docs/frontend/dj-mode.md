@@ -1,4 +1,4 @@
-# Mini DJ mode (plan; D1 to D3 built)
+# Mini DJ mode (plan; D1 to D4 built)
 
 Plan for turning the stem mixer ([stem-mixer.md](stem-mixer.md)) into a small DJ app: two decks, beat-aware mixing, cues and loops, stem-based transitions, EQ and effects, and recording a set. Everything audible stays in the browser (the owner's decision for stems: playback and mixing only in the front end and apps). Full profile only, open to guests, like the mixer.
 
@@ -9,7 +9,8 @@ Plan for turning the stem mixer ([stem-mixer.md](stem-mixer.md)) into a small DJ
 | D1 Beat grid | **Built** in the browser (`resources/js/mixer/beats.js`, `beats.worker.js`, `beats-client.js`), grid in `localStorage`. Pure logic tested; not heard on real tracks. |
 | D2 Beat sync and quantize | **Built** (Sync = tempo + phase, quantized start, shift a beat). Feel unverified. |
 | D3 Cues and loops | **Built** (`cues.js`; main cue, four hot cues, In/Out and beat loops 1/4 to 8, halve/double), cues in `localStorage`. The household-wide `track_cues` table and API is **not** built (decided: later, only when asked). |
-| D4 to D8 | Not started. |
+| D4 Stem transitions | **Built** (Blend with bass swap, Vocals out / drums in, Drop; 8, 16, 32 bars; Mix now, cancel by touching a fader). *Echo out* waits for D5. Feel unverified. |
+| D5 to D8 | Not started. |
 
 What the code does, how it was verified and what is not verified: [stem-mixer.md](stem-mixer.md), "Beat grid, sync, cues and loops". Departures from the plan below are marked **Built:**.
 
@@ -63,6 +64,8 @@ With the beat grid, automate what a DJ does by hand, and a bit more because ther
 - **Bass swap**: the outgoing deck's bass fades out exactly when the incoming deck's bass fades in, on a bar line. Two overlapping basses are the usual mud; here it is one gain ramp each.
 - **Transition presets** over N bars (8, 16, 32): *Blend* (crossfade with bass swap), *Vocals out, drums in*, *Drop* (cut everything but the drums for a bar, then bring the new track in on the downbeat), *Echo out* (needs D5).
 - One button on the crossfader: **Mix now** runs the chosen preset starting at the next bar, ramps the faders through the same Web Audio gain automation the engine already uses, and leaves the controls where they ended, so the DJ can grab any fader during it (grabbing cancels the automation).
+
+**Built:** `transitions.js` (pure: keyframes in beats per stem and for the crossfader, `buildPlan`, `planAt`), `Deck.automate` / `cancelAutomation` / `nextBeatTime(grid, lead, bar)` in `engine.js`, `mixNow` and friends in `component.js`, the Transition card on `/mixer`. Rules: the outgoing deck is the one that plays (both: the one the crossfader is on); the incoming deck is tempo-synced (and phase-synced if it already plays) and, if stopped, started from its nearest bar line on the plan's start (Drop: on the bar line the plan ends on); the plan starts on the outgoing deck's next bar line (at least 150 ms ahead); the bass swap is a 0.05-beat step on a bar line, so the two basses overlap for about 25 ms; Blend swaps at half the bars, Vocals/drums at half the bars with the new vocals at three quarters; Drop cuts everything but the drums one bar before the end. Audio runs as `setValueCurveAtTime` curves (8 points a beat) on the stem gains and the deck's crossfader gain; the sliders follow by the clock. Duration assumes the tempo does not change during the plan. The fader levels you had are what the incoming deck ends on; a muted stem is not respected during a plan.
 
 ### D5 EQ and effects *[M]*
 

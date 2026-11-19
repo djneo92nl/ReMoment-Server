@@ -399,6 +399,13 @@ export function snapToBeat(grid, t, mode = 'nearest') {
     return Math.max(0, beatAt(grid, Math.max(0, k)));
 }
 
+/** Time of the bar line (a downbeat) nearest to `t`, never before 0. */
+export function snapToBar(grid, t) {
+    const k = Math.round((beatIndex(grid, t) - grid.downbeat) / BEATS_PER_BAR) * BEATS_PER_BAR + grid.downbeat;
+
+    return Math.max(0, beatAt(grid, Math.max(0, k)));
+}
+
 /** Fraction of a beat that `t` is past the last beat, 0 <= x < 1. */
 export const beatPhase = (grid, t) => mod(beatIndex(grid, t), 1);
 

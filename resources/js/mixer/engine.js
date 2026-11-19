@@ -9,7 +9,7 @@
 // SoundTouch is imported only when the browser has AudioWorklet: that exists in a secure context only (https or
 // localhost), and a module that extends AudioWorkletNode throws on import without it. Without it the mixer still
 // plays; tempo then moves the pitch along and the key shift is off (`pitchCorrection` is false).
-import { beatAt, beatIndex } from './beats.js';
+import { beatAt, beatIndex, isDownbeat } from './beats.js';
 import { wrapLoop } from './cues.js';
 import { binPeaks, clamp, orderStems, stemGains } from './math.js';
 
@@ -165,18 +165,61 @@ export class Deck {
         return Math.min(this.duration, wrapLoop(this.#raw(time), this.loop));
     }
 
-    /** Audio-clock time of this playing deck's next beat on `grid`, at least `lead` seconds from now; null when not playing. */
-    nextBeatTime(grid, lead = 0.04) {
+    /**
+     * Audio-clock time of this playing deck's next beat (or, with `bar`, next bar line) on `grid`, at least `lead` seconds
+     * from now; null when not playing.
+     */
+    nextBeatTime(grid, lead = 0.04, bar = false) {
         this.#settle();
         if (!this.playing) {
             return null;
         }
         const t0 = this.audio.ctx.currentTime + lead;
         const raw = this.#raw(t0);
-        const k = Math.max(0, Math.ceil(beatIndex(grid, raw) - 1e-9));
+        let k = Math.max(0, Math.ceil(beatIndex(grid, raw) - 1e-9));
+        while (bar && !isDownbeat(grid, k)) k++;
 
         // On the unwrapped timeline: a loop that is a whole number of beats long repeats the same beats in wall time.
         return t0 + (beatAt(grid, k) - raw) / this.rate;
+    }
+
+    /**
+     * Plays gain curves from audio-clock time `start` for `duration` seconds (a stem transition, D4): `stems` is a
+     * Float32Array per stem, `fade` one for the deck's crossfader gain. They replace whatever the faders were set to, from now.
+     */
+    automate({ start, duration, stems = {}, fade = null }) {
+        if (!this.gains) {
+            return;
+        }
+        const now = this.audio.ctx.currentTime;
+        const run = (param, curve) => {
+            param.cancelScheduledValues(now);
+            param.setValueAtTime(curve[0], now);
+            param.setValueCurveAtTime(curve, Math.max(start, now), duration);
+        };
+        for (const [stem, curve] of Object.entries(stems)) {
+            if (this.gains[stem]) run(this.gains[stem].gain, curve);
+        }
+        if (fade) {
+            run(this.out.gain, fade);
+        }
+        this.automationStart = start;
+    }
+
+    /** Drops the curves of `automate` and holds the faders at `now` = `{ stems: {stem: gain}, fade }` (where the curves had got to). */
+    cancelAutomation(now = { stems: {}, fade: null }) {
+        if (!this.gains || this.automationStart === undefined) {
+            return;
+        }
+        const t = this.audio.ctx.currentTime;
+        const from = Math.min(this.automationStart, t);
+        const hold = (param, value) => {
+            param.cancelScheduledValues(from);
+            if (value !== null && value !== undefined) param.setValueAtTime(value, t);
+        };
+        for (const stem of this.stems) hold(this.gains[stem].gain, now.stems[stem]);
+        hold(this.out.gain, now.fade);
+        this.automationStart = undefined;
     }
 
     play() {

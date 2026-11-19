@@ -2,8 +2,9 @@
 // REST API. The audio objects live in this closure, not in the reactive state: Alpine wraps state in proxies, which
 // Web Audio nodes do not survive.
 
-import { beatPeriod, parseGrid, phaseShift, serializeGrid, setDownbeatAt, shiftGrid, snapToBeat, stemsFingerprint, ticksPath } from './beats.js';
+import { beatPeriod, parseGrid, phaseShift, serializeGrid, setDownbeatAt, shiftGrid, snapToBar, snapToBeat, stemsFingerprint, ticksPath } from './beats.js';
 import { HOT_CUES, LOOP_BEATS, beatLabel, beatLoop, loopFromPoints, sanitizeCues, scaleLoop, snapPosition } from './cues.js';
+import { BARS, BEATS_PER_BAR, PRESETS, buildPlan, curvePoints, fadeGains, planAt, planSeconds, sampleCurve } from './transitions.js';
 import { orderStems, RATE_MAX, RATE_MIN, crossfade, decodedMegabytes, effectiveBpm, formatTime, peaksPath, shiftCamelot, syncRate } from './math.js';
 
 const POLL_MS = 3000;
@@ -70,6 +71,7 @@ export default function mixer(config = {}) {
     const polls = { a: null, b: null };
     const prints = { a: null, b: null }; // fingerprint of each deck's stems: the key of its grid and cue caches
     const previews = { a: false, b: false }; // a main-cue preview is being held
+    let trans = null; // the running or armed stem transition (D4): { plan, out, inn, start, beatSeconds, startedIn }
     let raf = null;
     const other = (side) => (side === 'a' ? 'b' : 'a');
 
@@ -86,6 +88,9 @@ export default function mixer(config = {}) {
         RATE_MIN,
         RATE_MAX,
         LOOP_BEATS,
+        BARS,
+        PRESETS,
+        mix: { preset: 'blend', bars: 16, state: 'idle', info: '', message: '' }, // the Mix now panel: state idle | armed | running
         HOT_CUES,
         beatLabel,
         deck: { a: freshDeck(), b: freshDeck() },
@@ -401,11 +406,13 @@ export default function mixer(config = {}) {
         },
 
         toggle(side, kind, stem) {
+            this.cancelTransition();
             this.deck[side][kind][stem] = !this.deck[side][kind][stem];
             this.apply(side);
         },
 
         setLevel(side, stem, value) {
+            this.cancelTransition();
             this.deck[side].levels[stem] = Number(value);
             this.apply(side);
         },
@@ -463,6 +470,13 @@ export default function mixer(config = {}) {
                 decks[side].nudge((direction * 60000) / bpm);
                 d.pos = decks[side].position();
             }
+        },
+
+        /** The crossfader moved by hand. */
+        moveCross(value) {
+            this.cancelTransition();
+            this.cross = Number(value);
+            this.applyCross();
         },
 
         applyCross() {
@@ -711,6 +725,123 @@ export default function mixer(config = {}) {
             d.markIn = null;
         },
 
+        // --- stem transitions (D4) --------------------------------------------------------
+
+        /**
+         * Runs a transition preset from the outgoing deck (the one that plays, or when both do the one the crossfader is on)
+         * to the other, starting on the outgoing deck's next bar line: the faders and the crossfader move over the bars as
+         * Web Audio gain curves and stay where they end. Any fader or the crossfader grabbed by hand cancels it.
+         */
+        mixNow() {
+            this.mix.message = '';
+            const sides = ['a', 'b'];
+            if (!sides.every((s) => decks[s]?.loaded && this.deck[s].status === 'ready')) {
+                this.mix.message = 'Load a track into both decks first.';
+
+                return;
+            }
+            if (!sides.every((s) => this.deck[s].grid)) {
+                this.mix.message = 'Mix now needs a beat grid on both decks.';
+
+                return;
+            }
+            const playing = sides.filter((s) => decks[s].playing);
+            if (!playing.length) {
+                this.mix.message = 'Start the deck that plays out first.';
+
+                return;
+            }
+            this.cancelTransition();
+            audio.ensure();
+            const out = playing.length === 1 ? playing[0] : this.cross <= 0.5 ? 'a' : 'b';
+            const inn = other(out);
+            const dOut = this.deck[out];
+            const dIn = this.deck[inn];
+
+            this.sync(inn); // tempo (and phase when it already plays)
+            const start = decks[out].nextBeatTime(dOut.grid, 0.15, true);
+            const beatSeconds = planSeconds(1, dOut.grid.bpm, dOut.rate);
+            const plan = buildPlan({
+                preset: this.mix.preset, bars: Number(this.mix.bars), outStems: dOut.stems, inStems: dIn.stems,
+                outLevels: { ...dOut.levels }, inLevels: { ...dIn.levels }, cross0: out === 'a' ? this.cross : 1 - this.cross,
+            });
+            const n = curvePoints(plan.beats);
+            const duration = plan.beats * beatSeconds;
+            const share = sampleCurve(plan.cross, plan.beats, n); // how far towards the incoming deck
+            const curves = (group) => Object.fromEntries(Object.entries(group).map(([stem, keys]) => [stem, sampleCurve(keys, plan.beats, n)]));
+            const fade = (pick) => Float32Array.from(share, (x) => fadeGains(x)[pick]);
+            decks[out].automate({ start, duration, stems: curves(plan.out), fade: fade('out') });
+            decks[inn].automate({ start, duration, stems: curves(plan.in), fade: fade('in') });
+
+            let startedIn = null;
+            if (!decks[inn].playing) {
+                startedIn = start + plan.inStartBeat * beatSeconds;
+                decks[inn].playAt(startedIn, snapToBar(dIn.grid, decks[inn].position()));
+                dIn.playing = true;
+            }
+            trans = { plan, out, inn, start, beatSeconds, startedIn };
+            this.mix.state = 'armed';
+            this.tick();
+        },
+
+        /** The faders and crossfader of the UI follow the plan; the audio plays its own curves. */
+        followTransition() {
+            if (!trans) {
+                return;
+            }
+            const now = audio.ctx.currentTime;
+            if (now < trans.start) {
+                this.mix.info = `Starts on the next bar, in ${(trans.start - now).toFixed(1)} s`;
+
+                return;
+            }
+            const beat = (now - trans.start) / trans.beatSeconds;
+            if (beat >= trans.plan.beats) {
+                this.applyPlanAt(trans.plan.beats);
+                this.endTransition();
+
+                return;
+            }
+            this.mix.state = 'running';
+            this.mix.info = `Bar ${Math.floor(beat / BEATS_PER_BAR) + 1} of ${trans.plan.bars}`;
+            this.applyPlanAt(beat);
+        },
+
+        /** Puts the sliders where the plan is at `beat` (the audio is on its curves already). */
+        applyPlanAt(beat) {
+            const at = planAt(trans.plan, beat);
+            Object.assign(this.deck[trans.out].levels, at.out);
+            Object.assign(this.deck[trans.inn].levels, at.in);
+            this.cross = trans.out === 'a' ? at.cross : 1 - at.cross;
+        },
+
+        endTransition() {
+            for (const side of ['a', 'b']) {
+                if (decks[side]) decks[side].automationStart = undefined;
+            }
+            trans = null;
+            this.mix.state = 'idle';
+            this.mix.info = '';
+        },
+
+        /** Stops the transition where it is: the faders stay at their values now. Also called by any fader moved by hand. */
+        cancelTransition() {
+            if (!trans) {
+                return;
+            }
+            const now = audio.ctx.currentTime;
+            const beat = Math.max(0, (now - trans.start) / trans.beatSeconds);
+            const at = planAt(trans.plan, Math.min(beat, trans.plan.beats));
+            this.applyPlanAt(Math.min(beat, trans.plan.beats));
+            decks[trans.out].cancelAutomation({ stems: at.out, fade: fadeGains(at.cross).out });
+            decks[trans.inn].cancelAutomation({ stems: at.in, fade: fadeGains(at.cross).in });
+            if (trans.startedIn && now < trans.startedIn) {
+                decks[trans.inn].pause(); // it was only waiting for its bar line
+                this.deck[trans.inn].playing = false;
+            }
+            this.endTransition();
+        },
+
         // --- the clock --------------------------------------------------------------------
 
         tick() {
@@ -727,7 +858,8 @@ export default function mixer(config = {}) {
                         any ||= deck.playing;
                     }
                 }
-                if (any) {
+                this.followTransition();
+                if (any || trans) {
                     raf = requestAnimationFrame(run);
                 }
             };

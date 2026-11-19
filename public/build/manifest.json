@@ -19,7 +19,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-Bm1rFy3t.css",
+    "file": "assets/app-DWL3c8Ht.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -28,7 +28,7 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-6AkBjj3q.js",
+    "file": "assets/app-D-QdoTRq.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
@@ -38,7 +38,7 @@
     ]
   },
   "resources/js/mixer/beats-client.js": {
-    "file": "assets/beats-client-7_J3UJcp.js",
+    "file": "assets/beats-client-C4NpGgFo.js",
     "name": "beats-client",
     "src": "resources/js/mixer/beats-client.js",
     "isDynamicEntry": true,
@@ -47,7 +47,7 @@
     ]
   },
   "resources/js/mixer/engine.js": {
-    "file": "assets/engine-BJJZZVLg.js",
+    "file": "assets/engine-Dae5v4b0.js",
     "name": "engine",
     "src": "resources/js/mixer/engine.js",
     "isDynamicEntry": true,
