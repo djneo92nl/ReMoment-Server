@@ -2,11 +2,32 @@
 // REST API. The audio objects live in this closure, not in the reactive state: Alpine wraps state in proxies, which
 // Web Audio nodes do not survive.
 
+import { beatPeriod, parseGrid, phaseShift, serializeGrid, setDownbeatAt, shiftGrid, snapToBeat, stemsFingerprint, ticksPath } from './beats.js';
+import { HOT_CUES, LOOP_BEATS, beatLabel, beatLoop, loopFromPoints, sanitizeCues, scaleLoop, snapPosition } from './cues.js';
 import { orderStems, RATE_MAX, RATE_MIN, crossfade, decodedMegabytes, effectiveBpm, formatTime, peaksPath, shiftCamelot, syncRate } from './math.js';
 
 const POLL_MS = 3000;
 export const WAVE_BINS = 800; // the width of the waveform paths (viewBox units)
 const ENGINE = () => import('./engine.js');
+const BEATS = () => import('./beats-client.js');
+const GRID_KEY = 'remoment.mixer.grid.v1.';
+const CUES_KEY = 'remoment.mixer.cues.v1.';
+
+// localStorage is per browser and can be absent or full: everything that touches it is allowed to fail.
+const stored = (key) => {
+    try {
+        return JSON.parse(localStorage.getItem(key));
+    } catch {
+        return null;
+    }
+};
+const store = (key, value) => {
+    try {
+        localStorage.setItem(key, JSON.stringify(value));
+    } catch {
+        // private window or no space: the cue just is not remembered
+    }
+};
 
 const freshDeck = () => ({
     track: null, // SearchTrack of the REST API
@@ -31,6 +52,14 @@ const freshDeck = () => ({
     playing: false,
     level: 0,
     wave: null, // SVG path per stem and `mix` (the full track), see peaksPath
+    grid: null, // { bpm, offset, downbeat, lock, bar } of beats.js, or null
+    gridState: 'none', // none | analysing | ready | nogrid | error
+    ticks: { beat: '', bar: '' }, // SVG paths of the beat ticks on the waveforms
+    quantize: true, // with a grid: starts, cues and loops land on the beat
+    cue: null, // the main cue, seconds
+    hot: Array.from({ length: HOT_CUES }, () => null), // hot cues, seconds
+    markIn: null, // a loop-in point waiting for its out point
+    loop: null, // { start, end, beats } while a loop is on
 });
 
 export default function mixer(config = {}) {
@@ -39,7 +68,10 @@ export default function mixer(config = {}) {
     let engine = null; // the engine module
     const decks = { a: null, b: null }; // Deck instances
     const polls = { a: null, b: null };
+    const prints = { a: null, b: null }; // fingerprint of each deck's stems: the key of its grid and cue caches
+    const previews = { a: false, b: false }; // a main-cue preview is being held
     let raf = null;
+    const other = (side) => (side === 'a' ? 'b' : 'a');
 
     const json = async (path, options = {}) => {
         const response = await fetch(`${api}${path}`, {
@@ -53,6 +85,9 @@ export default function mixer(config = {}) {
     return {
         RATE_MIN,
         RATE_MAX,
+        LOOP_BEATS,
+        HOT_CUES,
+        beatLabel,
         deck: { a: freshDeck(), b: freshDeck() },
         cross: 0.5,
         master: 0.9,
@@ -87,7 +122,7 @@ export default function mixer(config = {}) {
         percent: (value) => `${Math.round(value * 100)}%`,
         tempoLabel(side) {
             const d = this.deck[side];
-            const bpm = effectiveBpm(d.bpm, d.rate);
+            const bpm = effectiveBpm(d.grid?.bpm ?? d.bpm, d.rate);
 
             return bpm ? `${bpm.toFixed(1)} BPM` : `${d.rate >= 1 ? '+' : ''}${((d.rate - 1) * 100).toFixed(1)}%`;
         },
@@ -99,13 +134,34 @@ export default function mixer(config = {}) {
         canSync(side) {
             const other = this.deck[side === 'a' ? 'b' : 'a'];
 
-            return this.deck[side].bpm > 0 && other.bpm > 0;
+            return (this.deck[side].grid?.bpm ?? this.deck[side].bpm) > 0 && (other.grid?.bpm ?? other.bpm) > 0;
+        },
+        gridLabel(side) {
+            const d = this.deck[side];
+            if (d.gridState === 'analysing') return 'Finding the beats…';
+            if (d.gridState === 'nogrid') return 'No steady beat, beat features are off';
+            if (d.gridState === 'error') return 'The beats could not be found';
+            if (!d.grid) return '';
+            const beat = (Math.floor((d.pos - d.grid.offset) / beatPeriod(d.grid)) - d.grid.downbeat) % 4;
+
+            return `${d.grid.bpm.toFixed(2)} BPM · beat ${((beat % 4) + 4) % 4 + 1} of 4`;
+        },
+        /** Beat features need a grid on the deck. */
+        beatsOn(side) {
+            return this.deck[side].grid !== null;
+        },
+        /** Where a loop or a cue sits on the waveform, as a percentage. */
+        at(side, seconds) {
+            const d = this.deck[side];
+
+            return d.dur > 0 && seconds !== null ? Math.min(100, Math.max(0, (seconds / d.dur) * 100)) : 0;
         },
 
         // --- loading a track into a deck -------------------------------------------------
 
         async setTrack(side, track) {
             decks[side]?.dispose();
+            prints[side] = null;
             clearTimeout(polls[side]);
             this.deck[side] = { ...freshDeck(), track, status: 'checking' };
             if (side === 'a') {
@@ -124,12 +180,13 @@ export default function mixer(config = {}) {
                 d.key = body.key ? `${body.key}${body.mode === 'minor' ? 'm' : ''}` : null;
                 d.camelot = body.camelot;
                 d.format = body.format;
+                prints[side] = stemsFingerprint(d.track.id, body);
                 d.stems = orderStems(Object.keys(body.stems));
                 d.levels = Object.fromEntries(d.stems.map((s) => [s, 1]));
                 d.muted = Object.fromEntries(d.stems.map((s) => [s, false]));
                 d.solo = Object.fromEntries(d.stems.map((s) => [s, false]));
                 d.megabytes = decodedMegabytes(body.duration, body.sample_rate, d.stems.length);
-                await this.load(side, body.stems);
+                await this.load(side, body.stems, body);
 
                 return;
             }
@@ -147,7 +204,7 @@ export default function mixer(config = {}) {
                 : body.message || 'The stems could not be read.';
         },
 
-        async load(side, stems) {
+        async load(side, stems, answer = null) {
             const d = this.deck[side];
             d.status = 'loading';
             try {
@@ -167,6 +224,8 @@ export default function mixer(config = {}) {
                 this.apply(side);
                 this.applyCross();
                 audio.setMaster(this.master);
+                this.loadCues(side);
+                this.findGrid(side, answer?.bpm ?? null);
             } catch (e) {
                 decks[side]?.dispose();
                 d.status = 'error';
@@ -226,6 +285,7 @@ export default function mixer(config = {}) {
         unload(side) {
             decks[side]?.dispose();
             decks[side] = null;
+            prints[side] = null;
             clearTimeout(polls[side]);
             this.deck[side] = freshDeck();
         },
@@ -266,10 +326,33 @@ export default function mixer(config = {}) {
             if (deck.playing) {
                 deck.pause();
             } else {
-                deck.play();
+                this.startDeck(side, deck.position());
             }
             this.deck[side].playing = deck.playing;
             this.tick();
+        },
+
+        /**
+         * Starts a stopped deck at `position`. With a grid and quantize on, while the other deck plays on a grid, the start
+         * lands on the other deck's next beat and the position moves to the nearest beat of this deck's own grid.
+         */
+        startDeck(side, position) {
+            const deck = decks[side];
+            const d = this.deck[side];
+            const o = this.deck[other(side)];
+            const reference = decks[other(side)];
+            if (d.quantize && d.grid && o.grid && reference?.playing) {
+                const when = reference.nextBeatTime(o.grid);
+                if (when !== null) {
+                    deck.playAt(when, snapToBeat(d.grid, position, 'nearest'));
+                    d.playing = deck.playing;
+
+                    return;
+                }
+            }
+            deck.seek(position);
+            deck.play();
+            d.playing = deck.playing;
         },
 
         /** Starts both decks at their current positions, in the same instant. */
@@ -339,12 +422,46 @@ export default function mixer(config = {}) {
             decks[side]?.setSemitones(semitones);
         },
 
-        /** Matches this deck's tempo to the other deck's current tempo (in half or double time when that is closer). */
+        /**
+         * Matches this deck's tempo to the other deck's current tempo (in half or double time when that is closer) and, when
+         * both decks play on a grid, moves this deck by up to half a beat so the beats coincide.
+         */
         sync(side) {
-            const other = this.deck[side === 'a' ? 'b' : 'a'];
-            const target = effectiveBpm(other.bpm, other.rate);
-            if (this.deck[side].bpm > 0 && target) {
-                this.setRate(side, syncRate(this.deck[side].bpm, target));
+            const me = this.deck[side];
+            const them = this.deck[other(side)];
+            const target = effectiveBpm(them.grid?.bpm ?? them.bpm, them.rate);
+            const own = me.grid?.bpm ?? me.bpm;
+            if (!(own > 0) || !target) {
+                return;
+            }
+            this.setRate(side, syncRate(own, target));
+            if (me.grid && them.grid && decks[side]?.playing && decks[other(side)]?.playing) {
+                this.alignPhase(side);
+            }
+        },
+
+        /** Seeks this playing deck, at a moment a little ahead, to where its beat phase equals the other deck's then. */
+        alignPhase(side) {
+            const mine = decks[side];
+            const theirs = decks[other(side)];
+            const t = audio.ctx.currentTime + 0.06;
+            const posS = mine.positionAt(t);
+            const delta = phaseShift({
+                gridS: this.deck[side].grid, posS, rateS: this.deck[side].rate,
+                gridO: this.deck[other(side)].grid, posO: theirs.positionAt(t), rateO: this.deck[other(side)].rate,
+            });
+            if (Math.abs(delta) > 0.0005) {
+                mine.seek(posS + delta, t);
+            }
+        },
+
+        /** A whole beat forwards or back (-1, +1): the coarse companion of the 20 ms nudge. Needs a tempo (grid, or the analysed BPM). */
+        shiftBeat(side, direction) {
+            const d = this.deck[side];
+            const bpm = d.grid?.bpm ?? d.bpm;
+            if (bpm > 0 && decks[side]) {
+                decks[side].nudge((direction * 60000) / bpm);
+                d.pos = decks[side].position();
             }
         },
 
@@ -357,6 +474,241 @@ export default function mixer(config = {}) {
         setMaster(value) {
             this.master = Number(value);
             audio?.setMaster(this.master);
+        },
+
+        // --- the beat grid (D1) -----------------------------------------------------------
+
+        /** Finds the grid of the deck's track (from the browser's cache, or by analysing the drums and bass in a worker). */
+        async findGrid(side, seedBpm) {
+            const deck = decks[side];
+            const print = prints[side];
+            const cached = print ? parseGrid(stored(GRID_KEY + print)) : undefined;
+            if (cached !== undefined) {
+                this.setGrid(side, cached);
+
+                return;
+            }
+            this.deck[side].gridState = 'analysing';
+            try {
+                const { findGrid } = await BEATS();
+                const result = await findGrid(deck.buffers, seedBpm);
+                if (decks[side] !== deck || prints[side] !== print) {
+                    return; // another track was loaded meanwhile
+                }
+                store(GRID_KEY + print, serializeGrid(result.grid));
+                this.setGrid(side, result.grid);
+            } catch (e) {
+                console.warn('The beat grid could not be computed:', e);
+                if (decks[side] === deck) {
+                    this.deck[side].gridState = 'error';
+                }
+            }
+        },
+
+        setGrid(side, grid) {
+            const d = this.deck[side];
+            d.grid = grid;
+            d.gridState = grid ? 'ready' : 'nogrid';
+            if (!grid && d.loop?.beats) {
+                this.exitLoop(side);
+            }
+            this.drawGrid(side);
+        },
+
+        drawGrid(side) {
+            const d = this.deck[side];
+            d.ticks = ticksPath(d.grid, d.dur, WAVE_BINS);
+        },
+
+        saveGrid(side) {
+            if (prints[side]) {
+                store(GRID_KEY + prints[side], serializeGrid(this.deck[side].grid));
+            }
+        },
+
+        /** Moves the grid against the audio by `milliseconds` (to fix a grid that sits a little early or late). */
+        nudgeGrid(side, milliseconds) {
+            const d = this.deck[side];
+            if (d.grid) {
+                d.grid = shiftGrid(d.grid, milliseconds / 1000);
+                this.drawGrid(side);
+                this.saveGrid(side);
+            }
+        },
+
+        /** Makes the beat nearest to the playhead the first beat of a bar. */
+        setDownbeat(side) {
+            const d = this.deck[side];
+            if (d.grid && decks[side]) {
+                d.grid = setDownbeatAt(d.grid, decks[side].position());
+                this.drawGrid(side);
+                this.saveGrid(side);
+            }
+        },
+
+        // --- cues and loops (D3) -----------------------------------------------------------
+
+        loadCues(side) {
+            const d = this.deck[side];
+            const cues = sanitizeCues(prints[side] ? stored(CUES_KEY + prints[side]) : null, d.dur);
+            d.cue = cues.cue;
+            d.hot = cues.hot;
+        },
+
+        saveCues(side) {
+            const d = this.deck[side];
+            if (prints[side]) {
+                store(CUES_KEY + prints[side], { cue: d.cue, hot: [...d.hot] });
+            }
+        },
+
+        /** A position as the deck keeps it: on a beat with a grid and quantize on. */
+        snap(side, seconds) {
+            const d = this.deck[side];
+
+            return snapPosition(d.grid, seconds, d.quantize);
+        },
+
+        /**
+         * The main cue. Playing: back to the cue and stop. Stopped away from the cue: set it here. Stopped on the cue: play
+         * from it while the button is held (the release returns to it).
+         */
+        cuePress(side) {
+            const deck = decks[side];
+            const d = this.deck[side];
+            if (!deck?.loaded) {
+                return;
+            }
+            audio.ensure();
+            const pos = deck.position();
+            if (deck.playing) {
+                deck.pause();
+                if (d.cue === null) {
+                    d.cue = this.snap(side, pos);
+                    this.saveCues(side);
+                }
+                deck.seek(d.cue);
+                d.playing = false;
+            } else if (d.cue === null || Math.abs(pos - d.cue) > 0.03) {
+                d.cue = this.snap(side, pos);
+                deck.seek(d.cue);
+                this.saveCues(side);
+            } else {
+                previews[side] = true;
+                this.startDeck(side, d.cue);
+                this.tick();
+            }
+            d.pos = deck.position();
+        },
+
+        cueRelease(side) {
+            if (!previews[side]) {
+                return;
+            }
+            previews[side] = false;
+            const deck = decks[side];
+            const d = this.deck[side];
+            deck.pause();
+            deck.seek(d.cue);
+            d.playing = false;
+            d.pos = deck.position();
+        },
+
+        /** A hot cue: empty, it is set here; set, it jumps there (on the next beat while quantized and playing), or starts the deck from there. */
+        hotCue(side, slot) {
+            const deck = decks[side];
+            const d = this.deck[side];
+            if (!deck?.loaded) {
+                return;
+            }
+            audio.ensure();
+            if (d.hot[slot] === null) {
+                d.hot[slot] = this.snap(side, deck.position());
+                this.saveCues(side);
+
+                return;
+            }
+            const target = d.hot[slot];
+            if (deck.playing) {
+                deck.seek(target, d.quantize && d.grid ? deck.nextBeatTime(d.grid) : null);
+            } else {
+                this.startDeck(side, target);
+                this.tick();
+            }
+        },
+
+        clearHot(side, slot) {
+            this.deck[side].hot[slot] = null;
+            this.saveCues(side);
+        },
+
+        loopIn(side) {
+            const deck = decks[side];
+            if (!deck?.loaded) {
+                return;
+            }
+            this.exitLoop(side);
+            this.deck[side].markIn = this.snap(side, deck.position());
+        },
+
+        /** Closes the loop at the playhead; playback returns to the loop-in point. */
+        loopOut(side) {
+            const d = this.deck[side];
+            const deck = decks[side];
+            if (!deck?.loaded || d.markIn === null) {
+                return;
+            }
+            const loop = loopFromPoints(d.markIn, this.snap(side, deck.position()), d.dur);
+            if (loop) {
+                this.engageLoop(side, loop);
+            }
+        },
+
+        /** A loop of `beats` beats from the nearest beat; pressing the active one again leaves the loop. Needs a grid. */
+        beatLoop(side, beats) {
+            const d = this.deck[side];
+            const deck = decks[side];
+            if (!deck?.loaded || !d.grid) {
+                return;
+            }
+            if (d.loop?.beats === beats) {
+                this.exitLoop(side);
+
+                return;
+            }
+            const loop = beatLoop(d.grid, deck.position(), beats, d.dur, d.quantize);
+            if (loop) {
+                this.engageLoop(side, loop);
+            }
+        },
+
+        /** The active loop twice as long (2) or half as long (0.5). */
+        scaleLoop(side, factor) {
+            const d = this.deck[side];
+            const loop = d.loop ? scaleLoop(d.loop, factor, d.dur) : null;
+            if (loop) {
+                this.engageLoop(side, loop);
+            }
+        },
+
+        engageLoop(side, loop) {
+            const d = this.deck[side];
+            d.loop = loop;
+            d.markIn = null;
+            decks[side].setLoop({ start: loop.start, end: loop.end });
+            d.pos = decks[side].position();
+            if (decks[side].playing) {
+                this.tick();
+            }
+        },
+
+        exitLoop(side) {
+            const d = this.deck[side];
+            if (d.loop) {
+                decks[side]?.setLoop(null);
+            }
+            d.loop = null;
+            d.markIn = null;
         },
 
         // --- the clock --------------------------------------------------------------------

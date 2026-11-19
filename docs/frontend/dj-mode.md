@@ -1,8 +1,19 @@
-# Mini DJ mode (plan, not built)
+# Mini DJ mode (plan; D1 to D3 built)
 
 Plan for turning the stem mixer ([stem-mixer.md](stem-mixer.md)) into a small DJ app: two decks, beat-aware mixing, cues and loops, stem-based transitions, EQ and effects, and recording a set. Everything audible stays in the browser (the owner's decision for stems: playback and mixing only in the front end and apps). Full profile only, open to guests, like the mixer.
 
-## Where we start
+## Status
+
+| Phase | State |
+|---|---|
+| D1 Beat grid | **Built** in the browser (`resources/js/mixer/beats.js`, `beats.worker.js`, `beats-client.js`), grid in `localStorage`. Pure logic tested; not heard on real tracks. |
+| D2 Beat sync and quantize | **Built** (Sync = tempo + phase, quantized start, shift a beat). Feel unverified. |
+| D3 Cues and loops | **Built** (`cues.js`; main cue, four hot cues, In/Out and beat loops 1/4 to 8, halve/double), cues in `localStorage`. The household-wide `track_cues` table and API is **not** built (decided: later, only when asked). |
+| D4 to D8 | Not started. |
+
+What the code does, how it was verified and what is not verified: [stem-mixer.md](stem-mixer.md), "Beat grid, sync, cues and loops". Departures from the plan below are marked **Built:**.
+
+## Where we start (before D1)
 
 Built and working: two decks of kept stems (vocals, drums, bass, other) with fader, mute and solo each; tempo 0.7 to 1.4 with the pitch kept (SoundTouch) and a key shift; Sync (tempo only); nudge; equal-power crossfader; master volume; waveform of the full track and of each stem with seek; a picker with "mixes well with" (tempo and Camelot key). **A DJ needs more than this in one place: the beats.** Without a beat grid, Sync matches tempo but not phase, and nothing can be quantized, looped by beats or automated over bars. So the beat grid comes first and most of the rest hangs on it.
 
@@ -27,17 +38,23 @@ A grid is `{ bpm, offset, downbeat }`: the time of the first beat and which beat
 
 UI: beat ticks on the waveforms (heavier on the downbeat), a "nudge the grid" control (drag or ±5 ms), and a grid-lock indicator. A track without a steady tempo (live, rubato) shows "no grid" and the beat features stay off for that deck instead of lying.
 
+**Built:** ticks (full track and drums rows), ±5 ms grid nudge and "Downbeat here" (the downbeat guess is the weakest part), "No steady beat" state. No drag, no lock meter beyond the stored `lock` value. The tempo is found by autocorrelation for a first guess and a phase histogram over a fine grid of tempi for the result (better than the autocorrelation peak for offset and drift); the analysed BPM only chooses the octave, so grid and analysis agree and a 70 BPM kick pattern with a 140 BPM analysis gets a 140 BPM grid. The cache key is `track id : duration : total stem bytes` because the stems answer has no file hash.
+
 ### D2 Beat sync and quantize *[S to M]*
 
 - **Sync** matches the other deck's tempo *and* phase: on press, shift this deck so its next beat lands with the other deck's current beat (a seek by a fraction of a beat, no audible jump when done at a bar boundary).
 - **Quantized start**: play, cue and loop start on the next beat of the grid when the deck is synced.
 - Keep the 20 ms nudge as the fine tool; add a coarse "shift a beat".
 
+**Built:** Sync also seeks the deck, a little ahead and sample-accurately, by up to half a beat when both decks play on a grid (half and double time are matched to every second or every beat). Quantize is a per-deck toggle (default on): starting a deck while the other plays waits for the other deck's next beat and starts on the nearest beat of its own grid; cue and hot-cue setting snap to the nearest beat; a hot cue pressed while playing jumps on the next beat. Nudge now counts from where the deck will be after its 30 ms restart (it used to be 30 ms short).
+
 ### D3 Cues and loops *[M]*
 
 - **Cue**: one main cue per deck (jump, or hold to preview) and four **hot cues** that set or jump.
 - **Loops**: loop in and out, and beat loops of 1, 2, 4, 8 beats (and half and quarter). Implemented with `loop`, `loopStart`, `loopEnd` on the four buffer sources, so they stay aligned and cost no extra CPU; the loop points are in track time, so a tempo change needs nothing.
 - **Persistence**: first in `localStorage` per file hash. Then a small `track_cues` table (`track_id`, `slot`, `position`, `label`), `GET|PUT /api/library/tracks/{id}/cues`, open like favourites (household-wide; no accounts), an `openapi.yaml` entry and a tool on the MCP server. Decide before building (Open questions).
+
+**Built:** the localStorage part only (key `remoment.mixer.cues.v1.<fingerprint>`; the grid is `remoment.mixer.grid.v1.<fingerprint>`). Loops are not stored. Main cue: set while stopped, return-and-stop while playing, play while held when stopped on the cue. Pressing the active beat loop leaves it; In sets the point, Out closes the loop and playback returns to In (as on a CDJ).
 
 ### D4 Stem transitions *[M; the part nobody else has]*
 

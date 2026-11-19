@@ -57,6 +57,19 @@
                         <div class="absolute inset-0 rounded bg-gray-50 dark:bg-stone-900/60"></div>
                         <svg class="absolute inset-0 h-full w-full text-gray-300 dark:text-stone-700 transition-opacity" :class="row !== 'mix' && ({{ $d }}.muted[row] || (Object.values({{ $d }}.solo).some(Boolean) && !{{ $d }}.solo[row])) ? 'opacity-30' : ''" viewBox="0 0 800 100" preserveAspectRatio="none" aria-hidden="true"><path :d="{{ $d }}.wave?.[row]" fill="currentColor"></path></svg>
                         <svg class="absolute inset-0 h-full w-full text-gray-700 dark:text-stone-300" :style="'clip-path:' + playedClip('{{ $side }}')" viewBox="0 0 800 100" preserveAspectRatio="none" aria-hidden="true"><path :d="{{ $d }}.wave?.[row]" fill="currentColor"></path></svg>
+                        {{-- Beat ticks of the grid, heavier on the first beat of a bar --}}
+                        <svg x-show="{{ $d }}.grid && (row === 'mix' || row === 'drums')" class="pointer-events-none absolute inset-0 h-full w-full text-sky-600 dark:text-sky-400" viewBox="0 0 800 100" preserveAspectRatio="none" aria-hidden="true" data-test="beat-ticks">
+                            <path :d="{{ $d }}.ticks.beat" fill="none" stroke="currentColor" stroke-width="1" stroke-opacity="0.45" vector-effect="non-scaling-stroke"></path>
+                            <path :d="{{ $d }}.ticks.bar" fill="none" stroke="currentColor" stroke-width="2" stroke-opacity="0.9" vector-effect="non-scaling-stroke"></path>
+                        </svg>
+                    </div>
+                </template>
+                {{-- Loop region and cue markers --}}
+                <div x-show="{{ $d }}.loop" class="pointer-events-none absolute inset-y-0 rounded-xl bg-emerald-500/20 ring-1 ring-emerald-500/50" :style="{{ $d }}.loop ? 'left:' + at('{{ $side }}', {{ $d }}.loop.start) + '%;width:' + (at('{{ $side }}', {{ $d }}.loop.end) - at('{{ $side }}', {{ $d }}.loop.start)) + '%' : ''"></div>
+                <div x-show="{{ $d }}.cue !== null" class="pointer-events-none absolute inset-y-0 w-0.5 bg-amber-500" :style="'left:' + at('{{ $side }}', {{ $d }}.cue) + '%'" title="Cue"></div>
+                <template x-for="(spot, slot) in {{ $d }}.hot" :key="slot">
+                    <div x-show="spot !== null" class="pointer-events-none absolute inset-y-0 w-0.5 bg-sky-500" :style="'left:' + at('{{ $side }}', spot) + '%'">
+                        <span class="absolute -top-0.5 left-0.5 text-[10px] font-semibold leading-none text-sky-600 dark:text-sky-400" x-text="slot + 1"></span>
                     </div>
                 </template>
                 <div class="pointer-events-none absolute inset-y-0 w-px bg-red-500" :style="'left:' + ({{ $d }}.dur > 0 ? ({{ $d }}.pos / {{ $d }}.dur) * 100 : 0) + '%'"></div>
@@ -101,8 +114,58 @@
                     <span class="text-sm text-gray-500">Nudge</span>
                     <x-secondary-button size="sm" @click="nudge('{{ $side }}', -20)" aria-label="Nudge 20 milliseconds back"><i class="fa-solid fa-backward-step text-xs"></i></x-secondary-button>
                     <x-secondary-button size="sm" @click="nudge('{{ $side }}', 20)" aria-label="Nudge 20 milliseconds forward"><i class="fa-solid fa-forward-step text-xs"></i></x-secondary-button>
+                    <span class="ml-2 text-sm text-gray-500">Beat</span>
+                    <x-secondary-button size="sm" @click="shiftBeat('{{ $side }}', -1)" x-bind:disabled="!({{ $d }}.grid?.bpm ?? {{ $d }}.bpm)" aria-label="Shift a beat back"><i class="fa-solid fa-angles-left text-xs"></i></x-secondary-button>
+                    <x-secondary-button size="sm" @click="shiftBeat('{{ $side }}', 1)" x-bind:disabled="!({{ $d }}.grid?.bpm ?? {{ $d }}.bpm)" aria-label="Shift a beat forward"><i class="fa-solid fa-angles-right text-xs"></i></x-secondary-button>
                 </div>
             </div>
+        </div>
+
+        {{-- Beat grid --}}
+        <div data-test="beat-grid">
+            <div class="flex items-center justify-between">
+                <p class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-600">Beat grid</p>
+                <p class="text-sm tabular-nums text-gray-700 dark:text-gray-300" x-text="gridLabel('{{ $side }}')"></p>
+            </div>
+            <div class="mt-2 flex flex-wrap items-center gap-2" x-show="{{ $d }}.grid">
+                <x-secondary-button size="sm" @click="{{ $d }}.quantize = !{{ $d }}.quantize" x-bind:aria-pressed="{{ $d }}.quantize" x-bind:class="{{ $d }}.quantize ? '!bg-gray-900 dark:!bg-stone-600 !border-gray-900 dark:!border-stone-600 !text-white' : ''" title="Starts, cues and loops land on the beat">Quantize</x-secondary-button>
+                <span class="ml-2 text-sm text-gray-500">Grid</span>
+                <x-secondary-button size="sm" @click="nudgeGrid('{{ $side }}', -5)" aria-label="Move the grid 5 milliseconds earlier"><i class="fa-solid fa-angle-left text-xs"></i>5 ms</x-secondary-button>
+                <x-secondary-button size="sm" @click="nudgeGrid('{{ $side }}', 5)" aria-label="Move the grid 5 milliseconds later">5 ms<i class="fa-solid fa-angle-right text-xs"></i></x-secondary-button>
+                <x-secondary-button size="sm" @click="setDownbeat('{{ $side }}')" title="Make the beat at the playhead the first of a bar">Downbeat here</x-secondary-button>
+            </div>
+        </div>
+
+        {{-- Cues and loops --}}
+        <div data-test="cues-loops">
+            <p class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-600">Cues</p>
+            <div class="flex flex-wrap items-center gap-2">
+                <x-secondary-button size="sm" @pointerdown.prevent="cuePress('{{ $side }}')" @pointerup="cueRelease('{{ $side }}')" @pointerleave="cueRelease('{{ $side }}')" @keydown.space.prevent="cuePress('{{ $side }}')" @keyup.space="cueRelease('{{ $side }}')" title="Set the cue (stopped), return to it (playing), play from it while held (stopped on the cue)">
+                    <span class="inline-block h-2 w-2 rounded-full bg-amber-500"></span>Cue
+                </x-secondary-button>
+                <template x-for="slot in HOT_CUES" :key="slot">
+                    <span class="inline-flex items-center">
+                        <x-secondary-button size="sm" class="min-w-14 justify-center tabular-nums" @click="hotCue('{{ $side }}', slot - 1)" x-bind:aria-label="'Hot cue ' + slot + ({{ $d }}.hot[slot - 1] === null ? ', empty: set here' : ', jump')">
+                            <span x-text="slot"></span><span class="text-gray-400 dark:text-gray-500" x-text="{{ $d }}.hot[slot - 1] === null ? '' : time({{ $d }}.hot[slot - 1])"></span>
+                        </x-secondary-button>
+                        <button type="button" x-show="{{ $d }}.hot[slot - 1] !== null" @click="clearHot('{{ $side }}', slot - 1)" class="ml-1 h-6 w-6 rounded-full text-xs text-gray-400 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 dark:text-gray-600 dark:hover:text-gray-300" x-bind:aria-label="'Clear hot cue ' + slot"><i class="fa-solid fa-xmark"></i></button>
+                    </span>
+                </template>
+            </div>
+
+            <p class="mb-2 mt-4 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-600">Loop</p>
+            <div class="flex flex-wrap items-center gap-2">
+                <x-secondary-button size="sm" @click="loopIn('{{ $side }}')" x-bind:class="{{ $d }}.markIn !== null ? '!border-emerald-500 !text-emerald-700 dark:!text-emerald-400' : ''">In</x-secondary-button>
+                <x-secondary-button size="sm" @click="loopOut('{{ $side }}')" x-bind:disabled="{{ $d }}.markIn === null">Out</x-secondary-button>
+                <x-secondary-button size="sm" @click="exitLoop('{{ $side }}')" x-bind:disabled="!{{ $d }}.loop">Exit</x-secondary-button>
+                <span class="mx-1 h-5 w-px bg-gray-200 dark:bg-stone-700"></span>
+                <template x-for="beats in LOOP_BEATS" :key="beats">
+                    <x-secondary-button size="sm" class="min-w-10 justify-center tabular-nums" @click="beatLoop('{{ $side }}', beats)" x-bind:disabled="!{{ $d }}.grid" x-bind:aria-pressed="{{ $d }}.loop?.beats === beats" x-bind:aria-label="'Loop ' + beatLabel(beats) + ' beats'" x-bind:class="{{ $d }}.loop?.beats === beats ? '!bg-emerald-600 !border-emerald-600 !text-white' : ''"><span x-text="beatLabel(beats)"></span></x-secondary-button>
+                </template>
+                <x-secondary-button size="sm" @click="scaleLoop('{{ $side }}', 0.5)" x-bind:disabled="!{{ $d }}.loop" aria-label="Halve the loop">½×</x-secondary-button>
+                <x-secondary-button size="sm" @click="scaleLoop('{{ $side }}', 2)" x-bind:disabled="!{{ $d }}.loop" aria-label="Double the loop">2×</x-secondary-button>
+            </div>
+            <p class="mt-2 text-xs text-gray-400 dark:text-gray-600" x-show="!{{ $d }}.grid && {{ $d }}.gridState !== 'analysing'">Beat loops, quantize and beat sync need a steady beat; cues and In/Out loops work without one.</p>
         </div>
     </div>
 </x-card>

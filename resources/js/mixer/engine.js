@@ -9,10 +9,13 @@
 // SoundTouch is imported only when the browser has AudioWorklet: that exists in a secure context only (https or
 // localhost), and a module that extends AudioWorkletNode throws on import without it. Without it the mixer still
 // plays; tempo then moves the pitch along and the key shift is off (`pitchCorrection` is false).
+import { beatAt, beatIndex } from './beats.js';
+import { wrapLoop } from './cues.js';
 import { binPeaks, clamp, orderStems, stemGains } from './math.js';
 
 const FADE = 0.006; // seconds of fade at a start/stop, so a seek or nudge does not click
 const SMOOTH = 0.015; // seconds of smoothing on a fader
+const PRE = 0.004; // a start is scheduled this much early and faded in by its beat, so the attack of a kick is not softened
 
 /** The shared audio context and master volume of both decks, made on the first user gesture. */
 export class MixerAudio {
@@ -73,6 +76,8 @@ export class Deck {
         this.playing = false;
         this.duration = 0;
         this.onEnded = null;
+        this.loop = null; // { start, end } in seconds of the track: the four sources loop there on their own
+        this.next = null; // a jump or start scheduled for later: { sources, when, offset }
     }
 
     get loaded() {
@@ -140,11 +145,38 @@ export class Deck {
         if (!this.loaded) {
             return 0;
         }
+        this.#settle();
         if (!this.playing) {
             return this.offset;
         }
 
-        return Math.min(this.duration, this.offset + (this.audio.ctx.currentTime - this.anchor) * this.rate);
+        return this.positionAt(this.audio.ctx.currentTime);
+    }
+
+    /** Where the deck is (or will be, at the current rate) at audio-clock time `time`, in seconds of the track. */
+    positionAt(time) {
+        if (!this.loaded) {
+            return 0;
+        }
+        if (!this.playing) {
+            return this.offset;
+        }
+
+        return Math.min(this.duration, wrapLoop(this.#raw(time), this.loop));
+    }
+
+    /** Audio-clock time of this playing deck's next beat on `grid`, at least `lead` seconds from now; null when not playing. */
+    nextBeatTime(grid, lead = 0.04) {
+        this.#settle();
+        if (!this.playing) {
+            return null;
+        }
+        const t0 = this.audio.ctx.currentTime + lead;
+        const raw = this.#raw(t0);
+        const k = Math.max(0, Math.ceil(beatIndex(grid, raw) - 1e-9));
+
+        // On the unwrapped timeline: a loop that is a whole number of beats long repeats the same beats in wall time.
+        return t0 + (beatAt(grid, k) - raw) / this.rate;
     }
 
     play() {
@@ -154,10 +186,22 @@ export class Deck {
         if (this.offset >= this.duration - 0.05) {
             this.offset = 0;
         }
+        if (this.loop && this.offset >= this.loop.end) {
+            this.offset = this.loop.start; // a loop set behind the playhead: start in it
+        }
         this.#start(this.offset);
     }
 
+    /** Starts at audio-clock time `when` from `offset` (seconds of the track): a quantized start. */
+    playAt(when, offset = this.offset) {
+        if (!this.loaded || this.playing) {
+            return;
+        }
+        this.#start(clamp(offset, 0, Math.max(0, this.duration - 0.05)), Math.max(when, this.audio.ctx.currentTime + 0.03));
+    }
+
     pause() {
+        this.#settle();
         if (!this.playing) {
             return;
         }
@@ -165,31 +209,76 @@ export class Deck {
         this.#stop();
     }
 
-    seek(seconds) {
+    /** Jumps to `seconds`; with `when` (audio-clock time, at least 20 ms ahead) a playing deck makes the jump at that instant. */
+    seek(seconds, when = null) {
         if (!this.loaded) {
             return;
         }
+        this.#settle();
         const target = clamp(seconds, 0, Math.max(0, this.duration - 0.05));
-        const wasPlaying = this.playing;
+        if (!this.playing) {
+            this.offset = target;
+
+            return;
+        }
+        const now = this.audio.ctx.currentTime;
+        if (when !== null && when > now + 0.02 && !this.next) {
+            this.#schedule(target, when);
+
+            return;
+        }
         this.#stop();
         this.offset = target;
-        if (wasPlaying) {
-            this.#start(target);
+        this.#start(target);
+    }
+
+    /** The loop of the four sources (`{ start, end }` in seconds of the track), or null to leave it. Playing on past its end jumps to its start. */
+    setLoop(loop) {
+        this.#settle();
+        const next = loop && loop.end - loop.start > 0.01 ? { start: clamp(loop.start, 0, this.duration), end: clamp(loop.end, 0, this.duration) } : null;
+        if (!this.playing) {
+            this.loop = next;
+
+            return;
+        }
+        const pos = this.position();
+        if (this.next) {
+            this.#stop();
+            this.loop = next;
+            this.#start(next && pos >= next.end ? next.start : pos);
+
+            return;
+        }
+        // Re-anchor at the model's own position, then change the sources in place: they wrap by themselves.
+        this.offset = pos;
+        this.anchor = this.audio.ctx.currentTime;
+        this.loop = next;
+        for (const { source } of this.sources) {
+            this.#applyLoop(source);
+        }
+        if (next && pos >= next.end) {
+            this.#stop();
+            this.#start(next.start);
         }
     }
 
-    /** Shifts the deck against the other one by `milliseconds` (to line up beats by ear). */
+    /**
+     * Shifts the deck against the other one by `milliseconds` (to line up beats by ear). The restart takes 30 ms, so the
+     * shift is counted from where the deck will be by then: the deck ends up exactly `milliseconds` away, not 30 ms less.
+     */
     nudge(milliseconds) {
-        this.seek(this.position() + milliseconds / 1000);
+        const from = this.playing ? this.positionAt(this.audio.ctx.currentTime + 0.03) : this.position();
+        this.seek(from + milliseconds / 1000);
     }
 
     /** Tempo as a ratio of the track's own (1 = unchanged); the pitch is corrected by SoundTouch. */
     setRate(rate) {
         const next = clamp(rate, 0.1, 8);
+        this.#settle();
         if (this.playing) {
             this.offset = this.position();
             this.anchor = this.audio.ctx.currentTime;
-            for (const { source } of this.sources) {
+            for (const { source } of [...this.sources, ...(this.next?.sources ?? [])]) {
                 source.playbackRate.setValueAtTime(next, this.audio.ctx.currentTime);
             }
         }
@@ -245,31 +334,61 @@ export class Deck {
         this.gains = this.mix = this.stretch = this.out = this.analyser = null;
         this.duration = 0;
         this.offset = 0;
+        this.loop = null;
     }
 
-    #start(offset) {
+    /** Elapsed track time on the unwrapped timeline (loops not applied) at audio-clock time `time`. */
+    #raw(time) {
+        return this.offset + Math.max(0, time - this.anchor) * this.rate;
+    }
+
+    #applyLoop(source) {
+        source.loop = this.loop !== null;
+        if (this.loop) {
+            source.loopStart = this.loop.start;
+            source.loopEnd = this.loop.end;
+        }
+    }
+
+    /** Creates and schedules the four sources to play `offset` at audio time `when`; returns them. */
+    #sources(offset, when) {
         const ctx = this.audio.ctx;
-        const when = ctx.currentTime + 0.03; // the same instant for all four, so they stay aligned
-        this.sources = this.stems.map((stem) => {
+        const pre = Math.min(PRE, offset / this.rate); // cannot start before the start of the track
+        const at = when - pre;
+
+        return this.stems.map((stem) => {
             const source = ctx.createBufferSource();
             source.buffer = this.buffers[stem];
             source.playbackRate.value = this.rate;
+            this.#applyLoop(source);
             const envelope = ctx.createGain();
-            envelope.gain.setValueAtTime(0, when);
-            envelope.gain.setTargetAtTime(1, when, FADE / 3);
+            envelope.gain.setValueAtTime(0, at);
+            envelope.gain.setTargetAtTime(1, at, FADE / 3);
             source.connect(envelope);
             envelope.connect(this.gains[stem]);
-            source.start(when, offset);
+            source.start(at, offset - pre * this.rate);
 
             return { stem, source, envelope };
         });
+    }
+
+    #start(offset, when = this.audio.ctx.currentTime + 0.03) {
+        // the same instant for all four, so they stay aligned
+        this.sources = this.#sources(offset, when);
         this.anchor = when;
         this.offset = offset;
         this.playing = true;
+        this.#watchEnd();
+    }
 
-        const [{ source: first }] = this.sources;
+    #watchEnd() {
+        const first = this.sources[0]?.source;
+        if (!first) {
+            return;
+        }
         first.onended = () => {
             // Only the end of the track counts: a seek or pause stops the sources too, and they are replaced by then.
+            this.#settle();
             if (this.playing && this.sources[0]?.source === first) {
                 this.offset = this.duration;
                 this.#stop();
@@ -278,15 +397,45 @@ export class Deck {
         };
     }
 
+    /** A jump of a playing deck at `when`: the new sources start then, the old ones fade out by then, the clock switches in #settle. */
+    #schedule(target, when) {
+        const fadeAt = when - PRE;
+        for (const { source, envelope } of this.sources) {
+            source.onended = null;
+            envelope.gain.cancelScheduledValues(fadeAt);
+            envelope.gain.setTargetAtTime(0, fadeAt, FADE / 3);
+            try {
+                source.stop(when + 0.05);
+            } catch {
+                // already stopped
+            }
+        }
+        this.next = { sources: this.#sources(target, when), when, offset: target };
+    }
+
+    /** Switches the clock over to a scheduled jump once its time has come. */
+    #settle() {
+        if (!this.next || !this.audio.ctx || this.audio.ctx.currentTime < this.next.when) {
+            return;
+        }
+        const { sources, when, offset } = this.next;
+        this.next = null;
+        this.sources = sources;
+        this.anchor = when;
+        this.offset = offset;
+        this.#watchEnd();
+    }
+
     #stop() {
         if (!this.audio.ctx) {
             this.sources = [];
+            this.next = null;
             this.playing = false;
 
             return;
         }
         const now = this.audio.ctx.currentTime;
-        for (const { source, envelope } of this.sources) {
+        for (const { source, envelope } of [...this.sources, ...(this.next?.sources ?? [])]) {
             source.onended = null;
             envelope.gain.cancelScheduledValues(now);
             envelope.gain.setTargetAtTime(0, now, FADE / 3);
@@ -297,6 +446,7 @@ export class Deck {
             }
         }
         this.sources = [];
+        this.next = null;
         this.playing = false;
     }
 }
