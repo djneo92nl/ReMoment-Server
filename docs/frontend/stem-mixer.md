@@ -1,5 +1,7 @@
 # Stem mixer (`/mixer`)
 
+How to use it, step by step: [mixer-guide.md](mixer-guide.md).
+
 Two decks of kept stems, mixed in the browser. The server separates and stores the stems (kind `stem_audio`, [../api/stems.md](../api/stems.md), [../architecture/stems-service.md](../architecture/stems-service.md)); everything audible happens in the page with the Web Audio API. Nothing is sent back: a mix is played, not saved or rendered. Full profile only (the `deep_analysis` feature gate covers `/mixer`), open to guests like the API behind it.
 
 ## Entry points
