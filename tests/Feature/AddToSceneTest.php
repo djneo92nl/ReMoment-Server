@@ -29,15 +29,15 @@ class AddToSceneTest extends TestCase
         Device::factory()->create(['device_name' => 'No library']);
     }
 
-    public function test_the_pages_have_the_button(): void
+    public function test_the_pages_hide_the_button(): void
     {
         $artist = Artist::create(['name' => 'Portishead']);
         $album = Album::create(['name' => 'Dummy', 'artist_id' => $artist->id]);
         $playlist = Playlist::create(['name' => 'Sunday jazz']);
 
-        $this->get(route('albums.show', $album))->assertOk()->assertSee('Add to scene');
-        $this->get(route('artists.show', $artist))->assertOk()->assertSee('Add to scene');
-        $this->get(route('playlists.show', $playlist))->assertOk()->assertSee('Add to scene');
+        $this->get(route('albums.show', $album))->assertOk()->assertDontSee('Add to scene');
+        $this->get(route('artists.show', $artist))->assertOk()->assertDontSee('Add to scene');
+        $this->get(route('playlists.show', $playlist))->assertOk()->assertDontSee('Add to scene');
     }
 
     public function test_it_appends_a_play_step_to_an_existing_scene(): void

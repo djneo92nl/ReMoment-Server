@@ -4,8 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ReMoment Player</title>
-<x-live-scripts />
+<script>
+  // Diagnostics that do not depend on player.js: say what is wrong instead of sitting on "Connecting…".
+  window.addEventListener('error', function (e) { var el = document.getElementById('status'); if (el) el.textContent = 'Script error: ' + e.message + ' (' + String(e.filename || '').split('/').pop() + ':' + e.lineno + ')'; });
+  window.addEventListener('unhandledrejection', function (e) { var el = document.getElementById('status'); if (el) el.textContent = 'Error: ' + (e.reason && e.reason.message || e.reason); });
+  setTimeout(function () { if (!window.__playerStarted) { var el = document.getElementById('status'); if (el) el.textContent = 'player.js did not start (not loaded, or blocked?)'; } }, 4000);
+</script>
 <script defer src="{{ asset('js/player.js') }}?v={{ filemtime(public_path('js/player.js')) }}"></script>
+<x-live-scripts />
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   :root { --accent: #ffffff; }

@@ -35,7 +35,14 @@
     function status(text) { $('status').textContent = text; }
 
     async function api(path, options) {
-        const response = await fetch('/api' + path, Object.assign({ headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }, options));
+        const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        const timer = ctl ? setTimeout(() => ctl.abort(), 15000) : null;
+        let response;
+        try {
+            response = await fetch('/api' + path, Object.assign({ headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, signal: ctl ? ctl.signal : undefined }, options));
+        } catch (e) {
+            throw new Error(path + (e && e.name === 'AbortError' ? ' timed out' : ' failed: ' + (e && e.message)));
+        } finally { if (timer) clearTimeout(timer); }
         if (!response.ok) throw new Error(path + ' ' + response.status);
         return response.json();
     }
@@ -360,8 +367,12 @@
         navigator.mediaSession.setActionHandler('seekto', e => { if (!(current && current.live)) { audio.currentTime = e.seekTime; report(); } });
     }
 
-    function connectMqtt(info) {
-        if (!window.mqtt) return;
+    function connectMqtt(info, tries) {
+        // The MQTT library comes from a CDN and may load late or never: the player works by polling meanwhile.
+        if (!window.mqtt) {
+            if ((tries || 0) < 60) setTimeout(() => connectMqtt(info, (tries || 0) + 1), 1000);
+            return;
+        }
         const host = info.mqtt && info.mqtt.host ? info.mqtt.host : location.hostname;
         const meta = document.querySelector('meta[name="remoment-mqtt-ws"]');
         const url = meta && meta.content ? meta.content : (location.protocol === 'https:' ? 'wss' : 'ws') + '://' + host + ':' + info.mqtt.ws_port;
@@ -401,6 +412,7 @@
             if (offline) select.value = offline.id;
 
             $('choose').style.display = 'block';
+            status('Choose a player above to continue.');
             return new Promise(resolve => $('use').addEventListener('click', () => {
                 $('choose').style.display = 'none';
                 resolve(select.value ? parseInt(select.value, 10) : null);
@@ -409,8 +421,14 @@
     }
 
     async function init() {
+        window.__playerStarted = true;
+        status('Starting…');
         $('name').value = store.get(NAME_KEY) || defaultName();
-        const info = await register(await chooseExisting());
+        status('Looking for players…');
+        const existing = await chooseExisting();
+        status('Registering…');
+        const info = await register(existing);
+        status('Registered, starting…');
         lastCommand = info.last_command_id || 0;
         setupMediaSession();
         connectMqtt(info);
@@ -444,5 +462,7 @@
         status('Online as ' + $('name').value);
     }
 
-    window.addEventListener('DOMContentLoaded', () => init().catch(e => status('Could not register: ' + e.message)));
+    // Start as soon as the page is parsed: DOMContentLoaded would also wait for the CDN script.
+    const start = () => init().catch(e => status('Could not register: ' + e.message));
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();

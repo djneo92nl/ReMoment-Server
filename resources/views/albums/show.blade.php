@@ -7,10 +7,6 @@
 
     <div class="space-y-8">
         <x-album-hero :page="$page" :devices="$playableDevices" :spotify-connected="$spotifyConnected" />
-        <div class="space-y-3">
-            <livewire:export-dialog type="album" :id="$album->id" :key="'export-album-'.$album->id" />
-            <livewire:add-to-scene type="album" :id="$album->id" :key="'scene-album-'.$album->id" />
-        </div>
 
         @php
             $details = $page->details;

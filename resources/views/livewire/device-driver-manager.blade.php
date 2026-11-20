@@ -103,6 +103,20 @@
         @endif
     </x-card>
 
+    @if(count($selected) > 0)
+        <div class="sticky top-2 z-20 flex items-center justify-between gap-4 rounded-2xl bg-white dark:bg-stone-900 border border-gray-200 dark:border-stone-700 px-6 py-3 shadow-sm">
+            <span class="text-sm text-gray-700 dark:text-gray-300">{{ count($selected) }} selected</span>
+            <div class="flex items-center gap-2">
+                <button type="button" wire:click="clearSelection" class="px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">Clear</button>
+                <button type="button" wire:click="deleteSelected"
+                        wire:confirm="Remove {{ count($selected) }} {{ count($selected) === 1 ? 'device' : 'devices' }}? This cannot be undone."
+                        class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors">
+                    <i class="fa-solid fa-trash-can"></i>Remove selected
+                </button>
+            </div>
+        </div>
+    @endif
+
     @foreach($groups as $groupKey => $group)
         <x-card flush x-data="{ open: {{ $group['devices']->isNotEmpty() ? 'true' : 'false' }} }">
 
@@ -120,10 +134,15 @@
             @if($group['devices']->isEmpty())
                 <div class="px-8 py-8 text-sm text-gray-400 dark:text-gray-600">No {{ $group['label'] }} devices registered yet.</div>
             @else
+                <div class="flex items-center justify-between gap-4 px-8 py-2 text-xs text-gray-500 border-b border-gray-50 dark:border-stone-800/50">
+                    <button type="button" wire:click="toggleGroup('{{ $groupKey }}')" class="font-medium hover:text-gray-800 dark:hover:text-gray-200">Select all</button>
+                </div>
                 <div class="divide-y divide-gray-50 dark:divide-stone-800/50">
                     @foreach($group['devices'] as $device)
                         <div class="flex items-center justify-between gap-4 px-8 py-4 hover:bg-gray-50/50 dark:hover:bg-stone-800/20 transition-colors {{ $device->hidden ? 'opacity-40' : '' }}">
-                            <div>
+                            <input type="checkbox" wire:model.live="selected" value="{{ $device->id }}" aria-label="Select {{ $device->device_name }}"
+                                   class="rounded border-gray-300 dark:border-stone-600 dark:bg-stone-900">
+                            <div class="flex-1">
                                 <a href="{{ route('devices.show', $device) }}" class="text-sm font-medium text-gray-900 dark:text-gray-100 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
                                     {{ $device->device_name }}
                                 </a>

@@ -184,6 +184,44 @@ class DeviceDriverManager extends Component
         $device?->update(['hidden' => !$device->hidden]);
     }
 
+    /** @var array<int, int|string> Ids of the registered devices ticked for a bulk remove. */
+    public array $selected = [];
+
+    /** Tick every device of a group, or untick them when they are all ticked already. */
+    public function toggleGroup(string $groupKey): void
+    {
+        $ids = ($this->driverGroups()[$groupKey]['devices'] ?? collect())->pluck('id')->map(fn ($id) => (string) $id)->all();
+        $selected = array_map('strval', $this->selected);
+
+        $this->selected = $ids !== [] && array_diff($ids, $selected) === []
+            ? array_values(array_diff($selected, $ids))
+            : array_values(array_unique(array_merge($selected, $ids)));
+    }
+
+    public function clearSelection(): void
+    {
+        $this->selected = [];
+    }
+
+    public function deleteSelected(): void
+    {
+        $ids = array_map('intval', $this->selected);
+        $this->selected = [];
+
+        if ($ids === []) {
+            return;
+        }
+
+        $devices = Device::whereIn('id', $ids)->get();
+
+        foreach ($devices as $device) {
+            $device->meta()->delete();
+            $device->delete();
+        }
+
+        session()->flash('success', $devices->count() === 1 ? '1 device removed.' : "{$devices->count()} devices removed.");
+    }
+
     public function deleteDevice(int $deviceId): void
     {
         $device = Device::find($deviceId);

@@ -144,12 +144,12 @@ class ExportDialogTest extends TestCase
         $this->get('/settings/storage')->assertRedirectContains('/not-in-profile');
     }
 
-    public function test_pages_show_the_button_to_the_admin_only(): void
+    public function test_pages_hide_the_button(): void
     {
         $album = $this->album();
         $this->get('/albums/'.$album->id)->assertOk()->assertDontSee('export-toggle');
         $this->actingAs(User::factory()->create());
-        $this->get('/albums/'.$album->id)->assertOk()->assertSee('export-toggle', false);
+        $this->get('/albums/'.$album->id)->assertOk()->assertDontSee('export-toggle', false);
     }
 
     private function done(string $id, \DateTimeInterface $finished, int $bytes = 1000): Export

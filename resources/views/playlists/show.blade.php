@@ -18,10 +18,6 @@
         </x-page-header>
     </x-slot>
 
-    <div class="mb-6 space-y-3">
-        <livewire:export-dialog type="playlist" :id="$playlist->id" :key="'export-playlist-'.$playlist->id" />
-        <livewire:add-to-scene type="playlist" :id="$playlist->id" :key="'scene-playlist-'.$playlist->id" />
-    </div>
 
     <div class="grid gap-6 lg:grid-cols-3">
         <div class="lg:col-span-2 space-y-6">
