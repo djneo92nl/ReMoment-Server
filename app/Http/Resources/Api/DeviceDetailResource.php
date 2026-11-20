@@ -11,6 +11,7 @@ use App\Domain\Library\NowPlayingLibrary;
 use App\Domain\Library\NowPlayingSections;
 use App\Domain\Library\NowPlayingStems;
 use App\Domain\Library\NowPlayingWaveform;
+use App\Domain\SubDevices\DeviceLinks;
 use App\Integrations\Contracts\RemoteControlInterface;
 use App\Models\Media\Track;
 use Illuminate\Http\Request;
@@ -67,6 +68,7 @@ class DeviceDetailResource extends JsonResource
         }
 
         $data['now_playing'] = $nowPlaying;
+        $data += DeviceLinks::describe($this->resource);
 
         if (in_array('remote_control', $data['capabilities'], true) && $this->driver instanceof RemoteControlInterface) {
             $data['supported_keys'] = array_map(fn (RemoteKey $key) => $key->value, $this->driver->supportedKeys());

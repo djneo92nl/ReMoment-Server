@@ -3431,6 +3431,123 @@ paths:
         "404": { description: Source not known for this device (list sources first) }
         "422": { description: Invalid body }
 
+  /admin/devices/{device}/links:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    get:
+      tags: [Admin]
+      summary: The sub device links of a device, as host and as sub device
+      description: |
+        `sub_devices` are the links where this device is the host, `hosts` those where it is connected to another device.
+        Everyone reads the relation in the device detail (`host`, `sub_devices`); the links with their configuration are admin only.
+        See docs/api/sub-devices.md.
+      operationId: listDeviceLinks
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sub_devices: { type: array, items: { $ref: "#/components/schemas/DeviceLink" } }
+                  hosts: { type: array, items: { $ref: "#/components/schemas/DeviceLink" } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /admin/devices/{device}/link-suggestions:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    get:
+      tags: [Admin]
+      summary: Links this device reports itself (an ASE player's Products list)
+      description: Asks the device, so it may answer 502. Only devices of yours that the host lists are suggested; an input is linked by hand.
+      operationId: listDeviceLinkSuggestions
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  suggestions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        device_id: { type: integer }
+                        device_name: { type: string }
+                        kind: { $ref: "#/components/schemas/DeviceLinkKind" }
+                        via: { type: string }
+                        borrowing: { type: boolean, description: "The host already borrows this product's sources" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "502": { description: The device did not answer }
+  /admin/device-links:
+    post:
+      tags: [Admin]
+      summary: Connect a sub device to a host
+      description: |
+        `device_id` is the sub device, `host_device_id` its host. One level deep: a host is no sub device and a sub device is no host.
+        A link of kind `input` or `source` needs `via` (the host's source id or input label).
+      operationId: createDeviceLink
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_id, host_device_id, kind]
+              properties:
+                device_id: { type: integer }
+                host_device_id: { type: integer }
+                kind: { $ref: "#/components/schemas/DeviceLinkKind" }
+                via: { type: string, nullable: true, example: hdmi_1 }
+                meta: { type: object, nullable: true, additionalProperties: true }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeviceLink" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { description: "Invalid body, or a link the rules refuse (error invalid, message says why)" }
+  /admin/device-links/{link}:
+    parameters:
+      - { name: link, in: path, required: true, schema: { type: integer }, description: Link id }
+    put:
+      tags: [Admin]
+      summary: Change the via or the meta of a link
+      operationId: updateDeviceLink
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                via: { type: string, nullable: true, example: hdmi_2 }
+                meta: { type: object, nullable: true, additionalProperties: true }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeviceLink" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "Invalid body or a link the rules refuse" }
+    delete:
+      tags: [Admin]
+      summary: Remove a link (both devices keep working on their own)
+      operationId: deleteDeviceLink
+      security: [{ adminToken: [] }]
+      responses:
+        "200": { description: OK }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /nodes/job:
     get:
       tags: [Clients]
@@ -4645,7 +4762,7 @@ components:
       enum: [off, all, one]
     Capability:
       type: string
-      enum: [media_controls, volume_control, radio_control, source_control, source_activation, multi_room, library_playback, seek, queue, queue_jump, queue_add, queue_next, queue_remove, queue_move, queue_clear, shuffle, repeat, like, power, sound_adjustment, bluetooth, device_info, battery, network_settings, wireless_speakers, wired_speakers, sleep_timer, digits, remote_control, stream_url, source_controls, move_playback, sync_group]
+      enum: [media_controls, volume_control, radio_control, source_control, source_activation, multi_room, library_playback, seek, queue, queue_jump, queue_add, queue_next, queue_remove, queue_move, queue_clear, shuffle, repeat, like, power, sound_adjustment, bluetooth, device_info, battery, network_settings, wireless_speakers, wired_speakers, sleep_timer, digits, remote_control, stream_url, source_controls, move_playback, sync_group, sub_devices]
     Battery:
       type: object
       nullable: true
@@ -4753,6 +4870,22 @@ components:
       properties:
         favorite: { type: boolean }
 
+    DeviceLinkKind:
+      type: string
+      description: borrow (a source the host borrowed from the sub device), input (an HDMI input) or source (any other source of the host)
+      enum: [borrow, input, source]
+    DeviceLink:
+      type: object
+      properties:
+        id: { type: integer }
+        device_id: { type: integer, description: The sub device }
+        device_name: { type: string, nullable: true }
+        host_device_id: { type: integer }
+        host_name: { type: string, nullable: true }
+        kind: { $ref: "#/components/schemas/DeviceLinkKind" }
+        via: { type: string, nullable: true, description: "The host's source id or input label that selects the sub device; null for a borrow link covering every source" }
+        meta: { type: object, additionalProperties: true }
+        active: { type: boolean, nullable: true }
     DeviceList:
       type: object
       properties:
@@ -4783,6 +4916,26 @@ components:
               type: array
               description: Only with the remote_control capability
               items: { $ref: "#/components/schemas/RemoteKey" }
+            host:
+              type: object
+              nullable: true
+              description: |
+                The host this device is connected to as a sub device: the one that has its input selected now, else the oldest link.
+                Null for a device that is no sub device. `via` is null for a link with none.
+              properties:
+                id: { type: integer }
+                name: { type: string }
+                via: { type: string, nullable: true }
+            sub_devices:
+              type: array
+              description: The sub devices connected to this device (a host also has the `sub_devices` capability)
+              items:
+                type: object
+                properties:
+                  id: { type: integer }
+                  name: { type: string }
+                  via: { type: string, nullable: true }
+                  active: { type: boolean, nullable: true, description: "The host has this device's input or source selected now; null while unknown (a host that does not report its input)" }
 
     JellyfinTile:
       type: object

@@ -34,6 +34,7 @@ All contracts live in `app/Integrations/Contracts/`.
 | `SessionHostInterface` | `addListener(string $peerId)` — the host side of a multiroom join: expand this device's experience to the peer with that ID. A guest joins by asking its host to do this | If device can take listeners (ASE: POST on `primaryExperience`; Mozart: `beolink/expand/{jid}`) |
 | `LibraryPlaybackInterface` | `playLibraryTrack(Track $track)`, `playLibraryPlaylist(Playlist $playlist)` | If device can stream a local DLNA track/playlist |
 | `RadioControlInterface` | `radioPlatform(): string`, `canPlayRadioStation(RadioStation $station): bool`, `playRadioStation(RadioStation $station)` | If device can tune radio stations |
+| `ReportsActiveSource` | marker, no methods: the driver's listener reports which source or input is selected (a `Source` on the now playing), so a sub device link on this device can say whether it is active (`LinkState`) | ASE drivers; a host without it keeps its links with an unknown state. See [sub-devices.md](sub-devices.md) |
 | `DiscoveryInterface` | `discover(): DiscoveredDevice[]` | Implemented by a discovery service, not the driver itself |
 
 A driver covers a whole platform, but some features need hardware only some models have (WiSA on the Moment). `App\Domain\Device\HardwareFeatures` reads such per-model flags from `config/devices.php`, matched on the device's product type; `DeviceCapabilities::for()` drops a capability the model lacks and the settings API answers `422` for it.
@@ -151,6 +152,8 @@ Only implement the interfaces the device actually supports — the API advertise
     ],
 ],
 ```
+
+Optional model keys next to `driver` and `driver_name`: `virtual`, `wisa`, `speaker` (see `HardwareFeatures`) and `standalone` (`false` for a model that cannot be controlled by itself, such as a Chromecast dongle: when it is connected to a host as a sub device it has no card in the `/devices` grid and is shown on the host's card, see [sub-devices.md](sub-devices.md); a model without the key is standalone).
 
 ### 3. Create a device listener (optional)
 

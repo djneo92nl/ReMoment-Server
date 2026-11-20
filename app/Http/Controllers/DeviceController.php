@@ -10,6 +10,7 @@ use App\Domain\Device\MultiRoomGroups;
 use App\Domain\Device\SpotifyRouting;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\SpotifyUri;
+use App\Domain\SubDevices\DeviceLinks;
 use App\Http\Controllers\Concerns\FlashesLibraryPlayback;
 use App\Models\Device;
 use App\Models\Media\Track;
@@ -28,8 +29,9 @@ class DeviceController extends Controller
         $hiddenCount = $all->where('hidden', true)->count();
 
         // The Spotify virtual device is hidden while Spotify plays on a mapped speaker in the list; a device
-        // joined to a host in the list is shown on the host's card.
-        $devices = MultiRoomGroups::withoutListeners(SpotifyRouting::visible($all->filter(fn (Device $device) => !$device->hidden || $showHidden)))
+        // joined to a host in the list is shown on the host's card, and so is a sub device that cannot be controlled
+        // by itself (a Chromecast on a TV input), see DeviceLinks::withoutNestedSubDevices.
+        $devices = DeviceLinks::withoutNestedSubDevices(MultiRoomGroups::withoutListeners(SpotifyRouting::visible($all->filter(fn (Device $device) => !$device->hidden || $showHidden))))
             ->sortByDesc(fn ($d) => match ($d->state) {
                 \App\Domain\Device\State::Playing => 3,
                 \App\Domain\Device\State::Paused => 2,

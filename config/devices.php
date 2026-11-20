@@ -64,9 +64,12 @@ return [
             'driver' => \App\Integrations\BangOlufsen\Ase\VideoPlayerDriver::class,
         ],
         // NetworkLink/MasterLink converter: not a UPnP renderer, found with `device:discover --brand=converter --host=IP`.
+        // `standalone`: it is controlled without a host too (sources, listener join, now playing), so its card stays in the
+        // grid when a player borrows it (docs/architecture/sub-devices.md). A model without the key is standalone.
         'BeoLink Converter NL/ML' => [
             'driver_name' => 'ASE',
             'driver' => \App\Integrations\BangOlufsen\Ase\ConverterDriver::class,
+            'standalone' => true,
         ],
         'Beoconnect Core' => [
             'driver_name' => 'Mozart',

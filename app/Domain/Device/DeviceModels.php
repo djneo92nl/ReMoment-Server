@@ -42,4 +42,14 @@ final class DeviceModels
 
         return null;
     }
+
+    /**
+     * Whether a model can be controlled by itself, so its card stays in the `/devices` grid when it is connected to a host
+     * as a sub device (docs/architecture/sub-devices.md). Declared per model in config/devices.php (`standalone => false`
+     * for a Chromecast dongle); a model that does not say is standalone, so nothing leaves the grid by accident.
+     */
+    public static function standalone(\App\Models\Device $device): bool
+    {
+        return (self::findByProduct($device->device_product_type)['standalone'] ?? true) !== false;
+    }
 }

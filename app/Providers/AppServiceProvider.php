@@ -52,6 +52,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scoped(\App\Support\SelectedDevice::class);
         $this->app->scoped(\App\Domain\Artwork\ArtworkEntryMemo::class);
         $this->app->scoped(\App\Domain\Library\IdAliases::class);
+        $this->app->scoped(\App\Domain\SubDevices\HostIndex::class);
     }
 
     /**

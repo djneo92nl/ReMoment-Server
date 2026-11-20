@@ -169,6 +169,27 @@ class ReMomentMcpTest extends TestCase
         ReMomentServer::tool(Tools\LibraryMaintenance::class, ['action' => 'sync_genres'])->assertNotRegistered();
         ReMomentServer::tool(Tools\Storage::class, ['action' => 'locations'])->assertNotRegistered();
         ReMomentServer::tool(Tools\RemoveLibraryItem::class, ['type' => 'track', 'id' => 1, 'confirm' => true])->assertNotRegistered();
+        ReMomentServer::tool(Tools\DeviceLinks::class, ['action' => 'list', 'device_id' => 1])->assertNotRegistered();
+    }
+
+    public function test_device_links_are_managed_through_the_admin_api(): void
+    {
+        $this->asAdmin();
+        $tv = \App\Models\Device::factory()->create(['device_name' => 'V1']);
+        $dongle = \App\Models\Device::factory()->create(['device_name' => 'Chromecast']);
+
+        ReMomentServer::tool(Tools\DeviceLinks::class, ['action' => 'add', 'device_id' => $dongle->id, 'host_device_id' => $tv->id, 'kind' => 'input', 'via' => 'hdmi_1'])
+            ->assertOk()->assertSee('hdmi_1');
+        $link = \App\Models\DeviceLink::firstOrFail();
+
+        ReMomentServer::tool(Tools\DeviceLinks::class, ['action' => 'list', 'device_id' => $tv->id])->assertOk()->assertSee('Chromecast');
+        ReMomentServer::tool(Tools\DeviceLinks::class, ['action' => 'add', 'device_id' => $tv->id, 'host_device_id' => $dongle->id, 'kind' => 'input', 'via' => 'x'])
+            ->assertHasErrors(['invalid (422)']);
+        ReMomentServer::tool(Tools\DeviceLinks::class, ['action' => 'update', 'id' => $link->id, 'via' => 'hdmi_2'])->assertOk();
+        $this->assertSame('hdmi_2', $link->fresh()->via);
+        ReMomentServer::tool(Tools\DeviceLinks::class, ['action' => 'remove'])->assertHasErrors(['needs id']);
+        ReMomentServer::tool(Tools\DeviceLinks::class, ['action' => 'remove', 'id' => $link->id])->assertOk();
+        $this->assertSame(0, \App\Models\DeviceLink::count());
     }
 
     public function test_admin_tools_work_with_the_token(): void

@@ -28,6 +28,7 @@ docs/
     physical.md             Physical collection (CDs, records, tapes): items by barcode or by hand, MusicBrainz barcode lookup, `physical` availability provider, wishes closed by owning it
     scenes.md               Scenes (8.1): household-wide step lists (operationId + device + params, or delay) run through the REST API; GET/POST /api/scenes, activate, schedule, `last_run`, `features.scenes`; MCP tool `scenes`
     sync-groups.md          Sync groups (fake multiroom) REST API: leader + members, offsets, errors
+    sub-devices.md          Sub devices (2a): `host` and `sub_devices` in the device detail, the `sub_devices` capability, admin link routes (`/api/admin/device-links`, `link-suggestions`), MCP `device_links`
     playback-move.md        Move playback to another device: POST /api/devices/{id}/move, what moves (library queue, radio, Spotify transfer), what is refused (local inputs)
     queue.md                Editing the queue: add, play next, remove, move, clear (queue_add/next/remove/move/clear), positions, `expect`, per-platform support
     server-info.md          GET /api/info bootstrap endpoint (API/MQTT/artwork addresses for clients)
@@ -59,6 +60,7 @@ docs/
     developer-tools.md      /settings/developer: quality test (transcode ladder played on a device), simulate now playing, MQTT console, device inspector, stream URL tester
     hardware-table.md       Generated supported-hardware table (9b): `hardware:table`, config/hardware-status.php statuses, the stale-page test
     device-drivers.md       Driver contracts, existing drivers, guide for adding a new brand
+    sub-devices.md          Sub devices (2a): `device_links`, one level deep, link kinds borrow/input/source, `LinkState`, routing generalised from SpotifyRouting, link actions, the follow rule, the Chromecast on the V1's HDMI 1; all hardware behaviour unverified
     beovision-tv.md         BeoVision / Beoplay V1 TV controls design: V1 API findings, one-way remote commands, TV screens (list, detail, remote), probe plan, phases; mostly unbuilt
     wiim.md                 WiiM (LinkPlay) driver on the vendor HTTP API (1.2) on top of UPnP: what is mapped, listener, discovery, quirks, wiim:probe; built from the document, unverified
     philips-tv.md           Philips Android TV on top of the UPnP driver (Jointspace v6): pairing command, standby, apps as sources, active app as now playing; what is unverified
@@ -292,7 +294,7 @@ Response: `{ "data": DeviceDetailResource }`
 
 `state` values: `playing` | `standby` | `paused` | `unreachable`
 
-`capabilities` values: `media_controls` | `volume_control` | `radio_control` | `source_control` | `source_activation` | `multi_room` | `library_playback` | `seek` | `queue` | `queue_jump` | `queue_add` | `queue_next` | `queue_remove` | `queue_move` | `queue_clear` | `shuffle` | `repeat` | `like` | `power` | `sound_adjustment` | `bluetooth` | `device_info` | `battery` | `network_settings` | `wireless_speakers` | `wired_speakers` | `sleep_timer` | `digits` | `remote_control` | `stream_url` | `source_controls` | `move_playback` | `sync_group`
+`capabilities` values: `media_controls` | `volume_control` | `radio_control` | `source_control` | `source_activation` | `multi_room` | `library_playback` | `seek` | `queue` | `queue_jump` | `queue_add` | `queue_next` | `queue_remove` | `queue_move` | `queue_clear` | `shuffle` | `repeat` | `like` | `power` | `sound_adjustment` | `bluetooth` | `device_info` | `battery` | `network_settings` | `wireless_speakers` | `wired_speakers` | `sleep_timer` | `digits` | `remote_control` | `stream_url` | `source_controls` | `move_playback` | `sync_group` | `sub_devices`
 
 `multiroom` is `{ role, host, listeners }` (role `standalone` | `host` | `listener`, `host` and `listeners` as `{ id, name }`) or `null` while unknown — ASE devices only for now, read by their listener (`MultiRoomStatusInterface`, `MultiRoomUpdated` → cache + MQTT `/multiroom`, checked every 5 s); the device card shows a badge.
 
@@ -463,6 +465,10 @@ GET      /api/devices/{id}/wired-speakers   PUT …/wired-speakers/{pl_1|pl_2} {
 ### Sync groups (fake multiroom)
 
 `/api/sync-groups` makes a leader + members group for devices without native multiroom (capability `sync_group`): members start on the leader's queue (the move machinery) and `SyncGroupMirror` keeps them in step from the leader's events: state, track changes, a seek of a member that drifted more than `sync.drift_threshold` (2 s). Library tracks and radio, not Spotify; precision about ±2 s. UI: "Sync groups" on `/multiroom`. See `docs/architecture/sync-groups.md` and `docs/api/sync-groups.md`.
+
+### Sub devices
+
+A device connected to another device, its host (a Chromecast on a TV's HDMI input, a BeoLink Converter a player borrows), stays a full device and is tied to the host by a row in `device_links` (`App\Models\DeviceLink`, `App\Domain\SubDevices\DeviceLinks`: `device_id` = the sub device, `host_device_id`, `kind` borrow|input|source, `via` = the host's input or source id, `meta` JSON). One level deep (a device is a sub device or a host, never both), many to many, deleting a device ends its links. `GET /api/devices/{id}` has `host` (`{id, name, via}`|null) and `sub_devices` (`[{id, name, via, active}]`, `active` null while unknown), a host has the `sub_devices` capability; `LinkState::active()` reads the host's `ActiveInput` cache, so a host driver must implement `ReportsActiveSource` for a known state. A model with `standalone => false` in `config/devices.php` (a Chromecast) has no card in the `/devices` grid, the host's card lists it while the link is active. Links are managed by the admin on the device edit page ("Connected devices", `Livewire\ConnectedDevices`), at `/api/admin/device-links` and with MCP `device_links`. See `docs/architecture/sub-devices.md` and `docs/api/sub-devices.md`; hardware behaviour is unverified.
 
 ### Spotify stream
 

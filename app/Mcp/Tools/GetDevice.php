@@ -10,7 +10,7 @@ use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
-#[Description('Full detail of one device: what is playing now (track, album, radio, source, position, artwork, shuffle/repeat/liked modes), capabilities, volume-related state and multiroom.')]
+#[Description('Full detail of one device: what is playing now (track, album, radio, source, position, artwork, shuffle/repeat/liked modes), capabilities, volume-related state, multiroom, and the sub device relation (host: the device this one is connected to; sub_devices: the devices connected to it, with `active` while the host has their input selected).')]
 #[IsReadOnly]
 class GetDevice extends Tool
 {

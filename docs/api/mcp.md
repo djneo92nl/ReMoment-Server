@@ -34,6 +34,7 @@ Device and library tools do not re-implement anything: `ApiBridge` dispatches an
 | `line_in` | the line-ins of nodes with the line-in role (live, listeners, who plays them); with `device_id` play one there (`stream_url`; `node_id` when several), 2 to 5 s delay, not for TV |
 | `spotify_stream` | the Spotify stream's address and receiver name; with `device_id` start it on that device (`stream_url`) |
 | `multiroom` | get, join, leave |
+| `device_links` | **ADMIN**: sub devices (a Chromecast on a TV's HDMI input, a converter a player borrows): `list` (`device_id`), `suggestions` (`device_id`: what an ASE player lists in its Products), `add` (`device_id` = sub device, `host_device_id`, `kind`, `via`, `meta`), `update` (`id`), `remove` (`id`); the relation itself is in `get_device` (`host`, `sub_devices`) for everyone; see `docs/api/sub-devices.md` |
 | `move_playback` | move what plays to another device (`POST /devices/{id}/move`): same queue and position for library tracks, station for radio, Spotify transfer; local inputs are refused; see `docs/api/playback-move.md` |
 | `sync_group` | sync groups ("fake multiroom"): list, create, add, remove, offset, dissolve; see `docs/api/sync-groups.md` |
 | `device_settings` | sound-adjustment, bluetooth, info (rename), sleep-timer (`docs/api/device-settings.md`) |

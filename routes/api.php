@@ -278,6 +278,12 @@ Route::middleware('admin.token')->group(function () {
     Route::delete('/admin/tags/{tag}', [TagController::class, 'destroy']);
     Route::put('/admin/devices/{device}/volume-limits', [DeviceController::class, 'setVolumeLimits']);
     Route::put('/admin/devices/{device}/sources/{sourceId}', [DeviceController::class, 'updateSource'])->where('sourceId', '[^/]+');
+    // Sub devices: links between a host and a device connected to it (docs/api/sub-devices.md)
+    Route::get('/admin/devices/{device}/links', [\App\Http\Controllers\Api\DeviceLinkController::class, 'index']);
+    Route::get('/admin/devices/{device}/link-suggestions', [\App\Http\Controllers\Api\DeviceLinkController::class, 'suggestions']);
+    Route::post('/admin/device-links', [\App\Http\Controllers\Api\DeviceLinkController::class, 'store']);
+    Route::put('/admin/device-links/{link}', [\App\Http\Controllers\Api\DeviceLinkController::class, 'update']);
+    Route::delete('/admin/device-links/{link}', [\App\Http\Controllers\Api\DeviceLinkController::class, 'destroy']);
     Route::post('/admin/files/{file}/move', [StorageController::class, 'move']);
     Route::put('/admin/files/{file}/tags', [StorageController::class, 'tags']);
     Route::post('/admin/files/{file}/verify', [StorageController::class, 'verify']);

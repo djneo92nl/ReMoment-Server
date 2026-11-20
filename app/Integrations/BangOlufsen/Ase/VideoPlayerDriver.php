@@ -20,6 +20,7 @@ use App\Integrations\Contracts\MultiRoomInterface;
 use App\Integrations\Contracts\MultiRoomStatusInterface;
 use App\Integrations\Contracts\MusicPlayerDriverInterface;
 use App\Integrations\Contracts\PowerInterface;
+use App\Integrations\Contracts\ReportsActiveSource;
 use App\Integrations\Contracts\SessionHostInterface;
 use App\Integrations\Contracts\SleepTimerInterface;
 use App\Integrations\Contracts\SourceActivationInterface;
@@ -30,7 +31,7 @@ use App\Listeners\Device\SwitchToDefaultSource;
 use App\Models\Device;
 use App\Models\DeviceMeta;
 
-class VideoPlayerDriver implements DigitsInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MultiRoomStatusInterface, MusicPlayerDriverInterface, PowerInterface, SessionHostInterface, SleepTimerInterface, SourceActivationInterface, SourcesInterface, VideoDeviceInterface, VolumeControlInterface
+class VideoPlayerDriver implements DigitsInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MultiRoomStatusInterface, MusicPlayerDriverInterface, PowerInterface, ReportsActiveSource, SessionHostInterface, SleepTimerInterface, SourceActivationInterface, SourcesInterface, VideoDeviceInterface, VolumeControlInterface
 {
     use ContentControls;
     use DeviceControls;

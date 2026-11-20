@@ -23,5 +23,11 @@
                 </div>
             </form>
         </x-card>
+
+        @auth
+            <div class="mt-6">
+                <livewire:connected-devices :device="$device" :key="'connected-'.$device->id" />
+            </div>
+        @endauth
     </div>
 </x-app-layout>

@@ -298,6 +298,27 @@
             </div>
         @endif
 
+        {{-- ── Sub devices connected to this one and selected now (a Chromecast on the HDMI input in use) ── --}}
+        @foreach(\App\Domain\SubDevices\DeviceLinks::activeSubLinks($device) as $subLink)
+            @php
+                $sub = $subLink->device;
+                $subNow = \App\Domain\Device\DeviceCache::getNowPlaying($sub->id);
+            @endphp
+            <a href="{{ route('devices.show', $sub) }}" wire:key="sub-{{ $subLink->id }}" data-test="sub-device-{{ $sub->id }}"
+               class="mt-5 flex items-center gap-3 rounded-2xl border border-gray-200/70 dark:border-stone-800 px-4 py-3 text-sm">
+                <i class="fa-solid fa-plug text-gray-400"></i>
+                <div class="min-w-0 flex-1">
+                    <div class="truncate text-gray-900 dark:text-gray-100">{{ $sub->device_name }}@if($subLink->via !== '') <span class="text-gray-500">· {{ $subLink->via }}</span>@endif</div>
+                    @if($subNow?->track)
+                        <div class="truncate text-xs text-gray-500">{{ $subNow->track->name }}@if($subNow->track->artist?->name) · {{ $subNow->track->artist->name }}@endif</div>
+                    @elseif($subNow?->source)
+                        <div class="truncate text-xs text-gray-500">{{ $subNow->source->name }}</div>
+                    @endif
+                </div>
+                <i class="fa-solid fa-chevron-right text-gray-300 dark:text-stone-700 text-xs"></i>
+            </a>
+        @endforeach
+
         @if($controlError)
             <p class="mt-3 text-xs text-red-500">{{ $controlError }}</p>
         @endif

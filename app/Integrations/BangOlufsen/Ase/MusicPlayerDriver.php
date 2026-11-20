@@ -35,6 +35,7 @@ use App\Integrations\Contracts\QueueMoveInterface;
 use App\Integrations\Contracts\QueuePlayNextInterface;
 use App\Integrations\Contracts\QueueRemoveInterface;
 use App\Integrations\Contracts\RadioControlInterface;
+use App\Integrations\Contracts\ReportsActiveSource;
 use App\Integrations\Contracts\SessionHostInterface;
 use App\Integrations\Contracts\SleepTimerInterface;
 use App\Integrations\Contracts\SoundAdjustmentInterface;
@@ -46,7 +47,7 @@ use App\Integrations\Contracts\WirelessSpeakersInterface;
 use App\Models\Device;
 use App\Models\RadioStation;
 
-class MusicPlayerDriver implements BluetoothInterface, DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MultiRoomStatusInterface, MusicPlayerDriverInterface, NetworkSettingsInterface, PlayStreamUrlInterface, PowerInterface, QueueAddInterface, QueueClearInterface, QueueInterface, QueueMoveInterface, QueuePlayNextInterface, QueueRemoveInterface, RadioControlInterface, SessionHostInterface, SleepTimerInterface, SoundAdjustmentInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface, WiredSpeakersInterface, WirelessSpeakersInterface
+class MusicPlayerDriver implements BluetoothInterface, DeviceInfoInterface, LibraryPlaybackInterface, MediaControlsInterface, MultiRoomInterface, MultiRoomStatusInterface, MusicPlayerDriverInterface, NetworkSettingsInterface, PlayStreamUrlInterface, PowerInterface, QueueAddInterface, QueueClearInterface, QueueInterface, QueueMoveInterface, QueuePlayNextInterface, QueueRemoveInterface, RadioControlInterface, ReportsActiveSource, SessionHostInterface, SleepTimerInterface, SoundAdjustmentInterface, SourceActivationInterface, SourcesInterface, VolumeControlInterface, WiredSpeakersInterface, WirelessSpeakersInterface
 {
     use BluetoothControls;
     use ContentControls;

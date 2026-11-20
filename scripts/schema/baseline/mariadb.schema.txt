@@ -199,6 +199,22 @@ TABLE devices [engine=InnoDB collation=utf8mb4_unicode_ci]
   col updated_at timestamp NULL default=NULL
   idx PRIMARY UNIQUE BTREE (id)
 
+TABLE device_links [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col created_at timestamp NULL default=NULL
+  col device_id bigint(20) unsigned NOT NULL default=-
+  col host_device_id bigint(20) unsigned NOT NULL default=-
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col kind varchar(16) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col meta longtext NULL default=NULL collate=utf8mb4_bin
+  col updated_at timestamp NULL default=NULL
+  col via varchar(191) NOT NULL default='' collate=utf8mb4_unicode_ci
+  idx PRIMARY UNIQUE BTREE (id)
+  idx device_links_device_id_host_device_id_kind_via_unique UNIQUE BTREE (device_id,host_device_id,kind,via)
+  idx device_links_host_device_id_foreign INDEX BTREE (host_device_id)
+  fk device_links_device_id_foreign (device_id) -> devices(id) ON DELETE CASCADE ON UPDATE RESTRICT
+  fk device_links_host_device_id_foreign (host_device_id) -> devices(id) ON DELETE CASCADE ON UPDATE RESTRICT
+  check meta json_valid(`meta`)
+
 TABLE device_meta [engine=InnoDB collation=utf8mb4_unicode_ci]
   col created_at timestamp NULL default=NULL
   col device_id bigint(20) unsigned NOT NULL default=-

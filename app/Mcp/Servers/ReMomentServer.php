@@ -35,6 +35,7 @@ class ReMomentServer extends Server
         Tools\BeolinkStream::class,
         Tools\LineIn::class,
         Tools\Multiroom::class,
+        Tools\DeviceLinks::class,
         Tools\MovePlayback::class,
         Tools\SyncGroup::class,
         Tools\DeviceSettings::class,

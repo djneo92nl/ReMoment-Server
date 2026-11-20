@@ -166,6 +166,19 @@ TABLE clients [autoincrement]
   check status in ('pending', 'approved')
   check type in ('single', 'multi')
 
+TABLE device_links [autoincrement]
+  col created_at datetime NULL default=-
+  col device_id integer NOT NULL default=-
+  col host_device_id integer NOT NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col kind varchar NOT NULL default=-
+  col meta text NULL default=-
+  col updated_at datetime NULL default=-
+  col via varchar NOT NULL default=''
+  idx device_links_device_id_host_device_id_kind_via_unique UNIQUE (device_id,host_device_id,kind,via)
+  fk (device_id) -> devices(id) ON DELETE CASCADE ON UPDATE NO ACTION
+  fk (host_device_id) -> devices(id) ON DELETE CASCADE ON UPDATE NO ACTION
+
 TABLE device_meta [autoincrement]
   col created_at datetime NULL default=-
   col device_id integer NOT NULL default=-
