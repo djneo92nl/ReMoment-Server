@@ -9,6 +9,7 @@ use App\Domain\Device\Cache\MultiRoom;
 use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\DeviceCapabilities;
+use App\Domain\Device\DeviceRouting;
 use App\Domain\Device\RepeatMode;
 use App\Domain\Device\SpotifyRouting;
 use App\Domain\Device\State;
@@ -83,7 +84,7 @@ class PlayerBar extends Component
         }
 
         try {
-            $driver = SpotifyRouting::driverFor($device, QueueInterface::class);
+            $driver = DeviceRouting::driverFor($device, QueueInterface::class);
             $items = $driver instanceof QueueInterface
                 ? array_map(function ($item) {
                     $row = $item->toArray();
@@ -105,7 +106,7 @@ class PlayerBar extends Component
         if (!$device) {
             return;
         }
-        $modesId = SpotifyRouting::modesDeviceId($device);
+        $modesId = DeviceRouting::modesDeviceId($device, ShuffleInterface::class);
         $modes = Modes::get($modesId);
         $shuffle = !($modes->shuffle ?? false);
         $this->control(ShuffleInterface::class, fn ($d) => $d->setShuffle($shuffle));
@@ -118,7 +119,7 @@ class PlayerBar extends Component
         if (!$device) {
             return;
         }
-        $modesId = SpotifyRouting::modesDeviceId($device);
+        $modesId = DeviceRouting::modesDeviceId($device, RepeatInterface::class);
         $modes = Modes::get($modesId);
         $repeat = match ($modes->repeat) {
             RepeatMode::Off, null => RepeatMode::All,
@@ -135,7 +136,7 @@ class PlayerBar extends Component
         if (!$device) {
             return;
         }
-        $modesId = SpotifyRouting::modesDeviceId($device);
+        $modesId = DeviceRouting::modesDeviceId($device, LikeInterface::class);
         $modes = Modes::get($modesId);
         $liked = !($modes->liked ?? false);
         $this->control(LikeInterface::class, fn ($d) => $d->setLiked($liked));
@@ -182,9 +183,11 @@ class PlayerBar extends Component
         }
 
         $state = DeviceCache::isListenerRunning($device->id) ? $device->state : State::Unreachable;
-        $nowPlaying = DeviceCache::getNowPlaying($device->id);
+        $nowPlaying = DeviceRouting::nowPlayingFor($device);
         $capabilities = DeviceCapabilities::for($device);
-        $modes = Modes::get(SpotifyRouting::modesDeviceId($device));
+        // The modes belong to whoever's playback is shown: an active sub device, else the speaker Spotify is routed to.
+        $shown = DeviceRouting::nowPlayingDevice($device);
+        $modes = Modes::get($shown->id !== $device->id ? $shown->id : SpotifyRouting::modesDeviceId($device));
 
         return view('livewire.player-bar', [
             'device' => $device,

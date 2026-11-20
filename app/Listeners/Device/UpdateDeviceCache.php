@@ -9,6 +9,7 @@ use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
 use App\Domain\Media\NowPlaying;
+use App\Domain\SubDevices\ActiveInput;
 use App\Events\Device\BatteryUpdated;
 use App\Events\Device\MultiRoomUpdated;
 use App\Events\Device\NowPlayingEnded;
@@ -42,6 +43,11 @@ class UpdateDeviceCache
             // Now-playing first: a state transition republishes it to MQTT /data.
             DeviceCache::updateNowPlaying($deviceId, $event->nowPlaying);
 
+            // The selected input outlives a track notification that carries no source (sub device links read it).
+            if ($event->nowPlaying->source !== null) {
+                ActiveInput::put($deviceId, $event->nowPlaying->source);
+            }
+
             DeviceCache::updateState($deviceId, State::Playing);
 
             return;
@@ -64,6 +70,7 @@ class UpdateDeviceCache
             DeviceCache::updateState($deviceId, State::Standby);
 
             DeviceCache::forgetNowPlaying($deviceId);
+            ActiveInput::forget($deviceId);
 
             return;
         }

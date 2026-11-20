@@ -17,7 +17,7 @@ The Livewire component `PartyQueue` shows:
 - a search field: tracks whose name or artist matches (MariaDB `LIKE`, 20 results), from the leading library source, and **only tracks this device can play** (`LibraryPlayback::playableTracks`);
 - now playing and the next ten tracks, read-only, refreshed every 10 seconds (`wire:poll`).
 
-**Add** puts the track at the end of the queue (`QueueAddInterface::addToQueue`, through `SpotifyRouting::driverFor`, then the `QueueUpdated` ping on MQTT). When the device is not playing, the first track starts the music (`LibraryPlayback::playTrack`, the track alone).
+**Add** puts the track at the end of the queue (`QueueAddInterface::addToQueue`, through `DeviceRouting::driverFor`, then the `QueueUpdated` ping on MQTT). When the device is not playing, the first track starts the music (`LibraryPlayback::playTrack`, the track alone).
 
 ## Limits
 

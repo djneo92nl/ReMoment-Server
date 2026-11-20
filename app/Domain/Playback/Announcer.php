@@ -4,8 +4,8 @@ namespace App\Domain\Playback;
 
 use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\DeviceCache;
+use App\Domain\Device\DeviceRouting;
 use App\Domain\Device\DeviceVolume;
-use App\Domain\Device\SpotifyRouting;
 use App\Domain\Device\State;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\PlayStreamUrlInterface;
@@ -57,7 +57,7 @@ final class Announcer
 
         if ($memory['kind'] === PlaybackSnapshot::SPOTIFY) {
             // Spotify plays from the cloud: pause it there, or it takes the speaker back during the clip.
-            $this->quietly(fn () => SpotifyRouting::driverFor($device, MediaControlsInterface::class)->pause());
+            $this->quietly(fn () => DeviceRouting::driverFor($device, MediaControlsInterface::class)->pause());
         }
 
         if ($volume !== null) {

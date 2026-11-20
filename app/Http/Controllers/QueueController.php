@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Domain\Device\SpotifyRouting;
+use App\Domain\Device\DeviceRouting;
 use App\Domain\Library\QueueTracks;
 use App\Events\Device\QueueUpdated;
 use App\Integrations\Contracts\QueueAddInterface;
@@ -29,7 +29,7 @@ class QueueController extends Controller
         $next = $request->boolean('next');
         $contract = $next ? QueuePlayNextInterface::class : QueueAddInterface::class;
         $what = isset($data['label']) ? "\"{$data['label']}\"" : 'that';
-        $driver = SpotifyRouting::driverFor($device, $contract);
+        $driver = DeviceRouting::driverFor($device, $contract);
 
         if (!($driver instanceof $contract)) {
             return back()->with('error', "{$device->device_name} can't edit its queue that way.");

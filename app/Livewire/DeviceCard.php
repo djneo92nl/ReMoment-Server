@@ -4,7 +4,7 @@ namespace App\Livewire;
 
 use App\Domain\Device\Cache\Volume;
 use App\Domain\Device\DeviceCache;
-use App\Domain\Device\SpotifyRouting;
+use App\Domain\Device\DeviceRouting;
 use App\Domain\Device\State;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\MultiRoomInterface;
@@ -64,7 +64,7 @@ class DeviceCard extends Component
             $this->supportsRadio = $driver instanceof RadioControlInterface;
             $this->supportsPower = $driver instanceof PowerInterface;
             $this->supportsWake = $this->supportsPower && method_exists($driver, 'canWakeOnLan') && $driver->canWakeOnLan();
-            $this->supportsSeek = SpotifyRouting::driverFor($device, SeekInterface::class) instanceof SeekInterface;
+            $this->supportsSeek = DeviceRouting::driverFor($device, SeekInterface::class) instanceof SeekInterface;
             // Asking the device costs a network round trip, so only the
             // single-device page reads it; grid cards start unmuted.
             // The page never waits for a device: mute is what its listener last cached.
@@ -118,7 +118,7 @@ class DeviceCard extends Component
         $this->refresh();
 
         // Lyrics and "Add to library" only on the single-device page, not for every card in the grid.
-        $canAdd = $this->standalone && $this->refreshTrackExtras(DeviceCache::getNowPlaying($this->device->id));
+        $canAdd = $this->standalone && $this->refreshTrackExtras(DeviceRouting::nowPlayingFor($this->device));
 
         return view('livewire.device-card', ['canAdd' => $canAdd]);
     }

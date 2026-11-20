@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use App\Domain\SubDevices\DeviceLinks;
-use App\Domain\SubDevices\HostIndex;
+use App\Domain\SubDevices\LinkIndex;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -36,10 +36,9 @@ class DeviceLink extends Model
     {
         static::saving(fn (self $link) => DeviceLinks::validate($link));
 
-        // The per-request index of hosts is stale once a link changes.
-        $forget = fn () => app()->forgetInstance(HostIndex::class);
-        static::saved($forget);
-        static::deleted($forget);
+        // The cached index of hosts is stale once a link changes.
+        static::saved(fn () => LinkIndex::forget());
+        static::deleted(fn () => LinkIndex::forget());
     }
 
     /** The sub device. */

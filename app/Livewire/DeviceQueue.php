@@ -4,7 +4,7 @@ namespace App\Livewire;
 
 use App\Domain\Artwork\LibraryItemArtwork;
 use App\Domain\Device\DeviceCapabilities;
-use App\Domain\Device\SpotifyRouting;
+use App\Domain\Device\DeviceRouting;
 use App\Domain\Device\State;
 use App\Integrations\Contracts\QueueInterface;
 use App\Livewire\Concerns\EditsQueue;
@@ -39,7 +39,7 @@ class DeviceQueue extends Component
 
         if ($this->ready && $this->device->state !== State::Unreachable) {
             try {
-                $driver = SpotifyRouting::driverFor($this->device, QueueInterface::class);
+                $driver = DeviceRouting::driverFor($this->device, QueueInterface::class);
                 if ($driver instanceof QueueInterface) {
                     $items = array_map(function ($item) {
                         $row = $item->toArray();

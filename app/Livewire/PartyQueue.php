@@ -4,7 +4,7 @@ namespace App\Livewire;
 
 use App\Domain\Artwork\LibraryItemArtwork;
 use App\Domain\Device\DeviceCache;
-use App\Domain\Device\SpotifyRouting;
+use App\Domain\Device\DeviceRouting;
 use App\Domain\Device\State;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\LibrarySources;
@@ -91,7 +91,7 @@ class PartyQueue extends Component
 
         try {
             if (in_array($device->state, [State::Playing, State::Paused], true)) {
-                $driver = SpotifyRouting::driverFor($device, QueueAddInterface::class);
+                $driver = DeviceRouting::driverFor($device, QueueAddInterface::class);
                 if (!($driver instanceof QueueAddInterface)) {
                     throw new \RuntimeException('no queue');
                 }
@@ -152,7 +152,7 @@ class PartyQueue extends Component
         }
 
         try {
-            $driver = SpotifyRouting::driverFor($device, QueueInterface::class);
+            $driver = DeviceRouting::driverFor($device, QueueInterface::class);
 
             return $driver instanceof QueueInterface
                 ? array_map(function ($item) {

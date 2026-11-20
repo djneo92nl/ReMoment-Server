@@ -29,6 +29,7 @@ use App\Listeners\Device\StorePlaybackHistory;
 use App\Listeners\Device\SwitchToDefaultSource;
 use App\Listeners\Device\SyncGroupMirror;
 use App\Listeners\Device\SyncNowPlayingDataWithState;
+use App\Listeners\Device\TrackSubDeviceLinks;
 use App\Listeners\Device\UpdateDeviceCache;
 use App\Services\MqttService;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -52,7 +53,6 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scoped(\App\Support\SelectedDevice::class);
         $this->app->scoped(\App\Domain\Artwork\ArtworkEntryMemo::class);
         $this->app->scoped(\App\Domain\Library\IdAliases::class);
-        $this->app->scoped(\App\Domain\SubDevices\HostIndex::class);
     }
 
     /**
@@ -85,6 +85,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(QueryExecuted::class, fn (QueryExecuted $query) => LibraryCache::observe($query->sql));
 
         Event::listen(NowPlayingUpdated::class, [UpdateDeviceCache::class, 'handle']);
+        Event::listen(NowPlayingUpdated::class, TrackSubDeviceLinks::class);
         Event::listen(NowPlayingUpdated::class, [StorePlaybackHistory::class, 'handle']);
         Event::listen(NowPlayingUpdated::class, PublishNowPlayingToMqtt::class);
         Event::listen(NowPlayingUpdated::class, DispatchArtworkProcessing::class);
@@ -95,6 +96,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(ProgressUpdated::class, PublishProgressToMqtt::class);
         Event::listen(ProgressUpdated::class, SyncGroupMirror::class);
         Event::listen(NowPlayingEnded::class, UpdateDeviceCache::class);
+        Event::listen(NowPlayingEnded::class, TrackSubDeviceLinks::class);
         Event::listen(NowPlayingEnded::class, [ClosePlaybackHistory::class, 'handle']);
         // First: a device above its volume limit is set back (VolumeLimits); the report itself still goes on.
         Event::listen(VolumeUpdated::class, EnforceVolumeLimit::class);
@@ -114,6 +116,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(DeviceStateChanged::class, PublishStateToMqtt::class);
         Event::listen(DeviceStateChanged::class, SyncNowPlayingDataWithState::class);
         Event::listen(DeviceStateChanged::class, SwitchToDefaultSource::class);
+        Event::listen(DeviceStateChanged::class, TrackSubDeviceLinks::class);
         Event::listen(DeviceStateChanged::class, SyncGroupMirror::class);
 
         // Home Assistant discovery (opt-in): playback events, and the client and device entities that follow the records.

@@ -5,7 +5,7 @@
     if (!$listenerRunning) {
         $state = \App\Domain\Device\State::Unreachable;
     }
-    $nowPlaying = \App\Domain\Device\DeviceCache::getNowPlaying($device->id);
+    $nowPlaying = \App\Domain\Device\DeviceRouting::nowPlayingFor($device);
     $isPlaying  = $state === \App\Domain\Device\State::Playing;
     $isPaused   = $state === \App\Domain\Device\State::Paused;
     $isActive   = $isPlaying || $isPaused;

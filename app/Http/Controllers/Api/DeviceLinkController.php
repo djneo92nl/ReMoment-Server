@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Domain\SubDevices\DeviceLinks;
 use App\Domain\SubDevices\InvalidDeviceLink;
+use App\Domain\SubDevices\LinkMeta;
 use App\Domain\SubDevices\LinkSuggestions;
 use App\Http\Controllers\Controller;
 use App\Models\Device;
@@ -44,7 +45,7 @@ class DeviceLinkController extends Controller
                 'host_device_id' => $data['host_device_id'],
                 'kind' => $data['kind'],
                 'via' => $data['via'] ?? '',
-                'meta' => $data['meta'] ?? null,
+                'meta' => LinkMeta::replace($data['meta'] ?? null, null),
             ]);
         } catch (InvalidDeviceLink $e) {
             return $this->invalid($e->getMessage());
@@ -62,14 +63,15 @@ class DeviceLinkController extends Controller
             'meta' => ['sometimes', 'nullable', 'array'],
         ]);
 
-        if (array_key_exists('via', $data)) {
-            $link->via = (string) $data['via'];
-        }
-        if (array_key_exists('meta', $data)) {
-            $link->meta = $data['meta'];
-        }
-
         try {
+            if (array_key_exists('via', $data)) {
+                $link->via = (string) $data['via'];
+            }
+            if (array_key_exists('meta', $data)) {
+                // What the server keeps on the link (`state`) survives an edit of the settings.
+                $link->meta = LinkMeta::replace($data['meta'], $link->meta);
+            }
+
             $link->save();
         } catch (InvalidDeviceLink $e) {
             return $this->invalid($e->getMessage());

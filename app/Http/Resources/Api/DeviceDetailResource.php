@@ -4,7 +4,7 @@ namespace App\Http\Resources\Api;
 
 use App\Domain\Artwork\NowPlayingArtwork;
 use App\Domain\Device\Cache\Modes;
-use App\Domain\Device\DeviceCache;
+use App\Domain\Device\DeviceRouting;
 use App\Domain\Device\RemoteKey;
 use App\Domain\Device\State;
 use App\Domain\Library\NowPlayingLibrary;
@@ -25,7 +25,9 @@ class DeviceDetailResource extends JsonResource
 
         $nowPlaying = null;
         if ($this->state !== State::Unreachable) {
-            $cachedNowPlaying = DeviceCache::getNowPlaying($this->id);
+            // While a sub device's input is selected and it plays something, that is what the host shows.
+            $cachedNowPlaying = DeviceRouting::nowPlayingFor($this->resource);
+            $shownDeviceId = DeviceRouting::nowPlayingDevice($this->resource)->id;
             $nowPlaying = $cachedNowPlaying?->toArray();
 
             if ($nowPlaying !== null && $cachedNowPlaying !== null) {
@@ -34,7 +36,7 @@ class DeviceDetailResource extends JsonResource
                     $nowPlaying['artwork'] = $artwork;
                 }
 
-                $nowPlaying['modes'] = Modes::get($this->id)->toArray();
+                $nowPlaying['modes'] = Modes::get($shownDeviceId)->toArray();
 
                 if (($library = NowPlayingLibrary::for($cachedNowPlaying)) !== null) {
                     $nowPlaying['library'] = $library;

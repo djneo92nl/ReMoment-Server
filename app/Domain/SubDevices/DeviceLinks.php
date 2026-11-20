@@ -36,6 +36,8 @@ final class DeviceLinks
             throw new InvalidDeviceLink('A link of kind '.$link->kind.' needs the host input or source it is connected to.');
         }
 
+        $link->meta = LinkMeta::normalize($link->meta);
+
         if (self::isHost((int) $link->device_id, $link->exists ? $link->id : null)) {
             throw new InvalidDeviceLink('That device is a host itself: sub devices go one level deep.');
         }

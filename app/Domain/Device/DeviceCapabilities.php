@@ -7,7 +7,7 @@ use App\Domain\Device\Cache\Battery;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Playback\PlaybackCapture;
 use App\Domain\Playback\SyncGroups;
-use App\Domain\SubDevices\HostIndex;
+use App\Domain\SubDevices\LinkIndex;
 use App\Integrations\ReMoment\PlayerDevice;
 use App\Integrations\ReMoment\PlayerDriver;
 use App\Models\Device;
@@ -20,7 +20,7 @@ use App\Models\Device;
  * capabilities its model has no hardware for (HardwareFeatures).
  * `sync_group` is reported for a device that can follow a leader (SyncGroups::canFollow).
  * `move_playback` is reported while something plays that can be moved to another device
- * (PlaybackCapture::movable). `sub_devices` is reported for a host that has a sub device linked (HostIndex, read once per request). `source_controls` is reported while the active source has controls a
+ * (PlaybackCapture::movable). `sub_devices` is reported for a host that has a sub device linked (LinkIndex, cached). `source_controls` is reported while the active source has controls a
  * transport can deliver (SourceControls). `battery` is reported only once the
  * device's listener has seen a battery: a driver also covers mains-powered
  * models.
@@ -30,7 +30,7 @@ final class DeviceCapabilities
     /** @return string[] */
     public static function for(Device $device): array
     {
-        $capabilities = SpotifyRouting::capabilities($device);
+        $capabilities = DeviceRouting::capabilities($device);
 
         if (!in_array('library_playback', $capabilities, true) && LibraryPlayback::availableFor($device)) {
             $capabilities[] = 'library_playback';
@@ -56,7 +56,7 @@ final class DeviceCapabilities
             $capabilities[] = 'sync_group';
         }
 
-        if (app(HostIndex::class)->isHost($device->id)) {
+        if (LinkIndex::isHost($device->id)) {
             $capabilities[] = 'sub_devices';
         }
 

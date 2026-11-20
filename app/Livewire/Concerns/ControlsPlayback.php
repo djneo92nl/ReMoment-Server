@@ -3,8 +3,8 @@
 namespace App\Livewire\Concerns;
 
 use App\Domain\Device\Cache\Volume;
+use App\Domain\Device\DeviceRouting;
 use App\Domain\Device\DeviceVolume;
-use App\Domain\Device\SpotifyRouting;
 use App\Integrations\Contracts\MediaControlsInterface;
 use App\Integrations\Contracts\SeekInterface;
 use App\Integrations\Contracts\VolumeControlInterface;
@@ -101,7 +101,7 @@ trait ControlsPlayback
         }
 
         $this->attempt(function () use ($device, $contract, $apply, $plain) {
-            $driver = $plain ? $device->driver : SpotifyRouting::driverFor($device, $contract);
+            $driver = $plain ? $device->driver : DeviceRouting::driverFor($device, $contract);
 
             if ($driver instanceof $contract) {
                 $apply($driver);

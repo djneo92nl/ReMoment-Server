@@ -25,7 +25,7 @@
 @php
     $state = \App\Domain\Device\DeviceCache::isListenerRunning($device->id) ? $device->state : \App\Domain\Device\State::Unreachable;
     $isPlaying = $state === \App\Domain\Device\State::Playing;
-    $nowPlaying = \App\Domain\Device\DeviceCache::getNowPlaying($device->id);
+    $nowPlaying = \App\Domain\Device\DeviceRouting::nowPlayingFor($device);
     $artwork = $nowPlaying ? \App\Domain\Artwork\NowPlayingArtwork::resolve($nowPlaying) : null;
     $thumb = \App\Domain\Artwork\LibraryItemArtwork::webUrl($artwork['proxy_120'] ?? $artwork['proxy_320'] ?? null);
     $track = $nowPlaying?->track;

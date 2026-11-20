@@ -5,11 +5,15 @@ namespace App\Integrations\BangOlufsen\Ase\Control;
 use App\Domain\Control\ControlProfile;
 use App\Domain\Control\ControlTransport;
 use App\Domain\Device\DeviceCache;
+use App\Domain\SubDevices\DeviceLinks;
+use App\Domain\SubDevices\LinkState;
+use App\Integrations\BangOlufsen\Ase\ConverterDriver;
 use App\Integrations\BangOlufsen\Ase\MusicPlayerDriver;
 use App\Integrations\BangOlufsen\Ase\VideoPlayerDriver;
 use App\Integrations\Common\HttpConnector;
 use App\Integrations\Common\UnsupportedOperationException;
 use App\Models\Device;
+use App\Models\DeviceLink;
 
 /**
  * FM presets of a BeoLink Converter NL/ML's tuner, pressed from an ASE player
@@ -23,7 +27,8 @@ use App\Models\Device;
  *
  * Sending the same calls to the converter itself does nothing useful (it logs an
  * IR command for the ML product and the tuner ignores it), so the source must
- * be borrowed and the command goes to the player. Tuning (`tune_up`/`tune_down`)
+ * be borrowed and the command goes to the player (the player's link to the converter says it is: see
+ * `playsConverterSource()`). Tuning (`tune_up`/`tune_down`)
  * has no known call and is not offered.
  * See docs/architecture/ase-api-map.md, "NetworkLink/MasterLink converter".
  */
@@ -63,9 +68,20 @@ final class ConverterDigitTransport implements ControlTransport
             || is_a((string) $device->device_driver, VideoPlayerDriver::class, true);
     }
 
-    /** Whether the device is playing a source that belongs to a converter (its own source jid names the product). */
+    /**
+     * Whether the player plays a source of a converter: the player has a link to a converter (`device_links`, a sub device
+     * with the `ConverterDriver`) and that link is active, that is the player has one of the converter's sources selected.
+     * A player with no link to a converter at all (borrowed before links existed) is judged as before, by the product type
+     * in its source's jid, so FM presets keep working until the link is made (the card's "Ask the device" does it).
+     */
     private function playsConverterSource(Device $device): bool
     {
+        $links = DeviceLinks::subLinks($device)->filter(fn (DeviceLink $link) => is_a((string) $link->device->device_driver, ConverterDriver::class, true));
+
+        if ($links->isNotEmpty()) {
+            return $links->contains(fn (DeviceLink $link) => LinkState::active($link->setRelation('host', $device)) === true);
+        }
+
         $jid = DeviceCache::getNowPlaying($device->id)?->source?->jid;
 
         return $jid !== null

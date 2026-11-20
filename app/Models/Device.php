@@ -39,6 +39,9 @@ class Device extends Model
 
     protected static function booted(): void
     {
+        // A deleted device takes its links with it (ON DELETE CASCADE does not fire model events): the cached index of hosts is stale.
+        static::deleted(fn () => \App\Domain\SubDevices\LinkIndex::forget());
+
         // An address changed by hand or by discovery: the control URLs stored for a UPnP renderer name the old host.
         // Point them at the new one (keeping port and path: some renderers, like the Streamium's :7123, do not answer
         // searches, so the stored URL is the only way to them) and let the listener start again at the new address.

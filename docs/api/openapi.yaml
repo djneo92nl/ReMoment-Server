@@ -731,7 +731,8 @@ paths:
         Ordered by `sort_order`. Includes hidden sources (`hidden: true`); pass `visible=1` for the picker
         (visible only). Visibility is household-wide and changed with `PUT /admin/devices/{device}/sources/{source_id}`.
         `in_use` is NOT "selected" on B&O devices; use `active` (absent when the device cannot tell; then match
-        `now_playing.source` against `source_type` or name). See `docs/ux/sources.md`.
+        `now_playing.source` against `source_type` or name). See `docs/ux/sources.md`. A host's links are in the
+        list too: `sub_device` on the source a sub device is connected through.
       operationId: listSources
       parameters:
         - name: visible
@@ -4884,8 +4885,25 @@ components:
         host_name: { type: string, nullable: true }
         kind: { $ref: "#/components/schemas/DeviceLinkKind" }
         via: { type: string, nullable: true, description: "The host's source id or input label that selects the sub device; null for a borrow link covering every source" }
-        meta: { type: object, additionalProperties: true }
+        meta:
+          type: object
+          description: |
+            `on_activate` / `on_deactivate`: lists of `{action: power_on | power_off | source, source_id?}` run on the sub device when the link
+            becomes active or ends; `follow` (`off`, `from_standby`, `always`; default `from_standby`) and `follow_off_after` (minutes):
+            the follow rule; `state`: what the server keeps (read only). Anything else is refused.
+          properties:
+            on_activate: { type: array, items: { $ref: "#/components/schemas/DeviceLinkAction" } }
+            on_deactivate: { type: array, items: { $ref: "#/components/schemas/DeviceLinkAction" } }
+            follow: { type: string, enum: [off, from_standby, always] }
+            follow_off_after: { type: integer, minimum: 1, maximum: 1440 }
+            state: { type: object, additionalProperties: true }
         active: { type: boolean, nullable: true }
+    DeviceLinkAction:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, enum: [power_on, power_off, source] }
+        source_id: { type: string, description: "Needed for the source action" }
     DeviceList:
       type: object
       properties:
@@ -5098,6 +5116,12 @@ components:
         signal:
           type: boolean
           description: The source has a signal (an HDMI box that is on). Show it as a status dot. Absent when the device cannot tell (B&O TVs report it).
+        sub_device:
+          type: object
+          description: "A sub device is connected to the host through this source or input (device links, docs/api/sub-devices.md). A link that names no source the host lists gets an entry of its own (category `link`, `source_type` the link's kind in capitals, `source_id` and `input` = the link's `via`), after the others."
+          properties:
+            id: { type: integer }
+            name: { type: string }
         hidden: { type: boolean, description: "Household preference; hidden sources stay out of pickers. QPlay and borrowed sources start hidden." }
         sort_order: { type: integer }
     RadioStation:

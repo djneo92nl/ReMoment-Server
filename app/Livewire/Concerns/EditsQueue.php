@@ -2,7 +2,7 @@
 
 namespace App\Livewire\Concerns;
 
-use App\Domain\Device\SpotifyRouting;
+use App\Domain\Device\DeviceRouting;
 use App\Events\Device\QueueUpdated;
 use App\Integrations\Contracts\QueueClearInterface;
 use App\Integrations\Contracts\QueueMoveInterface;
@@ -45,7 +45,7 @@ trait EditsQueue
         }
 
         try {
-            $driver = SpotifyRouting::driverFor($device, $contract);
+            $driver = DeviceRouting::driverFor($device, $contract);
 
             if ($driver instanceof $contract) {
                 $apply($driver);

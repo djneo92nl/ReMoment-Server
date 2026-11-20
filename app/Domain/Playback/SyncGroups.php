@@ -3,6 +3,7 @@
 namespace App\Domain\Playback;
 
 use App\Domain\Device\DeviceCache;
+use App\Domain\Device\DeviceRouting;
 use App\Domain\Device\SpotifyRouting;
 use App\Domain\Device\State;
 use App\Domain\Library\LibraryPlayback;
@@ -273,7 +274,7 @@ final class SyncGroups
     /** Sends play, pause or stop to a device, best effort. */
     public function control(Device $device, string $action): void
     {
-        $driver = SpotifyRouting::driverFor($device, MediaControlsInterface::class);
+        $driver = DeviceRouting::driverFor($device, MediaControlsInterface::class);
 
         if (!($driver instanceof MediaControlsInterface)) {
             return;
@@ -288,7 +289,7 @@ final class SyncGroups
 
     public function seek(Device $device, int $seconds): void
     {
-        $driver = SpotifyRouting::driverFor($device, SeekInterface::class);
+        $driver = DeviceRouting::driverFor($device, SeekInterface::class);
 
         if ($driver instanceof SeekInterface) {
             $driver->seek($seconds);

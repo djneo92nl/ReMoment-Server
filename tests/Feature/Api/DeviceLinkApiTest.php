@@ -140,4 +140,46 @@ class DeviceLinkApiTest extends TestCase
             ->assertStatus(502)
             ->assertJsonPath('error', 'driver_error');
     }
+
+    public function test_the_actions_and_the_follow_rule_are_stored_normalised_and_the_servers_state_survives_an_edit(): void
+    {
+        $tv = $this->device('V1');
+        $dongle = $this->device('Chromecast');
+
+        $id = $this->postJson('/api/admin/device-links', [
+            'device_id' => $dongle->id, 'host_device_id' => $tv->id, 'kind' => 'input', 'via' => 'hdmi_1',
+            'meta' => ['on_activate' => ['action' => 'power_on'], 'follow' => 'always', 'follow_off_after' => 20, 'state' => ['woke_host' => true]],
+        ], $this->auth)
+            ->assertCreated()
+            ->assertJsonPath('meta.on_activate', [['action' => 'power_on']])
+            ->assertJsonPath('meta.follow', 'always')
+            ->assertJsonMissingPath('meta.state')
+            ->json('id');
+
+        // The server keeps its own state on the link; an edit of the settings does not carry it and does not lose it.
+        $link = DeviceLink::find($id);
+        $link->update(['meta' => [...$link->meta, 'state' => ['woke_host' => true]]]);
+
+        $this->putJson("/api/admin/device-links/{$id}", ['meta' => ['follow' => 'off', 'state' => ['woke_host' => false]]], $this->auth)
+            ->assertOk()
+            ->assertJsonPath('meta.follow', 'off')
+            ->assertJsonPath('meta.state.woke_host', true)
+            ->assertJsonMissingPath('meta.on_activate');
+    }
+
+    public function test_a_setting_the_link_does_not_know_is_a_422(): void
+    {
+        $tv = $this->device('V1');
+        $dongle = $this->device('Chromecast');
+
+        $this->postJson('/api/admin/device-links', [
+            'device_id' => $dongle->id, 'host_device_id' => $tv->id, 'kind' => 'input', 'via' => 'hdmi_1', 'meta' => ['on_activte' => []],
+        ], $this->auth)->assertStatus(422)->assertJsonPath('error', 'invalid');
+
+        $link = DeviceLinks::add($dongle, $tv, 'input', 'hdmi_1');
+        $this->putJson("/api/admin/device-links/{$link->id}", ['meta' => ['follow' => 'sometimes']], $this->auth)
+            ->assertStatus(422)
+            ->assertJsonPath('error', 'invalid');
+        $this->assertSame(0, DeviceLink::whereNotNull('meta')->count());
+    }
 }

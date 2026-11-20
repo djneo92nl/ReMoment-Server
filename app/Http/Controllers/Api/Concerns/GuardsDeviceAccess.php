@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Concerns;
 
+use App\Domain\Device\DeviceRouting;
 use App\Domain\Device\HardwareFeatures;
 use App\Domain\Device\SpotifyRouting;
 use App\Domain\Device\State;
@@ -46,7 +47,7 @@ trait GuardsDeviceAccess
             return $error;
         }
 
-        $driver = SpotifyRouting::driverFor($device, $contract);
+        $driver = DeviceRouting::driverFor($device, $contract);
 
         if (!($driver instanceof $contract) || !HardwareFeatures::allows($device, $capability)) {
             return $this->unsupported($capability);

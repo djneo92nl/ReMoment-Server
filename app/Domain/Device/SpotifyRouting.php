@@ -5,18 +5,6 @@ namespace App\Domain\Device;
 use App\Domain\Device\Cache\Modes;
 use App\Domain\Spotify\LibrespotStream;
 use App\Events\Device\PlaybackModesUpdated;
-use App\Integrations\Contracts\LikeInterface;
-use App\Integrations\Contracts\MediaControlsInterface;
-use App\Integrations\Contracts\QueueAddInterface;
-use App\Integrations\Contracts\QueueClearInterface;
-use App\Integrations\Contracts\QueueInterface;
-use App\Integrations\Contracts\QueueJumpInterface;
-use App\Integrations\Contracts\QueueMoveInterface;
-use App\Integrations\Contracts\QueuePlayNextInterface;
-use App\Integrations\Contracts\QueueRemoveInterface;
-use App\Integrations\Contracts\RepeatInterface;
-use App\Integrations\Contracts\SeekInterface;
-use App\Integrations\Contracts\ShuffleInterface;
 use App\Integrations\Sonos\MusicPlayerDriver as SonosDriver;
 use App\Integrations\Spotify\MusicPlayerDriver as SpotifyDriver;
 use App\Models\Device;
@@ -30,28 +18,17 @@ use Illuminate\Support\Collection;
  * playback capabilities on top of its own, and device lists drop the
  * Spotify virtual device. The routed device id is set by the Spotify
  * listener (`DeviceCache::setSpotifyRoutedDevice()`, 30 s TTL).
+ *
+ * This is the Spotify rule of `DeviceRouting`, which callers ask for the driver and the capabilities (it adds the sub
+ * device rule); the Spotify-only state (routed device, modes, device lists) stays here.
  */
 final class SpotifyRouting
 {
     /**
-     * Contracts the Spotify driver handles for the routed speaker. Volume,
-     * mute, power, sources, multiroom, radio and library playback stay with
-     * the speaker's own driver.
+     * Contracts the Spotify driver handles for the routed speaker (the same as for a sub device, see DeviceRouting).
+     * Volume, mute, power, sources, multiroom, radio and library playback stay with the speaker's own driver.
      */
-    public const DELEGATED_CONTRACTS = [
-        MediaControlsInterface::class,
-        SeekInterface::class,
-        QueueInterface::class,
-        QueueJumpInterface::class,
-        QueueAddInterface::class,
-        QueuePlayNextInterface::class,
-        QueueRemoveInterface::class,
-        QueueMoveInterface::class,
-        QueueClearInterface::class,
-        ShuffleInterface::class,
-        RepeatInterface::class,
-        LikeInterface::class,
-    ];
+    public const DELEGATED_CONTRACTS = DeviceRouting::DELEGATED_CONTRACTS;
 
     public static function routedDeviceId(): ?int
     {
@@ -147,23 +124,30 @@ final class SpotifyRouting
     /**
      * API capabilities of $device: its own driver's, plus the Spotify
      * driver's playback capabilities while it is the routed target.
+     * (`DeviceRouting::capabilities()` is what the API reports: it adds the sub device rule too.)
      *
      * @return string[]
      */
     public static function capabilities(Device $device): array
     {
-        $own = Capabilities::forDriver($device->device_driver);
+        return Capabilities::sort(array_merge(Capabilities::forDriver($device->device_driver), self::delegatedCapabilities($device)));
+    }
 
+    /**
+     * The Spotify driver's playback capabilities while $device is the routed target, else none.
+     *
+     * @return string[]
+     */
+    public static function delegatedCapabilities(Device $device): array
+    {
         if (!self::isRoutedTarget($device) || !($spotify = self::spotifyDevice())) {
-            return $own;
+            return [];
         }
 
-        $delegated = array_intersect(
+        return array_values(array_intersect(
             Capabilities::forDriver($spotify->device_driver),
             Capabilities::forContracts(self::DELEGATED_CONTRACTS),
-        );
-
-        return Capabilities::sort(array_merge($own, $delegated));
+        ));
     }
 
     /**

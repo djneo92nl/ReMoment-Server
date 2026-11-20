@@ -39,6 +39,8 @@ All contracts live in `app/Integrations/Contracts/`.
 
 A driver covers a whole platform, but some features need hardware only some models have (WiSA on the Moment). `App\Domain\Device\HardwareFeatures` reads such per-model flags from `config/devices.php`, matched on the device's product type; `DeviceCapabilities::for()` drops a capability the model lacks and the settings API answers `422` for it.
 
+Which driver executes a playback command is not always the device's own: `App\Domain\Device\DeviceRouting::driverFor($device, $contract)` routes it to the Spotify virtual device (a speaker playing Spotify Connect) or to a sub device whose link is active (see [sub-devices.md](sub-devices.md)); code that sends transport, seek, queue or shuffle/repeat/like commands asks it instead of reading `$device->driver`.
+
 The API and UI check these interfaces to determine a device's capabilities at runtime — no separate capability configuration is needed. `App\Domain\Device\Capabilities::forDriver()` maps each contract to its REST capability string (`seek`, `queue`, …) from the driver *class name*, so listing devices never instantiates a driver or touches the network. The current shuffle/repeat/liked values are not read through the driver: the device's listener fires `PlaybackModesUpdated` with a `PlaybackModes` (`shuffle` ?bool, `repeat` ?`RepeatMode`, `liked` ?bool; null = unknown) whenever what it observes changes, which feeds `now_playing.modes` (cache `device:{id}:modes`) and the MQTT `/modes` topic. `MultiRoomInterface::getMultiRoomId()` also writes the platform ID (JID, UUID) to `device_meta` under the key returned by `multiRoomMetaKey()`, so devices can be looked up by peer ID later.
 
 ## Existing Drivers

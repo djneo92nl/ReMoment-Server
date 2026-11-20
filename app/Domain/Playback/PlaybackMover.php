@@ -3,7 +3,7 @@
 namespace App\Domain\Playback;
 
 use App\Domain\Device\DeviceCache;
-use App\Domain\Device\SpotifyRouting;
+use App\Domain\Device\DeviceRouting;
 use App\Domain\Device\State;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\NotPlayableException;
@@ -161,7 +161,7 @@ final class PlaybackMover
 
     private function seek(Device $device, int $seconds): void
     {
-        $driver = SpotifyRouting::driverFor($device, SeekInterface::class);
+        $driver = DeviceRouting::driverFor($device, SeekInterface::class);
 
         if ($driver instanceof SeekInterface) {
             try {
@@ -174,7 +174,7 @@ final class PlaybackMover
 
     private function pause(Device $device): void
     {
-        $driver = SpotifyRouting::driverFor($device, MediaControlsInterface::class);
+        $driver = DeviceRouting::driverFor($device, MediaControlsInterface::class);
 
         try {
             $driver->pause();
@@ -185,7 +185,7 @@ final class PlaybackMover
 
     private function stop(Device $device): void
     {
-        $driver = SpotifyRouting::driverFor($device, MediaControlsInterface::class);
+        $driver = DeviceRouting::driverFor($device, MediaControlsInterface::class);
 
         if ($driver instanceof MediaControlsInterface) {
             try {

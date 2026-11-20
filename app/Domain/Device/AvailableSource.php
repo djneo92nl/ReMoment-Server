@@ -19,6 +19,8 @@ class AvailableSource
         public ?bool $active = null,
         /** The source has a signal (an HDMI box that is on); null when the device cannot tell. */
         public ?bool $signal = null,
+        /** The sub device connected to the host through this source or input (`{id, name}`), see App\Domain\SubDevices\SubDeviceSources. */
+        public ?array $subDevice = null,
     ) {}
 
     public function toArray(): array
@@ -35,6 +37,7 @@ class AvailableSource
             'input' => $this->input,
             'active' => $this->active,
             'signal' => $this->signal,
+            'sub_device' => $this->subDevice,
         ], fn ($v) => $v !== null);
     }
 }

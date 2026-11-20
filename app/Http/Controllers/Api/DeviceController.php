@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Domain\Artwork\LibraryItemArtwork;
 use App\Domain\Device\Cache\Modes;
 use App\Domain\Device\Cache\Volume;
+use App\Domain\Device\DeviceRouting;
 use App\Domain\Device\MultiRoomPeers;
 use App\Domain\Device\PlaybackModes;
 use App\Domain\Device\RepeatMode;
@@ -27,6 +28,7 @@ use App\Domain\Playback\PlaybackMover;
 use App\Domain\Radio\Relay\RadioRelay;
 use App\Domain\Radio\StationNowPlaying;
 use App\Domain\Radio\StreamTitles;
+use App\Domain\SubDevices\SubDeviceSources;
 use App\Events\Device\PlaybackModesUpdated;
 use App\Http\Controllers\Api\Concerns\GuardsDeviceAccess;
 use App\Http\Controllers\Controller;
@@ -184,11 +186,11 @@ class DeviceController extends Controller
      */
     private function changeMode(Device $device, string $contract, string $capability, \Closure $apply, \Closure $update, array $response): JsonResponse
     {
-        return $this->withDriver($device, $contract, $capability, function ($driver) use ($device, $apply, $update, $response) {
+        return $this->withDriver($device, $contract, $capability, function ($driver) use ($device, $contract, $apply, $update, $response) {
             $apply($driver);
 
-            // While Spotify is routed to a speaker, its modes are reported for the speaker.
-            $modesDeviceId = SpotifyRouting::modesDeviceId($device);
+            // A sub device behind the host's selected input reports its own modes; while Spotify is routed to a speaker, its modes are reported for the speaker.
+            $modesDeviceId = DeviceRouting::modesDeviceId($device, $contract);
             event(new PlaybackModesUpdated((string) $modesDeviceId, $update(Modes::get($modesDeviceId)), routed: SpotifyRouting::routedDeviceId() === $modesDeviceId));
 
             return $response;
@@ -248,9 +250,10 @@ class DeviceController extends Controller
             SourceSync::store($device, $sources);
 
             $stored = $device->deviceSources()->get()->keyBy('source_id');
-            $rows = collect($sources)->map(fn ($s) => $s->toArray() + [
+            // The links of a host are entries of its list (the stored sources stay what the driver reported).
+            $rows = collect(SubDeviceSources::decorate($device, $sources))->map(fn ($s) => $s->toArray() + [
                 'hidden' => (bool) ($stored[$s->sourceId]->hidden ?? false),
-                'sort_order' => (int) ($stored[$s->sourceId]->sort_order ?? 0),
+                'sort_order' => (int) ($stored[$s->sourceId]->sort_order ?? SubDeviceSources::SORT_AFTER),
             ]);
 
             if ($request->boolean('visible')) {

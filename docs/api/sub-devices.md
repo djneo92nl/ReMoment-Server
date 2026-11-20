@@ -33,3 +33,28 @@ DELETE /api/admin/device-links/{link}            → { status: "ok" }
 Errors: `401` without the admin token, `422` `validation` for a bad body, `422` `invalid` with the reason for a link the rules refuse (a link to itself, the same link twice, a host that is a sub device, a sub device that is a host: sub devices go one level deep), `404` unknown link or device.
 
 MCP: tool `device_links` (ADMIN) with actions `list`, `suggestions`, `add`, `update`, `remove`; `get_device` shows the relation. OpenAPI: `listDeviceLinks`, `listDeviceLinkSuggestions`, `createDeviceLink`, `updateDeviceLink`, `deleteDeviceLink`.
+
+## What a link does on the host (open)
+
+While a link is active (the host has that input or source selected):
+
+- `POST /api/devices/{host}/play|pause|next|previous|stop`, `PUT …/seek`, `GET|POST|PUT|DELETE …/queue`, `PUT …/shuffle|repeat|like` are executed by the sub device's driver, as far as it implements them; volume, mute, power, other sources, multiroom, radio and library playback stay with the host. The host's `capabilities` list the sub device's playback capabilities while the link is active.
+- `now_playing` of the host is the sub device's (with its artwork and `modes`) while the sub device plays or pauses something, else the host's own. MQTT is unchanged: the sub device publishes on its own topic.
+- `GET /api/devices/{host}/sources` has the link in the list: `sub_device: { id, name }` on the source it is connected through, and an entry of its own (category `link`) when the host lists no such source; activate it with `POST …/sources/activate`.
+
+## Link settings (`meta`)
+
+`meta` of a link holds only these (anything else is a 422 `invalid`):
+
+```json
+{
+  "on_activate":   [{ "action": "power_on" }, { "action": "source", "source_id": "CD" }],
+  "on_deactivate": [{ "action": "power_off" }],
+  "follow": "from_standby",
+  "follow_off_after": 20
+}
+```
+
+- `on_activate` / `on_deactivate`: up to five actions for the **sub device**, run when the link becomes active or ends, whoever changed the host's input (`power_on`, `power_off`, `source` with `source_id`). They need the queue worker.
+- `follow` and `follow_off_after`: see the architecture document.
+- `state` (`woke_host`, ...) is the server's own; it is returned but never set, and an edit of the settings keeps it.

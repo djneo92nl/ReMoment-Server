@@ -9,7 +9,7 @@ use App\Models\DeviceLink;
 
 /**
  * Whether a link is active: the host has the sub device's input or source selected. Read from the cache the host's
- * listener keeps, so it never waits for a device. `null` is "unknown": the host's driver does not report its selected
+ * listener keeps (`ActiveInput`, else the source of its now playing), so it never waits for a device. `null` is "unknown": the host's driver does not report its selected
  * source (a Philips TV: its HDMI input is not readable), so the link is kept by hand and shows no state.
  */
 final class LinkState
@@ -26,6 +26,6 @@ final class LinkState
             return false;
         }
 
-        return LinkMatcher::matches($link, ActiveInput::get($host->id));
+        return LinkMatcher::matches($link, ActiveInput::get($host->id) ?? DeviceCache::getNowPlaying($host->id)?->source);
     }
 }
