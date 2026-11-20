@@ -368,6 +368,7 @@ TABLE file_analyses [engine=InnoDB collation=utf8mb4_unicode_ci]
   col spectral_cutoff_hz int(10) unsigned NULL default=NULL
   col stages longtext NULL default=NULL collate=utf8mb4_bin
   col stems longtext NULL default=NULL collate=utf8mb4_bin
+  col stem_audio longtext NULL default=NULL collate=utf8mb4_bin
   col trail_silence_ms int(10) unsigned NULL default=NULL
   col true_peak double NULL default=NULL
   col updated_at timestamp NULL default=NULL
@@ -386,6 +387,7 @@ TABLE file_analyses [engine=InnoDB collation=utf8mb4_unicode_ci]
   check mood_tags json_valid(`mood_tags`)
   check sections json_valid(`sections`)
   check stages json_valid(`stages`)
+  check stem_audio json_valid(`stem_audio`)
   check stems json_valid(`stems`)
   check waveform json_valid(`waveform`)
   check waveform_peak json_valid(`waveform_peak`)

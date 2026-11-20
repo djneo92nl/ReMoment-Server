@@ -309,6 +309,7 @@ TABLE file_analyses [autoincrement]
   col sections text NULL default=-
   col spectral_cutoff_hz integer NULL default=-
   col stages text NULL default=-
+  col stem_audio text NULL default=-
   col stems text NULL default=-
   col trail_silence_ms integer NULL default=-
   col true_peak float NULL default=-
