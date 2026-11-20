@@ -252,7 +252,11 @@ The app is a separate project that reads the REST API with the admin bearer toke
 | Delivery | signed part URL, 15 min | per-file signed URL, 6 h, or token; ranged |
 | Deletion | n/a | only entries of the target's manifest |
 
-## 13. Owner decisions (questions)
+## 13. Owner decisions
+
+**Answered 2026-11-20:** (1) first phase S1 + S2 + the iOS app; (2) a USB drive on the server host is a node on the same machine; (3) a capped artifact cache on the library disk shared between targets; (4) fill strategy defaults as proposed (`all` for small selections, `priority` otherwise, `fill_rest` explicit, 25 % churn); (5) a track deleted by hand is re-added at the next sync, an edited file is left alone and unmanaged; (6) the node is write-only in 1.0, no privileged mount helper, the UI says to wait until the job is done and then remove the drive; (7) mass-deletion confirmation as proposed, and no scheduled sync in the first version; (8) offline plays are scrobbled with their original time (within Last.fm's limit); (9) stock iPod via libgpod later or never, Rockbox iPod by folder recipe only; (10) one stick belongs to one server.
+
+The original questions follow for reference.
 
 1. **Smallest useful phase:** S1 + S2 + the iOS app first (recommended; no hardware), or S1 + S3 (a Mac/desktop CLI for folders and USB sticks, testable without a phone)?
 2. **USB on the server host = a node on the same machine** (recommended, section 1), or do you want the app container itself to write to a mounted path (simplest to build, needs the host's USB mounted and bound into the container, and never ejects safely)?
