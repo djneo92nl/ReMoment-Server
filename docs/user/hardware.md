@@ -68,6 +68,12 @@ Status key:
 |---|---|---|---|---|---|
 | Generic MediaRenderer | UPnP | verified on hardware | 2026-10-22 | Verified on a Philips Streamium MCi900 only; other renderers are untested, a WiiM is built from documentation. | `media_controls`, `volume_control`, `radio_control`, `library_playback`, `seek`, `queue`, `queue_jump`, `queue_add`, `queue_next`, `queue_remove`, `queue_move`, `queue_clear`, `shuffle`, `repeat`, `device_info`, `stream_url` |
 
+### Google
+
+| Model | Driver | Status | Checked | Note | What the server can do |
+|---|---|---|---|---|---|
+| Chromecast | Cast | fake-tested only | 2026-11-20 | What is casting and its transport, built on the Cast v2 protocol and tested with fakes; the receiver status read (cast:probe) was only run against a TV with Chromecast built in, never a dongle. | `media_controls`, `seek` |
+
 ### Philips TV
 
 | Model | Driver | Status | Checked | Note | What the server can do |

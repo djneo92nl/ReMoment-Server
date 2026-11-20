@@ -56,5 +56,6 @@ While a link is active (the host has that input or source selected):
 ```
 
 - `on_activate` / `on_deactivate`: up to five actions for the **sub device**, run when the link becomes active or ends, whoever changed the host's input (`power_on`, `power_off`, `source` with `source_id`). They need the queue worker.
-- `follow` and `follow_off_after`: see the architecture document.
+- `follow`: `off`, `from_standby` (default) or `always`: when the sub device starts playing, the host selects the link's `via` (only `input` and `source` links). `from_standby` switches only a host in standby (a cast wakes the TV, and never takes the screen from another input); `always` also takes it from another input. After a short debounce (`SUB_DEVICE_FOLLOW_DEBOUNCE`, 5 s) and only if the session still plays; the Chromecast's idle backdrop is not a session. Needs the queue worker.
+- `follow_off_after`: minutes (1 to 1440) or null. The host goes to standby that long after the sub device stops, only if the follow rule woke it.
 - `state` (`woke_host`, ...) is the server's own; it is returned but never set, and an edit of the settings keeps it.

@@ -15,6 +15,7 @@
 use App\Integrations\BangOlufsen\Ase\ConverterDriver;
 use App\Integrations\BangOlufsen\Ase\MusicPlayerDriver as AseMusic;
 use App\Integrations\BangOlufsen\Ase\VideoPlayerDriver as AseVideo;
+use App\Integrations\Cast\MusicPlayerDriver as Cast;
 use App\Integrations\Philips\Streamium\MusicPlayerDriver as Streamium;
 use App\Integrations\Philips\VideoPlayerDriver as PhilipsTv;
 use App\Integrations\ReMoment\PlayerDriver as RemomentPlayer;
@@ -35,6 +36,7 @@ return [
         AseMusic::class => ['status' => 'spec', 'date' => '2026-11-14', 'note' => 'ASE driver; only the models listed as verified were seen on a real device.'],
         AseVideo::class => ['status' => 'spec', 'date' => '2026-11-14', 'note' => 'ASE TV driver; see the model entry.'],
         ConverterDriver::class => ['status' => 'spec', 'date' => '2026-11-14', 'note' => 'Usually switched off in the lab; its sources were only seen through the V1.'],
+        Cast::class => ['status' => 'fake', 'date' => '2026-11-20', 'note' => 'What is casting and its transport, built on the Cast v2 protocol and tested with fakes; the receiver status read (cast:probe) was only run against a TV with Chromecast built in, never a dongle.'],
         Mozart::class => ['status' => 'spec', 'date' => '2026-11-14', 'note' => 'Built from B&O\'s OpenAPI spec without a device; the checklist for a real one is docs/architecture/mozart-hardware-test.md.'],
         Sonos::class => ['status' => 'spec', 'date' => '2026-11-14', 'note' => 'Uses the duncan3dc/sonos library; no hardware run is recorded in the repository docs.'],
         Spotify::class => ['status' => 'spec', 'date' => '2026-11-14', 'note' => 'Virtual device on the Spotify Web API; no recorded run with a real account or speaker.'],

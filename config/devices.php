@@ -26,6 +26,7 @@ return [
         \App\Integrations\Upnp\MusicPlayerDriver::class => \App\Integrations\Upnp\Services\DeviceListener::class,
         \App\Integrations\Philips\VideoPlayerDriver::class => \App\Integrations\Philips\Services\DeviceListener::class,
         \App\Integrations\Wiim\MusicPlayerDriver::class => \App\Integrations\Wiim\Services\DeviceListener::class,
+        \App\Integrations\Cast\MusicPlayerDriver::class => \App\Integrations\Cast\Services\DeviceListener::class,
         \App\Integrations\Philips\Streamium\MusicPlayerDriver::class => \App\Integrations\Philips\Streamium\Services\DeviceListener::class,
     ],
 
@@ -150,6 +151,16 @@ return [
         'Generic MediaRenderer' => [
             'driver_name' => 'UPnP',
             'driver' => \App\Integrations\Upnp\MusicPlayerDriver::class,
+        ],
+    ],
+    // A Chromecast dongle (docs/architecture/sub-devices.md): what it casts, and the transport of that session. Added by hand (no discovery
+    // yet). `standalone => false`: it is controlled through the TV it is plugged into, so connected to a host as a sub device it has no
+    // card of its own in the grid. A TV with Chromecast built in is not this model.
+    'Google' => [
+        'Chromecast' => [
+            'driver_name' => 'Cast',
+            'driver' => \App\Integrations\Cast\MusicPlayerDriver::class,
+            'standalone' => false,
         ],
     ],
     // A Philips Android TV paired with `php artisan philips:pair` (see Philips\Pairing): the UPnP driver plus standby, apps and

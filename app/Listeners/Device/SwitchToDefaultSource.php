@@ -4,6 +4,7 @@ namespace App\Listeners\Device;
 
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
+use App\Domain\SubDevices\FollowRule;
 use App\Events\Device\DeviceStateChanged;
 use App\Integrations\Contracts\SourceActivationInterface;
 use App\Integrations\Sonos\MusicPlayerDriver as SonosDriver;
@@ -16,7 +17,8 @@ use Illuminate\Support\Facades\Log;
  * Puts a device on its default input (device_meta `default_source`, e.g. a
  * soundbar's TV) when it wakes. Playback the server or a person started is
  * left alone: a track or station already playing means the wake was
- * deliberate, so only a wake without content switches. Queued, because it
+ * deliberate, so only a wake without content switches. A wake the follow rule of a sub device link just caused
+ * (a cast waking the TV on its HDMI input) is left alone too. Queued, because it
  * talks to the device and the event fires inside the listener's poll loop.
  */
 class SwitchToDefaultSource implements ShouldQueue
@@ -29,13 +31,18 @@ class SwitchToDefaultSource implements ShouldQueue
         $woke = in_array($event->state, [State::Playing, State::Paused], true)
             && in_array($event->previous, [null, State::Standby, State::Unreachable], true);
 
-        return $woke && $this->defaultSource($event->deviceId) !== null;
+        return $woke && !FollowRule::recentlySwitched($event->deviceId) && $this->defaultSource($event->deviceId) !== null;
     }
 
     public function handle(DeviceStateChanged $event): void
     {
         $sourceId = $this->defaultSource($event->deviceId);
         if ($sourceId === null) {
+            return;
+        }
+
+        // The follow rule of a sub device link has just put this device on the input it wanted (a cast woke it): leave it there.
+        if (FollowRule::recentlySwitched($event->deviceId)) {
             return;
         }
 

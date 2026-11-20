@@ -156,7 +156,7 @@ Things to settle with the hardware:
 3. **Wake latency**: how long the V1 takes from `hdmi_1` activation until the TV shows the input, to pick the debounce and tell the user what to expect.
 4. **Our own switch** versus someone else's: the listener must not treat the `source_changed` caused by the rule as a manual change.
 
-Until the link model exists the pair is two ordinary devices; nothing in phase 1 depends on it.
+The link model is built (workstream 2a, [sub-devices.md](sub-devices.md)): the Chromecast is a `Google` / `Chromecast` device (Cast driver and listener, added by hand), linked to the V1 with kind `input` and `via` `hdmi_1`; while `hdmi_1` is selected the V1's card shows the cast and takes its transport, and the follow rule (default `from_standby`) wakes the V1 on `hdmi_1` when a cast starts. All of it is tested with fakes and **unverified on the hardware**; the four things above are still the ones to check first. Probe question 4 (own switch against someone else's) is settled in the design: see sub-devices.md.
 
 ## Phases
 

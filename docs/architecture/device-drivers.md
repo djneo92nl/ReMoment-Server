@@ -88,6 +88,10 @@ Implements media controls, volume, radio, multiroom, library playback, seek, que
 
 **Path:** `app/Integrations/Philips/`. `VideoPlayerDriver` extends the generic UPnP driver for a **paired** Philips Android TV (`php artisan philips:pair {id}`): playback, queue, volume and seek over UPnP, plus `PowerInterface` (standby only), `SourcesInterface` / `SourceActivationInterface` (the TV's apps) and the app in front reported as the playing source. See [Philips TV](philips-tv.md).
 
+### Chromecast (Cast)
+
+**Path:** `app/Integrations/Cast/`. `MusicPlayerDriver` is a Chromecast dongle (model `Google` / `Chromecast`, `standalone => false`): `MediaControlsInterface` and `SeekInterface` over the Cast media namespace (`CastControls`), and `Services\DeviceListener` reads what is casting every 4 s (`CastNowPlaying`; the idle backdrop is not a session). No volume, power, sources or queue: it is meant to be a sub device of the TV it is plugged into (see [sub-devices.md](sub-devices.md)). Added by hand, no discovery. A TV with Chromecast built in is not this driver. Unverified on a real dongle.
+
 ### Spotify
 
 **Path:** `app/Integrations/Spotify/`
