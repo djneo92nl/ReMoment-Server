@@ -6,13 +6,14 @@ use App\Domain\Analysis\DecodeBranch;
 use App\Domain\Analysis\DecodedStage;
 use App\Domain\Analysis\DecodePass;
 use App\Domain\Analysis\Tools;
+use App\Domain\Similar\Embeddings;
 use App\Models\File;
 use App\Models\FileAnalysis;
 use Illuminate\Support\Facades\Http;
 
 /**
- * BPM, key, danceability and (when the sidecar runs the ML models) mood, arousal/valence, instrumentalness
- * and genre, computed by the Essentia sidecar (docker/analysis). The audio goes over as a mono 44.1 kHz WAV
+ * BPM, key, danceability and (when the sidecar runs the ML models) mood, arousal/valence, instrumentalness,
+ * genre and the sound embedding of the track, computed by the Essentia sidecar (docker/analysis). The audio goes over as a mono 44.1 kHz WAV
  * made here with ffmpeg (in the shared decode, see `DecodePass`), so it works for local and remote files and the sidecar needs no access to the music.
  */
 class EssentiaStage implements DecodedStage
@@ -27,7 +28,9 @@ class EssentiaStage implements DecodedStage
 
     public function version(): string
     {
-        return '1'.(config('analysis.essentia_ml') ? '+ml' : '');
+        // 2+ml: the ML sidecar also returns the track's embedding (`file_embeddings`, similar tracks); files analysed
+        // with 1+ml are analysed again by the nightly backlog to get one.
+        return config('analysis.essentia_ml') ? '2+ml' : '1';
     }
 
     public function enabled(): bool
@@ -60,7 +63,15 @@ class EssentiaStage implements DecodedStage
             throw new \RuntimeException('Essentia sidecar answered HTTP '.$response->status());
         }
 
-        return self::attributes($response->json() ?? []);
+        $data = $response->json() ?? [];
+
+        // The embedding is not a `file_analyses` column: it goes to its own table, for the content analysed now.
+        // A sidecar without ML (or an older one) sends none, and nothing is stored.
+        if (isset($data['embedding'])) {
+            Embeddings::store($file, $analysis->content_hash ?? $file->hash, $data['embedding'], (string) ($data['embedding_model'] ?? Embeddings::MODEL));
+        }
+
+        return self::attributes($data);
     }
 
     /**

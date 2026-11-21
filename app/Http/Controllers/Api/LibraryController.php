@@ -26,6 +26,7 @@ use App\Domain\Library\PlaylistEditor;
 use App\Domain\Library\PlaylistMode;
 use App\Domain\Library\RandomAlbum;
 use App\Domain\Library\RecentItems;
+use App\Domain\Library\SimilarTracks;
 use App\Domain\Library\SmartPlaylist\SmartPlaylistDescriber;
 use App\Domain\Library\SoundFilter;
 use App\Domain\Library\SpotifyCatalog;
@@ -280,6 +281,44 @@ class LibraryController extends Controller
                 'key_relation' => $match['key_relation'],
                 'tempo_relation' => $match['tempo_relation'],
                 'tempo_diff_percent' => round($match['tempo_diff'] * 100, 1),
+            ])->values(),
+            'next_cursor' => $matches->count() > $offset + self::TRACKS_PAGE_SIZE ? $this->encodeCursor($offset + self::TRACKS_PAGE_SIZE) : null,
+        ]);
+    }
+
+    /**
+     * "Similar tracks" (App\Domain\Library\SimilarTracks): the tracks of the scope that sound most like this one, by the
+     * distance of their sound embeddings, most similar first, 50 per page, at most `similar.max_results` deep.
+     * `device_id` keeps to what that device can play. 422 `not_analysed` while the track has no embedding.
+     * docs/api/similar-tracks.md.
+     */
+    public function similar(Request $request, Track $track): JsonResponse
+    {
+        $request->validate([
+            'cursor' => ['nullable', 'string', 'max:200'],
+            'device_id' => ['nullable', 'integer', 'exists:devices,id'],
+        ]);
+        $similar = new SimilarTracks($track, $this->hiddenSources($request), $this->deviceOf($request));
+        $source = $similar->source();
+
+        if ($source === null) {
+            return response()->json(['error' => 'not_analysed', 'message' => 'This track has no sound embedding yet (the audio analysis with the ML models has not run for it).'], 422);
+        }
+
+        $offset = $this->decodeCursor($request->query('cursor'));
+        $matches = $similar->matches();
+        $page = $matches->slice($offset, self::TRACKS_PAGE_SIZE)->values();
+        $tracks = Track::query()->with(['artist', 'album'])->findMany($page->pluck('track_id'))->keyBy('id');
+        $this->preloadArtwork(albums: $tracks->map->album->filter());
+        $reasons = $similar->reasons($page->pluck('track_id'));
+
+        return response()->json([
+            'canonical_id' => $track->id,
+            'source' => $source,
+            'data' => $page->filter(fn (array $match) => isset($tracks[$match['track_id']]))->map(fn (array $match) => $this->searchTrack($tracks[$match['track_id']]) + [
+                'similarity' => $match['similarity'],
+                'distance' => $match['distance'],
+                'reason' => $reasons[$match['track_id']] + ['same_artist' => $track->artist_id !== null && $tracks[$match['track_id']]->artist_id === $track->artist_id],
             ])->values(),
             'next_cursor' => $matches->count() > $offset + self::TRACKS_PAGE_SIZE ? $this->encodeCursor($offset + self::TRACKS_PAGE_SIZE) : null,
         ]);

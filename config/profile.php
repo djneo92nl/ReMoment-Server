@@ -92,7 +92,7 @@ return [
         'deep_analysis' => ['api/library/tracks/*/deep-analysis', 'api/library/tracks/*/deep-analysis/*', 'api/library/tracks/*/stems', 'api/library/tracks/*/stems/*', 'api/stems/weights', 'api/admin/stems/weights', 'mixer'],
         'rip_upload' => ['api/admin/files'],
         'cover_health' => ['api/library/health/covers', 'settings/library-health/covers'],
-        'analysis' => ['api/library/tracks/*/mixes-with', 'settings/analysis', 'settings/analysis/*', 'settings/library-health', 'settings/library-health/*', 'api/library/health', 'api/library/health/*'],
+        'analysis' => ['api/library/tracks/*/mixes-with', 'api/library/tracks/*/similar', 'api/devices/*/library/play-similar', 'settings/analysis', 'settings/analysis/*', 'settings/library-health', 'settings/library-health/*', 'api/library/health', 'api/library/health/*'],
         'catalogue' => [
             'api/library/wishlist', 'api/library/new-releases', 'api/library/wanted-tracks', 'api/library/wanted-tracks/*',
             'api/library/catalogue/*', 'api/library/physical', 'api/library/physical/*', 'api/library/artists/*/discography',

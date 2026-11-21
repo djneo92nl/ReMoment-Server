@@ -42,6 +42,9 @@ Schedule::command('catalogue:reconcile')->dailyAt('05:00')->when(fn () => Profil
 // Audio analysis (loudness, fingerprints, BPM/key/mood) of the own files; a bounded batch on its own queue, off by default (ANALYSIS_ENABLED).
 Schedule::command('library:analyze')->dailyAt('02:00')->when(fn () => Profile::allows('analysis'));
 
+// The optional sqlite-vec index of the sound embeddings (similar tracks), only while it is the chosen engine; without it queries scan the table.
+Schedule::command('similar:index')->dailyAt('04:40')->when(fn () => Profile::allows('analysis') && config('similar.engine') === 'sqlite-vec');
+
 // Opt-in (STEMS_NIGHTLY): stems for tracks that have none, a time-budgeted batch for the single `stems` worker, in the same night window.
 Schedule::command('library:analyze-stems')->dailyAt('02:00')->when(fn () => Profile::allows('deep_analysis') && config('analysis.stems_nightly'));
 // Kept stem audio of files that were removed or changed (kind `stem_audio`, docs/architecture/stems-service.md).

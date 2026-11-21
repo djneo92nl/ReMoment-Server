@@ -30,10 +30,11 @@ A Pi 2/3 runs tier 0 only (its app image has the tools; the sidecar is optional 
 
 ## How it works (`App\Domain\Analysis`)
 
-- **Stages** (`AnalysisStage`): `loudness`, `waveform`, `quality`, `fingerprint`, `acoustid`, `essentia`, in that order (the lookup uses the stored fingerprint). Each has a `version()` string (`essentia` is `1` or `1+ml`); bumping it re-runs only that stage. `enabled()` says whether this install can run it (switch, binary, key, sidecar).
+- **Stages** (`AnalysisStage`): `loudness`, `waveform`, `quality`, `fingerprint`, `acoustid`, `essentia`, in that order (the lookup uses the stored fingerprint). Each has a `version()` string (`essentia` is `1` or `2+ml`); bumping it re-runs only that stage. `enabled()` says whether this install can run it (switch, binary, key, sidecar).
 - **Storage:** `file_analyses`, one row per file (`FileAnalysis`), with typed columns (so smart playlists can range-query them) and `stages` / `errors` JSON. `content_hash` is `files.hash` at analysis time: a changed file starts over. A track reaches its analysis through its primary file (`Track::analysis()`, `Track::sound()`).
 - **Job:** `AnalyzeAudioFile` (unique per file, queue `analysis`, `tries` 1) opens the file once with `FileStore::withLocalPath()` (the real path locally, one download from remote storage), runs the stages still needed, and saves after each. A failing stage records its error (`errors.<stage>`: message, attempts, version) and does not stop the others; the backlog retries it until `analysis.max_attempts` (3) at the same version.
 - **Backlog:** `AudioAnalysis::pending()` lists present, primary, original files with something left to do, newest first. `php artisan library:analyze [--limit=] [--stage=] [--file=ID [--now]] [--dry-run]` queues it; scheduled nightly at 02:00; `LocalLibraryScanner` queues a small batch after a scan.
+- **Sound embedding (similar tracks):** with the ML build the sidecar also answers `embedding` (the 1280-number Discogs-EffNet mean) and `embedding_model`; `EssentiaStage` keeps it in `file_embeddings` (L2-normalised float32 BLOB, `content_hash` of the analysed content), not in `file_analyses`. The stage version is `2+ml` with ML (`1` without): files analysed before get one more `essentia` pass from the nightly backlog. See [similar-tracks.md](similar-tracks.md).
 - **Essentia stage:** the app decodes to a mono 44.1 kHz WAV with ffmpeg (a branch of the shared decode, see *Reducing CPU load*) and posts it to `POST /analyze` of the sidecar, so the sidecar needs no access to the music and remote files work. Features the sidecar did not compute (no ML models) are left out of the result instead of blanked.
 
 ## On-demand stages (`OnDemandStage`)
@@ -71,7 +72,7 @@ Checked on generated files (a brown-noise reference encoded and decoded again: M
 
 ## The sidecar (`docker/analysis`)
 
-A small FastAPI service. `GET /health` → `{ok, essentia, ml, models}`; `POST /analyze` (multipart `audio`) → `{bpm, key, mode, key_strength, danceability, [mood_tags, arousal, valence, instrumental, genre_tags]}`. One analysis at a time.
+A small FastAPI service. `GET /health` → `{ok, essentia, ml, models}`; `POST /analyze` (multipart `audio`) → `{bpm, key, mode, key_strength, danceability, [mood_tags, arousal, valence, instrumental, genre_tags, embedding, embedding_model]}`. One analysis at a time.
 
 ```bash
 # light build: BPM, key, danceability

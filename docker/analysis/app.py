@@ -1,6 +1,6 @@
 """Essentia analysis sidecar: POST /analyze (a mono WAV) answers BPM, key, danceability and, when the
-TensorFlow models are installed, mood, arousal/valence, voice/instrumental and genre. GET /health says
-what is available. The Laravel app (App\\Domain\\Analysis\\Stages\\EssentiaStage) is the only client."""
+TensorFlow models are installed, mood, arousal/valence, voice/instrumental and genre, plus the
+Discogs-EffNet embedding of the track (the mean over its patches, for "similar tracks"). GET /health says what is available. The Laravel app (App\\Domain\\Analysis\\Stages\\EssentiaStage) is the only client."""
 
 import json
 import os
@@ -142,6 +142,11 @@ def _ml(path):
     if "effnet" in _models:
         audio = es.MonoLoader(filename=path, sampleRate=16000, resampleQuality=4)()
         embeddings = _models["effnet"](audio)
+
+        # One 1280-number vector per track (the mean over its patches): what the app searches for similar tracks.
+        # The app normalises it; the sidecar only rounds, so the JSON stays about 15 kB.
+        out["embedding"] = [round(float(x), 6) for x in embeddings.mean(axis=0)]
+        out["embedding_model"] = "discogs-effnet-bs64-1"
 
         moods = []
         for mood in MOODS:

@@ -371,11 +371,46 @@ class AudioAnalysisTest extends TestCase
         $this->assertSame(['Trip Hop'], $track->genres());
     }
 
+    public function test_the_essentia_embedding_goes_to_its_own_table_for_the_analysed_content(): void
+    {
+        config(['analysis.essentia_url' => 'http://analysis:8090']);
+        $embedding = array_pad([3.0, 4.0], \App\Domain\Similar\Embeddings::DIMENSIONS, 0.0);
+        Http::fake([
+            'analysis:8090/analyze' => Http::response(['bpm' => 120, 'key' => 'A', 'mode' => 'minor', 'embedding' => $embedding, 'embedding_model' => 'discogs-effnet-bs64-1']),
+            'api.acoustid.org/*' => Http::response(['status' => 'ok', 'results' => []]),
+        ]);
+        [$file] = $this->localTrack();
+
+        AnalyzeAudioFile::dispatchSync($file);
+
+        $stored = \App\Models\FileEmbedding::find($file->id);
+        $this->assertNotNull($stored);
+        $this->assertSame($file->hash, $stored->content_hash);
+        $this->assertSame(\App\Domain\Similar\Embeddings::DIMENSIONS, $stored->dimensions);
+        $this->assertEqualsWithDelta(0.6, \App\Domain\Similar\Embeddings::unpack($stored->vector)[0], 1e-6);
+        $this->assertArrayNotHasKey('embedding', $file->analysis()->first()->getAttributes());
+    }
+
+    public function test_a_sidecar_without_an_embedding_or_with_a_broken_one_stores_nothing(): void
+    {
+        config(['analysis.essentia_url' => 'http://analysis:8090']);
+        Http::fake([
+            'analysis:8090/analyze' => Http::response(['bpm' => 120, 'key' => 'A', 'mode' => 'minor', 'embedding' => [1, 2, 3]]),
+            'api.acoustid.org/*' => Http::response(['status' => 'ok', 'results' => []]),
+        ]);
+        [$file] = $this->localTrack();
+
+        AnalyzeAudioFile::dispatchSync($file);
+
+        $this->assertSame(120.0, $file->analysis()->first()->bpm);
+        $this->assertNull(\App\Models\FileEmbedding::find($file->id));
+    }
+
     public function test_the_ml_flag_is_part_of_the_essentia_version(): void
     {
         $this->assertSame('1', (new EssentiaStage)->version());
         config(['analysis.essentia_ml' => true]);
-        $this->assertSame('1+ml', (new EssentiaStage)->version());
+        $this->assertSame('2+ml', (new EssentiaStage)->version());
     }
 
     public function test_mood_tags_under_the_cut_off_are_dropped(): void

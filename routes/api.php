@@ -131,6 +131,7 @@ Route::post('/devices/{device}/library/play', [DeviceController::class, 'library
 Route::post('/devices/{device}/library/play-playlist', [DeviceController::class, 'libraryPlayPlaylist']);
 Route::post('/devices/{device}/library/play-tracks', [DeviceController::class, 'libraryPlayTracks']);
 Route::post('/devices/{device}/library/play-listening-mode', [DeviceController::class, 'libraryPlayListeningMode']);
+Route::post('/devices/{device}/library/play-similar', [DeviceController::class, 'libraryPlaySimilar']);
 Route::post('/devices/{device}/library/play-album', [DeviceController::class, 'libraryPlayAlbum']);
 Route::post('/devices/{device}/library/play-artist', [DeviceController::class, 'libraryPlayArtist']);
 Route::post('/devices/{device}/library/play-external', [DeviceController::class, 'libraryPlayExternal']);
@@ -170,6 +171,7 @@ Route::get('/library/albums/{album}/spotify', [LibraryController::class, 'albumS
 Route::put('/library/albums/{album}/favorite', [LibraryController::class, 'favoriteAlbum']);
 Route::put('/library/tracks/{track}/favorite', [LibraryController::class, 'favoriteTrack']);
 Route::get('/library/tracks/{track}/mixes-with', [LibraryController::class, 'mixesWith']);
+Route::get('/library/tracks/{track}/similar', [LibraryController::class, 'similar']);
 Route::get('/library/tracks/{track}/waveform', [LibraryController::class, 'waveform']);
 Route::get('/library/listening-modes', [LibraryController::class, 'listeningModes']);
 Route::get('/library/history', [\App\Http\Controllers\Api\PlayHistoryController::class, 'index']);

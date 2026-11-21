@@ -8,6 +8,7 @@ use App\Domain\Analysis\Tools;
 use App\Domain\Artwork\NowPlayingArtwork;
 use App\Domain\Export\ExportFormats;
 use App\Domain\Profile\Profile;
+use App\Domain\Similar\Embeddings;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -60,6 +61,8 @@ class InfoController extends Controller
                 'analysis' => AudioAnalysis::enabled() && Profile::allows('analysis'),
             ]
             + ($deepKinds !== [] ? ['deep_analysis_kinds' => $deepKinds] : [])
+            // At least one own file has a sound embedding, so GET /api/library/tracks/{id}/similar can answer (docs/api/similar-tracks.md).
+            + (Profile::allows('analysis') && Embeddings::any() ? ['similar_tracks' => true] : [])
             // Export from the library as zip (docs/api/export.md): the profile has the library and own files, and ffmpeg can transcode.
             + (Profile::allows('library') && Profile::allows('file_storage') && Tools::available(Tools::ffmpeg()) ? ['export' => true, 'export_formats' => ExportFormats::availableIds()] : []),
         ]);

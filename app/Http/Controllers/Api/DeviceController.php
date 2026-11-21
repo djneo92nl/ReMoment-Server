@@ -21,6 +21,7 @@ use App\Domain\Library\NotPlayableException;
 use App\Domain\Library\PlaybackFailedException;
 use App\Domain\Library\PlaybackResult;
 use App\Domain\Library\PlaylistMode;
+use App\Domain\Library\SimilarTracks;
 use App\Domain\Library\SoundFilter;
 use App\Domain\Library\SpotifyUri;
 use App\Domain\Playback\NotMovableException;
@@ -511,6 +512,50 @@ class DeviceController extends Controller
         return $this->playFromLibrary(
             fn () => $library->playTracks($device, $tracks),
             (isset($data['mode']) ? ['mode' => $data['mode']] : []) + ['queued' => $tracks->count()],
+        );
+    }
+
+    /**
+     * "Similar tracks radio": the seed track, then up to `similar.radio_length` - 1 of the tracks that sound most like it
+     * (App\Domain\Library\SimilarTracks, most similar first), in that order, once (no refill). docs/api/similar-tracks.md.
+     */
+    public function libraryPlaySimilar(Request $request, Device $device, LibraryPlayback $library): JsonResponse
+    {
+        app(IdAliases::class)->resolveInput($request, ['track_id' => 'track']);
+        $request->validate([
+            'track_id' => ['required', 'integer', 'exists:tracks,id'],
+            'client' => ['nullable', 'string', 'max:100'],
+            'scope' => ['nullable', 'in:'.implode(',', LeadingSource::apiScopes())],
+        ]);
+        $seed = Track::findOrFail($request->integer('track_id'));
+
+        if ($error = $this->assertReachable($device)) {
+            return $error;
+        }
+
+        if (!LibraryPlayback::availableFor($device)) {
+            return $this->unsupported('library_playback');
+        }
+
+        $client = $request->filled('client') ? Client::byApiToken((string) $request->input('client')) : null;
+        $similar = new SimilarTracks($seed, LibrarySources::hiddenForRequest($client, $request->input('scope')), $device);
+
+        if ($similar->source() === null) {
+            return response()->json(['error' => 'not_analysed', 'message' => 'This track has no sound embedding yet (the audio analysis with the ML models has not run for it).'], 422);
+        }
+
+        if (!LibraryPlayback::trackPlayable($seed, $device)) {
+            return response()->json(['error' => 'not_playable', 'message' => "This track can not be played on {$device->device_name}."], 422);
+        }
+
+        $tracks = $similar->radio();
+        if ($tracks->count() <= ListeningModes::MIN_TRACKS) {
+            return response()->json(['error' => 'not_playable', 'message' => 'Not enough similar tracks this device can play.'], 422);
+        }
+
+        return $this->playFromLibrary(
+            fn () => $library->playTracks($device, $tracks, $seed),
+            ['seed' => $seed->id, 'queued' => $tracks->count()],
         );
     }
 

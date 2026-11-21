@@ -2,6 +2,8 @@
     @php
         $album = $page->album;
         $pinned = app(\App\Support\SelectedDevice::class)->device();
+        // Sound embeddings exist on this server: a track's details can list what sounds like it.
+        $hasSimilar = \App\Domain\Profile\Profile::allows('analysis') && \App\Domain\Similar\Embeddings::any();
         $sourceNames = collect($page->sources)->mapWithKeys(fn ($s) => [$s => \App\Domain\Library\LibrarySources::sourceName($s)]);
     @endphp
 
@@ -186,6 +188,10 @@
                                         <dd style="max-width:32rem"><livewire:track-sections lazy :track-id="$track->id" :key="'sections-'.$track->id" /></dd>
                                         <dt class="text-gray-400 dark:text-gray-600">Stems</dt>
                                         <dd style="max-width:32rem"><livewire:track-stems lazy :track-id="$track->id" :key="'stems-'.$track->id" /></dd>
+                                        @if($hasSimilar)
+                                            <dt class="text-gray-400 dark:text-gray-600">Similar</dt>
+                                            <dd style="max-width:44rem"><livewire:track-similar lazy :track-id="$track->id" :limit="6" title="" :key="'similar-'.$track->id" /></dd>
+                                        @endif
                                     @endif
                                     @if($quality)
                                         <dt class="text-gray-400 dark:text-gray-600">Quality</dt>

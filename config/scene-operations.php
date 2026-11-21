@@ -68,6 +68,7 @@ return [
         'playTrack' => ['label' => 'Play a track', 'device_param' => 'device', 'enabled' => true],
         'playTracks' => ['label' => 'Shuffle the whole library', 'device_param' => 'device', 'enabled' => true],
         'playListeningMode' => ['label' => 'Play a listening mode', 'device_param' => 'device', 'enabled' => true],
+        'playSimilarTracks' => ['label' => 'Play a similar tracks radio', 'device_param' => 'device', 'enabled' => true],
         'playExternal' => ['label' => 'Play from a streaming service', 'device_param' => 'device', 'enabled' => true],
     ],
 ];
