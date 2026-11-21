@@ -2,6 +2,7 @@
 
 namespace App\Domain\Health;
 
+use App\Domain\Health\Store\QueueStores;
 use App\Domain\Library\Enrichment;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
@@ -23,7 +24,7 @@ class QueueInspector
      * Pending jobs grouped by class: waiting (ready), running (reserved by a worker) and delayed (a retry
      * after a rate limit or failure, or a release by a limiter). Null when the driver can't be listed.
      *
-     * @return array{total: int, scanned: int, groups: list<array{job: string, count: int, waiting: int, running: int, delayed: int, oldest: ?Carbon}>}|null
+     * @return array{total: int, scanned: int, groups: list<array{job: string, class: string, queue: string, count: int, waiting: int, running: int, delayed: int, oldest: ?Carbon}>}|null
      */
     public function pending(): ?array
     {
@@ -44,10 +45,11 @@ class QueueInspector
         [$total, $rows] = $read;
         $groups = [];
 
-        foreach ($rows as [$payload, $state, $created]) {
-            $name = class_basename(json_decode($payload, true)['displayName'] ?? 'Unknown job');
-            $group = &$groups[$name];
-            $group ??= ['job' => $name, 'count' => 0, 'waiting' => 0, 'running' => 0, 'delayed' => 0, 'oldest' => null];
+        foreach ($rows as [$payload, $state, $created, $queue]) {
+            $class = json_decode($payload, true)['displayName'] ?? 'Unknown job';
+            $name = class_basename($class);
+            $group = &$groups[$queue.'|'.$name];
+            $group ??= ['job' => $name, 'class' => $class, 'queue' => $queue, 'count' => 0, 'waiting' => 0, 'running' => 0, 'delayed' => 0, 'oldest' => null];
 
             $group['count']++;
             $group[$state]++;
@@ -57,42 +59,53 @@ class QueueInspector
             unset($group);
         }
 
+        $groups = array_values($groups);
         usort($groups, fn ($a, $b) => $b['count'] <=> $a['count']);
 
         return ['total' => $total, 'scanned' => count($rows), 'groups' => $groups];
     }
 
     /**
-     * Per queue: jobs waiting, delayed and running, and how long the head of the waiting list has waited
-     * (`oldest_waiting`, null when nothing waits). A runner that is stuck shows as an age that keeps growing.
-     * Redis only; null for other drivers.
+     * Per queue: jobs waiting, delayed and running, the age of the oldest waiting job, whether the queue is paused,
+     * how many worker processes listen on it (null when the process table can't be read), failed jobs in the last 24 hours,
+     * when a job last finished and whether the queue is lagging (see `lagging()`). A runner that is stuck shows as an age
+     * that keeps growing. Redis and database drivers; null for the others.
      *
-     * @return list<array{queue: string, beat: ?Carbon, state: string, waiting: int, delayed: int, running: int, oldest_waiting: ?Carbon}>|null
+     * @return list<array{queue: string, beat: ?Carbon, state: string, waiting: int, delayed: int, running: int, oldest_waiting: ?Carbon, oldest_age: ?int, paused: bool, workers: ?int, worker: string, failed_24h: int, last_progress: ?Carbon, lag_after: int, lagging: bool}>|null
      */
     public function queues(): ?array
     {
-        if (config('queue.connections.'.config('queue.default').'.driver') !== 'redis') {
+        $store = QueueStores::current();
+        if ($store === null) {
             return null;
         }
 
         try {
-            $redis = Queue::connection()->getConnection();
+            $failed = $this->failedLast24h();
+            $workers = app(QueueWorkers::class)->counts();
 
-            return array_map(function (string $name) use ($redis) {
-                $head = $redis->lindex("queues:{$name}", 0);
-                $pushed = $head ? (json_decode($head, true)['pushedAt'] ?? null) : null;
-
+            return array_map(function (string $name) use ($store, $failed, $workers) {
+                $stats = $store->stats($name);
                 $beat = in_array($name, Queues::heartbeat(), true) ? Heartbeat::last(Queues::heartbeatKey($name)) : null;
-                $running = (int) $redis->zcard("queues:{$name}:reserved");
+                $oldest = $stats['oldest_waiting'];
+                $count = $workers === null ? null : ($workers[$name] ?? 0);
 
                 return [
                     'queue' => $name,
                     'beat' => $beat,
-                    'state' => $this->runnerState($name, $beat, $running),
-                    'waiting' => (int) $redis->llen("queues:{$name}"),
-                    'delayed' => (int) $redis->zcard("queues:{$name}:delayed"),
-                    'running' => $running,
-                    'oldest_waiting' => $pushed ? Carbon::createFromTimestamp((int) $pushed) : null,
+                    'state' => $this->runnerState($name, $beat, $stats['running']),
+                    'waiting' => $stats['waiting'],
+                    'delayed' => $stats['delayed'],
+                    'running' => $stats['running'],
+                    'oldest_waiting' => $oldest,
+                    'oldest_age' => $oldest ? (int) $oldest->diffInSeconds(now()) : null,
+                    'paused' => QueuePause::isPaused($name),
+                    'workers' => $count,
+                    'worker' => $count === null ? 'unknown' : ($count > 0 ? 'present' : 'absent'),
+                    'failed_24h' => $failed[$name] ?? 0,
+                    'last_progress' => QueueProgress::last($name),
+                    'lag_after' => Queues::lagAfter($name),
+                    'lagging' => $this->lagging($name, $stats),
                 ];
             }, $this->queueNames());
         } catch (\Throwable) {
@@ -101,12 +114,50 @@ class QueueInspector
     }
 
     /**
-     * `ok` (a heartbeat ran in the last 3 minutes), `busy` (none, but a job runs that is younger than the queue's
+     * A queue is lagging when its oldest waiting job has waited longer than the queue's threshold (`config('queues.lag_after')`)
+     * and nothing moves: no job finished within the threshold and none runs within its allowed runtime. A paused queue
+     * never lags. A backlog that drains is waiting, not lagging.
+     *
+     * @param  array{waiting: int, running: int, oldest_waiting: ?Carbon, longest_running: ?int}  $stats
+     */
+    public function lagging(string $queue, array $stats): bool
+    {
+        $limit = Queues::lagAfter($queue);
+
+        if (QueuePause::isPaused($queue) || $stats['waiting'] === 0 || $stats['oldest_waiting'] === null || $stats['oldest_waiting']->diffInSeconds(now()) <= $limit) {
+            return false;
+        }
+
+        $finished = QueueProgress::last($queue);
+        if ($finished !== null && $finished->diffInSeconds(now()) <= $limit) {
+            return false;
+        }
+
+        return !($stats['running'] > 0 && ($stats['longest_running'] ?? PHP_INT_MAX) < Queues::maxRuntime($queue));
+    }
+
+    /** @return array<string, int> failed jobs of the last 24 hours per queue */
+    private function failedLast24h(): array
+    {
+        try {
+            return DB::table('failed_jobs')->where('failed_at', '>=', now()->subDay())->selectRaw('queue, count(*) as total')->groupBy('queue')
+                ->pluck('total', 'queue')->map(fn ($n) => (int) $n)->all();
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    /**
+     * `paused` (an admin paused the queue), `ok` (a heartbeat ran in the last 3 minutes), `busy` (none, but a job runs that is younger than the queue's
      * longest timeout), `stuck` (neither: the runner is down or hung), `unknown` (no heartbeat is dispatched for this
      * queue, or the scheduler is down).
      */
     public function runnerState(string $queue, ?Carbon $beat, int $running): string
     {
+        if (QueuePause::isPaused($queue)) {
+            return 'paused';   // nothing is taken on purpose, so the heartbeat waits too
+        }
+
         if (!in_array($queue, Queues::heartbeat(), true) || !self::fresh(Heartbeat::last(Heartbeat::SCHEDULER))) {
             return 'unknown';
         }
@@ -131,24 +182,25 @@ class QueueInspector
         return Queues::all();
     }
 
-    /** @return array{0: int, 1: list<array{0: string, 1: string, 2: ?Carbon}>} */
+    /** @return array{0: int, 1: list<array{0: string, 1: string, 2: ?Carbon, 3: string}>} */
     private function databaseRows(): array
     {
         $table = config('queue.connections.database.table', 'jobs');
         $total = DB::table($table)->count();
         $now = now()->timestamp;
 
-        $rows = DB::table($table)->orderBy('id')->limit(self::SCAN_LIMIT)->get(['payload', 'available_at', 'reserved_at', 'created_at'])
+        $rows = DB::table($table)->orderBy('id')->limit(self::SCAN_LIMIT)->get(['payload', 'queue', 'available_at', 'reserved_at', 'created_at'])
             ->map(fn ($row) => [
                 $row->payload,
                 $row->reserved_at ? 'running' : ($row->available_at > $now ? 'delayed' : 'waiting'),
                 Carbon::createFromTimestamp($row->created_at),
+                $row->queue,
             ])->all();
 
         return [$total, $rows];
     }
 
-    /** @return array{0: int, 1: list<array{0: string, 1: string, 2: ?Carbon}>} */
+    /** @return array{0: int, 1: list<array{0: string, 1: string, 2: ?Carbon, 3: string}>} */
     private function redisRows(): array
     {
         $redis = Queue::connection()->getConnection();
@@ -167,7 +219,7 @@ class QueueInspector
                 $payloads = $state === 'waiting' ? $redis->lrange($key, 0, $room - 1) : $redis->zrange($key, 0, $room - 1);
                 foreach ($payloads as $payload) {
                     $pushed = json_decode($payload, true)['pushedAt'] ?? null;
-                    $rows[] = [$payload, $state, $pushed ? Carbon::createFromTimestamp((int) $pushed) : null];
+                    $rows[] = [$payload, $state, $pushed ? Carbon::createFromTimestamp((int) $pushed) : null, $name];
                 }
             }
         }

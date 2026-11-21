@@ -38,7 +38,7 @@ class QueueStabilityConfigTest extends TestCase
 
         $this->assertGreaterThan((new RunStorageTask('scan'))->timeout, $programs['storage-queue']['stopwaitsecs']);
         $this->assertGreaterThan((int) config('analysis.timeout'), $programs['analysis-queue']['stopwaitsecs']);
-        $this->assertGreaterThanOrEqual(900, $programs['queue']['stopwaitsecs']);   // BuildSdCardExport's timeout
+        $this->assertGreaterThan((new \App\Jobs\RunScene(1))->timeout, $programs['queue']['stopwaitsecs']);   // the longest job on health/default
     }
 
     public function test_every_worker_has_a_memory_limit_and_a_timeout_below_retry_after(): void

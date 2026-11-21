@@ -2,9 +2,9 @@
 
 namespace App\Domain\Health;
 
+use App\Domain\Health\Store\QueueStores;
 use App\Domain\Profile\Profile;
 use App\Jobs\RunStorageTask;
-use Illuminate\Support\Facades\Queue;
 
 /**
  * The queues the supervised workers listen on, and what is known about each runner.
@@ -60,11 +60,53 @@ final class Queues
     /** Seconds the longest job of a queue may run (its worker's --timeout), plus a margin: a reserved job older than this means a hung worker. */
     public static function maxRuntime(string $queue): int
     {
-        return match ($queue) {
-            RunStorageTask::QUEUE => 3600 + 100,
-            self::stems() => 3300 + 100,
-            default => 900 + 100,
+        return (self::worker($queue)['timeout'] ?? 900) + 100;
+    }
+
+    /**
+     * The supervised worker program that serves a queue (`config('queues.workers')`): `queues`, `timeout`, `stop_wait`.
+     * Queue names are matched after the env-configurable ones are resolved (analysis, stems, storage).
+     *
+     * @return array{queues: list<string>, timeout: int, stop_wait: int, processes: int}|null
+     */
+    public static function worker(string $queue): ?array
+    {
+        foreach (config('queues.workers') as $row) {
+            if (in_array($queue, self::resolve($row['queues']), true)) {
+                return $row;
+            }
+        }
+
+        return null;
+    }
+
+    /** `analysis` and `stems` are env-configurable names: the table lists their defaults. @param list<string> $queues @return list<string> */
+    private static function resolve(array $queues): array
+    {
+        return array_map(fn (string $q) => match ($q) {
+            'analysis' => (string) config('analysis.queue'),
+            'stems' => self::stems(),
+            default => $q,
+        }, $queues);
+    }
+
+    /** Seconds the oldest waiting job of a queue may wait before it counts as lagging (`config('queues.lag_after')`). */
+    public static function lagAfter(string $queue): int
+    {
+        $table = config('queues.lag_after');
+        $key = match (true) {
+            $queue === config('analysis.queue') => 'analysis',
+            $queue === self::stems() => 'stems',
+            default => $queue,
         };
+
+        return (int) ($table[$key] ?? config('queues.default_lag_after'));
+    }
+
+    /** Whether a queue may be paused: `health` never is (the watchdog's heartbeat lives there). */
+    public static function pausable(string $queue): bool
+    {
+        return !in_array($queue, config('queues.unpausable'), true);
     }
 
     /** Heartbeat cache key: the long-standing `health:queue` for the health/default workers. */
@@ -74,20 +116,12 @@ final class Queues
     }
 
     /**
-     * Seconds the longest-running job of a queue has been reserved by a worker, null when none (or the driver is not Redis).
-     * A reserved job's score is its reservation time plus `retry_after`.
+     * Seconds the longest-running job of a queue has been reserved by a worker, null when none (or the driver can't be read).
      */
     public static function longestRunningSeconds(string $queue): ?int
     {
         try {
-            if (config('queue.connections.'.config('queue.default').'.driver') !== 'redis') {
-                return null;
-            }
-
-            $oldest = Queue::connection()->getConnection()->zrange("queues:{$queue}:reserved", 0, 0, ['withscores' => true]);
-            $expires = $oldest ? (int) reset($oldest) : null;
-
-            return $expires === null ? null : max(0, now()->timestamp - ($expires - (int) config('queue.connections.redis.retry_after')));
+            return QueueStores::current()?->stats($queue)['longest_running'];
         } catch (\Throwable) {
             return null;
         }

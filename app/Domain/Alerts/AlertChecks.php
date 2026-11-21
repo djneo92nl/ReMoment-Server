@@ -12,8 +12,10 @@ use App\Domain\Health\QueueInspector;
 use App\Domain\Manager\ManagerClient;
 use App\Domain\Manager\ManagerException;
 use App\Domain\Profile\Profile;
+use App\Models\Alert;
 use App\Models\Device;
 use App\Models\StorageLocation;
+use Carbon\CarbonInterval;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -53,22 +55,34 @@ final class AlertChecks
     }
 
     /**
-     * queue.stuck per queue: only `stuck` raises, `busy` (a long job runs) and `unknown` never do.
+     * queue.stuck per queue, from two signals of the same condition (one alert per queue, `data.reason` says which):
+     * the runner state `stuck` (no heartbeat: critical) and a lagging queue (the oldest waiting job passed the queue's
+     * threshold with no progress, `config/queues.php`: warning). `ok` or `paused` resolves; `busy` and `unknown` leave a
+     * heartbeat alert as it is, but a lag alert ends as soon as the queue no longer lags. A paused queue never raises.
      *
-     * @param  list<array{queue: string, state: string, beat: ?\Illuminate\Support\Carbon}>|null  $queues  default: the inspector's rows (Redis only)
+     * @param  list<array{queue: string, state: string, beat: ?\Illuminate\Support\Carbon, lagging?: bool, oldest_age?: ?int}>|null  $queues  default: the inspector's rows
      */
     public function queues(?array $queues = null): void
     {
         $queues ??= (new QueueInspector)->queues() ?? [];
 
         foreach ($queues as $row) {
-            match ($row['state']) {
-                'stuck' => Alerts::raise('queue.stuck', $row['queue'], 'critical', "Queue {$row['queue']} is stuck",
-                    "The {$row['queue']} queue has not run its heartbeat".(($row['beat'] ?? null) ? ' since '.$row['beat']->diffForHumans() : '').'; its worker is down or hung.',
-                    data: ['queue' => $row['queue']]),
-                'ok' => Alerts::resolve('queue.stuck', $row['queue']),
-                default => null,   // busy and unknown: leave an active alert as it is
-            };
+            $queue = $row['queue'];
+
+            if ($row['state'] === 'stuck') {
+                Alerts::raise('queue.stuck', $queue, 'critical', "Queue {$queue} is stuck",
+                    "The {$queue} queue has not run its heartbeat".(($row['beat'] ?? null) ? ' since '.$row['beat']->diffForHumans() : '').'; its worker is down or hung.',
+                    data: ['queue' => $queue, 'reason' => 'heartbeat']);
+            } elseif ($row['lagging'] ?? false) {
+                $age = (int) ($row['oldest_age'] ?? 0);
+                Alerts::raise('queue.stuck', $queue, 'warning', "Queue {$queue} is not progressing",
+                    "The oldest job in the {$queue} queue has waited ".CarbonInterval::seconds($age)->cascade()->forHumans(['parts' => 2, 'short' => true]).' and nothing has finished since; check the worker or pause and resume the queue.',
+                    data: ['queue' => $queue, 'reason' => 'lag', 'oldest_age' => $age]);
+            } elseif (in_array($row['state'], ['ok', 'paused'], true)) {
+                Alerts::resolve('queue.stuck', $queue);
+            } elseif (Alert::active()->where('kind', 'queue.stuck')->where('key', $queue)->get()->contains(fn (Alert $a) => ($a->data['reason'] ?? null) === 'lag')) {
+                Alerts::resolve('queue.stuck', $queue);   // busy or unknown, and the lag is over
+            }
         }
     }
 

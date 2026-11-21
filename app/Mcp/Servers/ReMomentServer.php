@@ -59,6 +59,7 @@ class ReMomentServer extends Server
         Tools\DeepAnalysis::class,
         Tools\Export::class,
         Tools\Alerts::class,
+        Tools\Queues::class,
         Tools\PlaybackHistory::class,
         Tools\LibraryOverview::class,
         Tools\LibraryHealth::class,

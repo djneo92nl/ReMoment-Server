@@ -71,11 +71,13 @@ class QueueRunnerJobsTest extends TestCase
         Queue::assertPushed(PollRadioTitle::class, 1);
     }
 
-    public function test_the_per_queue_overview_is_only_for_redis(): void
+    public function test_the_per_queue_overview_is_for_redis_and_database_only(): void
     {
+        $this->assertNull((new QueueInspector)->queues());   // sync
+
         config(['queue.default' => 'database']);
 
-        $this->assertNull((new QueueInspector)->queues());
+        $this->assertNotEmpty((new QueueInspector)->queues());
     }
 
     public function test_long_jobs_go_to_the_heavy_queue(): void

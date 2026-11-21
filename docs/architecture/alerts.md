@@ -20,7 +20,7 @@ Code: `App\Domain\Alerts\Alerts` (the API), `AlertChecks` (the checks), `App\Mod
 
 | Kind | Key | Severity | Raised by | Raises when / resolves when |
 |------|-----|----------|-----------|-----------------------------|
-| `queue.stuck` | queue name | critical | `AlertChecks::queues` | the queue's runner state (`QueueInspector::runnerState`) is `stuck`; `ok` resolves. `busy` and `unknown` never raise and leave an active alert as it is. Redis driver only |
+| `queue.stuck` | queue name | critical, or warning for a lag | `AlertChecks::queues` | the queue's runner state (`QueueInspector::runnerState`) is `stuck` (critical, `data.reason` `heartbeat`), or the queue is lagging (warning, `reason` `lag`: the oldest waiting job passed the queue's `lag_after` and no job finished or runs, [queue-management.md](queue-management.md)); `ok` or `paused` resolves. `busy` and `unknown` leave a heartbeat alert as it is but end a lag alert once the lag is over. Redis and database drivers |
 | `scheduler.silent` | | critical | `AlertChecks::scheduler` | the scheduler heartbeat is missing or 180 s old; resolves on a fresh beat. Also checked by the open `/settings/health` page, since a dead scheduler cannot run `alerts:check` |
 | `backup.stale` | | warning | `AlertChecks::backup` | `BackupStatus::health()` is not ok (no backup, or older than `backup.stale_hours` = 48 h) |
 | `storage.unreachable` | location id | critical | `AlertChecks::storage` | the storage probe of `/settings/health` fails (probed every 5 min; a deleted location resolves) |

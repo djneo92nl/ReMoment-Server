@@ -62,6 +62,11 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->bindLibraryIds();
 
+        // Queues that can be paused without restarting a worker, and the last-finished time per queue (docs/architecture/queue-management.md).
+        $this->app['queue']->addConnector('redis', fn () => new \App\Queue\PausableRedisConnector($this->app['redis']));
+        $this->app['queue']->addConnector('database', fn () => new \App\Queue\PausableDatabaseConnector($this->app['db']));
+        Event::listen([\Illuminate\Queue\Events\JobProcessed::class, \Illuminate\Queue\Events\JobFailed::class], \App\Domain\Health\QueueProgress::class);
+
         // A SQLite file on a bind mount or network share corrupts (Control profile): say so in the log, once a day.
         if (config('database.default') === 'sqlite' && !$this->app->runningUnitTests()) {
             \App\Domain\Profile\SqliteGuard::logOnce();

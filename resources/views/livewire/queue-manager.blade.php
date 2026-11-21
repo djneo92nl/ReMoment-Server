@@ -21,11 +21,21 @@
                 <h2 class="text-base font-medium text-gray-900 dark:text-gray-100">Queues</h2>
             </div>
             @foreach($queues as $queue)
-                <div class="px-8 py-3 flex items-center gap-4 border-b border-gray-100 dark:border-stone-800 last:border-b-0" data-test="queue-{{ $queue['queue'] }}">
-                    <div class="flex-1 text-sm text-gray-900 dark:text-gray-100">{{ $queue['queue'] }}</div>
-                    <div class="w-20 text-xs {{ $queue['state'] === 'stuck' ? 'text-red-600 font-medium' : 'text-gray-500' }}" data-test="queue-state-{{ $queue['queue'] }}" title="{{ $queue['beat'] ? 'Last heartbeat '.$queue['beat']->diffForHumans() : 'No heartbeat yet' }}">{{ $queue['state'] }}</div>
-                    <div class="text-xs text-gray-500">{{ $queue['waiting'] }} waiting · {{ $queue['running'] }} running · {{ $queue['delayed'] }} delayed</div>
-                    <div class="w-36 text-xs text-gray-500 text-right">oldest waiting {{ $queue['oldest_waiting']?->diffForHumans(short: true) ?? '—' }}</div>
+                @php($name = $queue['queue'])
+                <div class="px-8 py-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-gray-100 dark:border-stone-800 last:border-b-0" data-test="queue-{{ $name }}" wire:key="queue-{{ $name }}">
+                    <div class="flex-1 min-w-32 text-sm text-gray-900 dark:text-gray-100">{{ $name }}</div>
+                    <div class="w-20 text-xs {{ $queue['state'] === 'stuck' ? 'text-red-600 font-medium' : ($queue['state'] === 'paused' ? 'text-amber-600 font-medium' : 'text-gray-500') }}" data-test="queue-state-{{ $name }}" title="{{ $queue['beat'] ? 'Last heartbeat '.$queue['beat']->diffForHumans() : 'No heartbeat yet' }}">{{ $queue['state'] }}</div>
+                    <div class="text-xs text-gray-500" data-test="queue-counts-{{ $name }}">{{ $queue['waiting'] }} waiting · {{ $queue['running'] }} running · {{ $queue['delayed'] }} delayed</div>
+                    <div class="w-24 text-xs text-gray-500 text-right" data-test="queue-workers-{{ $name }}" title="Worker processes listening on this queue">{{ $queue['workers'] === null ? 'workers ?' : $queue['workers'].' '.\Illuminate\Support\Str::plural('worker', $queue['workers']) }}</div>
+                    <div class="w-24 text-xs text-right {{ $queue['failed_24h'] > 0 ? 'text-red-600' : 'text-gray-500' }}" data-test="queue-failed-{{ $name }}">{{ $queue['failed_24h'] }} failed 24h</div>
+                    <div class="w-36 text-xs {{ $queue['lagging'] ? 'text-amber-600 font-medium' : 'text-gray-500' }} text-right" data-test="queue-age-{{ $name }}" title="{{ $queue['last_progress'] ? 'A job last finished '.$queue['last_progress']->diffForHumans() : 'No finished job recorded yet' }}">oldest waiting {{ $queue['oldest_waiting']?->diffForHumans(short: true) ?? '—' }}</div>
+                    <div class="w-20 text-right text-xs">
+                        @if($queue['paused'])
+                            <button wire:click="resumeQueue('{{ $name }}')" class="text-gray-900 dark:text-gray-100 underline" data-test="resume-{{ $name }}">Resume</button>
+                        @elseif(\App\Domain\Health\Queues::pausable($name))
+                            <button wire:click="pauseQueue('{{ $name }}')" wire:confirm="Pause the {{ $name }} queue? Jobs already running finish; nothing new starts until you resume." class="text-gray-500 hover:underline" data-test="pause-{{ $name }}">Pause</button>
+                        @endif
+                    </div>
                 </div>
             @endforeach
         </x-card>
@@ -46,7 +56,16 @@
                     <div class="flex-1 min-w-40 font-medium text-gray-900 dark:text-gray-100 truncate">{{ $group['job'] }}</div>
                     <div class="w-16 text-gray-900 dark:text-gray-100 tabular-nums">{{ number_format($group['count']) }}</div>
                     <div class="text-xs text-gray-500">{{ $group['waiting'] }} waiting · {{ $group['running'] }} running · {{ $group['delayed'] }} delayed</div>
+                    <div class="text-xs text-gray-400">{{ $group['queue'] }}</div>
                     <div class="w-28 text-xs text-gray-500 text-right">oldest {{ $group['oldest']?->diffForHumans(short: true) ?? '—' }}</div>
+                    @if($group['class'] !== \App\Jobs\QueueHeartbeat::class && ($group['waiting'] + $group['delayed']) > 0)
+                        <div class="flex gap-3 text-xs whitespace-nowrap" data-test="job-actions-{{ $group['queue'] }}-{{ $group['job'] }}">
+                            @if($canReorder && $group['waiting'] > 0)
+                                <button wire:click='prioritiseJobs(@json($group["queue"]), @json($group["class"]))' wire:confirm="Run the waiting {{ $group['job'] }} jobs before everything else in {{ $group['queue'] }}?" class="text-gray-900 dark:text-gray-100 underline" data-test="prioritise-{{ $group['queue'] }}-{{ $group['job'] }}">Run first</button>
+                            @endif
+                            <button wire:click='cancelJobs(@json($group["queue"]), @json($group["class"]))' wire:confirm="Cancel the {{ $group['waiting'] + $group['delayed'] }} waiting {{ $group['job'] }} jobs? Running ones finish. This can't be undone." class="text-red-600 hover:underline" data-test="cancel-{{ $group['queue'] }}-{{ $group['job'] }}">Cancel waiting</button>
+                        </div>
+                    @endif
                 </div>
             @empty
                 <div class="px-8 py-8 text-center text-sm text-gray-500">No pending jobs.</div>
