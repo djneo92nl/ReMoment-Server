@@ -60,5 +60,20 @@
                 <x-secondary-button type="submit">Publish now</x-secondary-button>
             </form>
         @endif
+
+        {{-- The rest_command package (what `php artisan ha:package` writes): Home Assistant calls ReMoment's REST API with it. --}}
+        <form method="GET" action="{{ route('settings.mqtt.home-assistant.package') }}" class="space-y-3" data-test="ha-package">
+            <x-settings-group>
+                <label class="flex items-center justify-between gap-4 px-5 py-3.5">
+                    <span class="text-[15px] text-gray-900 dark:text-gray-100">Server address for Home Assistant</span>
+                    <input type="url" name="base_url" value="{{ \App\Domain\Scenes\HaPackage::defaultBaseUrl() }}" class="w-64 rounded-xl border-gray-300 font-mono text-sm dark:border-gray-700 dark:bg-gray-800" data-test="ha-package-base-url">
+                </label>
+            </x-settings-group>
+            <p class="px-1 text-sm text-gray-500 dark:text-gray-400">
+                A <span class="font-mono">remoment.yaml</span> with one <span class="font-mono">rest_command</span> per action (scenes, play on a device, move playback, volume ...), for Home Assistant automations.
+                Add it as a package or merge it into <span class="font-mono">configuration.yaml</span>. The address must be one Home Assistant can reach. Not yet tried in a real Home Assistant.
+            </p>
+            <x-secondary-button type="submit" data-test="ha-package-download">Download package</x-secondary-button>
+        </form>
     </div>
 </x-app-layout>

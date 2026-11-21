@@ -13,7 +13,7 @@ class HaPackageCommand extends Command
 
     public function handle(HaPackage $package): int
     {
-        $base = $this->option('base-url') ?: (config('app.url') ?: 'http://remoment.local');
+        $base = $this->option('base-url') ?: HaPackage::defaultBaseUrl();
         $yaml = $package->yaml($base);
 
         if ($path = $this->option('output')) {

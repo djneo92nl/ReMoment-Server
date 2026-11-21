@@ -18,6 +18,12 @@ class HaPackage
 {
     public function __construct(private readonly SceneOperations $operations) {}
 
+    /** The origin Home Assistant calls when none is given: APP_URL, else http://remoment.local. */
+    public static function defaultBaseUrl(): string
+    {
+        return (string) (config('app.url') ?: 'http://remoment.local');
+    }
+
     /** The YAML document as text; `$baseUrl` is the server's origin (no `/api`). */
     public function yaml(string $baseUrl): string
     {
