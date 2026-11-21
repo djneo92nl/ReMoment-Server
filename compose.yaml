@@ -148,7 +148,8 @@ services:
 
     # Opt-in stems service (per-stem loudness lanes of one track, on demand): docker compose --profile stems up -d --build stems,
     # then STEMS_URL=http://stems:8092 (docs/architecture/stems-service.md). Needs about 1.5 GB RAM while it works; the model
-    # weights (84 MB) download from Hugging Face at first use into the volume. Multi-arch: runs natively on arm64.
+    # weights (84 MB) are NOT downloaded by themselves: their licence is unclear, so the admin starts the download (Settings >
+    # Audio analysis, opt-in) and they land in the volume. Multi-arch: runs natively on arm64.
     stems:
         profiles: [stems]
         build:
@@ -158,6 +159,8 @@ services:
         environment:
             STEMS_MAX_DURATION: '${STEMS_MAX_DURATION:-1200}'
             STEMS_MODEL: '${STEMS_MODEL:-htdemucs}'
+            STEMS_WEIGHTS_URL: '${STEMS_WEIGHTS_URL:-}'
+            STEMS_WEIGHTS_SHA256: '${STEMS_WEIGHTS_SHA256:-}'
         mem_limit: '${STEMS_MEM_LIMIT:-3g}'
         volumes:
             - 'sail-stems-models:/models'

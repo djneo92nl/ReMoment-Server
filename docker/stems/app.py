@@ -11,8 +11,9 @@ import zipfile
 from contextlib import asynccontextmanager
 
 import separate
+import weights
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from starlette.background import BackgroundTask
 
 MAX_DURATION = float(os.environ.get("STEMS_MAX_DURATION", 1200))
@@ -27,6 +28,8 @@ def _load():
     try:
         separate.load_model()
         _load_error = None
+    except weights.WeightsMissing:
+        _load_error = None  # not an error: the weights are opt-in, `weights` in /health says where they stand
     except Exception as e:  # noqa: BLE001 - offline without cached weights, a broken volume, ...
         _load_error = str(e).splitlines()[0][:200] if str(e) else e.__class__.__name__
 
@@ -34,6 +37,8 @@ def _load():
 @asynccontextmanager
 async def lifespan(_app):
     if os.environ.get("STEMS_PRELOAD", "1") == "1":
+        # A download finishing loads the model right away; weights already on the volume load now. Nothing downloads by itself.
+        separate.WEIGHTS.on_ready = lambda: threading.Thread(target=_load, daemon=True).start()
         threading.Thread(target=_load, daemon=True).start()
     yield
 
@@ -43,8 +48,10 @@ app = FastAPI(title="ReMoment stems", lifespan=lifespan)
 
 @app.get("/health")
 def health():
-    """`ok` once the model is loaded; a service that cannot fetch its weights says why in `error` and is not ok."""
+    """`ok` once the model is loaded. `weights` is missing | downloading | ready | failed: the weights are downloaded only on
+    request (POST /weights), so a fresh service is not ok and has no `error`; `error` is a model that could not load."""
     ok = separate.model_loaded()
+    state = separate.WEIGHTS.state()
 
     return {
         "ok": ok,
@@ -54,14 +61,35 @@ def health():
         "rate_hz": separate.RATE_HZ,
         "max_duration": MAX_DURATION,
         "audio_formats": separate.audio_formats(),
-        "loading": not ok and _load_error is None,
+        "weights": state,
+        "loading": not ok and _load_error is None and state == weights.READY,
         "error": _load_error,
     }
+
+
+@app.get("/weights")
+def weights_status():
+    """Where the opt-in model download stands: state missing | downloading | ready | failed, sizes, source, checksum, error."""
+    return separate.WEIGHTS.status()
+
+
+@app.post("/weights", status_code=202)
+def weights_download():
+    """Starts the download of the weights (pinned URL, SHA-256 checked) unless they are there or arriving. Idempotent: answers
+    the status, 202 while one is under way or just started, 200 when they were ready already."""
+    status = separate.WEIGHTS.start()
+
+    return JSONResponse(status, status_code=200 if status["state"] == weights.READY else 202)
 
 
 @app.post("/stems")
 def stems(audio: UploadFile = File(...), audio_format: str | None = Query(None, alias="audio"), bitrate: int = Query(separate.DEFAULT_BITRATE, ge=64, le=320)):
     """The curves as JSON; with `audio` (mp3 | flac) a zip (stored) of stems.json and one audio file per stem."""
+    if not separate.model_loaded():
+        try:
+            separate.WEIGHTS.require()
+        except weights.WeightsMissing as e:
+            raise HTTPException(503, str(e))
     if audio_format is not None and audio_format not in separate.audio_formats():
         raise HTTPException(422, f"Cannot encode {audio_format} here; this ffmpeg makes: {', '.join(separate.audio_formats()) or 'nothing'}.")
     suffix = os.path.splitext(audio.filename or "")[1] or ".audio"

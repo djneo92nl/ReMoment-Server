@@ -3,7 +3,8 @@
         <x-page-header title="Audio analysis" subtitle="How far each stage has come on your own files, what runs now and what failed" :back="route('settings.index')" />
     </x-slot>
 
-    <div class="max-w-4xl">
+    <div class="max-w-4xl space-y-6">
         <livewire:analysis-status />
+        <livewire:stem-weights-card />
     </div>
 </x-app-layout>

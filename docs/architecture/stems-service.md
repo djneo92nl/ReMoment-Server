@@ -7,8 +7,10 @@ The choice of model, the measurements on nine tracks, the owner's verdicts and t
 ## Contract
 
 ```
-GET  /health  → { ok, version, method, rate_hz, max_duration, loading, error }
+GET  /health  → { ok, version, method, rate_hz, max_duration, weights, loading, error }
 POST /stems   multipart: audio (any file ffmpeg reads; the app sends the original file)
+GET  /weights → { state, model, file, size, downloaded, total, source, sha256, error }   state missing | downloading | ready | failed
+POST /weights → 202 (200 when ready)   start the opt-in weights download, see "Weights"
 ```
 
 ```json
@@ -20,8 +22,8 @@ POST /stems   multipart: audio (any file ffmpeg reads; the app sends the origina
 
 - **Curves**: integer dB, the RMS of the stem's mono mix over one frame, relative to full scale, clamped to -80..0 (-80 = silence), one value per 0.5 s (`rate_hz` 2; frame `i` starts at `i / 2` s). A 4-minute track is 4 x 480 values, about 8 KB of JSON (5 KB for a 2-minute track as measured).
 - **`vocal_ratio`** 0-1 and **`instrumental`** `[{start, end}]` in seconds come from the vocals curve alone: median-smoothed over 2.5 s, a frame is quiet when it is more than **20 dB** under the track's own 90th percentile, quiet runs less than 3 s apart join, a run of at least **8 s** is an instrumental range. A track whose vocals never reach -50 dB has no vocals: one range over the whole length, ratio 0. The constants are in `docker/stems/separate.py` (`DROP`, `MIN_LEN`, `MERGE`, `VOCAL_FLOOR`); the spike's thresholds, judged right by the owner on five tracks.
-- **Health**: `ok` is true once the model is loaded. A service that cannot fetch its weights (offline, full volume) answers `ok: false` with `error`; one still loading says `loading: true`. The app treats `ok: false` as "not available" (the Settings › Health probe "Stems service" says which: ok / loading (warning) / error with the reason).
-- **Errors**: `413` longer than `STEMS_MAX_DURATION` (default 1200 s = 20 minutes) or an upload over `STEMS_MAX_UPLOAD_MB` (600), `422` not audio, `503` the model is not available. One request at a time (one uvicorn worker plus a lock), so two requests cannot double the RAM.
+- **Health**: `ok` is true once the model is loaded. `weights` is `missing`, `downloading`, `ready` or `failed` (see "Weights"): a fresh service is `ok: false, weights: "missing"` with no `error`, which is not a fault; weights that are `ready` and a model not loaded yet say `loading: true`; a model that cannot load says `error`. The app treats `ok: false` as "not available" (the Settings › Health probe "Stems service" says which: ok / weights not downloaded or downloading (warning) / download failed or load error (error) / loading (warning)).
+- **Errors**: `413` longer than `STEMS_MAX_DURATION` (default 1200 s = 20 minutes) or an upload over `STEMS_MAX_UPLOAD_MB` (600), `422` not audio, `503` the model is not available: `weights_missing: …` or `weights_downloading: … (42%)` while the weights are not there (answered before the upload is read), else the model's load error. One request at a time (one uvicorn worker plus a lock), so two requests cannot double the RAM.
 
 ## Audio on request
 
@@ -44,7 +46,18 @@ Kind **`stem_audio`** (`Stages\StemAudioStage`, an `OnDemandStage` on the same `
 
 `htdemucs` (Demucs 4.1.0, the maintained fork `adefossez/demucs`, MIT code), PyTorch 2.5.1 CPU, no shifts, segment 7.8 s (the model's own), overlap 0.25. The track is decoded by ffmpeg to 44.1 kHz stereo **as a stream** and separated in **60 s windows with 2 s padding on each side** (the padding is dropped): this keeps the peak RAM flat at about **1.5 GB for any track length**, where separating the whole track at once grows by about 3.5 MB per second of audio (an 8-minute track was OOM-killed under 3 GB). Demucs's own `--segment` does not reduce RAM (measured). Threads: `STEMS_THREADS` (default `min(4, cpus)`, the production compose file sets 2 with `cpus: 2`).
 
-The **weights (84 MB) are not in the image or the repo**: the `demucs` package downloads them from Hugging Face (`adefossez/HTDemucs`) at first use into `/models` (a named volume, `HF_HOME`), and the service preloads them at start (`STEMS_PRELOAD=0` turns that off). Offline, the first start has no model and reports it in `/health`.
+The **weights (84 MB) are not in the image or the repo, and nothing downloads them by itself** (their licence is unclear): see "Weights" below. With weights on the `/models` volume the service preloads the model at start (`STEMS_PRELOAD=0` turns that off).
+
+## Weights (opt-in download, decided 2026-11-20)
+
+The owner's decision: public images contain no Demucs weights; they are downloaded **only when the admin opts in**, with the licence note in front of the button. So a fresh service starts without a model and says `weights: missing`, and refuses stem jobs (`503 weights_missing`) until the admin has started the download.
+
+- **Where it comes from**: Meta's release files that the `demucs` 4.1.0 package itself uses (`demucs/remote/files.txt`; the weights are **not** on Hugging Face as an earlier version of these docs said): `https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/955717e8-8726e21a.th` (`htdemucs`, 84 141 911 bytes, SHA-256 `8726e21a993978c7ba086d3872e7608d7d5bfca646ca4aca459ffda844faa8b4`) and `…/5c90dfd2-34c22ccb.th` (`htdemucs_6s`, 54 996 327 bytes, SHA-256 `34c22ccb381c6f9fdbf324f04e1e2fe21aaaf293f5ded163a162697ff9a02ddd`), for the model `STEMS_MODEL` selects. The pins are `weights.SPECS` in `docker/stems/weights.py`; the SHA-256s were computed from a download on 2026-11-21 (the first 8 digits match the checksum in the file name, which is how demucs names them). `STEMS_WEIGHTS_URL` and `STEMS_WEIGHTS_SHA256` (service env, compose passes them through) replace the source, e.g. a mirror behind an http server; the SHA-256 may be given in full or as its first 8 or more hex digits.
+- **How**: `POST /weights` on the service (the app's `POST /api/admin/stems/weights`, the card on `/settings/analysis`, MCP `deep_analysis` action `download_weights`) starts one download in a thread: streamed to `{name}.part`, hashed on the way, compared with the pinned SHA-256, and only then renamed to `$TORCH_HOME/hub/checkpoints/{signature}-{checksum}.th` (the `/models` volume), the place `torch.hub` looks, so `get_model` then loads without any network access. A wrong hash, a short read or an unreachable source is `failed` with the reason, the partial file is removed and `POST` again tries again; asking while `downloading` or `ready` is a no-op. A finished download loads the model at once (when `STEMS_PRELOAD=1`), no restart. Only `http(s)` sources are accepted.
+- **Progress**: `GET /weights` has `downloaded` and `total` bytes (the source's `Content-Length`, else the pinned size). The app turns them into `percent` (`GET /api/stems/weights`, see [../api/stems.md](../api/stems.md), "Weights").
+- **Never by itself**: `separate.load_model()` checks the weights first (`weights.require()`, `WeightsMissing`) so `demucs.get_model` can never start its own download.
+- **Existing installs**: weights that an earlier version of this service fetched sit in the same cache path; the first status check hashes the file once (cached per size and mtime) and reports `ready`, no new download. A file with a different hash is `failed` ("does not match the checksum") until downloaded again.
+- **In the app**: `App\Domain\Analysis\StemWeights` (status, download), `Api\StemWeightsController`, `Livewire\StemWeightsCard`. `DeepAnalysis::available()` also requires `weights` to be `ready` when the health answer has the field, so `features.deep_analysis_kinds` lists `stems` and `stem_audio` only then; the download forgets the one-minute health cache so they appear as soon as the model has loaded. Full profile only (the routes are in the `deep_analysis` row of `config/profile.php`).
 
 ## Measured (Apple M5 Pro, native linux/arm64, 4 threads, CPU)
 
@@ -80,11 +93,11 @@ Caveats: the piano stem is the weakest (Demucs' authors say so), guitar is decen
 
 ## Licence (read before a public release)
 
-Code: Demucs is **MIT**; everything pinned here is permissive. **The htdemucs weights have no stated licence**: the maintained fork's README says "The license of the weights is not clear: MusDB contains some data that were only usable for research purpose", and the Hugging Face repo carries no licence tag. They are downloaded at first use and never committed or baked into the image, and the feature is off by default; that keeps the AGPL repository free of them but does not clarify the terms for someone running it commercially. Open-Unmix's default weights (`umxl`) are CC BY-NC-SA 4.0 and were excluded. Details and pages: [track-stems-spike.md](track-stems-spike.md).
+Code: Demucs is **MIT**; everything pinned here is permissive. **The htdemucs weights have no stated licence**: the maintained fork's README says "The license of the weights is not clear: MusDB contains some data that were only usable for research purpose", and the Hugging Face repo carries no licence tag. They are downloaded only when the admin opts in (see "Weights") and never committed or baked into the image, and the feature is off by default; that keeps the AGPL repository free of them but does not clarify the terms for someone running it commercially. Open-Unmix's default weights (`umxl`) are CC BY-NC-SA 4.0 and were excluded. Details and pages: [track-stems-spike.md](track-stems-spike.md).
 
 ## Verified and not
 
-Verified: the arm64 build and run, the pinned install (`demucs --no-deps`, because `sphn` has no aarch64 wheel and is unused), the tests, the numbers above, the whole path app → service → stored → album page (Casualty in the dev library). **Not verified:** linux/amd64 (the Dockerfile installs torch from the PyTorch CPU index there, because PyPI's amd64 wheel is the CUDA build; nothing was run), a mini PC or Pi, quality beyond the five tracks the owner judged, the supervised worker under real load (the dev container's supervisor config was not rebuilt), and the Ansible switch (written, not run).
+Verified: the arm64 build and run, the pinned install (`demucs --no-deps`, because `sphn` has no aarch64 wheel and is unused), the tests, the numbers above, the whole path app → service → stored → album page (Casualty in the dev library). Weights opt-in (2026-11-21): the source URLs exist and the pinned SHA-256s were computed from real downloads; `weights.py` and its tests (`docker/stems/tests/test_weights.py`, a local http server as the source) were run with plain Python, **but the service's pytest suite (`test_stems.py`, with FastAPI and numpy), the Docker build with the new file, and a real download followed by loading the model in the container were not run** (no numpy, FastAPI or Docker here). **Not verified:** linux/amd64 (the Dockerfile installs torch from the PyTorch CPU index there, because PyPI's amd64 wheel is the CUDA build; nothing was run), a mini PC or Pi, quality beyond the five tracks the owner judged, the supervised worker under real load (the dev container's supervisor config was not rebuilt), and the Ansible switch (written, not run).
 
 ## Nightly batch (opt-in)
 

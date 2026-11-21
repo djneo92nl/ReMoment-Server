@@ -242,6 +242,8 @@ Route::middleware('admin.token')->group(function () {
     Route::get('/admin/nodes/{client}/jobs', [\App\Http\Controllers\Api\AdminNodeJobController::class, 'index']);
     Route::post('/admin/nodes/{client}/jobs', [\App\Http\Controllers\Api\AdminNodeJobController::class, 'store']);
     Route::post('/admin/nodes/{client}/jobs/{job}/cancel', [\App\Http\Controllers\Api\AdminNodeJobController::class, 'cancel']);
+// Opt-in download of the Demucs weights (licence unclear): the state is open, starting it is admin only (below).
+Route::get('/stems/weights', [\App\Http\Controllers\Api\StemWeightsController::class, 'show']);
     Route::delete('/admin/token', [AdminAuthController::class, 'logout']);
     Route::post('/admin/alerts/{alert}/ack', [AlertController::class, 'acknowledge']);
 
@@ -258,6 +260,9 @@ Route::middleware('admin.token')->group(function () {
     // Storage locations and the library's files (docs/architecture/file-storage.md)
     Route::get('/admin/storage/locations', [StorageController::class, 'locations']);
     Route::post('/admin/storage/locations', [StorageController::class, 'storeLocation']);
+    // Starts the opt-in download of the stems service's Demucs weights (docs/api/stems.md, "Weights")
+    Route::post('/admin/stems/weights', [\App\Http\Controllers\Api\StemWeightsController::class, 'store']);
+
     Route::put('/admin/storage/locations/{location}', [StorageController::class, 'updateLocation']);
     Route::delete('/admin/storage/locations/{location}', [StorageController::class, 'destroyLocation']);
     Route::post('/admin/storage/locations/{location}/test', [StorageController::class, 'testLocation']);

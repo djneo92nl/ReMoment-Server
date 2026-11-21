@@ -102,6 +102,15 @@ return [
     */
     'stems_url' => env('STEMS_URL'),
 
+    /*
+    | The Demucs weights are downloaded only when the admin opts in (POST /api/admin/stems/weights, the card on
+    | /settings/analysis), because their licence is unclear. The source URL and SHA-256 are pinned in the stems service
+    | (docker/stems/weights.py; STEMS_WEIGHTS_URL / STEMS_WEIGHTS_SHA256 there replace them). This is the page the card
+    | links to, and the note it shows. docs/architecture/stems-service.md, "Weights".
+    */
+    'stems_weights_licence_url' => env('STEMS_WEIGHTS_LICENCE_URL', 'https://github.com/adefossez/demucs#license'),
+    'stems_weights_licence_note' => 'The licence of the Demucs weights is not clear: the training data (MUSDB) was only usable for research, and the authors cannot grant a licence. Fine for your own household; if you run ReMoment commercially, get advice first.',
+
     /** The queue and its single worker (docker/8.4/supervisord*.conf: one at a time, nice 15). */
     'stems_queue' => env('STEMS_QUEUE', 'stems'),
 

@@ -2023,6 +2023,44 @@ paths:
       security: []
       parameters:
         - { name: track, in: path, required: true, schema: { type: integer } }
+  /stems/weights:
+    get:
+      tags: [Library]
+      summary: Where the opt-in download of the stem separation weights stands
+      description: "Open (no admin token). The Demucs weights are not part of ReMoment and never downloaded by themselves, because their licence is unclear: the stems service starts without them (`weights: missing` in its health) and refuses stem jobs. `state` is `missing`, `downloading`, `ready` or `failed`; kinds `stems` and `stem_audio` are in `features.deep_analysis_kinds` of GET /info only when it is `ready`. `licence` carries the note to show before the download is started. 409 `not_available` without a stems service (`STEMS_URL`), 503 `unreachable`, 502 when the service is an older image without the download. Full profile only. See docs/api/stems.md, \"Weights\"."
+      operationId: getStemWeights
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StemWeights" }
+        "409": { description: "`not_available`: no stems service is configured", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "502": { description: "`driver_error`: the service answered wrongly", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "503": { description: "`unreachable`: the stems service does not answer", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /admin/stems/weights:
+    post:
+      tags: [Library]
+      summary: Start the opt-in download of the stem separation weights (admin)
+      description: "Admin token. Tells the stems service to download the weights from the source and SHA-256 pinned in the service (a file in its models volume, verified before it gets its name). No body. Nothing happens when they are `ready` (200) or already `downloading` (202); a `failed` download is tried again. Poll GET /stems/weights for the progress. Same errors as GET /stems/weights, plus 401 without the token. Full profile only. See docs/api/stems.md, \"Weights\"."
+      operationId: downloadStemWeights
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: The weights are ready already
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StemWeights" }
+        "202":
+          description: The download is running (just started or already under way)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StemWeights" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { description: "`not_available`: no stems service is configured", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "502": { description: "`driver_error`: the service answered wrongly", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "503": { description: "`unreachable`: the stems service does not answer", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
         - { name: stem, in: path, required: true, schema: { type: string, enum: [vocals, drums, bass, guitar, piano, other] } }
       responses:
         "200":
@@ -4190,7 +4228,7 @@ components:
             profile: { type: string, enum: [control, standard, full], description: "The profile this server runs. Control has no library, catalogue or analysis: those endpoints answer 422 not_available_in_profile (see docs/architecture/profiles.md)" }
             analysis: { type: boolean, description: "Audio analysis of the own files is enabled (ANALYSIS_ENABLED) and the profile allows it (Full). False: Sound data (TrackAnalysis, waveform, listening modes) will not appear, so explain an empty Sound page instead of showing nothing. Always present." }
             deep_analysis: { type: boolean, description: "A deep-analysis service answers its health check (cached for a minute): POST /library/tracks/{id}/deep-analysis can queue something" }
-            deep_analysis_kinds: { type: array, items: { $ref: "#/components/schemas/DeepAnalysisKind" }, description: "The kinds that can run now (sections: structure service; stems: stems service). Present only when not empty." }
+            deep_analysis_kinds: { type: array, items: { $ref: "#/components/schemas/DeepAnalysisKind" }, description: "The kinds that can run now (sections: structure service; stems and stem_audio: stems service, only once its weights are downloaded, see GET /stems/weights). Present only when not empty." }
             scenes: { type: boolean, description: "GET /scenes exists (true in every profile)" }
             export: { type: boolean, description: "Export from the library as zip is available: the profile has the library and own files, and ffmpeg can transcode (POST /library/exports). Present only when true." }
             export_formats: { type: array, items: { type: string, enum: [mp3, aac, opus] }, description: "The formats ffmpeg on this server can make for an export (probed with `ffmpeg -encoders`, cached); present with `export`. Profiles of other formats cannot convert files here." }
@@ -4390,6 +4428,26 @@ components:
             tracks: { type: integer }
             hours: { type: number, description: "Total duration of the tracks, one decimal" }
         decades:
+    StemWeights:
+      type: object
+      required: [state, size, downloaded, total, percent, source, sha256, error, licence]
+      properties:
+        state: { type: string, enum: [missing, downloading, ready, failed] }
+        model: { type: string, nullable: true, description: "The model the service runs (htdemucs, or htdemucs_6s)" }
+        size: { type: integer, nullable: true, description: "Bytes on disk, once ready" }
+        downloaded: { type: integer, description: "Bytes received while downloading; the file size when ready; 0 otherwise" }
+        total: { type: integer, nullable: true, description: "Bytes expected (the source's Content-Length, else the pinned size)" }
+        percent: { type: integer, nullable: true, minimum: 0, maximum: 100, description: "Null while the total is unknown" }
+        source: { type: string, nullable: true, description: "The pinned download URL" }
+        sha256: { type: string, nullable: true, description: "The pinned checksum (a file that does not match is thrown away)" }
+        error: { type: string, nullable: true, description: "Why the last download failed, when `state` is failed" }
+        licence:
+          type: object
+          required: [note, url]
+          properties:
+            note: { type: string, description: "Show this before starting the download: the weights' licence is unclear" }
+            url: { type: string }
+
           type: array
           description: "Albums per release decade, oldest first (albums with a release date from 1900 on)"
           items:

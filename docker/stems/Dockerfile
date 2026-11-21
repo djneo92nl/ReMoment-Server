@@ -1,6 +1,7 @@
 # Stems service: per-stem loudness curves and instrumental ranges of ONE track, on demand (docs/architecture/stems-service.md).
 # Demucs htdemucs on the CPU, about 1.5 GB RAM, about 0.45x real time on 4 fast threads. Image about 1.6 GB.
-# The model weights (84 MB) are NOT in the image or the repo: they download from Hugging Face at first use into /models.
+# The model weights (84 MB) are NOT in the image or the repo, and the service never fetches them by itself (licence unclear):
+# the admin's opt-in (POST /weights) downloads them into the /models volume (weights.py).
 # amd64 and arm64 (arm64 built and run; amd64 unverified).
 #   docker build docker/stems
 FROM python:3.12-slim
@@ -17,7 +18,7 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then pip install --no-cache-dir torch==2.5.1
     && pip install --no-cache-dir -r requirements.txt \
     && pip install --no-cache-dir --no-deps demucs==4.1.0
 
-COPY separate.py app.py ./
+COPY separate.py weights.py app.py ./
 
 VOLUME /models
 EXPOSE 8092

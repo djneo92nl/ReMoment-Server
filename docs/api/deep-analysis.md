@@ -63,11 +63,11 @@ The stored stems, in the same two places (`details` and `now_playing`), absent/`
 
 ## `GET /api/info`
 
-`features.deep_analysis` is true while any kind's service answers its health check (cached for a minute) and `features.deep_analysis_kinds` lists the kinds that can run now (`["sections", "stems", "stem_audio"]`, present only when not empty), see [server-info.md](server-info.md). Clients offer an action only for a kind in that list.
+`features.deep_analysis` is true while any kind's service answers its health check (cached for a minute) and `features.deep_analysis_kinds` lists the kinds that can run now (`["sections", "stems", "stem_audio"]`, present only when not empty; `stems` and `stem_audio` only once the stems service's Demucs weights are downloaded, an opt-in step, see [stems.md](stems.md), "Weights"), see [server-info.md](server-info.md). Clients offer an action only for a kind in that list.
 
 ## MCP
 
-Tool `deep_analysis` (open): `request` (`track_id`, `kinds`: `sections`, `stems` and/or `stem_audio`, default `["sections"]`), `status`, `remove`, `stems` (the kept audio of a track, see [stems.md](stems.md)); same answers and errors, see [mcp.md](mcp.md).
+Tool `deep_analysis` (open): `request` (`track_id`, `kinds`: `sections`, `stems` and/or `stem_audio`, default `["sections"]`), `status`, `remove`, `stems` (the kept audio of a track, see [stems.md](stems.md)), `weights` and `download_weights` (the opt-in weights download, admin for the second, see [stems.md](stems.md)); same answers and errors, see [mcp.md](mcp.md).
 
 ## Code
 

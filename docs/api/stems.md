@@ -66,3 +66,16 @@ No token header: the signature is the authorization. The file with its `Content-
 ## Storage and cleanup
 
 `stems/{file id}/{stem}.{mp3|flac}` on the disk `STEM_AUDIO_DISK` (`local` = `storage/app/private`), not part of any library storage location. About 6 MB per 4-minute track as MP3, 80-120 MB as FLAC. Nothing keeps stems by itself: they exist only for tracks someone asked for, until `DELETE …/deep-analysis/stem_audio`, a change of the file (forgotten; `stems:prune` removes the leftovers daily) or removal of the file. MCP: tool `deep_analysis` (`request` with `kinds: ["stem_audio"]`, `stems` to list). Licence note: the htdemucs weights have no stated licence; the files are served to the household's own apps only.
+
+## Weights (opt-in download)
+
+The Demucs weights are **not part of ReMoment** and are never downloaded by themselves, because their licence is unclear. Until the admin has started the download the stems service answers `weights: missing`, the kinds `stems` and `stem_audio` are **not** in `features.deep_analysis_kinds` of `GET /api/info`, and a request for them is `409 not_available`. Full profile only. Design: [../architecture/stems-service.md](../architecture/stems-service.md), "Weights".
+
+```
+GET  /api/stems/weights          open      → 200 { state, model, size, downloaded, total, percent, source, sha256, error, licence: { note, url } }
+POST /api/admin/stems/weights    admin token, no body   → 202 while it runs (just started or already under way), 200 when ready
+```
+
+`state` is `missing`, `downloading`, `ready` or `failed`. `size` is the file's bytes once ready; `downloaded` and `total` are bytes while downloading; `percent` is 0-100 while downloading with a known total, 100 when ready and `null` otherwise; `source` is the pinned URL and `sha256` the pinned checksum (the download is verified against it and thrown away on a mismatch); `error` says why a `failed` download failed (POST again tries again). `licence.note` is the text to show next to the button and `licence.url` the page to link: show them before you offer the download. POST is a no-op when the weights are there or arriving, so a client can call it again freely.
+
+Errors (both): `409 not_available` without a stems service (`STEMS_URL`), `503 unreachable`, `502 driver_error` (an older service image without the endpoint: rebuild it), `422 not_available_in_profile` outside Full, `401` for POST without the token. Once `state` is `ready` the service loads the model by itself (a few seconds; `GET /api/info` lists the kinds when it is done). The web card is on `/settings/analysis`; MCP: `deep_analysis` with action `weights` (state) or `download_weights` (admin).

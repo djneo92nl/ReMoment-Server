@@ -15,6 +15,7 @@ import threading
 from functools import lru_cache
 
 import numpy as np
+import weights
 
 VERSION = 1
 # STEMS_MODEL picks the model: `htdemucs` (four stems, the default) or `htdemucs_6s` (adds guitar and piano; the piano stem
@@ -44,15 +45,20 @@ MERGE = 3.0
 SMOOTH = 5
 VOCAL_FLOOR = -50
 
+# The weights of the configured model: downloaded only on request (weights.py), never by the model loader itself.
+WEIGHTS = weights.Weights(METHOD)
+
 _model = None
 _model_lock = threading.Lock()
 
 
 def load_model():
-    """The configured model (METHOD), loaded once (downloads its weights, 84 MB for htdemucs, into HF_HOME on first use)."""
+    """The configured model (METHOD), loaded once from the weights the admin downloaded (WEIGHTS); raises
+    weights.WeightsMissing, without touching the network, while they are not there."""
     global _model
     with _model_lock:
         if _model is None:
+            WEIGHTS.require()
             import torch
             from demucs.pretrained import get_model
 

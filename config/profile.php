@@ -89,7 +89,7 @@ return [
     'routes' => [
         // Play history and statistics work in every profile (the history feature); narrow rows come before `library`.
         'history' => ['api/library/stats', 'api/library/history', 'api/devices/*/history'],
-        'deep_analysis' => ['api/library/tracks/*/deep-analysis', 'api/library/tracks/*/deep-analysis/*', 'api/library/tracks/*/stems', 'api/library/tracks/*/stems/*', 'mixer'],
+        'deep_analysis' => ['api/library/tracks/*/deep-analysis', 'api/library/tracks/*/deep-analysis/*', 'api/library/tracks/*/stems', 'api/library/tracks/*/stems/*', 'api/stems/weights', 'api/admin/stems/weights', 'mixer'],
         'rip_upload' => ['api/admin/files'],
         'cover_health' => ['api/library/health/covers', 'settings/library-health/covers'],
         'analysis' => ['api/library/tracks/*/mixes-with', 'settings/analysis', 'settings/analysis/*', 'settings/library-health', 'settings/library-health/*', 'api/library/health', 'api/library/health/*'],

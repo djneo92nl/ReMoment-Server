@@ -202,7 +202,18 @@ class ExternalServices
             return ServiceCheck::ok('Stems service '.($response->json('method') ?? '').' v'.($response->json('version') ?? '?'));
         }
 
-        // Up but without a model: still loading, or the weights could not be downloaded (offline, full volume).
+        // Up but without a model: the weights are opt-in (not downloaded yet, or arriving), or still loading, or could not load.
+        $weights = $response->json('weights');
+        if ($weights === 'missing') {
+            return ServiceCheck::warning('Stems service is up; the model weights are not downloaded (opt-in, Settings > Audio analysis)');
+        }
+        if ($weights === 'downloading') {
+            return ServiceCheck::warning('Stems service is downloading its model weights');
+        }
+        if ($weights === 'failed') {
+            return ServiceCheck::error('Stems service could not download its model weights (Settings > Audio analysis)');
+        }
+
         return $response->json('error')
             ? ServiceCheck::error('Stems service has no model: '.$response->json('error'))
             : ServiceCheck::warning('Stems service is loading its model');

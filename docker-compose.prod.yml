@@ -166,7 +166,8 @@ services:
 
     # Opt-in stems service (per-stem loudness lanes of one track, on demand): docker compose --profile stems up -d, then set
     # STEMS_URL=http://127.0.0.1:8092 (docs/architecture/stems-service.md). About 1.5 GB RAM and all the CPU it may use for
-    # minutes per track; the model weights download at first use into the volume. arm64 verified, amd64 unverified.
+    # minutes per track; the model weights are downloaded only when the admin asks (opt-in, Settings > Audio analysis) into the volume.
+    # arm64 verified, amd64 unverified.
     stems:
         profiles: [stems]
         build:
@@ -178,6 +179,8 @@ services:
         environment:
             STEMS_MAX_DURATION: '${STEMS_MAX_DURATION:-1200}'
             STEMS_MODEL: '${STEMS_MODEL:-htdemucs}'
+            STEMS_WEIGHTS_URL: '${STEMS_WEIGHTS_URL:-}'
+            STEMS_WEIGHTS_SHA256: '${STEMS_WEIGHTS_SHA256:-}'
             STEMS_THREADS: '${STEMS_THREADS:-2}'
         volumes:
             - 'remoment-stems-models:/models'

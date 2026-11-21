@@ -89,15 +89,32 @@ final class DeepAnalysis
             return false;
         }
 
-        return Cache::remember("deep:health:{$stage->key()}:".md5($url), 60, function () use ($url) {
+        return Cache::remember(self::healthKey($stage->key(), $url), 60, function () use ($url) {
             try {
                 $response = Http::timeout(3)->get(rtrim($url, '/').'/health');
 
-                return $response->ok() && (bool) $response->json('ok');
+                // A service that reports its weights (the stems service: opt-in download) is available only once they are ready.
+                return $response->ok() && (bool) $response->json('ok') && ($response->json('weights') ?? StemWeights::READY) === StemWeights::READY;
             } catch (\Throwable) {
                 return false;
             }
         });
+    }
+
+    /** Forgets the remembered health of a stage's service (after its weights were asked for), so the kinds show up as soon as it is ok. */
+    public static function forgetHealth(string $stageKey): void
+    {
+        $stage = AudioAnalysis::onDemandStages()[$stageKey] ?? null;
+        $url = $stage?->serviceUrl();
+
+        if ($url) {
+            Cache::forget(self::healthKey($stageKey, $url));
+        }
+    }
+
+    private static function healthKey(string $stageKey, string $url): string
+    {
+        return "deep:health:{$stageKey}:".md5($url);
     }
 
     /** The kinds that can run now: `features.deep_analysis_kinds` of GET /api/info. @return list<string> */

@@ -192,6 +192,7 @@ def test_not_audio_is_422():
 def test_model_unavailable_is_503_and_health_says_why(wav, monkeypatch):
     monkeypatch.setattr(separate, "_model", None)
     monkeypatch.setattr(service, "_load_error", None)
+    monkeypatch.setattr(separate.WEIGHTS, "require", lambda: None)  # the weights are there; the model fails to load
 
     def fail():
         raise RuntimeError("offline")
@@ -229,3 +230,61 @@ def test_the_model_setting_decides_the_stems(monkeypatch):
         monkeypatch.delenv("STEMS_MODEL", raising=False)
         importlib.reload(separate)
     assert separate.SOURCES == ("vocals", "drums", "bass", "other")
+
+
+# --- opt-in weights (weights.py): nothing downloads by itself, the service refuses jobs until the admin asks ---------
+
+
+@pytest.fixture
+def no_weights(monkeypatch, tmp_path):
+    """A service without model and without weights, as on a fresh install; the weights directory is empty."""
+    import weights
+
+    w = weights.Weights("htdemucs", directory=str(tmp_path / "ckpt"))
+    monkeypatch.setattr(separate, "_model", None)
+    monkeypatch.setattr(separate, "WEIGHTS", w)
+    monkeypatch.setattr(service, "_load_error", None)
+
+    def never_download(*a, **k):
+        raise AssertionError("the model must not be loaded or fetched while the weights are missing")
+
+    monkeypatch.setattr(separate, "separate_block", never_download)
+    return w
+
+
+def test_fresh_service_reports_weights_missing_and_is_not_an_error(no_weights):
+    h = TestClient(service.app).get("/health").json()
+    assert h["ok"] is False and h["weights"] == "missing" and h["loading"] is False and h["error"] is None
+
+
+def test_stem_jobs_are_refused_while_weights_are_missing(wav, no_weights):
+    client = TestClient(service.app)
+    with open(wav, "rb") as f:
+        r = client.post("/stems", files={"audio": ("mix.wav", f)})
+    assert r.status_code == 503 and r.json()["detail"].startswith("weights_missing")
+    assert not separate.model_loaded()
+
+
+def test_loading_the_model_without_weights_never_reaches_the_network(no_weights):
+    import weights
+
+    with pytest.raises(weights.WeightsMissing):
+        separate.load_model()
+
+
+def test_get_weights_says_missing_with_the_pinned_source(no_weights):
+    body = TestClient(service.app).get("/weights").json()
+    assert body["state"] == "missing" and body["model"] == "htdemucs" and body["size"] is None
+    assert body["source"].startswith("https://dl.fbaipublicfiles.com/demucs/") and len(body["sha256"]) == 64
+
+
+def test_post_weights_starts_the_download_and_answers_the_status(no_weights, monkeypatch):
+    started = []
+
+    def start():
+        started.append(1)
+        return {**no_weights.status(), "state": "downloading"}
+
+    monkeypatch.setattr(no_weights, "start", start)
+    r = TestClient(service.app).post("/weights")
+    assert r.status_code == 202 and r.json()["state"] == "downloading" and started == [1]
