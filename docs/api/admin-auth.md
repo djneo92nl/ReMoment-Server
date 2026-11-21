@@ -45,13 +45,13 @@ DELETE /api/admin/token    → { "status": "ok" }                               
 ## Revoking
 
 - The app signs itself out with `DELETE /api/admin/token`.
-- The admin signs any app out at **Settings › Admin & Apps** (`DELETE /settings/app-tokens/{id}`).
+- The admin signs any app out at **Settings › Admin & Apps** (`DELETE /settings/app-tokens/{id}`), or an app lists and revokes tokens through [`/api/admin/tokens`](admin-tokens.md) (same code, `AdminTokens`).
 - **Changing the admin password signs every app out** (`PasswordController::update` deletes all tokens).
 
 Tokens do not expire on their own.
 
 ## What it gates, and what it does not
 
-Only routes inside the `admin.token` group (`routes/api.php`): the three routes above, `PUT /api/admin/devices/{id}/sources/{source_id}` (source hide/reorder), the storage routes and the areas listed below. The device-settings endpoints (`/api/devices/{id}/sound-adjustment`, `bluetooth`, `network`, `info`, …) are **unchanged and still open**, as is everything else documented in `docs/api/`; moving the admin-only ones (network and Wi-Fi changes, renaming) behind the token is a separate, breaking decision for the ESP clients. Admin areas added inside the group for apps (workstream 8b), each extracted from its web component into a shared domain class: [health](admin-health.md), [clients](admin-clients.md), [radio stations](admin-radio.md) and [devices with the discovery inbox](admin-devices.md); queues are in [admin-queues.md](admin-queues.md). **Multiroom presets are not here on purpose**: they are [open](multiroom-presets.md) like multiroom itself (decided 2026-10-26; the web page has no login either). Spotify and Last.fm connect flows and the Spotify Connect name mapping stay on the web. Still to come: tokens list/revoke, analysis status and actions, library settings and maintenance.
+Only routes inside the `admin.token` group (`routes/api.php`): the three routes above, `PUT /api/admin/devices/{id}/sources/{source_id}` (source hide/reorder), the storage routes and the areas listed below. The device-settings endpoints (`/api/devices/{id}/sound-adjustment`, `bluetooth`, `network`, `info`, …) are **unchanged and still open**, as is everything else documented in `docs/api/`; moving the admin-only ones (network and Wi-Fi changes, renaming) behind the token is a separate, breaking decision for the ESP clients. Admin areas added inside the group for apps (workstream 8b), each extracted from its web component into a shared domain class: [health](admin-health.md), [clients](admin-clients.md), [radio stations](admin-radio.md) and [devices with the discovery inbox](admin-devices.md); queues are in [admin-queues.md](admin-queues.md). **Multiroom presets are not here on purpose**: they are [open](multiroom-presets.md) like multiroom itself (decided 2026-10-26; the web page has no login either). Spotify and Last.fm connect flows and the Spotify Connect name mapping stay on the web. [Tokens](admin-tokens.md) list and revoke are there too.
 
 Brute force: the limiter is per IP and in the cache (Redis), like the web login's.

@@ -178,9 +178,20 @@ class SettingsController extends Controller
         return redirect()->route('settings.mqtt')->with('success', "Published {$count} entities to Home Assistant.");
     }
 
+    /** The `ha:package` YAML as a file (the same text as GET /api/admin/ha/package); `base_url` is the address Home Assistant uses to reach this server. */
+    public function homeAssistantPackage(Request $request, \App\Domain\Scenes\HaPackage $package)
+    {
+        $validated = $request->validate(['base_url' => ['nullable', 'string', 'max:255', 'url:http,https']]);
+
+        return response($package->yaml($validated['base_url'] ?? null ?: \App\Domain\Scenes\HaPackage::defaultBaseUrl()), 200, [
+            'Content-Type' => 'application/yaml; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="remoment.yaml"',
+        ]);
+    }
+
     public function users()
     {
-        $appTokens = \App\Models\AdminToken::orderByDesc('last_used_at')->orderByDesc('id')->get();
+        $appTokens = app(\App\Domain\Admin\AdminTokens::class)->all();
 
         return view('settings.users', compact('appTokens'));
     }
@@ -188,7 +199,7 @@ class SettingsController extends Controller
     /** Signs an app out: its token stops working. */
     public function revokeAppToken(\App\Models\AdminToken $token)
     {
-        $token->delete();
+        app(\App\Domain\Admin\AdminTokens::class)->revoke($token);
 
         return redirect()->route('settings.users')->with('status', 'app-signed-out');
     }
