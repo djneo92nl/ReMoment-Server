@@ -2,12 +2,12 @@
 
 namespace App\Livewire;
 
+use App\Domain\Device\DeviceAdmin;
 use App\Domain\Device\DeviceModels;
+use App\Domain\Device\DeviceScan;
 use App\Domain\Device\DiscoveryInbox;
 use App\Models\Device;
 use App\Models\DiscoveredDeviceRecord;
-use App\Services\NetworkDiscoveryService;
-use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Component;
@@ -87,19 +87,10 @@ class DeviceDriverManager extends Component
 
     public function scan(): void
     {
-        $service = app(NetworkDiscoveryService::class);
-        $hosts = array_values(array_filter(
-            preg_split('/[\s,;]+/', $this->hosts, -1, PREG_SPLIT_NO_EMPTY),
-            fn ($h) => filter_var($h, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) || preg_match('#^https?://[^/\s]+#i', $h)
-        ));
+        $result = app(DeviceScan::class)->run(DeviceScan::parseHosts($this->hosts));
 
-        $found = $service->discoverAll(hosts: $hosts);
-        $counts = app(DiscoveryInbox::class)->record(array_values($found));
-
-        $this->diagnostics = $service->diagnostics;
-        $this->scanSummary = count($found) === 0
-            ? 'No devices responded.'
-            : "{$counts['new']} new, {$counts['known']} already added.";
+        $this->diagnostics = $result['diagnostics'];
+        $this->scanSummary = $result['summary'];
     }
 
     public function addDiscovered(int $id): void
@@ -154,23 +145,15 @@ class DeviceDriverManager extends Component
 
         $data = $this->manualForm[$groupKey];
         [$brand, $product] = explode('|', $data['product_key'], 2);
-        $cfg = config("devices.{$brand}.{$product}");
+        $attributes = DeviceAdmin::attributesFor($brand, $product);
 
-        if (!$cfg) {
+        if (!$attributes) {
             $this->addError("manualForm.{$groupKey}.product_key", 'Unknown product.');
 
             return;
         }
 
-        Device::create([
-            'ip_address' => $data['ip'],
-            'device_name' => $data['name'],
-            'device_brand_name' => $brand,
-            'device_product_type' => $product,
-            'device_driver' => $cfg['driver'],
-            'device_driver_name' => $cfg['driver_name'],
-            'last_seen' => Carbon::now(),
-        ]);
+        DeviceAdmin::create($attributes + ['ip_address' => $data['ip'], 'device_name' => $data['name'], 'last_seen' => \Carbon\Carbon::now()]);
 
         unset($this->manualForm[$groupKey]);
 
@@ -179,9 +162,9 @@ class DeviceDriverManager extends Component
 
     public function toggleHidden(int $deviceId): void
     {
-        $device = Device::find($deviceId);
-
-        $device?->update(['hidden' => !$device->hidden]);
+        if ($device = Device::find($deviceId)) {
+            DeviceAdmin::setHidden($device, !$device->hidden);
+        }
     }
 
     /** @var array<int, int|string> Ids of the registered devices ticked for a bulk remove. */
@@ -212,14 +195,9 @@ class DeviceDriverManager extends Component
             return;
         }
 
-        $devices = Device::whereIn('id', $ids)->get();
+        $count = DeviceAdmin::deleteMany($ids);
 
-        foreach ($devices as $device) {
-            $device->meta()->delete();
-            $device->delete();
-        }
-
-        session()->flash('success', $devices->count() === 1 ? '1 device removed.' : "{$devices->count()} devices removed.");
+        session()->flash('success', $count === 1 ? '1 device removed.' : "{$count} devices removed.");
     }
 
     public function deleteDevice(int $deviceId): void
@@ -231,8 +209,7 @@ class DeviceDriverManager extends Component
         }
 
         $name = $device->device_name;
-        $device->meta()->delete();
-        $device->delete();
+        DeviceAdmin::delete($device);
 
         session()->flash('success', "{$name} removed.");
     }

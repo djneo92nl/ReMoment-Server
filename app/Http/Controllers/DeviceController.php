@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Device\Cache\Volume;
+use App\Domain\Device\DeviceAdmin;
 use App\Domain\Device\DeviceCache;
 use App\Domain\Device\DeviceCapabilities;
 use App\Domain\Device\DeviceModels;
@@ -62,7 +63,7 @@ class DeviceController extends Controller
             'device_driver_name' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $device = Device::create($validated);
+        $device = DeviceAdmin::create($validated);
 
         return $this->fromSettings($request)
             ? redirect()->route('settings.devices')->with('success', 'Device added successfully.')
@@ -142,7 +143,7 @@ class DeviceController extends Controller
             'device_driver_name' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $device->update($validated);
+        DeviceAdmin::update($device, $validated);
 
         return $this->fromSettings($request)
             ? redirect()->route('settings.devices')->with('success', 'Device updated.')
@@ -189,8 +190,7 @@ class DeviceController extends Controller
 
     public function destroy(Request $request, Device $device)
     {
-        $device->meta()->delete();
-        $device->delete();
+        DeviceAdmin::delete($device);
 
         return redirect()->route($this->fromSettings($request) ? 'settings.devices' : 'devices.index')->with('success', 'Device removed.');
     }
