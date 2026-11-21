@@ -23,7 +23,12 @@ Unauthenticated, like the rest of the API. Controller: `app/Http/Controllers/Api
     "ws_port": 9001,
     "ws_url": "ws://192.168.1.100:9001"
   },
-  "features": { "alerts": true, "profile": "full", "analysis": true, "deep_analysis": true, "deep_analysis_kinds": ["sections", "stems"], "export": true },
+  "features": {
+    "alerts": true, "scenes": true, "profile": "full", "deep_analysis": true, "analysis": true,
+    "deep_analysis_kinds": ["sections", "stems"], "stems_weights": "ready", "discover": true, "similar_tracks": true,
+    "export": true, "export_formats": ["mp3", "aac", "opus"], "rip": true, "media_servers": true, "sleep_timer": true,
+    "nodes": true, "line_in": true, "sub_devices": true, "push": true, "ha_discovery": true
+  },
   "placeholder": {
     "kind": "source",
     "proxy_512": "http://remoment.local/storage/artwork/6910ad50fb63f947ac24032558d3b570/512.jpg",
@@ -51,8 +56,35 @@ Unauthenticated, like the rest of the API. Controller: `app/Http/Controllers/Api
 | `mqtt.ws_port` | `MQTT_PUBLIC_WS_PORT`, default `9001` | The broker's WebSocket listener, for clients that speak MQTT over WebSocket (browsers, iOS apps) |
 | `mqtt.ws_url` | `MQTT_WS_URL`, else `ws://{mqtt.host}:{ws_port}` (`wss://` when the request was HTTPS) | Ready-to-use WebSocket URL. Set `MQTT_WS_URL` when the broker sits behind a reverse proxy |
 | `mqtt.topic_prefix` | constant | Device topics are `{topic_prefix}/{device_id}/{data,progress,state,volume,modes}` |
-| `features` | `InfoController` | What this server can do beyond the base contract, **only keys that are true today** (except `profile`, a string): `alerts` (`GET /api/alerts` exists, always true), `profile` (always present: `control`, `standard` or `full`, the profile the server runs; Control has no library, catalogue or analysis, and those endpoints answer `422 not_available_in_profile` with `{ error, message, profile, feature, required_profile }`; see [profiles.md](../architecture/profiles.md)), `analysis` (boolean, always present: audio analysis of the own files is enabled and the profile allows it; false explains an empty Sound page), `deep_analysis` (a deep-analysis service answers its health check, cached for a minute: something can be requested for a track) and `deep_analysis_kinds` (which kinds can run now: `sections` needs the structure service, `stems` the stems service; present only when not empty; see [deep-analysis.md](deep-analysis.md)). `export` (the profile has the library and own files and ffmpeg can transcode: [export.md](export.md); present only when true). A client treats a missing key as false, so keys can be added without bumping `api_version` |
+| `features` | `App\Domain\System\ServerFeatures` | What this server can do beyond the base contract; the table below lists every key. A client treats a **missing key as false**, so keys can be added without bumping `api_version` |
 | `placeholder` | `NowPlayingArtwork::placeholder()` | Artwork object (same shape as `now_playing.artwork`, `kind: "source"`) of the generic music-note logo. Show it whenever there is no artwork, including the first play of a cover that is still being processed. Rendered on the spot if not cached, so it is always present (`null` only if rendering itself fails). Its hash is the same on every server; cache `proxy_320` (and your screen's background, see below) like any cover |
+
+### `features`
+
+One class builds it, `App\Domain\System\ServerFeatures::all()` (workstream 8.7). A key is there (true) only when the server really has the capability switched on **and** the profile allows it. Only `profile` is a string, `analysis` and `deep_analysis` are always present (an empty Sound page needs an explanation), everything else is **present only when true**. Every check is cheap (config, a setting, a row, or a value cached for a minute or less), so the endpoint never waits on a speaker or a sidecar that is down.
+
+| Key | Present when | Where to read more |
+|-----|--------------|--------------------|
+| `profile` | always: `control`, `standard` or `full`. Endpoints of a feature the profile lacks answer `422 not_available_in_profile` | [profiles.md](../architecture/profiles.md) |
+| `alerts` | always (`GET /api/alerts`) | [alerts.md](../architecture/alerts.md) |
+| `scenes` | the profile has scenes (all of them today) | [scenes.md](scenes.md) |
+| `analysis` | always present, boolean: audio analysis of the own files is enabled (`ANALYSIS_ENABLED`) and the profile allows it (Full) | [audio-analysis.md](../architecture/audio-analysis.md) |
+| `deep_analysis` | always present, boolean: a deep-analysis service answers its health check (cached a minute) | [deep-analysis.md](deep-analysis.md) |
+| `deep_analysis_kinds` | not empty: the kinds that can run now (`sections`, `stems`, `stem_audio`) | [deep-analysis.md](deep-analysis.md) |
+| `stems_weights` | a stems service is configured in a profile with deep analysis: `missing`, `downloading`, `ready` or `failed`, the state of the opt-in Demucs download (cached 30 s; `stems` and `stem_audio` appear in `deep_analysis_kinds` only at `ready`). Absent when the service cannot be asked | [stems.md](stems.md) |
+| `discover` | the profile has the library (`GET /api/library/discover`) | [discover.md](discover.md) |
+| `similar_tracks` | at least one own file has a sound embedding (Full) | [similar-tracks.md](similar-tracks.md) |
+| `export`, `export_formats` | the profile has the library and own files and ffmpeg can transcode; `export_formats` lists what ffmpeg can make (`mp3`, `aac`, `opus`) | [export.md](export.md) |
+| `rip` | the profile takes rip uploads from the ripper app (Full, with own-file storage) | [file-storage.md](../architecture/file-storage.md) |
+| `media_servers` | at least one enabled media server has complete credentials | [media-servers.md](media-servers.md) |
+| `sleep_timer` | the server-side sleep timer `POST /api/devices/{id}/sleep` (all profiles; needs a real queue) | [scenes.md](scenes.md) |
+| `nodes` | nodes (clients with `kind: node`) can register and take jobs (all profiles) | [node-agent.md](../architecture/node-agent.md) |
+| `line_in` | an approved node has the `line-in` role switched on, so `GET /api/line-ins` lists something | [line-in.md](../architecture/line-in.md) |
+| `sub_devices` | `host` and `sub_devices` in the device detail, the admin link routes (all profiles) | [sub-devices.md](sub-devices.md) |
+| `push` | the server holds a VAPID key pair, so `POST /api/push/subscribe` can deliver a Web Push for warning and critical alerts (a native app does not use it) | [pwa.md](../frontend/pwa.md) |
+| `ha_discovery` | Home Assistant MQTT discovery is switched on | [home-assistant.md](../architecture/home-assistant.md) |
+
+Not built yet, so never present: `podcasts` (workstream 8.2). It will appear as `podcasts: true` when it ships; a client that already checks for it needs no change. To add a key, add it to `ServerFeatures`, to this table, to the `ServerInfo` schema of `openapi.yaml` and to `tests/Feature/Api/ServerFeaturesTest.php`.
 
 ### Why the MQTT host isn't `MQTT_HOST`
 

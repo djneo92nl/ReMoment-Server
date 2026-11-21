@@ -52,6 +52,7 @@ final class StemWeights
         // The health the app remembers for a minute may say "not ok": look again soon, so the kinds appear when the model loaded.
         DeepAnalysis::forgetHealth('stems');
         DeepAnalysis::forgetHealth('stem_audio');
+        \App\Domain\System\ServerFeatures::forgetStemsWeights();
 
         return [$status, $body];
     }

@@ -31,6 +31,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Tests\Support\InfoFeatures;
 use Tests\TestCase;
 
 /** Stems of one track on request (stems stage, AnalyzeTrackDeep on the `stems` queue, kind `stems` of deep-analysis). */
@@ -459,7 +460,7 @@ class StemsDeepAnalysisTest extends TestCase
 
     public function test_features_list_the_kinds_that_can_run(): void
     {
-        $this->getJson('/api/info')->assertJsonPath('features', ['alerts' => true, 'scenes' => true, 'profile' => 'full', 'deep_analysis' => true, 'analysis' => true, 'deep_analysis_kinds' => ['stems', 'stem_audio']] + $this->exportFeature());
+        InfoFeatures::assertFeatures($this->getJson('/api/info'), ['alerts' => true, 'scenes' => true, 'profile' => 'full', 'deep_analysis' => true, 'analysis' => true, 'deep_analysis_kinds' => ['stems', 'stem_audio']]);
 
         config(['analysis.structure_url' => 'http://structure:8091']);
         Http::fake(['structure:8091/health' => Http::response(['ok' => true])]);
@@ -468,7 +469,7 @@ class StemsDeepAnalysisTest extends TestCase
 
         config(['analysis.stems_url' => null, 'analysis.structure_url' => null]);
         Cache::flush();
-        $this->getJson('/api/info')->assertJsonPath('features', ['alerts' => true, 'scenes' => true, 'profile' => 'full', 'deep_analysis' => false, 'analysis' => true] + $this->exportFeature());
+        InfoFeatures::assertFeatures($this->getJson('/api/info'), ['alerts' => true, 'scenes' => true, 'profile' => 'full', 'deep_analysis' => false, 'analysis' => true]);
     }
 
     public function test_the_stems_probe_is_disabled_without_a_url_and_says_what_is_wrong_with_one(): void
@@ -523,11 +524,5 @@ class StemsDeepAnalysisTest extends TestCase
         $this->assertEquals([['start' => 1.0, 'end' => 2.0]], $out['instrumental']);
         $this->assertSame(1.0, $out['vocal_ratio']);
         $this->assertSame(2, $out['rate_hz']);
-    }
-
-    /** `features.export` is there when this machine has ffmpeg (ExportApiTest covers it). */
-    private function exportFeature(): array
-    {
-        return \App\Domain\Analysis\Tools::available(\App\Domain\Analysis\Tools::ffmpeg()) ? ['export' => true, 'export_formats' => \App\Domain\Export\ExportFormats::availableIds()] : [];
     }
 }

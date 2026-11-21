@@ -9,6 +9,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Tests\Support\InfoFeatures;
 use Tests\TestCase;
 
 /** Contract test for GET /api/info (see docs/api/server-info.md). */
@@ -36,8 +37,9 @@ class InfoApiTest extends TestCase
                 'ws_port' => 9001,
                 'ws_url' => 'ws://192.168.1.50:9001',
             ],
-            'features' => ['alerts' => true, 'scenes' => true, 'profile' => 'full', 'deep_analysis' => false, 'analysis' => false] + $this->exportFeature(),
+            'features' => $response->json('features'),
         ], Arr::except($response->json(), 'placeholder'));
+        InfoFeatures::assertFeatures($response, ['alerts' => true, 'scenes' => true, 'profile' => 'full', 'deep_analysis' => false, 'analysis' => false]);
     }
 
     public function test_analysis_feature_needs_the_setting_and_the_profile(): void
@@ -60,7 +62,7 @@ class InfoApiTest extends TestCase
         Http::fake(['structure:8091/health' => function () use (&$healthy) {
             return $healthy ? Http::response(['ok' => true, 'version' => 1, 'method' => 'novelty-v1']) : Http::response('', 503);
         }]);
-        $this->getJson('/api/info')->assertJsonPath('features', ['alerts' => true, 'scenes' => true, 'profile' => 'full', 'deep_analysis' => true, 'analysis' => false, 'deep_analysis_kinds' => ['sections']] + $this->exportFeature());
+        InfoFeatures::assertFeatures($this->getJson('/api/info'), ['alerts' => true, 'scenes' => true, 'profile' => 'full', 'deep_analysis' => true, 'analysis' => false, 'deep_analysis_kinds' => ['sections']]);
 
         Cache::flush();
         $healthy = false;
@@ -125,11 +127,5 @@ class InfoApiTest extends TestCase
 
         $this->getJson('http://remoment.local/api/info')
             ->assertJsonPath('mqtt.host', 'remoment.local');
-    }
-
-    /** `features.export` is there when this machine has ffmpeg (ExportApiTest covers it). */
-    private function exportFeature(): array
-    {
-        return \App\Domain\Analysis\Tools::available(\App\Domain\Analysis\Tools::ffmpeg()) ? ['export' => true, 'export_formats' => \App\Domain\Export\ExportFormats::availableIds()] : [];
     }
 }

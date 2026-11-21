@@ -174,14 +174,16 @@ class StemWeightsTest extends TestCase
     public function test_stems_is_listed_only_when_the_weights_are_ready(): void
     {
         // The service is up, the weights are not there: it is not ok and nothing is offered.
-        $this->getJson('/api/info')->assertJsonPath('features.deep_analysis', false)->assertJsonMissingPath('features.deep_analysis_kinds');
+        $this->getJson('/api/info')->assertJsonPath('features.deep_analysis', false)->assertJsonMissingPath('features.deep_analysis_kinds')
+            ->assertJsonPath('features.stems_weights', 'missing');
         $this->assertFalse(DeepAnalysis::available('stems'));
 
         $this->ready();
         // The health was remembered for a minute; asking for the download forgets it, so the kinds show up at once.
         $this->postJson('/api/admin/stems/weights', [], $this->auth())->assertOk();
 
-        $this->getJson('/api/info')->assertJsonPath('features.deep_analysis', true)->assertJsonPath('features.deep_analysis_kinds', ['stems', 'stem_audio']);
+        $this->getJson('/api/info')->assertJsonPath('features.deep_analysis', true)->assertJsonPath('features.deep_analysis_kinds', ['stems', 'stem_audio'])
+            ->assertJsonPath('features.stems_weights', 'ready');
     }
 
     public function test_a_service_that_says_ok_with_weights_not_ready_is_not_available(): void

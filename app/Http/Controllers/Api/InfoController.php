@@ -2,13 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Domain\Analysis\AudioAnalysis;
-use App\Domain\Analysis\DeepAnalysis;
-use App\Domain\Analysis\Tools;
 use App\Domain\Artwork\NowPlayingArtwork;
-use App\Domain\Export\ExportFormats;
-use App\Domain\Profile\Profile;
-use App\Domain\Similar\Embeddings;
+use App\Domain\System\ServerFeatures;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,8 +23,6 @@ class InfoController extends Controller
         $mqttHost = config('mqtt.public_host') ?: $request->getHost();
         $wsPort = (int) config('mqtt.public_ws_port');
 
-        $deepKinds = DeepAnalysis::availableKinds();
-
         return response()->json([
             'name' => config('app.name'),
             'version' => (string) config('app.version'),
@@ -48,23 +41,8 @@ class InfoController extends Controller
             // Shown by clients whenever there is no artwork; rendered on the spot if missing.
             'placeholder' => NowPlayingArtwork::placeholder(),
             // What this server can do beyond the base contract; only keys that are true today, a client treats a missing key as false.
-            'features' => [
-                'alerts' => true,
-                // GET /api/scenes: household-wide step lists (docs/api/scenes.md).
-                'scenes' => Profile::allows('scenes'),
-                // The profile this server runs: control | standard | full (docs/architecture/profiles.md).
-                'profile' => Profile::current(),
-                // A deep-analysis service answers its health check (cached for a minute): sections or stems of a track on request;
-                // deep_analysis_kinds says which.
-                'deep_analysis' => $deepKinds !== [],
-                // Audio analysis of the own files is enabled and the profile allows it: the Sound data (TrackAnalysis, waveform) can exist.
-                'analysis' => AudioAnalysis::enabled() && Profile::allows('analysis'),
-            ]
-            + ($deepKinds !== [] ? ['deep_analysis_kinds' => $deepKinds] : [])
-            // At least one own file has a sound embedding, so GET /api/library/tracks/{id}/similar can answer (docs/api/similar-tracks.md).
-            + (Profile::allows('analysis') && Embeddings::any() ? ['similar_tracks' => true] : [])
-            // Export from the library as zip (docs/api/export.md): the profile has the library and own files, and ffmpeg can transcode.
-            + (Profile::allows('library') && Profile::allows('file_storage') && Tools::available(Tools::ffmpeg()) ? ['export' => true, 'export_formats' => ExportFormats::availableIds()] : []),
+            // One class builds it (docs/api/server-info.md).
+            'features' => ServerFeatures::all(),
         ]);
     }
 }
