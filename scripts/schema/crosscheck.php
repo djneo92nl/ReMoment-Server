@@ -29,6 +29,7 @@ foreach ($files as $f) {
     $used[$t][] = $class;
     if (!in_array($t, $tables, true)) {
         $issues[] = "MODEL WITHOUT TABLE  $class -> $t";
+
         continue;
     }
     $cols = Schema::getColumnListing($t);
