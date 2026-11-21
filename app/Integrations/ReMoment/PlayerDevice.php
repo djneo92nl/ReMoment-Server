@@ -3,6 +3,7 @@
 namespace App\Integrations\ReMoment;
 
 use App\Domain\Artwork\LibraryArtwork;
+use App\Domain\Players\PlayerHousekeeping;
 use App\Domain\Storage\Proxies;
 use App\Domain\Storage\StreamUrl;
 use App\Models\Device;
@@ -40,9 +41,10 @@ class PlayerDevice
     /**
      * @param  string[]|null  $capabilities  optional capabilities the player supports (null: all)
      * @param  string[]|null  $formats  MIME types the player decodes (null: the defaults)
+     * @param  bool  $adoptByName  without a known token, take over the offline player with this name and kind instead of adding one
      * @return array{0: Device, 1: string} the device and the player token (new when none was given or it was unknown)
      */
-    public static function register(?string $token, string $name, string $kind, ?array $capabilities = null, ?array $formats = null, ?int $adopt = null, ?string $profile = null): array
+    public static function register(?string $token, string $name, string $kind, ?array $capabilities = null, ?array $formats = null, ?int $adopt = null, ?string $profile = null, bool $adoptByName = false): array
     {
         $device = $token ? self::findByToken($token) : null;
         $adopted = false;
@@ -56,6 +58,14 @@ class PlayerDevice
                 $token = Str::random(48);
                 DeviceMeta::create(['device_id' => $device->id, 'key' => 'player_token', 'value' => self::hash($token)]);
             }
+        }
+
+        // A reinstalled app has lost its token: with the opt-in flag it takes over the offline player of the same name and kind,
+        // gets a token of its own, and registers as usual (new capabilities and formats included).
+        if (!$device && $adoptByName && ($found = PlayerHousekeeping::adoptable($name, $kind))) {
+            $device = $found;
+            $token = Str::random(48);
+            DeviceMeta::create(['device_id' => $device->id, 'key' => 'player_token', 'value' => self::hash($token)]);
         }
 
         if (!$device) {

@@ -94,6 +94,9 @@ php artisan ha:package [--output=remoment.yaml] [--base-url=http://remoment.loca
 # Delete plays older than the history retention (Setting `history_keep_months`, set on /history; default keep forever = no-op); only `plays` rows go, scheduled daily; --dry-run counts; see docs/api/history.md
 php artisan history:prune [--months=N] [--dry-run]
 
+# Hide ReMoment Players that have not reported for PLAYERS_HIDE_AFTER_DAYS (default 30; never deletes; scheduled daily 04:10); see docs/api/players.md
+php artisan players:hide-stale [--days=N] [--dry-run]
+
 # Re-select the tracks of smart (rule-based) playlists (scheduled daily)
 php artisan playlists:refresh-smart [--playlist=ID]
 

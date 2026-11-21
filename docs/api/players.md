@@ -18,7 +18,16 @@ Response `201`: `{ player_token, device_id, command_topic, last_command_id, mqtt
 
 ## Taking over an existing player
 
-`GET /api/players` lists the players (`{ data: [{ id, name, kind, state }] }`). A client that has no token yet can send `adopt_device_id` with the register call: it gets a token of its own for that device and the device keeps its name, kind and formats (the other fields are ignored). Every token of a device works, so the browsers share it; nothing stops two of them playing at once. An id that is no player registers a new one. The `/player` page asks this once, when the browser has no token.
+`GET /api/players` lists the players (`{ data: [{ id, name, kind, state, last_seen, hidden }] }`; players hidden by the housekeeping are left out unless `?include_hidden=1`). A client that has no token yet can send `adopt_device_id` with the register call: it gets a token of its own for that device and the device keeps its name, kind and formats (the other fields are ignored). Every token of a device works, so the browsers share it; nothing stops two of them playing at once. An id that is no player registers a new one. The `/player` page asks this once, when the browser has no token.
+
+### Housekeeping: reinstalls do not pile up
+
+Every reinstall or unsigned build of an app that loses its token registers a new device. Three things keep the list clean (workstream 8b item 4):
+
+- **`last_seen`** of a player is the time of its last registration or state report (written at most once a minute) and shows in `GET /api/players` and `GET /api/devices`.
+- **Stale players are hidden, never deleted.** The daily `players:hide-stale` (04:10, `PLAYERS_HIDE_AFTER_DAYS`, default 30; `0` switches it off; `--days=` and `--dry-run` for a manual run) hides a player that has not reported for that long and is not live. Hidden players are left out of `GET /api/players` and `GET /api/devices` (only players: a device hidden on the web is listed as before) unless `?include_hidden=1`, and the web device list shows them under its "hidden" link. A player that reports again is shown again by itself; one an admin hid by hand stays hidden. Hidden players can still be taken over by name (below).
+- **Opt-in adoption by name.** `adopt_by_name: true` in the register call (no known `token`, no `adopt_device_id`) takes over the offline player with the same `name` and `kind` (hidden ones too, the one that reported last) and gives the client a token of its own; its capabilities, formats and profile are updated as in a normal registration. A **live** player is never taken: if the only match is online, a new player is made. Old tokens of that device keep working. An app that registers with a stable name (for example the device name) should send the flag on its first call after a reinstall.
+- **Removing one**: the admin deletes a player with `DELETE /api/admin/devices/{id}` ([admin-devices.md](admin-devices.md); admin token), which also drops its tokens. There is no separate player endpoint.
 
 ## Commands (server → player)
 

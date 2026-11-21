@@ -10,6 +10,7 @@ use App\Domain\Media\ArtistData;
 use App\Domain\Media\NowPlaying;
 use App\Domain\Media\Radio;
 use App\Domain\Media\TrackData;
+use App\Domain\Players\PlayerHousekeeping;
 use App\Domain\Radio\IcyReader;
 use App\Domain\Radio\StreamTitles;
 use App\Events\Device\NowPlayingEnded;
@@ -34,6 +35,7 @@ class PlayerController extends Controller
         $data = $request->validate([
             'token' => ['nullable', 'string', 'max:100'],
             'adopt_device_id' => ['nullable', 'integer'],
+            'adopt_by_name' => ['nullable', 'boolean'],
             'name' => ['required', 'string', 'max:255'],
             'kind' => ['required', 'in:'.implode(',', PlayerDevice::KINDS)],
             'capabilities' => ['nullable', 'array'],
@@ -43,7 +45,8 @@ class PlayerController extends Controller
             'profile' => ['nullable', 'string', 'max:50'],
         ]);
 
-        [$device, $token] = PlayerDevice::register($data['token'] ?? null, $data['name'], $data['kind'], $data['capabilities'] ?? null, $data['formats'] ?? null, $data['adopt_device_id'] ?? null, $data['profile'] ?? null);
+        [$device, $token] = PlayerDevice::register($data['token'] ?? null, $data['name'], $data['kind'], $data['capabilities'] ?? null, $data['formats'] ?? null, $data['adopt_device_id'] ?? null, $data['profile'] ?? null, (bool) ($data['adopt_by_name'] ?? false));
+        PlayerHousekeeping::touch($device);
 
         // A player that registers is online until it misses its heartbeats.
         DeviceCache::markListenerAlive($device->id);
@@ -64,15 +67,17 @@ class PlayerController extends Controller
     }
 
     /** The existing players, so a new browser can take one over instead of adding another. */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $players = Device::where('device_driver', PlayerDriver::class)->orderBy('device_name')->get();
+        $players = PlayerHousekeeping::visible(Device::where('device_driver', PlayerDriver::class)->orderBy('device_name')->get(), $request->boolean('include_hidden'));
 
         return response()->json(['data' => $players->map(fn (Device $device) => [
             'id' => $device->id,
             'name' => $device->device_name,
             'kind' => PlayerDevice::kind($device),
             'state' => $device->liveState()->value,
+            'last_seen' => $device->last_seen?->toIso8601String(),
+            'hidden' => (bool) $device->hidden,
         ])->values()]);
     }
 
@@ -91,6 +96,7 @@ class PlayerController extends Controller
         ]);
 
         DeviceCache::markListenerAlive($device->id);
+        PlayerHousekeeping::touch($device);
         $id = (string) $device->id;
 
         if (isset($data['volume'])) {

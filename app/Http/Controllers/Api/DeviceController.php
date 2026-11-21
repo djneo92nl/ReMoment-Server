@@ -64,9 +64,10 @@ class DeviceController extends Controller
 {
     use GuardsDeviceAccess;
 
-    public function index(): AnonymousResourceCollection
+    /** Players the housekeeping hid (stale reinstalls) are left out unless `include_hidden=1`; see docs/api/players.md. */
+    public function index(Request $request): AnonymousResourceCollection
     {
-        return DeviceListResource::collection(SpotifyRouting::visible(Device::all()));
+        return DeviceListResource::collection(SpotifyRouting::visible(\App\Domain\Players\PlayerHousekeeping::visible(Device::all(), $request->boolean('include_hidden'))));
     }
 
     public function show(Device $device): DeviceDetailResource

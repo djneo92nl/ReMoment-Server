@@ -28,6 +28,8 @@ Schedule::command('artwork:prerender')->daily()->when(fn () => Profile::allows('
 Schedule::command('library:enrich')->daily()->when(fn () => Profile::allows('enrichment'));
 Schedule::command('playlists:refresh-smart')->daily()->when(fn () => Profile::allows('library'));
 // Plays older than the retention setting (default: keep forever, so a no-op); only rows of `plays` go.
+// Players that stopped reporting (reinstalls, unsigned builds) are hidden, never deleted (docs/api/players.md)
+Schedule::command('players:hide-stale')->dailyAt('04:10')->when(fn () => Profile::allows('devices'));
 Schedule::command('history:prune')->dailyAt('04:20')->when(fn () => Profile::allows('history'));
 Schedule::command('radio:refresh')->weekly();
 Schedule::command('radio:fix-artwork')->weekly();
