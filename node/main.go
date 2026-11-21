@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 )
@@ -32,6 +33,7 @@ type Node struct {
 	roles   []string
 	lineIn  *lineIn
 	ripper  *ripper
+	syncing atomic.Bool
 	job     *Job // the job being run (one at a time), for handlers that report progress
 }
 
@@ -186,6 +188,9 @@ func (n *Node) status() nodeStatus {
 		if r == "ripper" && n.ripper != nil {
 			st.Roles[r] = n.ripper.roleState()
 		}
+		if r == "sync-target" {
+			st.Roles[r] = n.syncRoleState()
+		}
 	}
 	return st
 }
@@ -229,6 +234,9 @@ func (n *Node) capabilities() map[string]any {
 			label = n.cfg.LineIn.Device
 		}
 		caps["line-in"] = map[string]any{"inputs": []map[string]any{{"id": n.cfg.LineIn.Device, "label": label}}}
+	}
+	if n.cfg.Sync.VolumePath != "" {
+		caps["sync-target"] = map[string]any{"volume": n.cfg.Sync.VolumePath}
 	}
 	if n.cfg.Ripper.Device != "" {
 		caps["ripper"] = map[string]any{"drive": n.cfg.Ripper.Device, "engine": "cyanrip"}

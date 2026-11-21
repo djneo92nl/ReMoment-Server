@@ -23,6 +23,8 @@ type Config struct {
 	LineIn LineInConfig `json:"line_in"`
 	// Ripper is the CD drive and ripper of the ripper role (device, cyanrip, temp_dir, nice ...).
 	Ripper RipperConfig `json:"ripper"`
+	// Sync is the volume of the sync-target role: the mount point of the USB stick or share. Never taken from a job.
+	Sync SyncConfig `json:"sync"`
 }
 
 func loadConfig(path string) (*Config, error) {
@@ -51,6 +53,9 @@ func loadConfig(path string) (*Config, error) {
 	}
 	if v := os.Getenv("REMOMENT_NODE_RIPPER_DEVICE"); v != "" {
 		c.Ripper.Device = v
+	}
+	if v := os.Getenv("REMOMENT_NODE_SYNC_PATH"); v != "" {
+		c.Sync.VolumePath = v
 	}
 	if os.Getenv("REMOMENT_NODE_NO_MQTT") == "1" {
 		c.NoMQTT = true

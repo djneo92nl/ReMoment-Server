@@ -41,6 +41,11 @@ type httpError struct {
 func (e *httpError) Error() string { return fmt.Sprintf("HTTP %d: %s", e.Status, e.Body) }
 
 func (a *API) do(method, path string, bearer bool, in, out any) error {
+	return a.doWith(a.http, 1<<20, method, path, bearer, in, out)
+}
+
+// doWith is do with its own client (a plan for a big manifest may take the server a while) and its own limit on the answer.
+func (a *API) doWith(client *http.Client, limit int64, method, path string, bearer bool, in, out any) error {
 	var body io.Reader
 	if in != nil {
 		b, err := json.Marshal(in)
@@ -60,12 +65,12 @@ func (a *API) do(method, path string, bearer bool, in, out any) error {
 	if bearer {
 		req.Header.Set("Authorization", "Bearer "+a.token)
 	}
-	resp, err := a.http.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	data, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	data, _ := io.ReadAll(io.LimitReader(resp.Body, limit))
 	if resp.StatusCode == http.StatusUnauthorized || (resp.StatusCode == http.StatusNotFound && !bearer && method == "PUT") {
 		return errUnauthorized
 	}

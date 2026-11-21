@@ -13,6 +13,9 @@ var handlers = map[string]func(n *Node, params json.RawMessage) (map[string]any,
 	"line_in.stop":  lineInStop,
 	"ripper.status": ripperStatus,
 	"ripper.rip":    ripperRip,
+	"sync.scan":     syncScan,
+	"sync.claim":    syncClaim,
+	"sync.apply":    syncApply,
 	"ping": func(_ *Node, params json.RawMessage) (map[string]any, error) {
 		var p struct {
 			Message string `json:"message"`
