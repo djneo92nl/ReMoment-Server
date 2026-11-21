@@ -21,6 +21,8 @@ type Config struct {
 	NoMQTT bool `json:"no_mqtt"`
 	// LineIn is the capture of the line-in role (device, label, rate, bitrate).
 	LineIn LineInConfig `json:"line_in"`
+	// Ripper is the CD drive and ripper of the ripper role (device, cyanrip, temp_dir, nice ...).
+	Ripper RipperConfig `json:"ripper"`
 }
 
 func loadConfig(path string) (*Config, error) {
@@ -46,6 +48,9 @@ func loadConfig(path string) (*Config, error) {
 	}
 	if v := os.Getenv("REMOMENT_NODE_LINEIN_DEVICE"); v != "" {
 		c.LineIn.Device = v
+	}
+	if v := os.Getenv("REMOMENT_NODE_RIPPER_DEVICE"); v != "" {
+		c.Ripper.Device = v
 	}
 	if os.Getenv("REMOMENT_NODE_NO_MQTT") == "1" {
 		c.NoMQTT = true

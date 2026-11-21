@@ -2,11 +2,15 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -169,6 +173,71 @@ func (a *API) progress(id string) (cancel bool, err error) {
 	}
 	err = a.do("POST", "/api/nodes/jobs/"+id+"/progress", true, map[string]any{}, &r)
 	return r.Cancel, err
+}
+
+// progressWith renews the job's lease and sends what the node is doing; the answer says whether the admin cancelled it.
+func (a *API) progressWith(id string, p any) (cancel bool, err error) {
+	var r struct {
+		Cancel bool `json:"cancel_requested"`
+	}
+	err = a.do("POST", "/api/nodes/jobs/"+id+"/progress", true, map[string]any{"progress": p}, &r)
+	return r.Cancel, err
+}
+
+type uploadAnswer struct {
+	File struct {
+		ID int `json:"id"`
+	} `json:"file"`
+	TrackID int `json:"track_id"`
+}
+
+// uploadFile streams one file to the node upload (POST /api/nodes/files, multipart field `file`) with the node's token.
+// No overall timeout (a FLAC of a long track over a slow link): the context ends it.
+func (a *API) uploadFile(ctx context.Context, path string) (*uploadAnswer, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	pr, pw := io.Pipe()
+	mw := multipart.NewWriter(pw)
+	go func() {
+		part, err := mw.CreateFormFile("file", filepath.Base(path))
+		if err == nil {
+			_, err = io.Copy(part, f)
+		}
+		if err == nil {
+			err = mw.Close()
+		}
+		pw.CloseWithError(err)
+	}()
+
+	req, err := http.NewRequestWithContext(ctx, "POST", a.base+"/api/nodes/files", pr)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Bearer "+a.token)
+	resp, err := (&http.Client{}).Do(req)
+	if err != nil {
+		pr.CloseWithError(err)
+		return nil, err
+	}
+	defer resp.Body.Close()
+	data, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode == http.StatusUnauthorized {
+		return nil, errUnauthorized
+	}
+	if resp.StatusCode >= 300 {
+		return nil, &httpError{resp.StatusCode, string(bytes.TrimSpace(data))}
+	}
+	var out uploadAnswer
+	if err := json.Unmarshal(data, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
 
 func (a *API) result(id string, ok bool, result map[string]any, errMsg string) error {

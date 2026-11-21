@@ -1,6 +1,6 @@
-// remoment-node: the ReMoment Node agent (docs/architecture/node-agent.md). Phase N1: registers as a node client,
-// is approved by the admin, sends a heartbeat every 30 s, listens for the MQTT doorbell and runs fixed job types
-// (only `ping` so far) fetched over REST. No roles, no shell, no hardware.
+// remoment-node: the ReMoment Node agent (docs/architecture/node-agent.md). Registers as a node client, is approved by
+// the admin, sends a heartbeat every 30 s, listens for the MQTT doorbell and runs fixed job types fetched over REST:
+// `ping`, the line-in role (`line_in.*`) and the ripper role (`ripper.status`, `ripper.rip`). No shell, no free paths.
 package main
 
 import (
@@ -31,6 +31,8 @@ type Node struct {
 	mu      sync.Mutex
 	roles   []string
 	lineIn  *lineIn
+	ripper  *ripper
+	job     *Job // the job being run (one at a time), for handlers that report progress
 }
 
 func (n *Node) logf(f string, a ...any) { log.Printf(f, a...) }
@@ -51,6 +53,8 @@ func main() {
 	n := &Node{cfg: cfg, api: newAPI(cfg.Server), started: time.Now(), nudge: make(chan struct{}, 1)}
 	n.lineIn = newLineIn(cfg.LineIn, n.logf)
 	defer n.lineIn.Stop()
+	n.ripper = newRipper(cfg.Ripper, cfg.StateDir, n.logf)
+	n.ripper.cleanStale() // what an interrupted rip left behind
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
@@ -179,6 +183,9 @@ func (n *Node) status() nodeStatus {
 		if r == "line-in" && n.lineIn != nil {
 			st.Roles[r] = n.lineIn.roleState()
 		}
+		if r == "ripper" && n.ripper != nil {
+			st.Roles[r] = n.ripper.roleState()
+		}
 	}
 	return st
 }
@@ -222,6 +229,9 @@ func (n *Node) capabilities() map[string]any {
 			label = n.cfg.LineIn.Device
 		}
 		caps["line-in"] = map[string]any{"inputs": []map[string]any{{"id": n.cfg.LineIn.Device, "label": label}}}
+	}
+	if n.cfg.Ripper.Device != "" {
+		caps["ripper"] = map[string]any{"drive": n.cfg.Ripper.Device, "engine": "cyanrip"}
 	}
 	return caps
 }

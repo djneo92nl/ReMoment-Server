@@ -11,6 +11,8 @@ import (
 var handlers = map[string]func(n *Node, params json.RawMessage) (map[string]any, error){
 	"line_in.start": lineInStart,
 	"line_in.stop":  lineInStop,
+	"ripper.status": ripperStatus,
+	"ripper.rip":    ripperRip,
 	"ping": func(_ *Node, params json.RawMessage) (map[string]any, error) {
 		var p struct {
 			Message string `json:"message"`
@@ -42,7 +44,9 @@ func (n *Node) runJob(j *Job) {
 		n.report(j, false, nil, "cancelled")
 		return
 	}
+	n.job = j
 	res, err := h(n, j.Params)
+	n.job = nil
 	if err != nil {
 		n.report(j, false, nil, err.Error())
 		return

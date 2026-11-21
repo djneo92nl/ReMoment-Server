@@ -2,7 +2,7 @@
 
 Headless agent for a Pi or another Linux box (workstream 18; plan and decisions in `docs/architecture/node-agent.md`).
 
-Status: **phase N1 (hello node) plus the N3 line-in role (against fakes, unverified on hardware).** It registers as a `node` client, waits for the admin to approve it in Settings › Clients, sends a heartbeat every 30 s, listens for the MQTT doorbell and runs fixed job types fetched over REST. Job types: `ping`, and for the `line-in` role `line_in.start` / `line_in.stop` (see below). No ripper yet. Go, stdlib plus the Paho MQTT client, no cgo.
+Status: **phase N1 (hello node) plus the N3 line-in and N2 ripper roles (against fakes, unverified on hardware).** It registers as a `node` client, waits for the admin to approve it in Settings › Clients, sends a heartbeat every 30 s, listens for the MQTT doorbell and runs fixed job types fetched over REST. Job types: `ping`, for the `line-in` role `line_in.start` / `line_in.stop` and for the `ripper` role `ripper.status` / `ripper.rip` (see below). Go, stdlib plus the Paho MQTT client, no cgo.
 
 ```bash
 cd node
@@ -23,6 +23,15 @@ Config: JSON file (`-config`, default `/etc/remoment-node.json`, see `dist/remom
 ```
 
 (`REMOMENT_NODE_LINEIN_DEVICE` overrides the device; optional `ffmpeg` path, `rate`, `icecast_host`, default the host of `server`.) Needs `ffmpeg` with ALSA and libmp3lame on the node, and the node user in the `audio` group. After the admin switches the role on, the server starts and stops the capture with `line_in.start` / `line_in.stop`: `nice ffmpeg` pushes MP3 to the server's Icecast mount `linein-<node id>.mp3`, restarted with backoff while wanted, its state in the heartbeat. The command is built by a pure, unit-tested function (`captureCommand`). Latency 2 to 5 s. Unverified on hardware. See `docs/architecture/line-in.md`.
+
+**Ripper role.** Declare `"roles": ["ripper"]` and set the drive in the config (never in a job):
+
+```json
+{ "server": "http://remoment.local", "roles": ["ripper"],
+  "ripper": { "device": "/dev/sr0", "cyanrip": "cyanrip", "temp_dir": "/var/lib/remoment-node/rips", "nice": 15, "offset": 6, "retries": 5 } }
+```
+
+(`REMOMENT_NODE_RIPPER_DEVICE` overrides the device; `temp_dir` defaults to `<state_dir>/rips`; `offset` is the drive's AccurateRip read offset, left out when null.) Needs `cyanrip` on the node, the node user in the `cdrom` group and, under systemd, the drop-in `dist/remoment-node.service.d/ripper.conf` (the base unit hides devices and caps memory at 64 MB). The node reads the TOC of the disc itself (Linux CD-ROM ioctls) and computes the MusicBrainz disc id for `ripper.status`; `ripper.rip` runs `ionice -c 3 nice cyanrip` in `<temp_dir>/rip-<job id>`, reports progress every 2 s, uploads each FLAC to `POST /api/nodes/files` with the node's own token, and removes the directory. One rip at a time; a cancel from the admin kills cyanrip. It never ejects the disc. The command is built by a pure, unit-tested function (`ripArgs`); the tests use a fake cyanrip and a fake drive. Nothing has run with a real drive or a real cyanrip. See `docs/architecture/node-ripper.md`.
 
 Try it: register, approve in the web UI, then create a job:
 

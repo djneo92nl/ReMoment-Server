@@ -1,5 +1,6 @@
 {
   "server": "http://remoment.local",
   "roles": [],
-  "line_in": { "device": "", "label": "USB audio" }
+  "line_in": { "device": "", "label": "USB audio" },
+  "ripper": { "device": "", "cyanrip": "cyanrip", "temp_dir": "", "nice": 15, "offset": null, "retries": 5 }
 }
