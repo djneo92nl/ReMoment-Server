@@ -2,7 +2,7 @@
 
 Settings that change how a device behaves rather than what it plays. Each lives behind its own capability, so a client only offers what `GET /api/devices` lists in `capabilities`. The API is the same for every platform; what a platform can't do is a capability it doesn't list, or a `writable: false` / `422 unsupported`.
 
-No authentication, like the rest of the REST API. The web page `/devices/{id}/settings` is open to everyone like the controls; only the network section and renaming need the admin login (`DeviceSettings::ADMIN_SECTIONS`).
+No authentication, like the rest of the REST API, **except the network endpoints**: `GET /api/devices/{id}/network` and the three `PUT …/network/*` writes need the admin bearer token (`401 unauthenticated` without it, see [admin-auth.md](admin-auth.md)), because a wrong value can lock a device out (decided 2026-10-26, applied 2026-11-21). **Renaming (`PUT /info`) stays open** (harmless and easy to undo). This is a breaking change for any client that changed network settings without a token; the ESP clients do not use these endpoints so far, and a firmware that wants them needs a token (it can sign in at `POST /api/admin/login`). The web page `/devices/{id}/settings` is open to everyone like the controls; its network section and renaming need the admin login (`DeviceSettings::ADMIN_SECTIONS`; the web page keeps its own rule and is not part of this decision).
 
 Errors, as for the controls: `503 unreachable`, `422 unsupported` (device lacks the capability, or the one operation), `422 invalid` (value outside the range / unknown mode / unknown paired device), `502 driver_error` (the device failed, or answered but did not apply the change — every write is read back). Validation errors are Laravel's `422 { message, errors }`.
 
@@ -102,7 +102,7 @@ PUT /api/devices/{id}/info                 body: { "name": "Kitchen" }     (1–
 
 `renamable` is false where the platform can't rename (Sonos: `PUT` answers `422 unsupported`); `product_type`, `firmware` and `mac_address` are `null` when the platform doesn't report them. A rename is written to the device and to ReMoment's own `device_name`.
 
-## Network — `network_settings`
+## Network — `network_settings` (admin token)
 
 ```
 GET /api/devices/{id}/network

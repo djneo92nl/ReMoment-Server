@@ -8,17 +8,37 @@ use App\Models\Device;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\FakeBareDriver;
 use Tests\Support\FakeNetworkDriver;
+use Tests\Support\SignsInAsAdmin;
 use Tests\TestCase;
 
 class NetworkSettingsApiTest extends TestCase
 {
     use RefreshDatabase;
+    use SignsInAsAdmin;
 
     protected function setUp(): void
     {
         parent::setUp();
 
         FakeNetworkDriver::reset();
+        // The network routes are behind the admin token (decided 2026-10-26).
+        $this->withHeaders($this->adminHeaders());
+    }
+
+    public function test_the_network_routes_need_the_admin_token_but_renaming_does_not(): void
+    {
+        $device = $this->makeDevice();
+        $this->withoutHeader('Authorization');
+
+        $this->assertNeedsAdminToken([
+            ['GET', "/api/devices/{$device->id}/network"],
+            ['PUT', "/api/devices/{$device->id}/network/interface"],
+            ['PUT', "/api/devices/{$device->id}/network/wired"],
+            ['PUT', "/api/devices/{$device->id}/network/wifi"],
+        ]);
+        // Rename and the other settings stay open: this device lacks the capability (422), but it is not a 401.
+        $this->getJson("/api/devices/{$device->id}/info")->assertStatus(422)->assertJsonPath('error', 'unsupported');
+        $this->putJson("/api/devices/{$device->id}/info", ['name' => 'Kitchen'])->assertStatus(422)->assertJsonPath('error', 'unsupported');
     }
 
     private function makeDevice(string $product = 'BeoSound Essence', string $driver = FakeNetworkDriver::class, State $state = State::Standby): Device
