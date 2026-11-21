@@ -207,6 +207,21 @@ TABLE device_sources [autoincrement]
   idx device_sources_device_id_source_id_unique UNIQUE (device_id,source_id)
   fk (device_id) -> devices(id) ON DELETE CASCADE ON UPDATE NO ACTION
 
+TABLE device_timers [autoincrement]
+  col created_at datetime NULL default=-
+  col device_id integer NOT NULL default=-
+  col ends_at datetime NOT NULL default=-
+  col finished_at datetime NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col kind varchar NOT NULL default=-
+  col scene_id integer NULL default=-
+  col starts_at datetime NOT NULL default=-
+  col state text NOT NULL default=-
+  col status varchar NOT NULL default='active'
+  col updated_at datetime NULL default=-
+  idx device_timers_device_id_kind_status_index INDEX (device_id,kind,status)
+  fk (device_id) -> devices(id) ON DELETE CASCADE ON UPDATE NO ACTION
+
 TABLE devices [autoincrement]
   col created_at datetime NULL default=-
   col device_brand_name varchar NULL default=-
@@ -336,6 +351,16 @@ TABLE file_analyses [autoincrement]
   idx file_analyses_file_id_unique UNIQUE (file_id)
   fk (file_id) -> files(id) ON DELETE CASCADE ON UPDATE NO ACTION
 
+TABLE file_embeddings
+  col content_hash varchar NULL default=-
+  col created_at datetime NULL default=-
+  col dimensions integer NOT NULL default=-
+  col file_id integer NOT NULL default=- pk=1
+  col model varchar NOT NULL default=-
+  col updated_at datetime NULL default=-
+  col vector blob NOT NULL default=-
+  fk (file_id) -> files(id) ON DELETE CASCADE ON UPDATE NO ACTION
+
 TABLE files [autoincrement]
   col bit_depth integer NULL default=-
   col bitrate integer NULL default=-
@@ -412,6 +437,18 @@ TABLE jobs [autoincrement]
   col queue varchar NOT NULL default=-
   col reserved_at integer NULL default=-
   idx jobs_queue_index INDEX (queue)
+
+TABLE media_servers [autoincrement]
+  col base_url varchar NULL default=-
+  col created_at datetime NULL default=-
+  col credential varchar NULL default=-
+  col driver varchar NOT NULL default=-
+  col enabled tinyint(1) NOT NULL default='1'
+  col id integer NOT NULL default=- pk=1
+  col meta text NULL default=-
+  col name varchar NOT NULL default=-
+  col updated_at datetime NULL default=-
+  idx media_servers_driver_index INDEX (driver)
 
 TABLE metadata [autoincrement]
   col created_at datetime NULL default=-
@@ -606,6 +643,7 @@ TABLE radio_stations [autoincrement]
   idx radio_stations_last_played_at_index INDEX (last_played_at)
 
 TABLE scenes [autoincrement]
+  col alarm text NULL default=-
   col color varchar NULL default=-
   col created_at datetime NULL default=-
   col icon varchar NULL default=-
@@ -620,6 +658,8 @@ TABLE scenes [autoincrement]
   col schedule_time varchar NULL default=-
   col steps text NOT NULL default=-
   col stop_on_error tinyint(1) NOT NULL default='0'
+  col trigger_debounce integer NOT NULL default='10'
+  col triggers text NULL default=-
   col updated_at datetime NULL default=-
   idx scenes_name_index INDEX (name)
   idx scenes_schedule_enabled_schedule_time_index INDEX (schedule_enabled,schedule_time)

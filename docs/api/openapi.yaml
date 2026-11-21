@@ -564,6 +564,66 @@ paths:
                   on: { type: boolean }
         "422": { $ref: "#/components/responses/DeviceError" }
 
+  /devices/{device}/sleep:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    get:
+      tags: [Playback]
+      summary: The scene-level sleep timer of the device (null when none runs)
+      description: |
+        A server-side timer, distinct from the device's own `sleep_timer` capability: after N minutes the volume
+        fades down, the device stops (or goes to standby) and the volume is put back. See docs/api/scenes.md.
+      operationId: getSleep
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    allOf: [{ $ref: "#/components/schemas/SleepTimer" }]
+                    nullable: true
+    post:
+      tags: [Playback]
+      summary: Start a sleep timer (fade, then stop or standby, then restore the volume); replaces a running one
+      operationId: startSleep
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [minutes]
+              properties:
+                minutes: { type: integer, minimum: 1, maximum: 480 }
+                fade_seconds: { type: integer, minimum: 0, maximum: 600, description: "Length of the fade at the end, at most the timer itself; default 60" }
+                action: { type: string, enum: [stop, standby], description: "What happens at the end; default stop" }
+      responses:
+        "201":
+          description: Started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/SleepTimer" }
+        "422": { $ref: "#/components/responses/DeviceError" }
+    delete:
+      tags: [Playback]
+      summary: Cancel the sleep timer and put a faded volume back (not an error when none runs)
+      operationId: cancelSleep
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  cancelled: { type: boolean }
+
   /devices/{device}/sleep-timer:
     parameters: [{ $ref: "#/components/parameters/device" }]
     get:
@@ -677,7 +737,7 @@ paths:
     parameters: [{ $ref: "#/components/parameters/device" }]
     get:
       tags: [Playback]
-      summary: Jellyfin on a TV - continue watching and next up (Philips TV with a Jellyfin key; see docs/api/jellyfin.md)
+      summary: Jellyfin on a TV - continue watching and next up (Philips TV with a Jellyfin key; a wrapper over /devices/{device}/media, see docs/api/jellyfin.md)
       operationId: jellyfinLists
       responses:
         "200":
@@ -719,6 +779,81 @@ paths:
                 properties:
                   status: { type: string }
                   item_id: { type: string }
+        "422": { $ref: "#/components/responses/DeviceError" }
+        "502": { $ref: "#/components/responses/DeviceError" }
+
+  /media-servers:
+    get:
+      tags: [Playback]
+      summary: Media servers (Jellyfin; more types later) and what each can do (see docs/api/media-servers.md)
+      operationId: listMediaServers
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/MediaServer" } }
+
+  /devices/{device}/media:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    get:
+      tags: [Playback]
+      summary: Continue watching and next up from every media server that applies to a TV, as normalised items (see docs/api/media-servers.md)
+      operationId: deviceMedia
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  active: { type: boolean, description: "The device shows a media server's app with nothing playing" }
+                  servers:
+                    type: array
+                    description: The servers read for this device; `ok` false for one that did not answer (the others still show)
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        name: { type: string }
+                        driver: { type: string }
+                        ok: { type: boolean }
+                  continue_watching: { type: array, items: { $ref: "#/components/schemas/MediaItem" } }
+                  next_up: { type: array, items: { $ref: "#/components/schemas/MediaItem" } }
+        "422": { $ref: "#/components/responses/DeviceError" }
+        "502": { $ref: "#/components/responses/DeviceError" }
+
+  /devices/{device}/media/play:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    post:
+      tags: [Playback]
+      summary: Start a media server's item in its app on the device (see docs/api/media-servers.md)
+      operationId: playDeviceMedia
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [item]
+              properties:
+                item: { type: string, description: "A listed item's `id` (server id and item id, 3:abc), or a bare item id while one server applies or with `server`" }
+                server: { type: integer, description: "Server id for a bare item id" }
+                position: { type: number, minimum: 0, description: "Seconds to start from; the item's `resume_position` to resume" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  item: { type: string }
         "422": { $ref: "#/components/responses/DeviceError" }
         "502": { $ref: "#/components/responses/DeviceError" }
 
@@ -1327,6 +1462,97 @@ paths:
         "403": { description: Forbidden for client devices }
         "422": { description: Validation error }
         "502": { description: MusicBrainz did not answer (driver_error) }
+  /library/physical/import:
+    post:
+      tags: [Library]
+      operationId: previewPhysicalImport
+      description: "CSV import of a physical collection, step one: reads a Discogs collection export or any CSV whose headers name the columns (artist, title, medium or format, year, barcode, location ...), writes nothing, and answers what each row would become (`new`, `lookup`: its barcode is looked up on MusicBrainz after the import, `duplicate` by barcode or artist+title+medium, `invalid` with the reason) and a `token` for the confirm step. Not available to client devices. See docs/api/physical.md."
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary, description: "The CSV (UTF-8 or Windows-1252; comma, semicolon or tab; at most 2 MB and 5000 rows). Send this or `csv`." }
+                csv: { type: string, description: "The CSV as text, with a header line" }
+                default_medium: { type: string, enum: [cd, tape, vinyl, minidisc, other], description: "The medium of rows that have none; without it such rows are invalid" }
+                mapping: { type: object, additionalProperties: { type: string }, description: "field => the file's column header, to override what the headers say; fields are artist, title, medium, year, barcode, location, catalogue_number, condition, notes, acquired_on" }
+                rows: { type: integer, description: "List only this many rows in `data` (the summary counts all)" }
+          application/json:
+            schema:
+              type: object
+              properties:
+                csv: { type: string }
+                default_medium: { type: string, enum: [cd, tape, vinyl, minidisc, other] }
+                mapping: { type: object, additionalProperties: { type: string } }
+                rows: { type: integer }
+      responses:
+        "200":
+          description: The preview
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [preview] }
+                  token: { type: string, description: "Confirm with this within `expires_in` seconds" }
+                  expires_in: { type: integer }
+                  format: { type: string, enum: [discogs, generic] }
+                  mapping: { type: object, additionalProperties: { type: string }, description: "field => column header that was used" }
+                  unmapped: { type: array, items: { type: string }, description: "Columns of the file that were not used" }
+                  summary:
+                    type: object
+                    properties:
+                      rows: { type: integer }
+                      new: { type: integer }
+                      lookup: { type: integer }
+                      duplicate: { type: integer }
+                      invalid: { type: integer }
+                  truncated: { type: boolean, description: "`data` lists fewer rows than the file has" }
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        row: { type: integer, description: "Line of the file (the header is 1)" }
+                        status: { type: string, enum: [new, lookup, duplicate, invalid] }
+                        reason: { type: string, nullable: true, description: "Why a row is a duplicate or invalid" }
+                        duplicate_of: { type: integer, nullable: true, description: "The collection item it duplicates" }
+                        artist: { type: string, nullable: true, description: "Null for a barcode-only row: MusicBrainz names it" }
+                        title: { type: string, nullable: true }
+                        medium: { type: string, nullable: true }
+                        year: { type: integer, nullable: true }
+                        barcode: { type: string, nullable: true }
+                        location: { type: string, nullable: true }
+                        catalogue_number: { type: string, nullable: true }
+                        condition: { type: string, nullable: true }
+                        notes: { type: string, nullable: true }
+                        acquired_on: { type: string, nullable: true }
+        "403": { description: Forbidden for client devices }
+        "422": { description: "Not a usable CSV (no columns for artist and title or a barcode, too large, unknown column in `mapping`)" }
+  /library/physical/import/{token}/confirm:
+    post:
+      tags: [Library]
+      operationId: confirmPhysicalImport
+      description: "CSV import, step two: adds the rows of a preview (classified again, so a row added meanwhile is skipped). `new` rows and `lookup` rows with a name are added at once; every `lookup` row is looked up on MusicBrainz by a queued, rate-limited job (about one every two seconds), which ties the item to its release or, for a row with only a barcode, adds it from the release (a barcode MusicBrainz does not know is kept as 'Unknown artist' / 'Barcode …'). The preview is used up. Not available to client devices."
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [ok] }
+                  added: { type: integer, description: "Items added now" }
+                  queued_lookups: { type: integer, description: "Barcode lookups queued" }
+                  skipped_duplicates: { type: integer }
+                  skipped_invalid: { type: integer }
+        "403": { description: Forbidden for client devices }
+        "404": { description: "The preview is unknown, used or expired" }
   /library/physical/{id}:
     parameters:
       - { name: id, in: path, required: true, schema: { type: integer } }
@@ -1827,6 +2053,58 @@ paths:
                   next_cursor: { type: string, nullable: true }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { description: "`not_analysed`: the track has no tempo and key yet" }
+  /library/tracks/{track}/similar:
+    parameters:
+      - name: track
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Library]
+      summary: Tracks that sound like this one (sound embedding), most similar first, 50 per page
+      operationId: listSimilarTracks
+      description: "Needs the sound embedding of the track's own file (analysis with the ML sidecar; Full profile). Candidates are the tracks of the scope that have one too, ranked by the cosine similarity of the embeddings; never the track itself, the same recording, or the same artist's track with the same title. At most 200 deep (`next_cursor` ends there). `device_id` keeps to tracks that device can play. `similarity` is 0 to 1 for typical music (cosine, higher is closer), `distance` is 1 minus it; `reason` says what else the two share, from the analysis. `422 not_analysed` while the track has no embedding. See docs/api/similar-tracks.md."
+      parameters:
+        - { $ref: "#/components/parameters/cursor" }
+        - name: device_id
+          in: query
+          description: Keep to tracks this device can play
+          schema: { type: integer }
+        - { $ref: "#/components/parameters/client" }
+        - { $ref: "#/components/parameters/scope" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  canonical_id: { type: integer }
+                  source:
+                    type: object
+                    properties:
+                      model: { type: string, example: discogs-effnet-bs64-1 }
+                      dimensions: { type: integer, example: 1280 }
+                  data:
+                    type: array
+                    items:
+                      allOf:
+                        - { $ref: "#/components/schemas/SearchTrack" }
+                        - type: object
+                          properties:
+                            similarity: { type: number, example: 0.912 }
+                            distance: { type: number, example: 0.088 }
+                            reason:
+                              type: object
+                              properties:
+                                moods: { type: array, items: { type: string }, description: Mood tags both tracks have }
+                                genres: { type: array, items: { type: string }, description: Classifier genre tags both tracks have }
+                                tempo_diff_percent: { type: number, nullable: true, description: "Tempo difference as a percentage of this track's tempo; null without a tempo on either" }
+                                same_artist: { type: boolean }
+                  next_cursor: { type: string, nullable: true }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "`not_analysed`: the track has no sound embedding yet" }
   /library/albums/{album}:
     parameters:
       - name: album
@@ -1971,6 +2249,44 @@ paths:
                       stem_audio: { $ref: "#/components/schemas/DeepAnalysisState" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { description: "`no_file`", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /stems/weights:
+    get:
+      tags: [Library]
+      summary: Where the opt-in download of the stem separation weights stands
+      description: "Open (no admin token). The Demucs weights are not part of ReMoment and never downloaded by themselves, because their licence is unclear: the stems service starts without them (`weights: missing` in its health) and refuses stem jobs. `state` is `missing`, `downloading`, `ready` or `failed`; kinds `stems` and `stem_audio` are in `features.deep_analysis_kinds` of GET /info only when it is `ready`. `licence` carries the note to show before the download is started. 409 `not_available` without a stems service (`STEMS_URL`), 503 `unreachable`, 502 when the service is an older image without the download. Full profile only. See docs/api/stems.md, \"Weights\"."
+      operationId: getStemWeights
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StemWeights" }
+        "409": { description: "`not_available`: no stems service is configured", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "502": { description: "`driver_error`: the service answered wrongly", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "503": { description: "`unreachable`: the stems service does not answer", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /admin/stems/weights:
+    post:
+      tags: [Library]
+      summary: Start the opt-in download of the stem separation weights (admin)
+      description: "Admin token. Tells the stems service to download the weights from the source and SHA-256 pinned in the service (a file in its models volume, verified before it gets its name). No body. Nothing happens when they are `ready` (200) or already `downloading` (202); a `failed` download is tried again. Poll GET /stems/weights for the progress. Same errors as GET /stems/weights, plus 401 without the token. Full profile only. See docs/api/stems.md, \"Weights\"."
+      operationId: downloadStemWeights
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: The weights are ready already
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StemWeights" }
+        "202":
+          description: The download is running (just started or already under way)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StemWeights" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { description: "`not_available`: no stems service is configured", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "502": { description: "`driver_error`: the service answered wrongly", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "503": { description: "`unreachable`: the stems service does not answer", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
   /library/tracks/{track}/stems:
     parameters:
       - { name: track, in: path, required: true, schema: { type: integer }, description: "Library track id (a merged id resolves to the survivor)" }
@@ -2023,44 +2339,6 @@ paths:
       security: []
       parameters:
         - { name: track, in: path, required: true, schema: { type: integer } }
-  /stems/weights:
-    get:
-      tags: [Library]
-      summary: Where the opt-in download of the stem separation weights stands
-      description: "Open (no admin token). The Demucs weights are not part of ReMoment and never downloaded by themselves, because their licence is unclear: the stems service starts without them (`weights: missing` in its health) and refuses stem jobs. `state` is `missing`, `downloading`, `ready` or `failed`; kinds `stems` and `stem_audio` are in `features.deep_analysis_kinds` of GET /info only when it is `ready`. `licence` carries the note to show before the download is started. 409 `not_available` without a stems service (`STEMS_URL`), 503 `unreachable`, 502 when the service is an older image without the download. Full profile only. See docs/api/stems.md, \"Weights\"."
-      operationId: getStemWeights
-      security: []
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/StemWeights" }
-        "409": { description: "`not_available`: no stems service is configured", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
-        "502": { description: "`driver_error`: the service answered wrongly", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
-        "503": { description: "`unreachable`: the stems service does not answer", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
-  /admin/stems/weights:
-    post:
-      tags: [Library]
-      summary: Start the opt-in download of the stem separation weights (admin)
-      description: "Admin token. Tells the stems service to download the weights from the source and SHA-256 pinned in the service (a file in its models volume, verified before it gets its name). No body. Nothing happens when they are `ready` (200) or already `downloading` (202); a `failed` download is tried again. Poll GET /stems/weights for the progress. Same errors as GET /stems/weights, plus 401 without the token. Full profile only. See docs/api/stems.md, \"Weights\"."
-      operationId: downloadStemWeights
-      security: [{ adminToken: [] }]
-      responses:
-        "200":
-          description: The weights are ready already
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/StemWeights" }
-        "202":
-          description: The download is running (just started or already under way)
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/StemWeights" }
-        "401": { $ref: "#/components/responses/Unauthenticated" }
-        "409": { description: "`not_available`: no stems service is configured", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
-        "502": { description: "`driver_error`: the service answered wrongly", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
-        "503": { description: "`unreachable`: the stems service does not answer", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
         - { name: stem, in: path, required: true, schema: { type: string, enum: [vocals, drums, bass, guitar, piano, other] } }
       responses:
         "200":
@@ -2462,6 +2740,35 @@ paths:
                         description: { type: string }
                         icon: { type: string, description: Font Awesome solid icon name, example: champagne-glasses }
                         track_count: { type: integer, description: Tracks the mode would play (at most 100) }
+  /library/discover:
+    get:
+      tags: [Library]
+      summary: Discover shelves (rediscover, new releases, mixes, listening modes, random picks)
+      operationId: getLibraryDiscover
+      description: >-
+        The Discover shelves as data: a list of sections, each with a `kind` (album, artist, track, catalogue, mode), a title, a description and
+        items that each carry a `reason` in words. A section with nothing in it is left out, so a small library answers a short list; a new
+        shelf is a new section, so lay sections out by `kind`. Rediscover shelves come from the play history and the favorites only
+        (thresholds in config/discover.php). `new_releases` is left out for a client token and where the profile has no catalogue;
+        `mixes_well` and `listening_modes` need audio analysis (Full). Not available in the Control profile. See docs/api/discover.md.
+      parameters:
+        - { $ref: "#/components/parameters/client" }
+        - { $ref: "#/components/parameters/scope" }
+        - { name: sections, in: query, schema: { type: string }, description: "Comma-separated section keys to build (default all): new_releases, forgotten_favorites, used_to_play, on_this_day, forgotten_artists, forgotten_tracks, not_played_in_a_year, mixes_well, listening_modes, random_albums. An unknown key is 422." }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 60 }, description: "Items per section (default 18)." }
+        - { name: seed, in: query, schema: { type: integer }, description: "Another seed, another `random_albums` pick; the same seed gives the same pick." }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/DiscoverSection" }
+        "422": { description: "Validation error, or not available in the Control profile" }
   /library/genres:
     get:
       tags: [Library]
@@ -2787,6 +3094,36 @@ paths:
                 properties:
                   status: { type: string, example: ok }
                   mode: { type: string, description: "Only when a preset `mode` was sent" }
+                  queued: { type: integer }
+        "422": { $ref: "#/components/responses/DeviceError" }
+  /devices/{device}/library/play-similar:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    post:
+      tags: [Library playback]
+      summary: Similar tracks radio
+      operationId: playSimilarTracks
+      description: "Plays the track, then up to 49 of the tracks that sound most like it (the order of GET /library/tracks/{id}/similar, only what the device can play), once (no refill). 422 `not_analysed` while the track has no sound embedding, 422 `not_playable` when the track itself or fewer than 6 neighbours can be played on this device, 422 `unsupported` without library playback. See docs/api/similar-tracks.md."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [track_id]
+              properties:
+                track_id: { type: integer }
+                client: { type: string, description: "A client's api_token: hides what it hides" }
+                scope: { type: string, description: "local, streaming, all or a library id; default the leading source" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  seed: { type: integer, description: The track the radio started from }
                   queued: { type: integer }
         "422": { $ref: "#/components/responses/DeviceError" }
   /devices/{device}/library/play-playlist:
@@ -4117,6 +4454,44 @@ components:
         schedule_enabled: { type: boolean, default: false }
         schedule_time: { type: string, example: "07:30", nullable: true }
         schedule_days: { type: array, items: { type: integer, minimum: 1, maximum: 7 }, nullable: true, description: "ISO weekdays, 1 Monday; null is every day" }
+        triggers: { type: array, maxItems: 10, nullable: true, items: { $ref: "#/components/schemas/SceneTrigger" }, description: "What else starts the scene: an MQTT message or a device event" }
+        trigger_debounce: { type: integer, minimum: 5, maximum: 3600, default: 10, description: "Seconds after a trigger starts the scene during which its other triggers are ignored" }
+        alarm: { allOf: [{ $ref: "#/components/schemas/SceneAlarm" }], nullable: true }
+    SceneTrigger:
+      type: object
+      description: |
+        `type: mqtt` needs `topic` (an MQTT topic filter; the server's own `remoment/player/...` topics are refused) and
+        may have `payload` (the whole message must equal it). `type: device` needs `device_id` and `event`: `state`
+        with `value` playing, paused, standby or unreachable, or `source` with an optional `value` (the source's name or input).
+      properties:
+        type: { type: string, enum: [mqtt, device] }
+        topic: { type: string, maxLength: 200, example: "home/doorbell/#" }
+        payload: { type: string, maxLength: 200 }
+        device_id: { type: integer }
+        event: { type: string, enum: [state, source] }
+        value: { type: string, maxLength: 80, example: playing }
+    SceneAlarm:
+      type: object
+      description: Sets `start_volume` before the steps and ramps the volume up to `target_volume` over `minutes` after them
+      required: [device_id, minutes, start_volume, target_volume]
+      properties:
+        device_id: { type: integer }
+        minutes: { type: integer, minimum: 1, maximum: 60 }
+        start_volume: { type: integer, minimum: 0, maximum: 100 }
+        target_volume: { type: integer, minimum: 1, maximum: 100, description: "Higher than start_volume" }
+    SleepTimer:
+      type: object
+      properties:
+        id: { type: integer }
+        device_id: { type: integer }
+        kind: { type: string, example: sleep }
+        status: { type: string, enum: [active, done, cancelled] }
+        started_at: { type: string, format: date-time }
+        ends_at: { type: string, format: date-time }
+        remaining_seconds: { type: integer }
+        action: { type: string, enum: [stop, standby] }
+        fade_seconds: { type: integer }
+        original_volume: { type: integer, nullable: true, description: "The volume that is put back; null when the device did not report one" }
     SceneItem:
       type: object
       properties:
@@ -4132,12 +4507,15 @@ components:
             enabled: { type: boolean }
             time: { type: string, nullable: true }
             days: { type: array, items: { type: integer }, nullable: true }
+        triggers: { type: array, items: { $ref: "#/components/schemas/SceneTrigger" } }
+        trigger_debounce: { type: integer }
+        alarm: { allOf: [{ $ref: "#/components/schemas/SceneAlarm" }], nullable: true }
         last_run:
           type: object
           properties:
             at: { type: string, format: date-time, nullable: true }
             status: { type: string, enum: [ok, partial, failed, running], nullable: true }
-            source: { type: string, enum: [api, schedule], nullable: true }
+            source: { type: string, enum: [api, schedule, trigger], nullable: true }
     Scene:
       allOf:
         - { $ref: "#/components/schemas/SceneItem" }
@@ -4152,9 +4530,10 @@ components:
       type: object
       properties:
         index: { type: integer, nullable: true }
-        type: { type: string, enum: [operation, delay] }
-        operation: { type: string }
+        type: { type: string, enum: [operation, delay, alarm] }
+        operation: { type: string, nullable: true }
         device_id: { type: integer, nullable: true }
+        minutes: { type: integer, description: "Alarm entry only" }
         seconds: { type: number }
         ok: { type: boolean }
         status: { type: integer, nullable: true, description: "HTTP status of the step; null for a delay or a skipped step" }
@@ -4164,7 +4543,7 @@ components:
       type: object
       properties:
         id: { type: integer, description: Monotonic }
-        kind: { type: string, example: queue.stuck, description: "queue.stuck, scheduler.silent, backup.stale, storage.unreachable, device.offline, listener.down, network.exposed (more later: container.crashed, disk.low)" }
+        kind: { type: string, example: queue.stuck, description: "queue.stuck, scheduler.silent, backup.stale, storage.unreachable, device.offline, listener.down, network.exposed, mount.unavailable (more later: container.crashed, disk.low)" }
         key: { type: string, description: "Dedupe key within the kind: a queue name, a device or location id, '' for a single condition" }
         severity: { type: string, enum: [info, warning, critical] }
         title: { type: string }
@@ -4230,6 +4609,7 @@ components:
             deep_analysis: { type: boolean, description: "A deep-analysis service answers its health check (cached for a minute): POST /library/tracks/{id}/deep-analysis can queue something" }
             deep_analysis_kinds: { type: array, items: { $ref: "#/components/schemas/DeepAnalysisKind" }, description: "The kinds that can run now (sections: structure service; stems and stem_audio: stems service, only once its weights are downloaded, see GET /stems/weights). Present only when not empty." }
             scenes: { type: boolean, description: "GET /scenes exists (true in every profile)" }
+            similar_tracks: { type: boolean, description: "At least one own file has a sound embedding (analysis with the ML sidecar, Full profile), so GET /library/tracks/{id}/similar and POST /devices/{id}/library/play-similar can answer. Present only when true; a single track still answers 422 not_analysed until its own file has one. See docs/api/similar-tracks.md." }
             export: { type: boolean, description: "Export from the library as zip is available: the profile has the library and own files, and ffmpeg can transcode (POST /library/exports). Present only when true." }
             export_formats: { type: array, items: { type: string, enum: [mp3, aac, opus] }, description: "The formats ffmpeg on this server can make for an export (probed with `ffmpeg -encoders`, cached); present with `export`. Profiles of other formats cannot convert files here." }
 
@@ -4345,6 +4725,26 @@ components:
         finished_at: { type: string, format: date-time, nullable: true }
         expires_at: { type: string, format: date-time, nullable: true }
 
+    StemWeights:
+      type: object
+      required: [state, size, downloaded, total, percent, source, sha256, error, licence]
+      properties:
+        state: { type: string, enum: [missing, downloading, ready, failed] }
+        model: { type: string, nullable: true, description: "The model the service runs (htdemucs, or htdemucs_6s)" }
+        size: { type: integer, nullable: true, description: "Bytes on disk, once ready" }
+        downloaded: { type: integer, description: "Bytes received while downloading; the file size when ready; 0 otherwise" }
+        total: { type: integer, nullable: true, description: "Bytes expected (the source's Content-Length, else the pinned size)" }
+        percent: { type: integer, nullable: true, minimum: 0, maximum: 100, description: "Null while the total is unknown" }
+        source: { type: string, nullable: true, description: "The pinned download URL" }
+        sha256: { type: string, nullable: true, description: "The pinned checksum (a file that does not match is thrown away)" }
+        error: { type: string, nullable: true, description: "Why the last download failed, when `state` is failed" }
+        licence:
+          type: object
+          required: [note, url]
+          properties:
+            note: { type: string, description: "Show this before starting the download: the weights' licence is unclear" }
+            url: { type: string }
+
     DeepAnalysisKind:
       type: string
       enum: [sections, stems, stem_audio]
@@ -4428,26 +4828,6 @@ components:
             tracks: { type: integer }
             hours: { type: number, description: "Total duration of the tracks, one decimal" }
         decades:
-    StemWeights:
-      type: object
-      required: [state, size, downloaded, total, percent, source, sha256, error, licence]
-      properties:
-        state: { type: string, enum: [missing, downloading, ready, failed] }
-        model: { type: string, nullable: true, description: "The model the service runs (htdemucs, or htdemucs_6s)" }
-        size: { type: integer, nullable: true, description: "Bytes on disk, once ready" }
-        downloaded: { type: integer, description: "Bytes received while downloading; the file size when ready; 0 otherwise" }
-        total: { type: integer, nullable: true, description: "Bytes expected (the source's Content-Length, else the pinned size)" }
-        percent: { type: integer, nullable: true, minimum: 0, maximum: 100, description: "Null while the total is unknown" }
-        source: { type: string, nullable: true, description: "The pinned download URL" }
-        sha256: { type: string, nullable: true, description: "The pinned checksum (a file that does not match is thrown away)" }
-        error: { type: string, nullable: true, description: "Why the last download failed, when `state` is failed" }
-        licence:
-          type: object
-          required: [note, url]
-          properties:
-            note: { type: string, description: "Show this before starting the download: the weights' licence is unclear" }
-            url: { type: string }
-
           type: array
           description: "Albums per release decade, oldest first (albums with a release date from 1900 on)"
           items:
@@ -5013,6 +5393,37 @@ components:
                   via: { type: string, nullable: true }
                   active: { type: boolean, nullable: true, description: "The host has this device's input or source selected now; null while unknown (a host that does not report its input)" }
 
+    MediaServer:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        driver: { type: string, description: "The server type, `jellyfin`" }
+        label: { type: string }
+        base_url: { type: string }
+        enabled: { type: boolean }
+        configured: { type: boolean, description: "Its credentials are complete (Settings > Services); a server that is not is left out of the device lists" }
+        capabilities:
+          type: array
+          items: { type: string, enum: [continue_watching, next_up, play_on_client, sessions] }
+
+    MediaItem:
+      type: object
+      description: One title of a media server, the same shape for every server type. Times are seconds.
+      properties:
+        id: { type: string, description: "Namespaced by the server (`3:abc`): what play takes" }
+        server_id: { type: integer }
+        item_id: { type: string }
+        kind: { type: string, enum: [movie, episode, series, season, album, track] }
+        title: { type: string, description: "The film or the series" }
+        subtitle: { type: string, nullable: true, description: "The year, or `S2E3 · Episode name`" }
+        year: { type: integer, nullable: true }
+        image: { type: string, nullable: true, description: "A poster URL on the media server" }
+        progress: { type: integer, minimum: 0, maximum: 100 }
+        resume_position: { type: number, description: "Seconds to resume from" }
+        duration: { type: integer, nullable: true }
+        library: { type: string, nullable: true }
+
     JellyfinTile:
       type: object
       properties:
@@ -5333,9 +5744,9 @@ components:
         notes: { type: string, nullable: true }
         location: { type: string, nullable: true }
         acquired_on: { type: string, nullable: true }
-        album_id: { type: integer, nullable: true, description: The library album with the same artist and title. }
+        album_id: { type: integer, nullable: true, description: "The library album with the same artist and title; for a ripped CD, the album the ripped files landed in." }
         release_group_mbid: { type: string, nullable: true }
-        ripped: { type: boolean }
+        ripped: { type: boolean, description: "Set by hand, or by itself when a file with the item's MusicBrainz release id or barcode in its tags arrives (a CD ripped by the ReMoment Ripper); `album_id` then links the album." }
         ripped_at: { type: string, nullable: true }
     WantedSong:
       type: object
@@ -5514,6 +5925,35 @@ components:
               artwork: { $ref: "#/components/schemas/LibraryArtwork", description: 'The track''s album cover, null when none or not processed' }
               playable: { type: boolean, description: "In local mode: has a local copy playable on device_id" }
               missing_locally: { type: boolean, description: "Local mode only: the track has no copy in the Local library (not playable)" }
+    DiscoverSection:
+      type: object
+      description: One Discover shelf. `items` are AlbumItem, ArtistItem, SearchTrack, CatalogueItem or a listening mode according to `kind`, each with a `reason`.
+      properties:
+        key: { type: string, example: forgotten_favorites }
+        title: { type: string, example: Forgotten favorites }
+        description: { type: string, description: "What the shelf is, in one sentence" }
+        kind: { type: string, enum: [album, artist, track, catalogue, mode] }
+        seed:
+          type: object
+          description: "`mixes_well` only: the analysed track the tracks mix well with"
+          properties:
+            id: { type: integer }
+            name: { type: string }
+            artist_name: { type: string, nullable: true }
+            bpm: { type: number }
+            camelot: { type: string, example: 8A }
+        items:
+          type: array
+          items:
+            type: object
+            description: "The item of the section's kind plus `reason`. Rediscover items add `last_played_at` (null when never played), `play_days` (albums, artists) or `plays` (tracks) and `favorite`; `mixes_well` tracks add bpm, camelot, key_relation, tempo_relation and tempo_diff_percent like mixes-with; `new_releases` items are CatalogueItem plus release_date."
+            properties:
+              id: { type: integer }
+              reason: { type: string, example: "Favorite, played on 5 days, last played 1 year ago" }
+              last_played_at: { type: string, format: date-time, nullable: true }
+              play_days: { type: integer }
+              plays: { type: integer }
+              favorite: { type: boolean }
     SearchTrack:
       type: object
       properties:

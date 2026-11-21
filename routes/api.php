@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\InfoController;
 use App\Http\Controllers\Api\JellyfinController;
 use App\Http\Controllers\Api\LibraryController;
 use App\Http\Controllers\Api\LiteArtworkController;
+use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\PhysicalController;
 use App\Http\Controllers\Api\PlayerController;
 use App\Http\Controllers\Api\PushSubscriptionController;
@@ -96,6 +97,10 @@ Route::get('/devices/{device}/keys', [RemoteKeysController::class, 'index']);
 Route::post('/devices/{device}/keys', [RemoteKeysController::class, 'press']);
 Route::get('/devices/{device}/jellyfin', [JellyfinController::class, 'index']);
 Route::post('/devices/{device}/jellyfin/play', [JellyfinController::class, 'play']);
+// Media servers (workstream 15, docs/api/media-servers.md): the generic shelves and play-on-device; the two Jellyfin routes above wrap them.
+Route::get('/media-servers', [MediaController::class, 'servers']);
+Route::get('/devices/{device}/media', [MediaController::class, 'show']);
+Route::post('/devices/{device}/media/play', [MediaController::class, 'play']);
 
 Route::get('/devices/{device}/sources', [DeviceController::class, 'sources']);
 Route::post('/devices/{device}/sources/activate', [DeviceController::class, 'activateSource']);
@@ -179,6 +184,7 @@ Route::get('/library/tracks/{track}/mixes-with', [LibraryController::class, 'mix
 Route::get('/library/tracks/{track}/similar', [LibraryController::class, 'similar']);
 Route::get('/library/tracks/{track}/waveform', [LibraryController::class, 'waveform']);
 Route::get('/library/listening-modes', [LibraryController::class, 'listeningModes']);
+Route::get('/library/discover', [\App\Http\Controllers\Api\DiscoverController::class, 'index']);
 Route::get('/library/history', [\App\Http\Controllers\Api\PlayHistoryController::class, 'index']);
 Route::get('/devices/{device}/history', [\App\Http\Controllers\Api\PlayHistoryController::class, 'device']);
 Route::get('/library/albums/{album}/plays', [\App\Http\Controllers\Api\PlayHistoryController::class, 'album']);
@@ -239,6 +245,8 @@ Route::get('/library/exports/{id}/download/{part}', [ExportController::class, 'd
 Route::post('/library/tracks/{track}/deep-analysis', [DeepAnalysisController::class, 'store']);
 Route::get('/library/tracks/{track}/deep-analysis', [DeepAnalysisController::class, 'show']);
 Route::delete('/library/tracks/{track}/deep-analysis/{kind}', [DeepAnalysisController::class, 'destroy']);
+// Opt-in download of the Demucs weights (licence unclear): the state is open, starting it is admin only (below).
+Route::get('/stems/weights', [\App\Http\Controllers\Api\StemWeightsController::class, 'show']);
 Route::get('/library/tracks/{track}/stems', [TrackStemsController::class, 'show']);
 Route::get('/library/tracks/{track}/stems/{stem}', [TrackStemsController::class, 'download'])
     ->middleware('signed:relative')->name('api.library.stems.download');
@@ -249,13 +257,14 @@ Route::middleware('admin.token')->group(function () {
     Route::get('/admin/nodes/{client}/jobs', [\App\Http\Controllers\Api\AdminNodeJobController::class, 'index']);
     Route::post('/admin/nodes/{client}/jobs', [\App\Http\Controllers\Api\AdminNodeJobController::class, 'store']);
     Route::post('/admin/nodes/{client}/jobs/{job}/cancel', [\App\Http\Controllers\Api\AdminNodeJobController::class, 'cancel']);
-// Opt-in download of the Demucs weights (licence unclear): the state is open, starting it is admin only (below).
-Route::get('/stems/weights', [\App\Http\Controllers\Api\StemWeightsController::class, 'show']);
     Route::delete('/admin/token', [AdminAuthController::class, 'logout']);
     Route::post('/admin/alerts/{alert}/ack', [AlertController::class, 'acknowledge']);
 
     // Redacted diagnostics zip to attach to an issue (docs/architecture/diagnostics.md)
     Route::get('/admin/diagnostics', [\App\Http\Controllers\DiagnosticsController::class, 'download']);
+
+    // Starts the opt-in download of the stems service's Demucs weights (docs/api/stems.md, "Weights")
+    Route::post('/admin/stems/weights', [\App\Http\Controllers\Api\StemWeightsController::class, 'store']);
 
     // Export from the library as zip parts (docs/api/export.md); admin only, the download itself is signed
     Route::post('/library/exports/estimate', [ExportController::class, 'estimate']);
@@ -267,9 +276,6 @@ Route::get('/stems/weights', [\App\Http\Controllers\Api\StemWeightsController::c
     // Storage locations and the library's files (docs/architecture/file-storage.md)
     Route::get('/admin/storage/locations', [StorageController::class, 'locations']);
     Route::post('/admin/storage/locations', [StorageController::class, 'storeLocation']);
-    // Starts the opt-in download of the stems service's Demucs weights (docs/api/stems.md, "Weights")
-    Route::post('/admin/stems/weights', [\App\Http\Controllers\Api\StemWeightsController::class, 'store']);
-
     Route::put('/admin/storage/locations/{location}', [StorageController::class, 'updateLocation']);
     Route::delete('/admin/storage/locations/{location}', [StorageController::class, 'destroyLocation']);
     Route::post('/admin/storage/locations/{location}/test', [StorageController::class, 'testLocation']);
