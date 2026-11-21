@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Domain\Artwork\LibraryItemArtwork;
 use App\Domain\Radio\RadioPlayLog;
 use App\Domain\Radio\RadioSettings;
+use App\Domain\Radio\RadioStations;
 use App\Domain\Radio\RadioSuggestions;
 use App\Integrations\Contracts\RadioControlInterface;
 use App\Integrations\Radio\Nts\NtsImporter;
@@ -83,14 +84,7 @@ class RadioStationController extends Controller
             'identifiers.url' => ['nullable', 'url', 'max:2048'],
         ]);
 
-        $station = RadioStation::create(collect($validated)->only(['name', 'image_url', 'genre'])->all());
-
-        foreach ($request->input('identifiers', []) as $platform => $identifier) {
-            $identifier = trim((string) $identifier);
-            if ($identifier !== '') {
-                $station->setMeta($platform, $identifier);
-            }
-        }
+        RadioStations::save(null, $validated, $request->input('identifiers', []));
 
         return redirect()->route('radio.index')->with('success', 'Radio station added.');
     }
@@ -111,17 +105,7 @@ class RadioStationController extends Controller
             'identifiers.url' => ['nullable', 'url', 'max:2048'],
         ]);
 
-        $radio->update(collect($validated)->only(['name', 'image_url', 'genre'])->all());
-
-        foreach ($request->input('identifiers', []) as $platform => $identifier) {
-            $identifier = trim((string) $identifier);
-            if ($identifier !== '') {
-                $radio->setMeta($platform, $identifier);
-            } else {
-                $radio->meta()->where('key', $platform)->delete();
-                $radio->unsetRelation('meta');
-            }
-        }
+        RadioStations::save($radio, $validated, $request->input('identifiers', []));
 
         return redirect()->route('radio.index')->with('success', 'Radio station updated.');
     }
@@ -135,7 +119,7 @@ class RadioStationController extends Controller
 
     public function destroy(RadioStation $radio)
     {
-        $radio->delete();
+        RadioStations::delete($radio);
 
         return redirect()->route('radio.index')->with('success', 'Radio station removed.');
     }

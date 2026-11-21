@@ -3,9 +3,8 @@
 namespace App\Livewire;
 
 use App\Domain\Radio\RadioBrowser;
+use App\Domain\Radio\RadioStations;
 use App\Domain\Radio\RadioSuggestions;
-use App\Models\RadioStation;
-use App\Models\RadioStationMeta;
 use Livewire\Component;
 
 /** Search radio-browser.info on the add-station page and add a result with one click (name, stream URL, logo, genre). */
@@ -68,21 +67,7 @@ class RadioStationSearch extends Component
             return;
         }
 
-        $existing = RadioStationMeta::where('key', 'url')->where('value', $result['url'])->first()?->station;
-
-        $station = $existing ?? RadioStation::create([
-            'name' => $result['name'],
-            'image_url' => $result['image_url'],
-            'genre' => $result['genre'],
-        ]);
-
-        if ($existing === null) {
-            $station->setMeta('url', $result['url']);
-
-            if (!empty($result['uuid'])) {
-                $station->setMeta('radio_browser_uuid', $result['uuid']);
-            }
-        }
+        $station = RadioStations::addFromDirectory($result);
 
         $this->added[$result['url']] = $station->id;
     }
