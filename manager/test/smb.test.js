@@ -172,6 +172,21 @@ test('with Samba running a change reloads the config; inbox is read-write, expor
   assert.deepEqual(host.calls().filter((c) => c.cmd === 'smbcontrol').map((c) => c.args), [['smbd', 'reload-config'], ['smbd', 'reload-config']]);
 });
 
+test('the fragment sets `map to guest = Bad User` in [global] while a share is on, and nothing when all are off', async () => {
+  const text = fs.readFileSync(conf, 'utf8');
+  const global = text.split(/^\[/m).find((x) => x.startsWith('global]'));
+  assert.ok(global, 'a [global] section in the fragment');
+  assert.match(global, /^\s+map to guest = Bad User$/m);
+  assert.ok(text.indexOf('[global]') < text.indexOf('[inbox]'), '[global] comes before the shares');
+  assert.equal(text.match(/^\[global\]/gm).length, 1);
+  // The dry run and GET /smb/config show the same section, and testparm is given a file that has it.
+  assert.match((await req('GET', '/smb/config')).json().config, /map to guest = Bad User/);
+  assert.match((await req('POST', '/smb/shares/library?dry_run=1', { body: { enabled: true } })).json().config, /\[global\]\n   map to guest = Bad User/);
+  host.clear();
+  await req('POST', '/smb/shares/exports', { body: { enabled: true } });
+  assert.match(host.calls().find((c) => c.cmd === 'testparm').file, /map to guest = Bad User/);
+});
+
 test('the library can be made writable, and back', async () => {
   await req('POST', '/smb/shares/library', { body: { enabled: true, writable: true } });
   assert.match(fs.readFileSync(conf, 'utf8').split(/^\[/m).find((x) => x.startsWith('library]')), /read only = no/);

@@ -112,6 +112,55 @@ class ManagerClient
         $this->send('delete', '/smb/user');
     }
 
+    /**
+     * NAS mounts (manager/mount.js): SMB shares of a NAS mounted on the host so they can be used as a storage location.
+     * Every entry says whether it is mounted and readable; `lost` is a mount that worked before and does not now.
+     * No password is ever in the answer.
+     *
+     * @return array{dry_run: bool, method: string, base: string, problems: list<string>, data: list<array<string, mixed>>}
+     */
+    public function mounts(): array
+    {
+        return $this->send('get', '/mounts')->json();
+    }
+
+    /**
+     * The dry run of adding (or updating) a mount: the unit files, the fstab equivalent, the credentials with the password
+     * hidden and a `plan` token. Nothing is written on the host. `$form`: name, host, share, user, domain, password,
+     * writable, version; a preview needs no password.
+     *
+     * @param  array<string, mixed>  $form
+     * @return array{dry_run: bool, name: string, updating: bool, path: string, plan: string, config: array<string, mixed>, actions: list<string>}
+     */
+    public function mountPreview(array $form): array
+    {
+        return $this->send('post', '/mounts?dry_run=1', body: $form)->json();
+    }
+
+    /**
+     * Applies it. `$plan` must be the token of the dry run of this same form (the manager refuses a changed plan). The
+     * password travels in this body only; the manager writes it to a root-only credentials file and nowhere else.
+     *
+     * @param  array<string, mixed>  $form
+     * @return array{status: string, name: string, path: string, updated: bool}
+     */
+    public function mountAdd(array $form, string $plan): array
+    {
+        return $this->send('post', '/mounts', body: $form + ['confirm' => $plan])->json();
+    }
+
+    /** Switches a mount on or off (the automount; off also unmounts it) and keeps its configuration. */
+    public function mountActive(string $name, bool $active, ?string $plan = null): array
+    {
+        return $this->send('post', '/mounts/'.rawurlencode($name).'/active'.($plan === null ? '?dry_run=1' : ''), body: ['active' => $active] + ($plan === null ? [] : ['confirm' => $plan]))->json();
+    }
+
+    /** Removes a mount (units, credentials file, empty folder). With no `$plan` it is the dry run and answers the token. */
+    public function mountRemove(string $name, ?string $plan = null): array
+    {
+        return $this->send('delete', '/mounts/'.rawurlencode($name).'?'.($plan === null ? 'dry_run=1' : 'confirm='.rawurlencode($plan)))->json();
+    }
+
     /** @return list<array{time: string, action: string, service: ?string, result: string}> */
     public function audit(int $limit = 20): array
     {
@@ -159,7 +208,7 @@ class ManagerClient
 
         throw new ManagerException($error, match ($response->status()) {
             401 => 'The manager refused the token. The token file the app reads is not the one the manager uses.',
-            409 => 'The manager is busy with another change. Try again in a moment.',
+            409 => $error === 'busy' || $message === '' ? 'The manager is busy with another change. Try again in a moment.' : $message,
             default => trim("The manager answered {$response->status()} {$error}. {$message}"),
         });
     }

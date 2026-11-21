@@ -4,6 +4,8 @@ namespace App\Livewire;
 
 use App\Domain\Manager\ManagerClient;
 use App\Domain\Manager\ManagerException;
+use App\Domain\Profile\Profile;
+use App\Models\StorageLocation;
 use Livewire\Component;
 
 /**
@@ -11,6 +13,8 @@ use Livewire\Component;
  * all through the ReMoment Manager (docs/architecture/manager.md). Admin only (the route is behind the login).
  * Upgrade and rollback run in the manager in the background; the card follows them (every 2 s while one runs).
  * The Shares card (SMB: library, exports, inbox, one share user) is the manager's `smb.js`; the generated password is shown once.
+ * The NAS mounts card is the manager's `mount.js`: a form, a preview (the manager's dry run: unit files, fstab line, plan token),
+ * and Apply, which sends the plan token of that preview back. The NAS password is typed here, goes to the manager once and is cleared.
  * Restarting `app` or everything stops this page's own server, so the answer may never arrive: the page says so.
  */
 class ManagerPanel extends Component
@@ -28,6 +32,28 @@ class ManagerPanel extends Component
 
     /** The Samba fragment shown by "Preview", rendered by the manager; nothing is written. */
     public ?string $smbPreview = null;
+
+    // --- NAS mount form (the manager's mount.js). The password only lives here between typing it and Apply/Cancel. ---
+    public bool $mountForm = false;
+
+    public string $mountName = '';
+
+    public string $mountHost = '';
+
+    public string $mountShare = '';
+
+    public string $mountUser = '';
+
+    public string $mountDomain = '';
+
+    public string $mountPassword = '';
+
+    public bool $mountWritable = false;
+
+    public string $mountVersion = 'default';
+
+    /** The manager's dry run of the form: unit files, fstab line, credentials (password hidden), actions and the plan token. */
+    public ?array $mountPlan = null;
 
     public function showLogs(string $service): void
     {
@@ -112,6 +138,182 @@ class ManagerPanel extends Component
         $this->sharePassword = null;
     }
 
+    /** @return array<string, mixed> the form as the manager's API takes it (empty optional fields left out) */
+    private function mountFormData(): array
+    {
+        return array_filter([
+            'name' => trim($this->mountName),
+            'host' => trim($this->mountHost),
+            'share' => trim($this->mountShare, " \t/"),
+            'user' => trim($this->mountUser) ?: null,
+            'domain' => trim($this->mountDomain) ?: null,
+            'password' => $this->mountPassword !== '' ? $this->mountPassword : null,
+            'version' => $this->mountVersion,
+        ], fn ($v) => $v !== null) + ['writable' => $this->mountWritable];
+    }
+
+    public function newMount(): void
+    {
+        $this->resetMountForm();
+        $this->mountForm = true;
+    }
+
+    public function cancelMount(): void
+    {
+        $this->resetMountForm();
+    }
+
+    private function resetMountForm(): void
+    {
+        $this->reset(['mountForm', 'mountName', 'mountHost', 'mountShare', 'mountUser', 'mountDomain', 'mountPassword', 'mountWritable', 'mountVersion', 'mountPlan']);
+        $this->resetErrorBag();
+    }
+
+    /** Step one: ask the manager what it would do. Writes nothing on the host. */
+    public function previewMount(ManagerClient $manager): void
+    {
+        $this->notice = $this->failure = null;
+        $this->mountPlan = null;
+
+        try {
+            $this->mountPlan = $manager->mountPreview($this->mountFormData());
+        } catch (ManagerException $e) {
+            $this->failure = $e->getMessage();
+        }
+    }
+
+    /** Step two, only after a preview: apply with that preview's plan token. A changed form needs a new preview. */
+    public function applyMount(ManagerClient $manager): void
+    {
+        $this->notice = $this->failure = null;
+
+        if ($this->mountPlan === null) {
+            $this->failure = 'Preview what will be done first.';
+
+            return;
+        }
+
+        try {
+            $answer = $manager->mountAdd($this->mountFormData(), (string) $this->mountPlan['plan']);
+            $this->notice = ($answer['updated'] ?? false)
+                ? "The mount {$this->mountName} was updated."
+                : "The mount {$this->mountName} was added at ".($answer['path'] ?? '').'. It is mounted when it is first used.';
+            $this->resetMountForm();
+        } catch (ManagerException $e) {
+            $this->failure = $e->getMessage();
+            $this->mountPlan = null; // the plan may be stale: preview again
+        } finally {
+            $this->mountPassword = ''; // the password never stays in the component
+        }
+    }
+
+    public function mountActive(string $name, bool $active, ManagerClient $manager): void
+    {
+        $this->change(function () use ($manager, $name, $active) {
+            $plan = $manager->mountActive($name, $active)['plan'];
+            $manager->mountActive($name, $active, $plan);
+        }, $active ? "The mount {$name} is on." : "The mount {$name} is off and unmounted.");
+    }
+
+    /** Removes the mount unless a storage location still lives on it. */
+    public function removeMount(string $name, ManagerClient $manager): void
+    {
+        $this->notice = $this->failure = null;
+
+        try {
+            $mount = collect($manager->mounts()['data'] ?? [])->firstWhere('name', $name);
+            $using = $mount ? $this->locationsOn($mount['path']) : [];
+
+            if ($using !== []) {
+                $this->failure = 'The storage location '.implode(', ', $using).' uses this mount. Change or remove it in Settings › Storage first.';
+
+                return;
+            }
+
+            $plan = $manager->mountRemove($name)['plan'];
+            $manager->mountRemove($name, $plan);
+            $this->notice = "The mount {$name} was removed.";
+        } catch (ManagerException $e) {
+            $this->failure = $e->getMessage();
+        }
+    }
+
+    /**
+     * Registers the mount's folder as a storage location (the entry only: Settings › Storage does the rest). The path comes
+     * from the manager's own answer, never from the browser, and the folder has to be mounted and readable right now.
+     */
+    public function useMountAsStorage(string $name, string $role, ManagerClient $manager): void
+    {
+        $this->notice = $this->failure = null;
+
+        if (!Profile::allows('file_storage')) {
+            $this->failure = 'This profile has no own files, so there are no storage locations.';
+
+            return;
+        }
+
+        if (!in_array($role, [StorageLocation::ROLE_LIBRARY, StorageLocation::ROLE_INBOX], true)) {
+            return;
+        }
+
+        try {
+            $mount = collect($manager->mounts()['data'] ?? [])->firstWhere('name', $name);
+        } catch (ManagerException $e) {
+            $this->failure = $e->getMessage();
+
+            return;
+        }
+
+        if (!$mount) {
+            $this->failure = 'That mount does not exist (any more).';
+
+            return;
+        }
+
+        if (($mount['state'] ?? '') !== 'ok') {
+            $this->failure = 'The share is not mounted and readable right now, so it cannot be used as a storage location yet.';
+
+            return;
+        }
+
+        if ($role === StorageLocation::ROLE_INBOX && !($mount['writable'] ?? false)) {
+            $this->failure = 'An inbox needs a writable mount: the files are moved out of it.';
+
+            return;
+        }
+
+        $path = rtrim((string) $mount['path'], '/');
+
+        if ($this->locationsOn($path, exact: true) !== []) {
+            $this->failure = 'A storage location for this folder exists already.';
+
+            return;
+        }
+
+        $label = 'NAS '.$name;
+        $unique = $label;
+        for ($i = 2; StorageLocation::where('name', $unique)->exists(); $i++) {
+            $unique = "{$label} {$i}";
+        }
+
+        StorageLocation::create(['name' => $unique, 'driver' => 'local', 'role' => $role, 'config' => ['root' => $path]]);
+        $this->notice = "Added the storage location {$unique} ({$role}). Scan it in Settings › Storage.";
+    }
+
+    /** @return list<string> names of the local storage locations whose root is this folder (exact) or inside it */
+    private function locationsOn(string $path, bool $exact = false): array
+    {
+        $path = rtrim($path, '/');
+
+        return StorageLocation::all()
+            ->filter(function (StorageLocation $l) use ($path, $exact) {
+                $root = rtrim((string) ($l->config['root'] ?? ''), '/');
+
+                return $l->isLocal() && $root !== '' && ($root === $path || (!$exact && str_starts_with($root, $path.'/')));
+            })
+            ->pluck('name')->all();
+    }
+
     private function change(callable $change, string $done): void
     {
         $this->notice = $this->failure = null;
@@ -132,6 +334,7 @@ class ManagerPanel extends Component
         $error = null;
         $job = null;
         $smb = null;
+        $mounts = null;
 
         try {
             $status = $manager->status();
@@ -149,6 +352,12 @@ class ManagerPanel extends Component
                 // A manager without SMB support: no shares card.
             }
 
+            try {
+                $mounts = $manager->mounts();
+            } catch (ManagerException) {
+                // A manager without NAS mount support: no mounts card.
+            }
+
             if ($this->logService !== null) {
                 $logs = $manager->logs($this->logService, $this->logTail);
             }
@@ -162,6 +371,8 @@ class ManagerPanel extends Component
             'logs' => $logs,
             'job' => $job,
             'smb' => $smb,
+            'mounts' => $mounts,
+            'canUseAsStorage' => Profile::allows('file_storage'),
             'error' => $error,
             'health' => $status === null ? $manager->health() : null,
         ]);

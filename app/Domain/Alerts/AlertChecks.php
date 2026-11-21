@@ -9,6 +9,8 @@ use App\Domain\Device\State;
 use App\Domain\Health\ExternalServices;
 use App\Domain\Health\Heartbeat;
 use App\Domain\Health\QueueInspector;
+use App\Domain\Manager\ManagerClient;
+use App\Domain\Manager\ManagerException;
 use App\Domain\Profile\Profile;
 use App\Models\Device;
 use App\Models\StorageLocation;
@@ -24,7 +26,7 @@ final class AlertChecks
 {
     public function runAll(): void
     {
-        foreach (['scheduler', 'queues', 'backup', 'storage', 'devices', 'nodes', 'exposure'] as $check) {
+        foreach (['scheduler', 'queues', 'backup', 'storage', 'mounts', 'devices', 'nodes', 'exposure'] as $check) {
             try {
                 $this->{$check}();
             } catch (\Throwable $e) {
@@ -120,6 +122,53 @@ final class AlertChecks
         // A deleted location can no longer be unreachable.
         foreach (Alerts::active()->where('kind', 'storage.unreachable')->whereNotIn('key', $ids) as $orphan) {
             Alerts::resolve('storage.unreachable', $orphan->key);
+        }
+    }
+
+    /**
+     * mount.unavailable per NAS mount the Manager keeps (docs/architecture/manager.md, "SMB mount"): a mount that is switched
+     * on but not mounted or not readable. Critical when it worked before (it disappeared), a warning when it never did.
+     * A mount switched off on purpose, a removed mount and a manager that does not answer never raise or keep an alert:
+     * without an answer nothing is known, so an active alert is left as it is.
+     */
+    public function mounts(): void
+    {
+        if (!Profile::allows('file_storage')) {
+            return;
+        }
+
+        try {
+            $manager = app(ManagerClient::class);
+            if ($manager->token() === null) {
+                return;
+            }
+            $mounts = $manager->mounts()['data'] ?? [];
+        } catch (ManagerException) {
+            return;
+        }
+
+        $names = [];
+        foreach ($mounts as $mount) {
+            $name = (string) $mount['name'];
+            $names[] = $name;
+            $state = (string) ($mount['state'] ?? 'inactive');
+
+            if ($state === 'ok' || $state === 'inactive') {
+                Alerts::resolve('mount.unavailable', $name);
+
+                continue;
+            }
+
+            $lost = (bool) ($mount['lost'] ?? false);
+            Alerts::raise('mount.unavailable', $name, $lost ? 'critical' : 'warning',
+                $lost ? "NAS mount {$name} disappeared" : "NAS mount {$name} is not available",
+                trim(($mount['error'] ?? 'The share is not available.').' //'.($mount['host'] ?? '?').'/'.($mount['share'] ?? '?').' at '.($mount['path'] ?? '?').'.'),
+                data: ['mount' => $name, 'state' => $state, 'path' => $mount['path'] ?? null]);
+        }
+
+        // A removed mount can no longer be unavailable.
+        foreach (Alerts::active()->where('kind', 'mount.unavailable')->whereNotIn('key', $names) as $orphan) {
+            Alerts::resolve('mount.unavailable', $orphan->key);
         }
     }
 

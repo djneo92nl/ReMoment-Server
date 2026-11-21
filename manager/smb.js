@@ -71,9 +71,13 @@ function createSmb({ cfg, run, audit, isBusy, setBusy }) {
   function render(shares) {
     const out = [
       '# Managed by the ReMoment Manager: changes made here are overwritten.',
-      `# Add this line to ${smb.mainConf} once, in the [global] section:  include = ${smb.confFile}`,
+      `# Add this line to ${smb.mainConf} once, at the end of the file:  include = ${smb.confFile}`,
       '',
     ];
+    // `map to guest = Bad User` is what makes a guest share work (a client that sends an unknown user name is mapped to
+    // guest instead of refused) and the owner wants it on every install that serves shares, so the fragment sets it.
+    // Only while a share is on: switching everything off leaves a fragment with no settings at all.
+    if (Object.values(shares).some((s) => s.enabled)) out.push('[global]', '   map to guest = Bad User', '');
     for (const [name, def] of Object.entries(SHARES)) {
       if (!shares[name].enabled) continue;
       const writable = shares[name].writable;
@@ -83,7 +87,7 @@ function createSmb({ cfg, run, audit, isBusy, setBusy }) {
         `   path = ${smb.dirs[def.dir].replace(/\/+$/, '') || '/'}`,
         '   browseable = yes',
         ...(shares[name].guest
-          ? ['   guest ok = yes'] // opt-in: no password; needs `map to guest = Bad User` in [global] of smb.conf
+          ? ['   guest ok = yes'] // opt-in: no password; works through `map to guest = Bad User` in the [global] part above
           : ['   guest ok = no', `   valid users = ${smb.user}`]),
         `   read only = ${writable ? 'no' : 'yes'}`,
         '   follow symlinks = no',

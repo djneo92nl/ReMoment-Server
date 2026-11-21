@@ -28,9 +28,10 @@ Code: `App\Domain\Alerts\Alerts` (the API), `AlertChecks` (the checks), `App\Mod
 | `node.offline` | client id | warning | `AlertChecks::nodes` | an approved ReMoment Node with a role switched on has sent no heartbeat or job poll for 90 s (`ALERTS_NODE_OFFLINE_SECONDS`); not debounced; a node with no role on never raises ([node-agent.md](node-agent.md)) |
 | `listener.down` | device id | warning | `AlertChecks::devices` | a device whose driver has a listener (`DeviceListeners::for()` not null) has no `listener_running_{id}` heartbeat for 3 minutes (`ALERTS_LISTENER_DOWN_MINUTES`) |
 | `network.exposed` | | warning | `ExposureAlert` (middleware `WarnWhenExposed`; `AlertChecks::exposure`) | a request came through a public host name or address, from a public client address, on a public server address, or `APP_URL` is public; resolves when nothing public was seen for an hour and `APP_URL` is private. Warn only, never blocks. See [network-exposure.md](network-exposure.md) |
+| `mount.unavailable` | mount name | critical, or warning when it never worked | `AlertChecks::mounts` | a NAS mount the Manager keeps ([manager.md](manager.md), "SMB mount") is switched on but not mounted or not readable (`GET /mounts`: `state` `not_mounted` / `unreadable`, probed by the Manager at most every 10 s); **critical** when it worked before (`lost`), warning when it never did. A mount switched off on purpose (`inactive`) never raises, a removed mount resolves, and a Manager that does not answer (or no token) changes nothing |
 | `radio_relay` | station id | warning | `RelayManager` (the `radio:relay` process) | a station's relay died soon after starting three times in a row; resolves once the restarted relay has run 30 s. See [radio-relay.md](radio-relay.md) |
 
-Reserved for later: `container.crashed` and `disk.low` (the Manager, workstream 10).
+Reserved for later: `container.crashed` and `disk.low` (the Manager, workstream 10; `mount.unavailable` is the first kind it feeds).
 
 **Debounce** (device kinds): the condition must hold continuously for its threshold before it raises (a listener restart or a short outage never raises), and must be gone for `resolve_after_minutes` (2) before it resolves, so a flapping device does not raise and resolve in a loop. The state is two cache keys per condition (`alerts:{kind}:{key}:bad-since` / `good-since`).
 

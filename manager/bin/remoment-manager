@@ -29,6 +29,12 @@ const HELP = `remoment-manager: control the running ReMoment install
   remoment-manager smb disable <library|exports|inbox> [--dry-run]
   remoment-manager smb user create [--dry-run]   create the share user or set a new password (shown once)
   remoment-manager smb user remove [--dry-run]
+  remoment-manager mount [status] [--json]   NAS mounts: mounted? readable? (SMB share on this host, for a storage location)
+  remoment-manager mount add <name> --host H --share S [--user U [--domain D] --password-stdin] [--writable] [--vers V]
+                                           plans first (nothing is written); repeat with --confirm <plan> to apply.
+                                           The password is read from stdin, never from an argument.
+  remoment-manager mount on|off <name> [--confirm <plan>]
+  remoment-manager mount remove <name> [--confirm <plan>]
   remoment-manager token          where the token file is (never the token itself)
 
 Talks to ${BASE} (REMOMENT_MANAGER_PORT, REMOMENT_MANAGER_HOME).`;
@@ -196,6 +202,66 @@ async function main() {
         return;
       }
       die('Usage: remoment-manager smb [status|config|enable|disable|user create|user remove]');
+    }
+    case 'mount': {
+      const sub = args.shift() || 'status';
+      const confirm = flag(args, '--confirm');
+      const show = (r) => {
+        console.log(c(33, 'Dry run: nothing was changed.'));
+        if (r.config) {
+          console.log(`\n# ${r.path}: unit files\n${r.config.mount_unit}\n${r.config.automount_unit}`);
+          console.log(`# the same as an fstab line:\n${r.config.fstab}\n`);
+          if (r.config.credentials) console.log(`# credentials file ${r.config.credentials_file} (mode 0600, the password is not shown):\n${r.config.credentials}`);
+        }
+        console.log('Would: ' + r.actions.join('; '));
+        console.log(c(1, `To apply, repeat the command with: --confirm ${r.plan}`));
+      };
+      if (sub === 'status') {
+        const text = await api('GET', '/mounts');
+        if (json) return console.log(text);
+        const v = JSON.parse(text);
+        console.log(c(1, 'NAS mounts'), `(base ${v.base})${v.dry_run ? c(33, '  DRY-RUN mode: nothing is changed') : ''}`);
+        for (const p of v.problems) console.log(c(31, `  ${p}`));
+        if (!v.data.length) console.log('  none (mount add)');
+        for (const m of v.data) console.log(`  ${m.name.padEnd(14)} ${m.state === 'ok' ? c(32, 'ok') : c(m.lost ? 31 : 33, m.state.toUpperCase())}  //${m.host}/${m.share} -> ${m.path} ${m.writable ? 'read-write' : 'read-only'}${m.error ? `  ${m.error}` : ''}`);
+        return;
+      }
+      if (sub === 'add') {
+        const name = args.shift();
+        const body = { name, host: flag(args, '--host'), share: flag(args, '--share'), user: flag(args, '--user'), domain: flag(args, '--domain') };
+        const vers = flag(args, '--vers');
+        if (vers) body.version = vers;
+        if (args.includes('--writable')) body.writable = true;
+        if (!name || !body.host || !body.share) die('Usage: remoment-manager mount add <name> --host H --share S [--user U [--domain D] --password-stdin] [--writable] [--vers V] [--confirm <plan>]');
+        if (args.includes('--password-stdin')) {
+          let text = '';
+          for await (const chunk of process.stdin) text += chunk;
+          body.password = text.replace(/\r?\n$/, '');
+        } else if (body.user) die('A user needs its password on stdin: --password-stdin (a password is never taken as an argument).');
+        if (confirm) body.confirm = confirm;
+        const r = JSON.parse(await api('POST', `/mounts${confirm ? '' : '?dry_run=1'}`, body));
+        if (json) return console.log(JSON.stringify(r));
+        if (r.dry_run) return show(r);
+        return console.log(`${name} ${r.updated ? 'updated' : 'added'}; mount point ${r.path}. It is mounted when it is first used.`);
+      }
+      if (sub === 'on' || sub === 'off') {
+        const name = args[0];
+        if (!name) die(`Usage: remoment-manager mount ${sub} <name> [--confirm <plan>]`);
+        const body = { active: sub === 'on', ...(confirm ? { confirm } : {}) };
+        const r = JSON.parse(await api('POST', `/mounts/${encodeURIComponent(name)}/active${confirm ? '' : '?dry_run=1'}`, body));
+        if (json) return console.log(JSON.stringify(r));
+        if (r.dry_run) return show(r);
+        return console.log(`${name} switched ${sub}.`);
+      }
+      if (sub === 'remove') {
+        const name = args[0];
+        if (!name) die('Usage: remoment-manager mount remove <name> [--confirm <plan>]');
+        const r = JSON.parse(await api('DELETE', `/mounts/${encodeURIComponent(name)}${confirm ? `?confirm=${encodeURIComponent(confirm)}` : '?dry_run=1'}`));
+        if (json) return console.log(JSON.stringify(r));
+        if (r.dry_run) return show(r);
+        return console.log(`${name} removed.`);
+      }
+      die('Usage: remoment-manager mount [status|add|on|off|remove]');
     }
     case 'token':
       return console.log(json ? JSON.stringify({ token_file: tokenFile }) : `Token file: ${tokenFile} (readable by its owner only)`);

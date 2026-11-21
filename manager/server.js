@@ -12,6 +12,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { execFile } = require('child_process');
 const { createSmb, smbConfig } = require('./smb');
+const { createMounts, mountConfig } = require('./mount');
 
 const VERSION = '0.1.0';
 const MAX_BODY = 1024; // bytes; no endpoint takes a body
@@ -46,6 +47,10 @@ function loadConfig(env = process.env) {
     // How a new app image comes in: `build` (compose build, the code is already on disk) or `pull` (registry image).
     upgradeMode: env.REMOMENT_UPGRADE_MODE === 'pull' ? 'pull' : 'build',
     envFile: path.join(projectDir, '.env'),
+    // A manager that runs as root (SMB shares, NAS mounts) hands the token file to this numeric uid, the app container's
+    // user, so the app can read it from the manager's home mounted read-only; the home then stays traversable (0755) and
+    // everything else in it stays root-only. Ignored when the manager is not root. Set by manager/install/install-linux.sh.
+    tokenUid: /^\d{1,10}$/.test(env.REMOMENT_MANAGER_TOKEN_UID || '') ? Number(env.REMOMENT_MANAGER_TOKEN_UID) : null,
     port: Number(env.REMOMENT_MANAGER_PORT || 8099),
     // 127.0.0.1 unless the admin opts in to the LAN (0.0.0.0 or one address): then the web page is reachable from other machines.
     bind: env.REMOMENT_MANAGER_BIND || '127.0.0.1',
@@ -63,17 +68,21 @@ function loadConfig(env = process.env) {
     sampleSeconds: Number(env.REMOMENT_SAMPLE_SECONDS === undefined ? 15 : env.REMOMENT_SAMPLE_SECONDS),
     // SMB shares (smb.js): Samba config fragment, share paths, share user.
     smb: smbConfig(env, home),
+    // NAS mounts (mount.js): mount point base, unit and credentials directories.
+    mount: mountConfig(env, home),
   };
 }
 
 // The token lives in a file only the owner can read; created on first start, never logged.
 function ensureToken(cfg) {
-  fs.mkdirSync(cfg.home, { recursive: true, mode: 0o700 });
-  try { fs.chmodSync(cfg.home, 0o700); } catch { /* not ours to change */ }
+  const handOver = cfg.tokenUid !== null && typeof process.getuid === 'function' && process.getuid() === 0;
+  fs.mkdirSync(cfg.home, { recursive: true, mode: handOver ? 0o755 : 0o700 });
+  try { fs.chmodSync(cfg.home, handOver ? 0o755 : 0o700); } catch { /* not ours to change */ }
   if (!fs.existsSync(cfg.tokenFile)) {
     fs.writeFileSync(cfg.tokenFile, crypto.randomBytes(32).toString('hex') + '\n', { mode: 0o600, flag: 'wx' });
   }
   fs.chmodSync(cfg.tokenFile, 0o600);
+  if (handOver) { try { fs.chownSync(cfg.tokenFile, cfg.tokenUid, -1); } catch { /* the app then cannot read it: the page says so */ } }
   return fs.readFileSync(cfg.tokenFile, 'utf8').trim();
 }
 
@@ -585,6 +594,7 @@ function createManager(cfg) {
   // request: the service is the constant `app` (checked against the compose file), the image comes from the compose file,
   // the backup archive from the last upgrade's own answer (and is checked against ARCHIVE_RE before it reaches a command).
   const smb = createSmb({ cfg, run, audit, isBusy: () => busy, setBusy: (v) => { busy = v; } });
+  const mounts = createMounts({ cfg, run, audit, isBusy: () => busy, setBusy: (v) => { busy = v; } });
 
   const jobLog = []; // { t, line }, the current or last job, capped
   let job = null; // the record being written while a job runs
@@ -808,6 +818,35 @@ function createManager(cfg) {
     return answer(await smb.setShare(name, body, dry));
   }
 
+  // /mounts (GET list, POST add or update), /mounts/{name} (DELETE), /mounts/{name}/active (POST). Changes need the header;
+  // `?dry_run=1` plans without touching anything and answers the plan token a real call must repeat as `confirm`
+  // (in the body, or `?confirm=` for DELETE). The password is in the add body only and is never answered.
+  async function mountRoute(req, res, url, p, method) {
+    const answer = (r) => send(res, r.code, r.body);
+    if (p === '/mounts') {
+      if (method === 'GET') return send(res, 200, await mounts.status());
+      if (method !== 'POST') return send(res, 405, { error: 'method_not_allowed' });
+    }
+    let name = null;
+    let tail = null;
+    if (p !== '/mounts') {
+      const seg = p.split('/').filter(Boolean);
+      if (seg.length < 2 || seg.length > 3 || (seg.length === 3 && seg[2] !== 'active')) return send(res, 404, { error: 'not_found' });
+      try { name = decodeURIComponent(seg[1]); } catch { return send(res, 404, { error: 'unknown_mount' }); }
+      tail = seg[2] || null;
+      const want = tail ? 'POST' : 'DELETE';
+      if (method !== want) return send(res, 405, { error: 'method_not_allowed' });
+    }
+    if (req.headers[CHANGE_HEADER] !== '1') return send(res, 403, { error: `missing ${CHANGE_HEADER} header` });
+    const dry = ['1', 'true'].includes(url.searchParams.get('dry_run'));
+    if (method === 'DELETE') return answer(await mounts.remove(name, url.searchParams.get('confirm'), dry));
+    const raw = await readBody(req);
+    if (raw === null) return send(res, 413, { error: 'too_large' });
+    let body = {};
+    try { body = JSON.parse(raw || '{}'); } catch { return send(res, 422, { error: 'invalid', message: 'The body is not JSON.' }); }
+    return answer(tail === 'active' ? await mounts.setActive(name, body, dry) : await mounts.add(body, dry));
+  }
+
   async function handle(req, res) {
     if (!hostAllowed(req.headers.host)) return send(res, 403, { error: 'bad_host' });
 
@@ -844,6 +883,8 @@ function createManager(cfg) {
     }
 
     if (p === '/smb' || p === '/smb/config' || p === '/smb/user' || p.startsWith('/smb/shares/')) return smbRoute(req, res, url, p, method);
+
+    if (p === '/mounts' || p.startsWith('/mounts/')) return mountRoute(req, res, url, p, method);
 
     if (p === '/features') {
       if (method !== 'GET') return send(res, 405, { error: 'method_not_allowed' });

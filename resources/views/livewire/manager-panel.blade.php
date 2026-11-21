@@ -127,7 +127,7 @@
             <x-card flush data-test="manager-smb">
                 <div class="px-8 py-5 border-b border-gray-100 dark:border-stone-800">
                     <h2 class="text-base font-medium text-gray-900 dark:text-gray-100">Network shares (SMB)</h2>
-                    <p class="text-xs text-gray-500">Samba on the host, set up by the manager. Access needs the share user's password unless you open a share to guests (off by default; guests also need <code>map to guest = Bad User</code> in smb.conf).
+                    <p class="text-xs text-gray-500">Samba on the host, set up by the manager. Access needs the share user's password unless you open a share to guests (off by default; the manager's file sets <code>map to guest = Bad User</code> for them).
                         Samba is {{ $smb['running'] ? 'running' : 'not running' }}@if($smb['sessions'] !== null) · {{ $smb['sessions']['count'] }} connected @endif.
                         @if($smb['dry_run']) <span class="text-amber-600">The manager is in dry-run mode: nothing is changed.</span>@endif</p>
                 </div>
@@ -136,7 +136,7 @@
                     <div class="px-8 py-3 text-sm text-red-600 border-b border-gray-100 dark:border-stone-800">{{ $problem }}</div>
                 @endforeach
                 @if(! $smb['include_present'])
-                    <div class="px-8 py-3 text-xs text-amber-700 border-b border-gray-100 dark:border-stone-800" data-test="smb-include">smb.conf does not include <code>{{ $smb['conf_file'] }}</code> yet: add <code>include = {{ $smb['conf_file'] }}</code> to its [global] section, or the shares below are not served.</div>
+                    <div class="px-8 py-3 text-xs text-amber-700 border-b border-gray-100 dark:border-stone-800" data-test="smb-include">smb.conf does not include <code>{{ $smb['conf_file'] }}</code> yet: add <code>include = {{ $smb['conf_file'] }}</code> at the end of it (the installer's <code>--with-samba</code> does), or the shares below are not served.</div>
                 @endif
 
                 @if($sharePassword)
@@ -200,6 +200,136 @@
                         <pre class="mt-2 max-h-72 overflow-auto text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ $smbPreview }}</pre>
                     </div>
                 @endif
+            </x-card>
+        @endif
+
+        @if($mounts)
+            <x-card flush data-test="manager-mounts">
+                <div class="px-8 py-5 border-b border-gray-100 dark:border-stone-800 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h2 class="text-base font-medium text-gray-900 dark:text-gray-100">NAS mounts (SMB)</h2>
+                        <p class="text-xs text-gray-500">A share on your NAS, mounted on this host under <code>{{ $mounts['base'] }}</code>, to use as a storage location. Read-only unless you allow writing. The password goes to a root-only file on the host and is never shown again.
+                            @if($mounts['dry_run']) <span class="text-amber-600">The manager is in dry-run mode: nothing is changed.</span>@endif</p>
+                    </div>
+                    <x-secondary-button size="sm" wire:click="newMount" data-test="mount-new"><i class="fa-solid fa-plus mr-2"></i>Add a mount</x-secondary-button>
+                </div>
+
+                @foreach($mounts['problems'] as $problem)
+                    <div class="px-8 py-3 text-sm text-red-600 border-b border-gray-100 dark:border-stone-800">{{ $problem }}</div>
+                @endforeach
+
+                @if($mountForm)
+                    <div class="px-8 py-5 space-y-4 border-b border-gray-100 dark:border-stone-800" data-test="mount-form">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1.5">Name</label>
+                                <x-text-input size="sm" type="text" wire:model="mountName" placeholder="nas" class="w-full" data-test="mount-name" />
+                                <p class="text-xs text-gray-400 dark:text-gray-600 mt-1">Letters, digits, hyphens. It becomes the folder name.</p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1.5">NAS host</label>
+                                <x-text-input size="sm" type="text" wire:model="mountHost" placeholder="192.168.1.20 or nas.local" class="w-full" data-test="mount-host" />
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1.5">Share</label>
+                                <x-text-input size="sm" type="text" wire:model="mountShare" placeholder="music" class="w-full" data-test="mount-share" />
+                                <p class="text-xs text-gray-400 dark:text-gray-600 mt-1">A sub folder may follow: music/albums. No spaces.</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1.5">User <span class="text-gray-400">(empty = guest)</span></label>
+                                <x-text-input size="sm" type="text" wire:model="mountUser" autocomplete="off" class="w-full" data-test="mount-user" />
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1.5">Password</label>
+                                <x-text-input size="sm" type="password" wire:model="mountPassword" autocomplete="new-password" class="w-full" data-test="mount-password" />
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1.5">Domain <span class="text-gray-400">(optional)</span></label>
+                                <x-text-input size="sm" type="text" wire:model="mountDomain" autocomplete="off" class="w-full" data-test="mount-domain" />
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-x-6 gap-y-3">
+                            <label class="flex items-center gap-3 text-sm text-gray-700 dark:text-gray-300">
+                                <x-toggle :on="$mountWritable" label="Allow writing" wire:click="$toggle('mountWritable')" data-test="mount-writable" />
+                                Allow writing <span class="text-xs text-gray-500">(off: read-only)</span>
+                            </label>
+                            <div class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                <span class="text-xs text-gray-500">SMB version</span>
+                                <x-select size="sm" wire:model="mountVersion" data-test="mount-version">
+                                    <option value="default">Let the server pick</option>
+                                    <option value="3.1.1">3.1.1</option>
+                                    <option value="3.0">3.0</option>
+                                    <option value="2.1">2.1</option>
+                                    <option value="2.0">2.0</option>
+                                </x-select>
+                            </div>
+                        </div>
+
+                        @if($mountPlan)
+                            <div class="rounded-2xl border border-gray-200 dark:border-stone-700 p-4 space-y-2" data-test="mount-plan">
+                                <h3 class="text-sm font-medium text-gray-900 dark:text-gray-100">What the manager will do {{ $mountPlan['updating'] ? '(this updates an existing mount)' : '' }}</h3>
+                                <ul class="list-disc pl-5 text-xs text-gray-600 dark:text-gray-400">
+                                    @foreach($mountPlan['actions'] as $action)<li>{{ $action }}</li>@endforeach
+                                </ul>
+                                <pre class="max-h-60 overflow-auto text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap" data-test="mount-plan-units">{{ $mountPlan['config']['mount_unit'] }}
+{{ $mountPlan['config']['automount_unit'] }}
+# the same as an /etc/fstab line:
+{{ $mountPlan['config']['fstab'] }}@if($mountPlan['config']['credentials'])
+
+# {{ $mountPlan['config']['credentials_file'] }} (root only, the password is not shown):
+{{ $mountPlan['config']['credentials'] }}@endif</pre>
+                                <p class="text-xs text-gray-500">The share is mounted on first use. A NAS that is off never blocks the server's start or the app.</p>
+                            </div>
+                        @endif
+
+                        <div class="flex flex-wrap gap-2">
+                            <x-secondary-button size="sm" wire:click="previewMount" data-test="mount-preview">Preview</x-secondary-button>
+                            @if($mountPlan)
+                                <x-primary-button size="sm" wire:click="applyMount" data-test="mount-apply">Apply</x-primary-button>
+                            @endif
+                            <x-secondary-button size="sm" wire:click="cancelMount" data-test="mount-cancel">Cancel</x-secondary-button>
+                        </div>
+                    </div>
+                @endif
+
+                @forelse($mounts['data'] as $mount)
+                    @php
+                        $ok = $mount['state'] === 'ok';
+                        $off = $mount['state'] === 'inactive';
+                        $dot = $ok ? 'bg-emerald-500' : ($off ? 'bg-gray-400' : 'bg-red-500');
+                        $label = ['ok' => 'mounted', 'inactive' => 'off', 'not_mounted' => 'not mounted', 'unreadable' => 'not readable'][$mount['state']] ?? $mount['state'];
+                    @endphp
+                    <div class="px-8 py-3 flex flex-wrap items-center gap-x-5 gap-y-1 border-b border-gray-100 dark:border-stone-800 last:border-b-0" data-test="mount-{{ $mount['name'] }}">
+                        <div class="w-44 text-sm font-medium text-gray-900 dark:text-gray-100">
+                            <span class="inline-block w-1.5 h-1.5 rounded-full {{ $dot }} mr-2"></span>{{ $mount['name'] }}
+                        </div>
+                        <div class="flex-1 min-w-48 text-xs text-gray-500">
+                            <code>//{{ $mount['host'] }}/{{ $mount['share'] }}</code> → <code>{{ $mount['path'] }}</code>
+                            · {{ $mount['writable'] ? 'read-write' : 'read-only' }} · {{ $mount['user'] ? 'user '.$mount['user'] : 'guest' }}
+                            <br><span class="{{ $ok || $off ? '' : 'text-red-600' }}" data-test="mount-state-{{ $mount['name'] }}">{{ $label }}@if($mount['lost']), it worked before and is gone @endif</span>@if($mount['error'] && ! $ok) · {{ $mount['error'] }}@endif
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            @if($canUseAsStorage && $ok)
+                                <x-secondary-button size="sm" wire:click="useMountAsStorage('{{ $mount['name'] }}', 'library')" data-test="mount-storage-{{ $mount['name'] }}">Use as storage location</x-secondary-button>
+                                @if($mount['writable'])
+                                    <x-secondary-button size="sm" wire:click="useMountAsStorage('{{ $mount['name'] }}', 'inbox')" data-test="mount-inbox-{{ $mount['name'] }}">Use as inbox</x-secondary-button>
+                                @endif
+                            @endif
+                            @if($off)
+                                <x-secondary-button size="sm" wire:click="mountActive('{{ $mount['name'] }}', true)" data-test="mount-on-{{ $mount['name'] }}">Switch on</x-secondary-button>
+                            @else
+                                <x-secondary-button size="sm" wire:click="mountActive('{{ $mount['name'] }}', false)" wire:confirm="Switch {{ $mount['name'] }} off and unmount it? Anything using it loses access." data-test="mount-off-{{ $mount['name'] }}">Unmount</x-secondary-button>
+                            @endif
+                            <x-secondary-button size="sm" wire:click="removeMount('{{ $mount['name'] }}')" wire:confirm="Remove the mount {{ $mount['name'] }}? It is unmounted and its settings and password file are deleted. The files on the NAS are not touched." data-test="mount-remove-{{ $mount['name'] }}">Remove</x-secondary-button>
+                        </div>
+                    </div>
+                @empty
+                    @if(! $mountForm)
+                        <div class="px-8 py-6 text-center text-sm text-gray-500" data-test="mounts-empty">No NAS mounts yet.</div>
+                    @endif
+                @endforelse
             </x-card>
         @endif
 
