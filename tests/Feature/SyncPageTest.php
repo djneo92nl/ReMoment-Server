@@ -86,7 +86,8 @@ class SyncPageTest extends TestCase
         $this->assertSame(1, NodeJob::where('type', 'sync.claim')->count());
         SyncTarget::whereKey($target->id)->update(['active_job_id' => null]);
 
-        $c->call('sync', $target->id); $c->assertSee('Sync queued');
+        $c->call('sync', $target->id);
+        $c->assertSee('Sync queued');
         $job = NodeJob::where('type', 'sync.apply')->first();
         $this->assertSame(['target_id' => $target->id, 'confirm' => false], $job->params);
         $c->assertSeeHtml('data-test="running"')->assertSeeHtml('data-test="cancel-run"');
