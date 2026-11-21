@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Sync\SyncPlays;
 use App\Domain\Sync\SyncRefused;
 use App\Domain\Sync\Syncs;
 use App\Domain\Sync\SyncService;
@@ -59,6 +60,28 @@ class SyncTargetController extends Controller
         return response()->json(['status' => 'ok']);
     }
 
+    /** @return array<string, mixed> */
+    private function playRules(): array
+    {
+        return [
+            'plays' => ['nullable', 'array', 'max:'.SyncPlays::MAX_PER_REQUEST],
+            'plays.*.client_id' => ['required', 'string', 'max:64'],
+            'plays.*.track_id' => ['required', 'integer', 'min:1'],
+            'plays.*.started_at' => ['required', 'string', 'max:40'],
+            'plays.*.played_seconds' => ['required', 'integer', 'min:0', 'max:86400'],
+        ];
+    }
+
+    /** @param list<array<string, mixed>> $plays @return array<string, mixed> */
+    private function storePlays(SyncTarget $target, array $plays): array
+    {
+        if ($target->kind !== SyncTarget::APP) {
+            throw new SyncRefused('not_an_app_target', 'Only an app target sends plays.', 422);
+        }
+
+        return SyncPlays::record($target, $plays);
+    }
+
     /** What the rules would hold; the stored rules unless `rules` is sent. Nothing is stored or prepared. */
     public function estimate(Request $request, SyncTarget $target): JsonResponse
     {
@@ -77,6 +100,14 @@ class SyncTargetController extends Controller
     public function report(Request $request, SyncTarget $target): JsonResponse
     {
         return $this->recordReport($request, $target);
+    }
+
+    /** Offline plays of an app target: stored with their original time, scrobbled, idempotent (docs/api/sync.md). */
+    public function plays(Request $request, SyncTarget $target): JsonResponse
+    {
+        $data = $request->validate($this->playRules());
+
+        return $this->guard(fn () => $this->storePlays($target, $data['plays']));
     }
 
     /** Sync now on the node of the target. */
@@ -125,7 +156,11 @@ class SyncTargetController extends Controller
             'released' => ['nullable', 'array', 'max:200000'], 'released.*' => ['string', 'max:100'],
             'owned_bytes' => ['nullable', 'integer', 'min:0'], 'owned_count' => ['nullable', 'integer', 'min:0'],
             'free_bytes' => ['nullable', 'integer', 'min:0'],
-        ]);
+        ] + $this->playRules());
+
+        if (!empty($data['plays']) && $target->kind !== SyncTarget::APP) {
+            return response()->json(['error' => 'not_an_app_target', 'message' => 'Only an app target sends plays.'], 422);
+        }
 
         $target->forceFill([
             'last_report' => [
@@ -139,7 +174,7 @@ class SyncTargetController extends Controller
             'owned_count' => $data['owned_count'] ?? $target->owned_count,
         ])->save();
 
-        return response()->json(['status' => 'ok']);
+        return response()->json(['status' => 'ok'] + (!empty($data['plays']) ? ['plays' => SyncPlays::record($target, $data['plays'])] : []));
     }
 
     /** @param  callable(): array<string, mixed>  $work */

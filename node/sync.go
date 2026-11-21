@@ -152,14 +152,20 @@ func (s *syncServer) Progress(p syncer.Progress) (bool, error) {
 
 // Download fetches from the server only: the URL must be a sync file path the server issued, never another address.
 func (s *syncServer) Download(ctx context.Context, url string, offset int64) (int, io.ReadCloser, error) {
-	if !strings.HasPrefix(url, "/api/sync/files/") {
-		return 0, nil, fmt.Errorf("refusing a download URL that is not a sync file")
-	}
 	if s.dl == nil {
 		s.dl = &http.Client{Transport: &http.Transport{ResponseHeaderTimeout: 60 * time.Second}}
 	}
+
+	return fetchSyncFile(ctx, s.dl, s.n.cfg.Server, url, offset)
+}
+
+// fetchSyncFile is the ranged GET of a signed sync file under base, shared by the node job and the helper CLI.
+func fetchSyncFile(ctx context.Context, client *http.Client, base, url string, offset int64) (int, io.ReadCloser, error) {
+	if !strings.HasPrefix(url, "/api/sync/files/") {
+		return 0, nil, fmt.Errorf("refusing a download URL that is not a sync file")
+	}
 	ctx, cancel := context.WithCancel(ctx)
-	req, err := http.NewRequestWithContext(ctx, "GET", s.n.cfg.Server+url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", base+url, nil)
 	if err != nil {
 		cancel()
 		return 0, nil, err
@@ -167,7 +173,7 @@ func (s *syncServer) Download(ctx context.Context, url string, offset int64) (in
 	if offset > 0 {
 		req.Header.Set("Range", fmt.Sprintf("bytes=%d-", offset))
 	}
-	resp, err := s.dl.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		cancel()
 		return 0, nil, err

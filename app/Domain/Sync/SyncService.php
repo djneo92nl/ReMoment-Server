@@ -268,6 +268,7 @@ class SyncService
             'name' => $target->name,
             'kind' => $target->kind,
             'client_ref' => $target->client_ref,
+            'server_id' => Syncs::serverId(),
             'node_id' => $target->node_id,
             'node' => $target->node ? ['id' => $target->node->id, 'name' => $target->node->name] : null,
             'rules' => $this->rules($target),

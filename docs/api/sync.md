@@ -13,7 +13,8 @@ GET|POST        /api/admin/sync/targets
 GET|PUT|DELETE  /api/admin/sync/targets/{target}
 POST            /api/admin/sync/targets/{target}/estimate     { rules?, free_bytes? }
 POST            /api/admin/sync/targets/{target}/plan         { have, free_bytes?, fs?, rules_version? }
-POST            /api/admin/sync/targets/{target}/report       { applied, failed, released, owned_bytes, owned_count, free_bytes }
+POST            /api/admin/sync/targets/{target}/report       { applied, failed, released, owned_bytes, owned_count, free_bytes, plays? }
+POST            /api/admin/sync/targets/{target}/plays        { plays: [{ client_id, track_id, started_at, played_seconds }] }   app targets: offline plays
 POST            /api/admin/sync/targets/{target}/run          { confirm? }       node targets: Sync now
 DELETE          /api/admin/sync/targets/{target}/run                             cancel
 POST            /api/admin/sync/targets/{target}/volume       { action: scan|claim }
@@ -24,7 +25,7 @@ POST            /api/nodes/sync/plan | /api/nodes/sync/report                   
 
 `{target}` is a ULID. `POST /targets` takes `{ name, kind: app|node, client_ref?, node_id?, rules? }`: an `app` target needs the `client_ref` the install keeps and is **idempotent** on it (`200` with the existing target); a `node` target needs an approved node that declares the `sync-target` role, one target per node (one volume per node). The kind is fixed at creation. `PUT` takes `name` and/or `rules`; a changed rule set bumps `rules_version`.
 
-A target is `{ id, name, kind, client_ref, node_id, node, rules, rules_version, owned_bytes, owned_count, last_report, last_report_at, last_run, running }`.
+A target is `{ id, name, kind, client_ref, server_id, node_id, node, rules, rules_version, owned_bytes, owned_count, last_report, last_report_at, last_run, running }`.
 
 ### Rules
 
@@ -90,6 +91,30 @@ Answer:
 
 `POST …/report` (admin) or `POST /api/nodes/sync/report` (node): `{ rules_version, applied: [key], failed: [{key, error}], released: [key], owned_bytes, owned_count, free_bytes }`. Counts and the owned totals are kept as `last_report`, never the lists. `released` are files the user changed on the target: they are no longer ours.
 
+## Offline plays (app targets)
+
+`POST …/plays` (or `plays` in the report, same rules and the answer then carries `plays`): up to 500 per call, each `{ client_id, track_id, started_at, played_seconds }`. `track_id` is the number in the sync key `track:{id}` (a merged id resolves), `started_at` an ISO 8601 time **with offset** on the phone's clock, `played_seconds` 0 to 86400, `client_id` the app's own id of the play (echoed back in `rejected`).
+
+```json
+{ "accepted": 3, "duplicates": 1, "rejected": [{ "client_id": "…", "error": "unknown_track" }], "scrobbled": 2, "too_old": 0 }
+```
+
+- **Idempotent.** A play with the same track and start on the same target is a duplicate (`duplicates`), so the app queues plays, sends them, and sends them again until an answer arrives; nothing is stored twice. There is no per-play id on the server: the identity is target + track + start second.
+- **History.** A play is written with `source_type: offline`, `source_name` the target's name, `played_at` the original start and `ended_at` start + `played_seconds`; under 30 s counts as a skip, as for a live play. The plays belong to a hidden player device made for the target on its first play (meta `sync_target`), not to a visible device. An old play still reaches the history.
+- **Scrobbling** uses the original time: a play younger than 14 days (`SyncPlays::SCROBBLE_MAX_AGE_DAYS`) and not a skip is queued as `ScrobbleToLastfm` with `played_at` as the timestamp, and the job applies the usual rule (at least half the track, 4 minutes at most, a track over 30 s). Older ones are counted in `too_old`: stored, not scrobbled. Last.fm's two-week limit is from its API documentation, **not verified against the live service.**
+- Rejected: `bad_started_at` (not a date, or more than 10 minutes ahead of the server: a wrong clock), `unknown_track`. Other errors: `422` for a bad shape or more than 500 plays, `422 not_an_app_target` for a node target, `401` without the admin token.
+- Plays are not an MCP tool: it is the app's call.
+
+## The app's contract (what the iOS app does, S5)
+
+The app is not in this repository; this is the whole contract it needs, server half built and tested against fakes, **nothing verified on a phone.**
+
+1. **Find the target:** `POST /api/admin/sync/targets { name, kind: "app", client_ref }`, idempotent on `client_ref` (keep it in the keychain); rules are edited in the app or on the web.
+2. **Plan:** read the local manifest, `POST …/plan { have: [{ key, fingerprint, path, size }], free_bytes, rules_version }`; `409`-like `preparing` entries are asked again with the same `have`.
+3. **Download** every `add`/`replace` from its signed `url` (relative to the server, valid 6 hours, `Range` resumes, no header needed); `403`/`404 stale` means plan again. Check `size` and `sha256` when given. `move` and `remove` are local renames and deletes of keys in the app's own manifest only.
+4. **Report:** `POST …/report { rules_version, applied, failed, released, owned_bytes, owned_count, free_bytes }`.
+5. **Plays:** queue every offline play locally with a UUID `client_id`, send them with the report or `POST …/plays` when online, drop a queued play once the answer arrived (accepted or duplicate; a `rejected` one will not succeed by retrying).
+
 ## Running a node target
 
 `POST …/run { confirm? }` queues the node job `sync.apply` (`409 target_busy`: one job per target; `422 not_a_node_target`, `node_unavailable` when the node is gone or its `sync-target` role is off). `DELETE …/run` cancels: the node finishes the current file, writes its manifest and stops. `POST …/volume { action: scan }` reads the drive (marker, filesystem, size, free space, what the manifest holds) and writes nothing; `claim` writes the marker `.remoment-sync/target.json` on a volume without one ("Use this drive"), a volume with a marker is refused and nothing is ever formatted. The answer of a scan or claim is the result of the node job (`GET /api/admin/nodes/{id}/jobs`).
@@ -99,6 +124,14 @@ The run shows in the task tray (`sync:{target}`: files done of total), its outco
 ## The node's calls
 
 `POST /api/nodes/sync/plan { target_id, have, free_bytes, fs, rules_version }` and `…/report` use the node's own Bearer token. A node can only plan and report for the target bound to it (`403` for another target, `401` for an unknown token). Files are fetched from the signed URLs, no token. The node job params carry only `target_id` (and `confirm`); the server adds its `server_id` when the node fetches the job (REST only). The volume is the node's own config, never a param.
+
+## The helper CLI
+
+`remoment-node sync --server http://remoment.local --token rmt_… --target-id <ULID> --path /Volumes/STICK` runs the node's apply engine by hand on a folder or a mounted drive, from a Mac or PC, signed in with an admin token (an app sign-in) instead of a node registration. `--claim` writes the marker (the server id comes from `GET …/targets/{id}`), `--scan` reads the folder and writes nothing, `--confirm` lets mass deletion through. Exit code 0 done, 3 needs confirmation, 4 low space, 130 cancelled (Ctrl-C finishes the file and writes the manifest), 1 refused or failed. Also `REMOMENT_SERVER` and `REMOMENT_TOKEN`. It plans and reports through the admin routes of the target, so the Sync page shows its last report.
+
+## Rockbox iPod and other players (S6)
+
+A Rockbox iPod, an MP3 player in mass-storage mode or an SD card is an ordinary folder target: the **recipe** is a node target (or the CLI) with `profile: mp3-192` (or `highest` for a lossless-capable player), `options.layout: tree` (`flat` for one playlist), a `budget` below the card and `fill: priority`. No new code: Rockbox reads the folders by its own database scan. A stock iPod (iTunesDB through libgpod) is **not supported** and stays "later or never"; the Rockbox recipe is **not verified on a device.**
 
 ## MCP
 
