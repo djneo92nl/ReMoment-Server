@@ -84,6 +84,7 @@ Nothing is deleted: the code paths stay, only the entry points are gated. Livewi
 | `history-queue` (queue `history`, one process: the single writer of the play history) | **yes** | – | – |
 | `storage-queue`, `heavy-queue` (`heavy,catalogue`) | – | yes | yes |
 | `analysis-queue`, `stems-queue` | – | – | yes |
+| `scene-triggers` (`scenes:listen`, the MQTT subscriber of scene triggers; feature `scenes`, so every profile today; `START_SCENE_TRIGGERS`) | yes | yes | yes |
 
 The play history is written by a queued listener (`StorePlaybackHistory`). Control runs it on the `history` queue with exactly one worker, so SQLite has one writer for it (`Profile::historyQueue()`, `viaQueue()`); the other profiles keep the default queue as before. `tests/Unit/ProfileSupervisorTest.php` renders the effective program list per profile from `docker/8.4/profile-env.sh` and checks it against `config('profile.workers')`; render it yourself with `PROFILE=control bash docker/8.4/profile-env.sh`. The supervisor config needs the new `START_*` variables, so **rebuild the image** (`docker compose build`) after pulling: an old image's entrypoint does not set them and supervisor refuses to start.
 

@@ -119,6 +119,10 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(DeviceStateChanged::class, TrackSubDeviceLinks::class);
         Event::listen(DeviceStateChanged::class, SyncGroupMirror::class);
 
+        // Scene triggers: a device changed state or source (docs/api/scenes.md).
+        Event::listen(NowPlayingUpdated::class, [\App\Listeners\Device\TriggerScenes::class, 'handleNowPlaying']);
+        Event::listen(DeviceStateChanged::class, [\App\Listeners\Device\TriggerScenes::class, 'handleState']);
+
         // Home Assistant discovery (opt-in): playback events, and the client and device entities that follow the records.
         Event::listen(NowPlayingUpdated::class, [\App\Listeners\Device\PublishHomeAssistantEvents::class, 'handleNowPlaying']);
         Event::listen(DeviceStateChanged::class, [\App\Listeners\Device\PublishHomeAssistantEvents::class, 'handleState']);

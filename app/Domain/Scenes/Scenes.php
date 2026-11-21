@@ -22,6 +22,9 @@ class Scenes
                 'time' => $scene->schedule_time,
                 'days' => $scene->schedule_days,
             ],
+            'triggers' => $scene->triggers ?? [],
+            'trigger_debounce' => (int) ($scene->trigger_debounce ?? config('scenes.triggers.debounce_default')),
+            'alarm' => $scene->alarm,
             'last_run' => [
                 'at' => $scene->last_run_at?->toIso8601String(),
                 'status' => $scene->last_run_status,

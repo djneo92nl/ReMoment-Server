@@ -42,13 +42,13 @@ class ProfileSupervisorTest extends TestCase
 
     public function test_control_starts_only_history_and_the_always_on_programs(): void
     {
-        $this->assertSame(['history-queue' => true, 'storage-queue' => false, 'heavy-queue' => false, 'analysis-queue' => false, 'stems-queue' => false], $this->effective('control'));
+        $this->assertSame(['history-queue' => true, 'storage-queue' => false, 'heavy-queue' => false, 'analysis-queue' => false, 'stems-queue' => false, 'scene-triggers' => true], $this->effective('control'));
     }
 
     public function test_standard_has_no_analysis_workers_and_full_has_all_but_history(): void
     {
-        $this->assertSame(['history-queue' => false, 'storage-queue' => true, 'heavy-queue' => true, 'analysis-queue' => false, 'stems-queue' => false], $this->effective('standard'));
-        $this->assertSame(['history-queue' => false, 'storage-queue' => true, 'heavy-queue' => true, 'analysis-queue' => true, 'stems-queue' => true], $this->effective('full'));
+        $this->assertSame(['history-queue' => false, 'storage-queue' => true, 'heavy-queue' => true, 'analysis-queue' => false, 'stems-queue' => false, 'scene-triggers' => true], $this->effective('standard'));
+        $this->assertSame(['history-queue' => false, 'storage-queue' => true, 'heavy-queue' => true, 'analysis-queue' => true, 'stems-queue' => true, 'scene-triggers' => true], $this->effective('full'));
     }
 
     public function test_an_unknown_or_empty_profile_is_standard(): void

@@ -123,6 +123,8 @@ return [
         'heavy-queue' => ['features' => 'library', 'env' => 'START_HEAVY_QUEUE'],
         'analysis-queue' => ['features' => 'analysis', 'env' => 'START_ANALYSIS_QUEUE'],
         'stems-queue' => ['features' => 'deep_analysis', 'env' => 'START_STEMS_QUEUE'],
+        // The MQTT subscriber of scene triggers (`scenes:listen`); the scenes feature is in every profile today.
+        'scene-triggers' => ['features' => 'scenes', 'env' => 'START_SCENE_TRIGGERS'],
     ],
 
     /*

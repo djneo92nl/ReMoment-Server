@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\ClientController;
 use App\Http\Controllers\Api\DeepAnalysisController;
 use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\DeviceSettingsController;
+use App\Http\Controllers\Api\DeviceSleepController;
 use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\ExternalCatalogueController;
 use App\Http\Controllers\Api\InfoController;
@@ -84,6 +85,10 @@ Route::get('/devices/{device}/wireless-speakers', [DeviceSettingsController::cla
 Route::post('/devices/{device}/wireless-speakers/scan', [DeviceSettingsController::class, 'scanWirelessSpeakers']);
 Route::get('/devices/{device}/info', [DeviceSettingsController::class, 'getInfo']);
 Route::put('/devices/{device}/info', [DeviceSettingsController::class, 'setInfo']);
+// Scene-level sleep timer (fade, stop or standby, restore the volume); distinct from the device's own sleep-timer below
+Route::get('/devices/{device}/sleep', [DeviceSleepController::class, 'show']);
+Route::post('/devices/{device}/sleep', [DeviceSleepController::class, 'start']);
+Route::delete('/devices/{device}/sleep', [DeviceSleepController::class, 'cancel']);
 Route::get('/devices/{device}/sleep-timer', [DeviceSettingsController::class, 'getSleepTimer']);
 Route::put('/devices/{device}/sleep-timer', [DeviceSettingsController::class, 'setSleepTimer']);
 Route::post('/devices/{device}/digits', [DeviceSettingsController::class, 'sendDigits']);

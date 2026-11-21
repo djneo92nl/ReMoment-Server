@@ -34,6 +34,7 @@ export START_STORAGE_QUEUE="$(runs_in standard full)"
 export START_HEAVY_QUEUE="$(runs_in standard full)"
 export START_ANALYSIS_QUEUE="$(runs_in full)"
 export START_STEMS_QUEUE="$(runs_in full)"
+export START_SCENE_TRIGGERS="$(runs_in control standard full)"
 
 # Run directly (not sourced): print the result.
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then

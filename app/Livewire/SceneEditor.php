@@ -2,9 +2,12 @@
 
 namespace App\Livewire;
 
+use App\Domain\Device\State;
 use App\Domain\Profile\Profile;
+use App\Domain\Scenes\SceneAlarm;
 use App\Domain\Scenes\SceneOperations;
 use App\Domain\Scenes\SceneRunner;
+use App\Domain\Scenes\SceneTriggers;
 use App\Models\Device;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
@@ -58,6 +61,27 @@ class SceneEditor extends Component
     /** @var list<array> */
     public array $steps = [];
 
+    /** @var list<array<string, string>> `{type: mqtt, topic, payload}` or `{type: device, device_id, event, value}` as form texts */
+    public array $triggers = [];
+
+    public string $triggerDebounce = '10';
+
+    /** @var array<int, list<string>> messages per trigger index */
+    public array $triggerErrors = [];
+
+    public bool $alarmEnabled = false;
+
+    public string $alarmDeviceId = '';
+
+    public string $alarmMinutes = '20';
+
+    public string $alarmStart = '5';
+
+    public string $alarmTarget = '40';
+
+    /** @var list<string> */
+    public array $alarmErrors = [];
+
     /** @var array<int, list<string>> messages per step index */
     public array $stepErrors = [];
 
@@ -79,6 +103,73 @@ class SceneEditor extends Component
         $this->scheduleTime = (string) $scene->schedule_time;
         $this->scheduleDays = array_map('intval', $scene->schedule_days ?? []);
         $this->steps = array_map(fn ($step) => $this->toForm($step), $scene->steps ?? []);
+        $this->triggers = array_map(fn ($t) => $t['type'] === 'mqtt'
+            ? ['type' => 'mqtt', 'topic' => $t['topic'], 'payload' => (string) ($t['payload'] ?? '')]
+            : ['type' => 'device', 'device_id' => (string) $t['device_id'], 'event' => $t['event'], 'value' => (string) ($t['value'] ?? '')], $scene->triggers ?? []);
+        $this->triggerDebounce = (string) ($scene->trigger_debounce ?? config('scenes.triggers.debounce_default'));
+        if ($alarm = $scene->alarm) {
+            $this->alarmEnabled = true;
+            $this->alarmDeviceId = (string) $alarm['device_id'];
+            $this->alarmMinutes = (string) $alarm['minutes'];
+            $this->alarmStart = (string) $alarm['start_volume'];
+            $this->alarmTarget = (string) $alarm['target_volume'];
+        }
+    }
+
+    public function addTrigger(string $type): void
+    {
+        $this->triggers[] = $type === 'mqtt'
+            ? ['type' => 'mqtt', 'topic' => '', 'payload' => '']
+            : ['type' => 'device', 'device_id' => '', 'event' => 'state', 'value' => State::Playing->value];
+        $this->triggerErrors = [];
+    }
+
+    public function removeTrigger(int $i): void
+    {
+        unset($this->triggers[$i]);
+        $this->triggers = array_values($this->triggers);
+        $this->triggerErrors = [];
+    }
+
+    /** Another event has other values: a state is picked from a list, a source is a name. */
+    public function updatedTriggers($value, string $key): void
+    {
+        if (str_ends_with($key, '.event')) {
+            $i = (int) explode('.', $key)[0];
+            $this->triggers[$i]['value'] = $value === 'state' ? State::Playing->value : '';
+        }
+    }
+
+    /** The triggers as the API stores them, device ids cast, empty optional texts left out. */
+    private function triggersForSave(): array
+    {
+        return array_map(function ($t) {
+            if (($t['type'] ?? '') === 'mqtt') {
+                return array_filter(['type' => 'mqtt', 'topic' => trim($t['topic'] ?? ''), 'payload' => ($t['payload'] ?? '') === '' ? null : $t['payload']], fn ($v) => $v !== null);
+            }
+
+            return array_filter([
+                'type' => 'device',
+                'device_id' => ctype_digit((string) ($t['device_id'] ?? '')) ? (int) $t['device_id'] : null,
+                'event' => $t['event'] ?? null,
+                'value' => trim((string) ($t['value'] ?? '')) === '' ? null : trim($t['value']),
+            ], fn ($v) => $v !== null);
+        }, array_values($this->triggers));
+    }
+
+    private function alarmForSave(): ?array
+    {
+        if (!$this->alarmEnabled) {
+            return null;
+        }
+        $int = fn (string $v) => is_numeric($v) && (int) $v == $v ? (int) $v : null;
+
+        return [
+            'device_id' => ctype_digit($this->alarmDeviceId) ? (int) $this->alarmDeviceId : null,
+            'minutes' => $int($this->alarmMinutes),
+            'start_volume' => $int($this->alarmStart),
+            'target_volume' => $int($this->alarmTarget),
+        ];
     }
 
     private function toForm(array $step): array
@@ -239,7 +330,36 @@ class SceneEditor extends Component
             return;
         }
 
+        $this->triggerErrors = [];
+        $this->alarmErrors = [];
+        $triggers = $this->triggersForSave();
+        $alarm = $this->alarmForSave();
+        $debounce = is_numeric($this->triggerDebounce) && (int) $this->triggerDebounce == $this->triggerDebounce ? (int) $this->triggerDebounce : null;
+        $found = false;
+        foreach (SceneTriggers::validate($triggers) as $key => $message) {
+            $found = true;
+            if (preg_match('/^triggers\.(\d+)\.(.+)$/', $key, $m)) {
+                $this->triggerErrors[(int) $m[1]][] = $m[2].': '.$message;
+            } else {
+                $this->formError = $message;
+            }
+        }
+        if ($triggers !== [] && ($error = SceneTriggers::debounceErrors($debounce))) {
+            $found = true;
+            $this->addError('triggerDebounce', $error['trigger_debounce']);
+        }
+        foreach (SceneAlarm::validate($alarm) as $key => $message) {
+            $found = true;
+            $this->alarmErrors[] = $message;
+        }
+        if ($found) {
+            return;
+        }
+
         $data = [
+            'triggers' => SceneTriggers::normalise($triggers),
+            'trigger_debounce' => $triggers === [] ? (int) config('scenes.triggers.debounce_default') : $debounce,
+            'alarm' => SceneAlarm::normalise($alarm),
             'name' => trim($this->name),
             'icon' => $this->icon ?: null,
             'color' => $this->color ?: null,
@@ -268,6 +388,7 @@ class SceneEditor extends Component
             ],
             'searchPickers' => Profile::allows('library'),
             'devices' => Device::orderBy('device_name')->get(['id', 'device_name']),
+            'states' => array_map(fn (State $state) => $state->value, State::cases()),
             'icons' => self::ICONS + ($this->icon !== '' && !isset(self::ICONS[$this->icon]) ? [$this->icon => $this->icon] : []),
             'colors' => array_flip(self::COLORS) + ($this->color !== '' && !in_array($this->color, self::COLORS, true) ? [$this->color => 'Custom'] : []),
         ]);

@@ -276,4 +276,146 @@ class SceneWebTest extends TestCase
         config(['profile.current' => 'control']);
         Livewire::test(SceneEditor::class, ['sceneId' => $scene->id])->assertDontSee('Search artists');
     }
+
+    public function test_the_editor_saves_triggers_and_an_alarm_and_loads_them_again(): void
+    {
+        $scene = $this->scene([$this->volume(20)]);
+        $id = (string) $this->device->id;
+
+        Livewire::test(SceneEditor::class, ['sceneId' => $scene->id])
+            ->call('addTrigger', 'mqtt')
+            ->set('triggers.0.topic', 'home/doorbell/#')
+            ->set('triggers.0.payload', 'ring')
+            ->call('addTrigger', 'device')
+            ->set('triggers.1.device_id', $id)
+            ->set('triggers.1.value', 'standby')
+            ->call('addTrigger', 'device')
+            ->set('triggers.2.device_id', $id)
+            ->set('triggers.2.event', 'source')
+            ->assertSet('triggers.2.value', '')
+            ->set('triggerDebounce', '45')
+            ->set('alarmEnabled', true)
+            ->set('alarmDeviceId', $id)
+            ->set('alarmMinutes', '15')
+            ->set('alarmStart', '4')
+            ->set('alarmTarget', '35')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $scene->refresh();
+        $this->assertSame([
+            ['type' => 'mqtt', 'topic' => 'home/doorbell/#', 'payload' => 'ring'],
+            ['type' => 'device', 'device_id' => $this->device->id, 'event' => 'state', 'value' => 'standby'],
+            ['type' => 'device', 'device_id' => $this->device->id, 'event' => 'source'],
+        ], $scene->triggers);
+        $this->assertSame(45, $scene->trigger_debounce);
+        $this->assertSame(['device_id' => $this->device->id, 'minutes' => 15, 'start_volume' => 4, 'target_volume' => 35], $scene->alarm);
+
+        Livewire::test(SceneEditor::class, ['sceneId' => $scene->id])
+            ->assertSet('triggers.0.topic', 'home/doorbell/#')
+            ->assertSet('triggers.1.value', 'standby')
+            ->assertSet('triggerDebounce', '45')
+            ->assertSet('alarmEnabled', true)
+            ->assertSet('alarmTarget', '35')
+            ->call('removeTrigger', 0)
+            ->set('alarmEnabled', false)
+            ->call('save');
+
+        $scene->refresh();
+        $this->assertCount(2, $scene->triggers);
+        $this->assertNull($scene->alarm);
+    }
+
+    public function test_the_editor_shows_what_is_wrong_with_a_trigger_or_the_alarm(): void
+    {
+        $scene = $this->scene([$this->volume(20)]);
+
+        Livewire::test(SceneEditor::class, ['sceneId' => $scene->id])
+            ->call('addTrigger', 'mqtt')
+            ->set('triggers.0.topic', 'remoment/player/1/state')
+            ->set('alarmEnabled', true)
+            ->set('alarmDeviceId', (string) $this->device->id)
+            ->set('alarmStart', '50')
+            ->set('alarmTarget', '30')
+            ->call('save')
+            ->assertSee('server publishes on this topic itself')
+            ->assertSee('target volume must be higher');
+
+        $this->assertNull($scene->fresh()->triggers);
+
+        Livewire::test(SceneEditor::class, ['sceneId' => $scene->id])
+            ->call('addTrigger', 'mqtt')
+            ->set('triggers.0.topic', 'a/b')
+            ->set('triggerDebounce', '1')
+            ->call('save')
+            ->assertHasErrors('triggerDebounce');
+    }
+
+    public function test_the_list_marks_scenes_with_triggers_and_an_alarm(): void
+    {
+        $this->scene([$this->volume(20)], [
+            'triggers' => [['type' => 'mqtt', 'topic' => 'a']],
+            'alarm' => ['device_id' => $this->device->id, 'minutes' => 10, 'start_volume' => 1, 'target_volume' => 20],
+        ]);
+
+        Livewire::test(SceneList::class)->assertSee('1 trigger')->assertSee('Alarm');
+    }
+
+    public function test_the_sleep_timer_card_starts_and_cancels_a_timer(): void
+    {
+        Queue::fake();
+        FakePlayerDriver::$volume = 30;
+
+        $this->get('/scenes')->assertOk()->assertSee('Sleep timer');
+
+        // Livewire's harness switches route-model binding off, so the card's REST calls go through a bridge that
+        // answers like the API (the endpoints themselves are tested in DeviceTimersTest).
+        $bridge = new class extends ApiBridge
+        {
+            public array $calls = [];
+
+            public function __construct()
+            {
+                parent::__construct(app('router'));
+            }
+
+            public function call(string $method, string $path, array $params = []): array
+            {
+                $this->calls[] = [$method, $path, $params];
+
+                return $method === 'POST' && $params['minutes'] > 480
+                    ? [422, ['message' => 'The minutes field must not be greater than 480.', 'errors' => ['minutes' => ['Too long.']]]]
+                    : [$method === 'POST' ? 201 : 200, ['status' => 'ok']];
+            }
+        };
+        $this->app->instance(ApiBridge::class, $bridge);
+
+        Livewire::test(\App\Livewire\SleepTimerCard::class)
+            ->call('start')
+            ->assertSee('Choose a device')
+            ->set('deviceId', (string) $this->device->id)
+            ->set('minutes', '45')
+            ->set('fadeSeconds', '90')
+            ->set('end', 'standby')
+            ->call('start')
+            ->assertSet('feedbackIsError', false)
+            ->assertSee('Sleep timer set on Kitchen')
+            ->set('minutes', '999')
+            ->call('start')
+            ->assertSet('feedbackIsError', true)
+            ->assertSee('Too long.')
+            ->call('cancel', $this->device->id)
+            ->assertSee('cancelled');
+
+        $this->assertSame(['POST', "devices/{$this->device->id}/sleep", ['minutes' => 45, 'fade_seconds' => 90, 'action' => 'standby']], $bridge->calls[0]);
+        $this->assertSame(['DELETE', "devices/{$this->device->id}/sleep", []], end($bridge->calls));
+    }
+
+    public function test_the_sleep_timer_card_lists_a_running_timer(): void
+    {
+        Queue::fake();
+        app(\App\Domain\Scenes\DeviceTimers::class)->startSleep($this->device, 30, 60);
+
+        Livewire::test(\App\Livewire\SleepTimerCard::class)->assertSee('Kitchen')->assertSee('Stop in 30 min');
+    }
 }

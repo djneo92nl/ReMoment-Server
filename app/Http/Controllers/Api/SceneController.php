@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Scenes\SceneAlarm;
 use App\Domain\Scenes\SceneRunner;
 use App\Domain\Scenes\Scenes;
+use App\Domain\Scenes\SceneTriggers;
 use App\Http\Controllers\Controller;
 use App\Models\Scene;
 use Illuminate\Http\JsonResponse;
@@ -75,7 +77,25 @@ class SceneController extends Controller
             'schedule_time' => ['nullable', 'date_format:H:i'],
             'schedule_days' => 'nullable|array',
             'schedule_days.*' => 'integer|between:1,7',
+            'triggers' => 'nullable|array',
+            'trigger_debounce' => 'sometimes|integer',
+            'alarm' => 'nullable|array',
         ]);
+
+        // Triggers and the alarm check their devices and shapes with the same code as the editor.
+        $errors = [];
+        foreach (['triggers' => SceneTriggers::validate($data['triggers'] ?? null), 'alarm' => SceneAlarm::validate($data['alarm'] ?? null), 'debounce' => array_key_exists('trigger_debounce', $data) ? SceneTriggers::debounceErrors($data['trigger_debounce']) : []] as $found) {
+            $errors += $found;
+        }
+        if ($errors) {
+            throw ValidationException::withMessages(array_map(fn ($m) => [$m], $errors));
+        }
+        if (array_key_exists('triggers', $data)) {
+            $data['triggers'] = SceneTriggers::normalise($data['triggers']);
+        }
+        if (array_key_exists('alarm', $data)) {
+            $data['alarm'] = SceneAlarm::normalise($data['alarm']);
+        }
 
         if (array_key_exists('steps', $data)) {
             if ($errors = $this->runner->validate($data['steps'])) {

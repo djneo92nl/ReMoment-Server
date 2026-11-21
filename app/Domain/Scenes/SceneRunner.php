@@ -26,9 +26,12 @@ class SceneRunner
 
     private ?Closure $sleeper;
 
-    public function __construct(private readonly ApiBridge $bridge, private readonly SceneOperations $operations, ?Closure $sleeper = null)
+    private DeviceTimers $timers;
+
+    public function __construct(private readonly ApiBridge $bridge, private readonly SceneOperations $operations, ?Closure $sleeper = null, ?DeviceTimers $timers = null)
     {
         $this->sleeper = $sleeper;
+        $this->timers = $timers ?? new DeviceTimers($bridge);
     }
 
     public static function isDelay(array $step): bool
@@ -106,23 +109,64 @@ class SceneRunner
     }
 
     /**
-     * Runs the steps of a scene and records the outcome on it.
+     * Runs the steps of a scene and records the outcome on it. A scene with an alarm (SceneAlarm) sets its start
+     * volume first, and ramps the volume up after the steps; that is one more entry in the results (`type: alarm`).
+     * While it runs, and a moment after, the scene's own triggers are ignored (loop protection, SceneTriggers).
      *
      * @return array{status: string, results: list<array>} status ok | partial | failed
      */
     public function run(Scene $scene, string $source = 'api'): array
     {
-        $outcome = $this->execute($scene->steps ?? [], (bool) $scene->stop_on_error);
+        SceneTriggers::guardRun($scene->id);
 
-        $scene->forceFill([
-            'last_run_at' => now(),
-            'last_run_status' => $outcome['status'],
-            'last_run_source' => $source,
-            'last_run_results' => $outcome['results'],
-        ])->save();
-        \App\Domain\HomeAssistant\Hooks::scene($scene, $outcome['status'], $source);
+        try {
+            $steps = $scene->steps ?? [];
+            $alarm = $scene->alarm;
+            $valid = $this->validate($steps) === [];
 
-        return $outcome;
+            if ($alarm && $valid) {
+                // Best effort: a device in standby may not take a volume before its steps wake it.
+                $this->bridge->call('PUT', "devices/{$alarm['device_id']}/volume", ['volume' => $alarm['start_volume']]);
+            }
+
+            $outcome = $this->execute($steps, (bool) $scene->stop_on_error);
+
+            if ($alarm && $valid && ($outcome['status'] === 'ok' || ($outcome['status'] === 'partial' && !$scene->stop_on_error))) {
+                $outcome['results'][] = $this->startAlarm($scene, $alarm, count($outcome['results']));
+                $ok = count(array_filter($outcome['results'], fn ($r) => $r['ok']));
+                $outcome['status'] = $ok === count($outcome['results']) ? 'ok' : ($ok === 0 ? 'failed' : 'partial');
+            }
+
+            $scene->forceFill([
+                'last_run_at' => now(),
+                'last_run_status' => $outcome['status'],
+                'last_run_source' => $source,
+                'last_run_results' => $outcome['results'],
+            ])->save();
+            \App\Domain\HomeAssistant\Hooks::scene($scene, $outcome['status'], $source);
+
+            return $outcome;
+        } finally {
+            SceneTriggers::releaseRun($scene->id);
+        }
+    }
+
+    private function startAlarm(Scene $scene, array $alarm, int $index): array
+    {
+        $base = ['index' => $index, 'type' => 'alarm', 'operation' => null, 'device_id' => $alarm['device_id'], 'minutes' => $alarm['minutes']];
+
+        $device = \App\Models\Device::find($alarm['device_id']);
+        if (!$device) {
+            return $base + ['ok' => false, 'status' => 404, 'error' => 'not_found: The alarm\'s device does not exist.'];
+        }
+
+        try {
+            $this->timers->startRamp($device, $alarm['minutes'], $alarm['start_volume'], $alarm['target_volume'], $scene->id);
+        } catch (\Throwable $e) {
+            return $base + ['ok' => false, 'status' => 500, 'error' => $e->getMessage()];
+        }
+
+        return $base + ['ok' => true, 'status' => null, 'error' => null];
     }
 
     /**
@@ -207,6 +251,7 @@ class SceneRunner
     /** Marks the scene as running and queues its run. */
     public function start(Scene $scene, string $source): void
     {
+        SceneTriggers::guardRun($scene->id);
         $scene->forceFill(['last_run_status' => 'running', 'last_run_source' => $source, 'last_run_at' => now()])->save();
         \App\Jobs\RunScene::dispatch($scene->id, $source);
     }

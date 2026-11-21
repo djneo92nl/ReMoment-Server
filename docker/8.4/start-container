@@ -32,8 +32,8 @@ else
         [ -f "$f" ] && . "$f" && break
     done
     # Without the script (an old checkout) every program starts, as before profiles existed.
-    : "${START_HISTORY_QUEUE:=false}" "${START_STORAGE_QUEUE:=true}" "${START_HEAVY_QUEUE:=true}" "${START_ANALYSIS_QUEUE:=true}" "${START_STEMS_QUEUE:=true}"
-    export START_HISTORY_QUEUE START_STORAGE_QUEUE START_HEAVY_QUEUE START_ANALYSIS_QUEUE START_STEMS_QUEUE
+    : "${START_HISTORY_QUEUE:=false}" "${START_STORAGE_QUEUE:=true}" "${START_HEAVY_QUEUE:=true}" "${START_ANALYSIS_QUEUE:=true}" "${START_STEMS_QUEUE:=true}" "${START_SCENE_TRIGGERS:=true}"
+    export START_HISTORY_QUEUE START_STORAGE_QUEUE START_HEAVY_QUEUE START_ANALYSIS_QUEUE START_STEMS_QUEUE START_SCENE_TRIGGERS
     # FRANKENPHP_MODE (classic | worker) picks the Caddyfile of the web server (docs/architecture/frankenphp.md). Worker mode
     # keeps the app in memory (Octane) and costs RAM per worker, so Control (the Pi floor) stays classic.
     : "${FRANKENPHP_MODE:=classic}" "${FRANKENPHP_WORKERS:=2}" "${MAX_REQUESTS:=500}"

@@ -191,6 +191,125 @@
         @endif
     </x-card>
 
+    {{-- Triggers --}}
+    <div class="space-y-3">
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-600">Triggers</h3>
+        <p class="text-sm text-gray-500">Start this scene by itself: when an MQTT message arrives, or when a device changes state or source. The scene's own actions never start it again, and a trigger that fires is ignored for the pause below.</p>
+
+        @foreach($triggers as $i => $trigger)
+            <x-card compact class="p-5 space-y-4" wire:key="trigger-{{ $i }}">
+                <div class="flex items-center gap-3">
+                    <span class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ $trigger['type'] === 'mqtt' ? 'MQTT message' : 'Device event' }}</span>
+                    <button type="button" wire:click="removeTrigger({{ $i }})" aria-label="Remove trigger"
+                            class="ml-auto p-2 rounded-xl text-gray-400 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"><i class="fa-solid fa-trash-can text-sm"></i></button>
+                </div>
+
+                @if($trigger['type'] === 'mqtt')
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <x-input-label value="Topic filter" class="mb-1.5" />
+                            <x-text-input wire:model="triggers.{{ $i }}.topic" type="text" class="w-full" placeholder="home/doorbell/#" />
+                        </div>
+                        <div>
+                            <x-input-label value="Payload (optional)" class="mb-1.5" />
+                            <x-text-input wire:model="triggers.{{ $i }}.payload" type="text" class="w-full" placeholder="Any message" />
+                        </div>
+                    </div>
+                @else
+                    <div class="grid gap-4 sm:grid-cols-3">
+                        <div>
+                            <x-input-label value="Device" class="mb-1.5" />
+                            <x-select wire:model="triggers.{{ $i }}.device_id" class="w-full">
+                                <option value="">Choose a device…</option>
+                                @foreach($devices as $device)
+                                    <option value="{{ $device->id }}">{{ $device->device_name }}</option>
+                                @endforeach
+                            </x-select>
+                        </div>
+                        <div>
+                            <x-input-label value="When" class="mb-1.5" />
+                            <x-select wire:model.live="triggers.{{ $i }}.event" class="w-full">
+                                <option value="state">its state becomes</option>
+                                <option value="source">its source changes</option>
+                            </x-select>
+                        </div>
+                        <div>
+                            @if(($trigger['event'] ?? 'state') === 'state')
+                                <x-input-label value="State" class="mb-1.5" />
+                                <x-select wire:model="triggers.{{ $i }}.value" class="w-full">
+                                    @foreach($states as $state)
+                                        <option value="{{ $state }}">{{ $state }}</option>
+                                    @endforeach
+                                </x-select>
+                            @else
+                                <x-input-label value="Source (optional)" class="mb-1.5" />
+                                <x-text-input wire:model="triggers.{{ $i }}.value" type="text" class="w-full" placeholder="Any source, or a name like HDMI 2" />
+                            @endif
+                        </div>
+                    </div>
+                @endif
+
+                @foreach($triggerErrors[$i] ?? [] as $message)
+                    <x-input-error :messages="[$message]" />
+                @endforeach
+            </x-card>
+        @endforeach
+
+        <div class="flex flex-wrap items-center gap-2">
+            <x-secondary-button type="button" wire:click="addTrigger('mqtt')"><i class="fa-solid fa-plus text-xs"></i>Add MQTT trigger</x-secondary-button>
+            <x-secondary-button type="button" wire:click="addTrigger('device')"><i class="fa-solid fa-plus text-xs"></i>Add device trigger</x-secondary-button>
+        </div>
+
+        @if($triggers !== [])
+            <div>
+                <x-input-label value="Pause after a start (seconds)" class="mb-1.5" />
+                <x-text-input wire:model="triggerDebounce" type="number" min="5" max="3600" :invalid="$errors->has('triggerDebounce')" class="w-28" />
+                <x-input-error :messages="$errors->get('triggerDebounce')" class="mt-1.5" />
+            </div>
+        @endif
+    </div>
+
+    {{-- Alarm --}}
+    <x-card compact class="p-6 space-y-4">
+        <label class="flex items-center gap-3 cursor-pointer">
+            <input type="checkbox" wire:model.live="alarmEnabled"
+                   class="w-4 h-4 rounded border-gray-300 dark:border-stone-600 text-gray-900 dark:text-gray-100 focus:ring-gray-400 dark:focus:ring-stone-500">
+            <span class="text-sm text-gray-700 dark:text-gray-300">Alarm: raise the volume slowly after the steps</span>
+        </label>
+
+        @if($alarmEnabled)
+            <p class="text-sm text-gray-500">The volume is set to the start level, the steps run (switch on, play a playlist or station), and then it rises to the target. The rise stops if someone changes the volume by hand or the device goes to standby.</p>
+            <div class="grid gap-4 sm:grid-cols-4">
+                <div class="sm:col-span-2">
+                    <x-input-label value="Device" class="mb-1.5" />
+                    <x-select wire:model="alarmDeviceId" class="w-full">
+                        <option value="">Choose a device…</option>
+                        @foreach($devices as $device)
+                            <option value="{{ $device->id }}">{{ $device->device_name }}</option>
+                        @endforeach
+                    </x-select>
+                </div>
+                <div>
+                    <x-input-label value="Rise over (minutes)" class="mb-1.5" />
+                    <x-text-input wire:model="alarmMinutes" type="number" min="1" max="60" class="w-full" />
+                </div>
+                <div class="flex gap-3">
+                    <div class="flex-1">
+                        <x-input-label value="From" class="mb-1.5" />
+                        <x-text-input wire:model="alarmStart" type="number" min="0" max="100" class="w-full" />
+                    </div>
+                    <div class="flex-1">
+                        <x-input-label value="To" class="mb-1.5" />
+                        <x-text-input wire:model="alarmTarget" type="number" min="1" max="100" class="w-full" />
+                    </div>
+                </div>
+            </div>
+            @foreach($alarmErrors as $message)
+                <x-input-error :messages="[$message]" />
+            @endforeach
+        @endif
+    </x-card>
+
     <div class="flex items-center gap-3">
         <x-primary-button size="lg" type="submit">Save scene</x-primary-button>
         <a href="{{ route('scenes.index') }}" class="px-5 py-2.5 rounded-xl text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors">Cancel</a>

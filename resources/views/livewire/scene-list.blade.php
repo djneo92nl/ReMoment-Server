@@ -26,6 +26,12 @@
                         @if($scene->schedule_enabled)
                             <span>· {{ $scene->schedule_time }}</span>
                         @endif
+                        @if(!empty($scene->triggers))
+                            <span>· <i class="fa-solid fa-bolt text-xs" aria-hidden="true"></i> {{ trans_choice(':count trigger|:count triggers', count($scene->triggers)) }}</span>
+                        @endif
+                        @if($scene->alarm)
+                            <span>· <i class="fa-solid fa-bell text-xs" aria-hidden="true"></i> Alarm</span>
+                        @endif
                         @if($status)
                             <x-badge :variant="match($status) { 'ok' => 'success', 'partial' => 'warning', 'running' => 'info', default => 'danger' }">{{ $status }}</x-badge>
                         @endif

@@ -7,5 +7,8 @@
         </x-page-header>
     </x-slot>
 
-    <livewire:scene-list />
+    <div class="space-y-8">
+        <livewire:scene-list />
+        <livewire:sleep-timer-card />
+    </div>
 </x-app-layout>
