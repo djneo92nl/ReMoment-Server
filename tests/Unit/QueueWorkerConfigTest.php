@@ -8,12 +8,14 @@ use App\Jobs\AnalyzeTrackDeep;
 use App\Jobs\BuildSdCardExport;
 use App\Jobs\ExportLibrarySelection;
 use App\Jobs\PollRadioTitle;
+use App\Jobs\PrepareSyncArtifact;
 use App\Jobs\ProcessArtwork;
 use App\Jobs\ProcessLibraryUpload;
 use App\Jobs\ReportRadioClick;
 use App\Jobs\RestoreAfterAnnouncement;
 use App\Jobs\RunScene;
 use App\Jobs\RunStorageTask;
+use App\Jobs\ScanForDevices;
 use App\Jobs\SendAlertPush;
 use App\Jobs\Soak\SoakNoop;
 use App\Jobs\SyncFollower;
@@ -107,9 +109,11 @@ class QueueWorkerConfigTest extends TestCase
             ProcessLibraryUpload::class => fn () => new ProcessLibraryUpload('u', 1, 'x'),
             BuildSdCardExport::class => fn () => new BuildSdCardExport,
             RunScene::class => fn () => new RunScene(1),
+            ScanForDevices::class => fn () => new ScanForDevices,
             RunStorageTask::class => fn () => new RunStorageTask('scan'),
             ProcessArtwork::class => fn () => new ProcessArtwork('http://x/y.jpg'),
             SoakNoop::class => fn () => new SoakNoop,
+            PrepareSyncArtifact::class => fn () => new PrepareSyncArtifact('f', []),
             SyncFollower::class => fn () => new SyncFollower(1, 1, 'play'),
             SendAlertPush::class => fn () => new SendAlertPush(1, 'critical'),
             PollRadioTitle::class => fn () => new PollRadioTitle(1),

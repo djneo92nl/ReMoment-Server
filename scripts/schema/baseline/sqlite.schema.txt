@@ -693,6 +693,23 @@ TABLE storage_locations [autoincrement]
   col updated_at datetime NULL default=-
   idx storage_locations_name_unique UNIQUE (name)
 
+TABLE sync_artifacts [autoincrement]
+  col created_at datetime NULL default=-
+  col error varchar NULL default=-
+  col extension varchar NOT NULL default=-
+  col file_id integer NULL default=-
+  col fingerprint varchar NOT NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col last_used_at datetime NULL default=-
+  col sha256 varchar NULL default=-
+  col size integer NOT NULL default='0'
+  col state varchar NOT NULL default='preparing'
+  col updated_at datetime NULL default=-
+  idx sync_artifacts_fingerprint_unique UNIQUE (fingerprint)
+  idx sync_artifacts_last_used_at_index INDEX (last_used_at)
+  idx sync_artifacts_state_index INDEX (state)
+  fk (file_id) -> files(id) ON DELETE SET NULL ON UPDATE NO ACTION
+
 TABLE sync_group_members [autoincrement]
   col created_at datetime NULL default=-
   col device_id integer NOT NULL default=-
@@ -712,6 +729,26 @@ TABLE sync_groups [autoincrement]
   col updated_at datetime NULL default=-
   idx sync_groups_leader_device_id_unique UNIQUE (leader_device_id)
   fk (leader_device_id) -> devices(id) ON DELETE CASCADE ON UPDATE NO ACTION
+
+TABLE sync_targets
+  col active_job_id varchar NULL default=-
+  col client_ref varchar NULL default=-
+  col created_at datetime NULL default=-
+  col id varchar NOT NULL default=- pk=1
+  col kind varchar NOT NULL default=-
+  col last_report text NULL default=-
+  col last_report_at datetime NULL default=-
+  col last_run text NULL default=-
+  col name varchar NOT NULL default=-
+  col node_id integer NULL default=-
+  col owned_bytes integer NOT NULL default='0'
+  col owned_count integer NOT NULL default='0'
+  col rules text NULL default=-
+  col rules_version integer NOT NULL default='1'
+  col updated_at datetime NULL default=-
+  idx auto(pk) UNIQUE (id)
+  idx sync_targets_client_ref_unique UNIQUE (client_ref)
+  fk (node_id) -> clients(id) ON DELETE SET NULL ON UPDATE NO ACTION
 
 TABLE track_files [autoincrement]
   col created_at datetime NULL default=-

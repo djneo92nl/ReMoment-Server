@@ -127,6 +127,12 @@ Route::get('/radio/relays', [\App\Http\Controllers\Api\RadioRelayController::cla
 Route::get('/devices/{device}/multiroom', [DeviceController::class, 'multiroom']);
 Route::post('/devices/{device}/multiroom/join', [DeviceController::class, 'multiroomJoin']);
 Route::delete('/devices/{device}/multiroom/leave', [DeviceController::class, 'multiroomLeave']);
+// Multiroom presets: named groupings, the first device the host; open like multiroom itself (docs/api/multiroom-presets.md)
+Route::get('/multiroom/presets', [\App\Http\Controllers\Api\MultiroomPresetController::class, 'index']);
+Route::post('/multiroom/presets', [\App\Http\Controllers\Api\MultiroomPresetController::class, 'store']);
+Route::put('/multiroom/presets/{preset}', [\App\Http\Controllers\Api\MultiroomPresetController::class, 'update']);
+Route::delete('/multiroom/presets/{preset}', [\App\Http\Controllers\Api\MultiroomPresetController::class, 'destroy']);
+Route::post('/multiroom/presets/{preset}/activate', [\App\Http\Controllers\Api\MultiroomPresetController::class, 'activate']);
 
 Route::post('/devices/{device}/move', [DeviceController::class, 'move']);
 
@@ -142,6 +148,7 @@ Route::post('/devices/{device}/library/play-playlist', [DeviceController::class,
 Route::post('/devices/{device}/library/play-tracks', [DeviceController::class, 'libraryPlayTracks']);
 Route::post('/devices/{device}/library/play-listening-mode', [DeviceController::class, 'libraryPlayListeningMode']);
 Route::post('/devices/{device}/library/play-similar', [DeviceController::class, 'libraryPlaySimilar']);
+Route::post('/devices/{device}/library/play-daily-mix', [DeviceController::class, 'libraryPlayDailyMix']);
 Route::post('/devices/{device}/library/play-album', [DeviceController::class, 'libraryPlayAlbum']);
 Route::post('/devices/{device}/library/play-artist', [DeviceController::class, 'libraryPlayArtist']);
 Route::post('/devices/{device}/library/play-external', [DeviceController::class, 'libraryPlayExternal']);
@@ -233,6 +240,12 @@ Route::prefix('nodes')->group(function () {
     Route::post('/jobs/{job}/accept', [\App\Http\Controllers\Api\NodeController::class, 'accept']);
     Route::post('/jobs/{job}/progress', [\App\Http\Controllers\Api\NodeController::class, 'progress']);
     Route::post('/jobs/{job}/result', [\App\Http\Controllers\Api\NodeController::class, 'result']);
+    // Ripper role (docs/api/rips.md): which nodes can rip (open) and the node's upload of a ripped file (Bearer, only during a rip)
+    Route::get('/rippers', [\App\Http\Controllers\Api\RipController::class, 'rippers']);
+    Route::post('/files', [\App\Http\Controllers\Api\NodeFileController::class, 'store']);
+    // Sync target role (docs/api/sync.md): the node asks for its plan and reports, for the target bound to it only
+    Route::post('/sync/plan', [\App\Http\Controllers\Api\NodeSyncController::class, 'plan']);
+    Route::post('/sync/report', [\App\Http\Controllers\Api\NodeSyncController::class, 'report']);
 });
 
 // Admin token login for apps. Routes that change configuration go in the `admin.token` group (see docs/api/admin-auth.md).
@@ -250,13 +263,79 @@ Route::get('/stems/weights', [\App\Http\Controllers\Api\StemWeightsController::c
 Route::get('/library/tracks/{track}/stems', [TrackStemsController::class, 'show']);
 Route::get('/library/tracks/{track}/stems/{stem}', [TrackStemsController::class, 'download'])
     ->middleware('signed:relative')->name('api.library.stems.download');
+// Signed, 6-hour download of one file of a sync (docs/api/sync.md): the signature is the authorization, Range works
+Route::get('/sync/files/{target}/{key}/{fingerprint}', [\App\Http\Controllers\Api\SyncFileController::class, 'show'])
+    ->middleware('signed:relative')->where('key', '[^/]+')->name('api.sync.files');
 Route::middleware('admin.token')->group(function () {
     Route::get('/admin/me', [AdminAuthController::class, 'me']);
+
+    // Sync to offline targets: a USB stick on a node, the iOS app's offline library (docs/api/sync.md)
+    Route::get('/admin/sync/targets', [\App\Http\Controllers\Api\SyncTargetController::class, 'index']);
+    Route::post('/admin/sync/targets', [\App\Http\Controllers\Api\SyncTargetController::class, 'store']);
+    Route::get('/admin/sync/targets/{target}', [\App\Http\Controllers\Api\SyncTargetController::class, 'show']);
+    Route::put('/admin/sync/targets/{target}', [\App\Http\Controllers\Api\SyncTargetController::class, 'update']);
+    Route::delete('/admin/sync/targets/{target}', [\App\Http\Controllers\Api\SyncTargetController::class, 'destroy']);
+    Route::post('/admin/sync/targets/{target}/estimate', [\App\Http\Controllers\Api\SyncTargetController::class, 'estimate']);
+    Route::post('/admin/sync/targets/{target}/plan', [\App\Http\Controllers\Api\SyncTargetController::class, 'plan']);
+    Route::post('/admin/sync/targets/{target}/report', [\App\Http\Controllers\Api\SyncTargetController::class, 'report']);
+    Route::post('/admin/sync/targets/{target}/run', [\App\Http\Controllers\Api\SyncTargetController::class, 'run']);
+    Route::post('/admin/sync/targets/{target}/volume', [\App\Http\Controllers\Api\SyncTargetController::class, 'volume']);
+    Route::delete('/admin/sync/targets/{target}/run', [\App\Http\Controllers\Api\SyncTargetController::class, 'cancel']);
+    Route::get('/admin/sync/files/{target}/{key}/{fingerprint}', [\App\Http\Controllers\Api\SyncFileController::class, 'show'])->where('key', '[^/]+');
+
+    // Health for apps: the data of /settings/health and the external-service probes (docs/api/admin-health.md)
+    Route::get('/admin/health', [\App\Http\Controllers\Api\AdminHealthController::class, 'show']);
+    Route::get('/admin/health/services', [\App\Http\Controllers\Api\AdminHealthController::class, 'services']);
+    Route::post('/admin/health/services/check', [\App\Http\Controllers\Api\AdminHealthController::class, 'check']);
+
+    // Client registrations: list, approve, reject, edit, new token, remove (docs/api/admin-clients.md)
+    Route::get('/admin/clients', [\App\Http\Controllers\Api\AdminClientController::class, 'index']);
+    Route::get('/admin/clients/{client}', [\App\Http\Controllers\Api\AdminClientController::class, 'show']);
+    Route::put('/admin/clients/{client}', [\App\Http\Controllers\Api\AdminClientController::class, 'update']);
+    Route::delete('/admin/clients/{client}', [\App\Http\Controllers\Api\AdminClientController::class, 'destroy']);
+    Route::post('/admin/clients/{client}/approve', [\App\Http\Controllers\Api\AdminClientController::class, 'approve']);
+    Route::post('/admin/clients/{client}/reject', [\App\Http\Controllers\Api\AdminClientController::class, 'reject']);
+    Route::post('/admin/clients/{client}/regenerate-token', [\App\Http\Controllers\Api\AdminClientController::class, 'regenerateToken']);
+
+    // Radio stations: add, change, remove and the stream finder (docs/api/admin-radio.md)
+    Route::get('/admin/radio-stations', [\App\Http\Controllers\Api\AdminRadioStationController::class, 'index']);
+    Route::post('/admin/radio-stations', [\App\Http\Controllers\Api\AdminRadioStationController::class, 'store']);
+    Route::get('/admin/radio-stations/search', [\App\Http\Controllers\Api\AdminRadioStationController::class, 'search']);
+    Route::post('/admin/radio-stations/directory', [\App\Http\Controllers\Api\AdminRadioStationController::class, 'addFromDirectory']);
+    Route::get('/admin/radio-stations/{station}', [\App\Http\Controllers\Api\AdminRadioStationController::class, 'show']);
+    Route::put('/admin/radio-stations/{station}', [\App\Http\Controllers\Api\AdminRadioStationController::class, 'update']);
+    Route::delete('/admin/radio-stations/{station}', [\App\Http\Controllers\Api\AdminRadioStationController::class, 'destroy']);
+
+    // Devices: add, change, hide and remove by hand, and the discovery inbox (docs/api/admin-devices.md)
+    Route::get('/admin/device-models', [\App\Http\Controllers\Api\AdminDeviceController::class, 'models']);
+    Route::get('/admin/devices', [\App\Http\Controllers\Api\AdminDeviceController::class, 'index']);
+    Route::post('/admin/devices', [\App\Http\Controllers\Api\AdminDeviceController::class, 'store']);
+    Route::get('/admin/devices/{device}', [\App\Http\Controllers\Api\AdminDeviceController::class, 'show']);
+    Route::put('/admin/devices/{device}', [\App\Http\Controllers\Api\AdminDeviceController::class, 'update']);
+    Route::delete('/admin/devices/{device}', [\App\Http\Controllers\Api\AdminDeviceController::class, 'destroy']);
+    Route::get('/admin/discovery', [\App\Http\Controllers\Api\AdminDiscoveryController::class, 'index']);
+    Route::post('/admin/discovery/scan', [\App\Http\Controllers\Api\AdminDiscoveryController::class, 'scan']);
+    Route::post('/admin/discovery/add-all', [\App\Http\Controllers\Api\AdminDiscoveryController::class, 'addAll']);
+    Route::post('/admin/discovery/{record}/add', [\App\Http\Controllers\Api\AdminDiscoveryController::class, 'add']);
+    Route::post('/admin/discovery/{record}/ignore', [\App\Http\Controllers\Api\AdminDiscoveryController::class, 'ignore']);
+    Route::post('/admin/discovery/{record}/restore', [\App\Http\Controllers\Api\AdminDiscoveryController::class, 'restore']);
+
+    // Per-queue health, pause/resume, cancel and run-first of a queue's jobs (docs/api/admin-queues.md)
+    Route::get('/admin/queues', [\App\Http\Controllers\Api\AdminQueueController::class, 'index']);
+    Route::post('/admin/queues/{queue}/pause', [\App\Http\Controllers\Api\AdminQueueController::class, 'pause']);
+    Route::post('/admin/queues/{queue}/resume', [\App\Http\Controllers\Api\AdminQueueController::class, 'resume']);
+    Route::post('/admin/queues/{queue}/cancel', [\App\Http\Controllers\Api\AdminQueueController::class, 'cancel']);
+    Route::post('/admin/queues/{queue}/prioritise', [\App\Http\Controllers\Api\AdminQueueController::class, 'prioritise']);
 
     // Jobs for a ReMoment Node (docs/architecture/node-agent.md)
     Route::get('/admin/nodes/{client}/jobs', [\App\Http\Controllers\Api\AdminNodeJobController::class, 'index']);
     Route::post('/admin/nodes/{client}/jobs', [\App\Http\Controllers\Api\AdminNodeJobController::class, 'store']);
     Route::post('/admin/nodes/{client}/jobs/{job}/cancel', [\App\Http\Controllers\Api\AdminNodeJobController::class, 'cancel']);
+    // Ripping a CD on a node: check the disc, choose the release, progress (docs/api/rips.md)
+    Route::get('/admin/rips', [\App\Http\Controllers\Api\RipController::class, 'index']);
+    Route::post('/admin/rips', [\App\Http\Controllers\Api\RipController::class, 'store']);
+    Route::get('/admin/rips/{rip}', [\App\Http\Controllers\Api\RipController::class, 'show']);
+    Route::post('/admin/rips/{rip}/cancel', [\App\Http\Controllers\Api\RipController::class, 'cancel']);
     Route::delete('/admin/token', [AdminAuthController::class, 'logout']);
     Route::post('/admin/alerts/{alert}/ack', [AlertController::class, 'acknowledge']);
 

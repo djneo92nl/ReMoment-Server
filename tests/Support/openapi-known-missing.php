@@ -41,7 +41,6 @@ return [
         'GET /devices/{}/wireless-speakers',
         'POST /devices/{}/wireless-speakers/scan',
         'POST /librespot/event',
-        'GET /radio/{}/now',
     ],
 
     'stale' => [

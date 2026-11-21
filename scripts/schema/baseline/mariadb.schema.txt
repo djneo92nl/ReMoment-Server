@@ -777,6 +777,25 @@ TABLE storage_locations [engine=InnoDB collation=utf8mb4_unicode_ci]
   idx PRIMARY UNIQUE BTREE (id)
   idx storage_locations_name_unique UNIQUE BTREE (name)
 
+TABLE sync_artifacts [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col created_at timestamp NULL default=NULL
+  col error varchar(500) NULL default=NULL collate=utf8mb4_unicode_ci
+  col extension varchar(8) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col file_id bigint(20) unsigned NULL default=NULL
+  col fingerprint varchar(40) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
+  col last_used_at timestamp NULL default=NULL
+  col sha256 varchar(64) NULL default=NULL collate=utf8mb4_unicode_ci
+  col size bigint(20) unsigned NOT NULL default=0
+  col state varchar(12) NOT NULL default='preparing' collate=utf8mb4_unicode_ci
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx sync_artifacts_file_id_foreign INDEX BTREE (file_id)
+  idx sync_artifacts_fingerprint_unique UNIQUE BTREE (fingerprint)
+  idx sync_artifacts_last_used_at_index INDEX BTREE (last_used_at)
+  idx sync_artifacts_state_index INDEX BTREE (state)
+  fk sync_artifacts_file_id_foreign (file_id) -> files(id) ON DELETE SET NULL ON UPDATE RESTRICT
+
 TABLE sync_groups [engine=InnoDB collation=utf8mb4_unicode_ci]
   col created_at timestamp NULL default=NULL
   col id bigint(20) unsigned NOT NULL default=- extra=auto_increment
@@ -799,6 +818,30 @@ TABLE sync_group_members [engine=InnoDB collation=utf8mb4_unicode_ci]
   idx sync_group_members_sync_group_id_foreign INDEX BTREE (sync_group_id)
   fk sync_group_members_device_id_foreign (device_id) -> devices(id) ON DELETE CASCADE ON UPDATE RESTRICT
   fk sync_group_members_sync_group_id_foreign (sync_group_id) -> sync_groups(id) ON DELETE CASCADE ON UPDATE RESTRICT
+
+TABLE sync_targets [engine=InnoDB collation=utf8mb4_unicode_ci]
+  col active_job_id varchar(26) NULL default=NULL collate=utf8mb4_unicode_ci
+  col client_ref varchar(64) NULL default=NULL collate=utf8mb4_unicode_ci
+  col created_at timestamp NULL default=NULL
+  col id varchar(26) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col kind varchar(12) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col last_report longtext NULL default=NULL collate=utf8mb4_bin
+  col last_report_at timestamp NULL default=NULL
+  col last_run longtext NULL default=NULL collate=utf8mb4_bin
+  col name varchar(100) NOT NULL default=- collate=utf8mb4_unicode_ci
+  col node_id bigint(20) unsigned NULL default=NULL
+  col owned_bytes bigint(20) unsigned NOT NULL default=0
+  col owned_count int(10) unsigned NOT NULL default=0
+  col rules longtext NULL default=NULL collate=utf8mb4_bin
+  col rules_version int(10) unsigned NOT NULL default=1
+  col updated_at timestamp NULL default=NULL
+  idx PRIMARY UNIQUE BTREE (id)
+  idx sync_targets_client_ref_unique UNIQUE BTREE (client_ref)
+  idx sync_targets_node_id_foreign INDEX BTREE (node_id)
+  fk sync_targets_node_id_foreign (node_id) -> clients(id) ON DELETE SET NULL ON UPDATE RESTRICT
+  check last_report json_valid(`last_report`)
+  check last_run json_valid(`last_run`)
+  check rules json_valid(`rules`)
 
 TABLE tracks [engine=InnoDB collation=utf8mb4_unicode_ci]
   col album_id bigint(20) unsigned NULL default=NULL

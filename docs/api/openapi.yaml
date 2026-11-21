@@ -46,6 +46,7 @@ tags:
   - name: Players
   - name: Tags
   - name: Scenes
+  - name: Sync
   - name: Admin
 
 paths:
@@ -1147,6 +1148,30 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/FavoriteBody" }
+  /radio/{station}/now:
+    parameters:
+      - { name: station, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Radio]
+      summary: What a station plays now (refreshes the cached title)
+      description: "The `now` of the station item, read fresh: the song from the stream's ICY title or NTS. `null` while unknown. Open."
+      operationId: getRadioNow
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  now:
+                    type: object
+                    nullable: true
+                    properties:
+                      artist: { type: string, nullable: true }
+                      title: { type: string }
+                      source: { type: string, description: "icy | nts" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /devices/{device}/multiroom:
     parameters: [{ $ref: "#/components/parameters/device" }]
@@ -3126,6 +3151,33 @@ paths:
                   seed: { type: integer, description: The track the radio started from }
                   queued: { type: integer }
         "422": { $ref: "#/components/responses/DeviceError" }
+  /devices/{device}/library/play-daily-mix:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    post:
+      tags: [Library playback]
+      summary: Play the daily mix
+      operationId: playDailyMix
+      description: "Plays today's daily mix (the `daily_mix` section of GET /library/discover): songs you loved and have not played for a while, deep cuts (never played, on albums you love) and one track of albums you own and never played, in turns, only what the device can play, once. The same mix all day, a new one tomorrow. 422 `not_playable` when nothing is left to bring back, 422 `unsupported` without library playback. See docs/api/discover.md."
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                client: { type: string, description: "A client's api_token: hides what it hides" }
+                scope: { type: string, description: "local, streaming, all or a library id; default the leading source" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  queued: { type: integer }
+        "422": { $ref: "#/components/responses/DeviceError" }
   /devices/{device}/library/play-playlist:
     parameters: [{ $ref: "#/components/parameters/device" }]
     post:
@@ -3297,6 +3349,135 @@ paths:
             application/zip:
               schema: { type: string, format: binary }
         "401": { $ref: "#/components/responses/Unauthenticated" }
+  /admin/queues:
+    get:
+      tags: [Alerts]
+      summary: Health of every job queue (pending, oldest job age, running, failed in 24 hours, workers, paused)
+      description: |
+        One row per queue the server's workers serve (`docs/api/admin-queues.md`). `state` is `ok` (heartbeat ran), `busy`
+        (no heartbeat, a job runs within its allowed time), `stuck` (worker down or hung), `paused` or `unknown` (no heartbeat
+        for this queue). `lagging` is true when the oldest waiting job passed `lag_after_seconds` and nothing finished or
+        runs; the `queue.stuck` alert follows it. `workers` is null when the worker processes can't be counted.
+        `supported` is false for a queue driver that can't be listed (sync); `can_reorder` says whether `prioritise` works.
+      operationId: listQueues
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: The queues
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  driver: { type: string, example: redis }
+                  supported: { type: boolean }
+                  can_reorder: { type: boolean }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/QueueHealth" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+  /admin/queues/{queue}/pause:
+    post:
+      tags: [Alerts]
+      summary: Pause a queue (workers take no new job from it; a running job finishes)
+      description: Takes effect on the next poll of every worker, without restarting any. The `health` queue cannot be paused (422 `invalid`). Waiting jobs stay in place. A paused queue raises no alert.
+      operationId: pauseQueue
+      security: [{ adminToken: [] }]
+      parameters:
+        - { name: queue, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: The queue's row, `paused` true
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/QueueHealth" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { description: No such queue }
+        "422": { description: The queue cannot be paused }
+  /admin/queues/{queue}/resume:
+    post:
+      tags: [Alerts]
+      summary: Resume a paused queue
+      operationId: resumeQueue
+      security: [{ adminToken: [] }]
+      parameters:
+        - { name: queue, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: The queue's row, `paused` false
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/QueueHealth" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { description: No such queue }
+  /admin/queues/{queue}/cancel:
+    post:
+      tags: [Alerts]
+      summary: Cancel the waiting and delayed jobs of a queue, or of one job class in it
+      description: |
+        Removes jobs a worker has not taken; running jobs are never touched. A cancelled unique job gives its lock back, so
+        the same work can be queued again. Heartbeat jobs are never cancelled. `skipped_running` counts jobs a worker took
+        while this ran. Not undoable.
+      operationId: cancelQueueJobs
+      security: [{ adminToken: [] }]
+      parameters:
+        - { name: queue, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                job: { type: string, description: "A job class, short (EnrichTrackLyrics) or full name; every job when absent", example: EnrichTrackLyrics }
+      responses:
+        "200":
+          description: How many jobs were removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cancelled: { type: integer }
+                  skipped_running: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { description: No such queue }
+        "422": { description: "Validation failed, or the queue driver cannot be managed" }
+  /admin/queues/{queue}/prioritise:
+    post:
+      tags: [Alerts]
+      summary: Run the waiting jobs of a class before the rest of the queue
+      description: Moves them to the head of the queue in their order (redis driver). The database driver can't reorder and answers 422 `unsupported`; pause the other queues instead.
+      operationId: prioritiseQueueJobs
+      security: [{ adminToken: [] }]
+      parameters:
+        - { name: queue, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [job]
+              properties:
+                job: { type: string, example: AnalyzeAudioFile }
+      responses:
+        "200":
+          description: How many jobs moved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  moved: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { description: No such queue }
+        "422": { description: "Validation failed, or the driver can't reorder" }
   /announcements/clips:
     get:
       tags: [Playback]
@@ -3963,9 +4144,25 @@ paths:
     post:
       tags: [Clients]
       summary: Renew the lease of a running job; the answer says whether the admin cancelled it
+      description: Optionally carries `progress` (phase, track, tracks, percent, detail), kept for the job and shown by the admin API (a rip's progress).
       operationId: nodeJobProgress
       security: [{ nodeToken: [] }]
       parameters: [{ $ref: "#/components/parameters/nodeJob" }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                progress:
+                  type: object
+                  properties:
+                    phase: { type: string, maxLength: 30 }
+                    track: { type: integer, minimum: 0, maximum: 999 }
+                    tracks: { type: integer, minimum: 0, maximum: 999 }
+                    percent: { type: number, minimum: 0, maximum: 100 }
+                    detail: { type: string, maxLength: 200 }
       responses:
         "200":
           description: OK
@@ -4002,6 +4199,123 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { description: Invalid body }
+  /nodes/rippers:
+    get:
+      tags: [Clients]
+      summary: The nodes that can rip a CD (ripper role switched on) and whether a disc is in
+      description: Open. `disc` is the disc as of the last check (`POST /admin/rips` without a release), null when there was none or it is older than RIPPER_DISC_FRESH_SECONDS. Full profile. See docs/api/rips.md.
+      operationId: listRippers
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Ripper" }
+        "422": { description: "not_available_in_profile" }
+  /nodes/files:
+    post:
+      tags: [Clients]
+      summary: Upload one ripped audio file (called by a ripping node, Bearer = its client api_token)
+      description: |
+        The node's own token, not the admin token, and only while the node has a running `ripper.rip` job that was not cancelled (otherwise `403 no_rip_job`).
+        The same ingest as `POST /admin/files` (the Ripper app): an identical file that is already in the library is kept instead, so a retry is safe.
+      operationId: nodeUploadFile
+      security: [{ nodeToken: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "201":
+          description: Stored and indexed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  file: { type: object, properties: { id: { type: integer }, path: { type: string }, size: { type: integer }, hash: { type: string } } }
+                  track_id: { type: integer, nullable: true }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { description: "no_rip_job: the node has no running rip" }
+        "422": { description: "invalid: not audio, or unreadable" }
+  /admin/rips:
+    get:
+      tags: [Clients]
+      summary: Recent disc checks and rips of ripper nodes, newest first
+      operationId: listRips
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Rip" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+    post:
+      tags: [Clients]
+      summary: Check the disc in a node's drive, or (with `release_mbid`) rip it as that release
+      description: |
+        Without `release_mbid`: queues a disc check (`kind: probe`); an open check is returned again (200). When the node has answered and MusicBrainz was asked,
+        `GET /admin/rips/{id}` has state `choose_release` and the `candidates`. With `release_mbid` (one candidate, or any release with as many tracks as the disc):
+        queues the rip (`kind: rip`). Errors: `unsupported` (role not on), `node_offline` 503, `busy` 409, `not_probed`, `no_disc`, `not_audio`, `unknown_release`, `lookup_failed` 502.
+        See docs/api/rips.md.
+      operationId: startRip
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [node_id]
+              properties:
+                node_id: { type: integer }
+                release_mbid: { type: string, format: uuid }
+      responses:
+        "200": { description: The open check or rip that this request would have created, content: { application/json: { schema: { $ref: "#/components/schemas/Rip" } } } }
+        "202": { description: Queued, content: { application/json: { schema: { $ref: "#/components/schemas/Rip" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { description: "No such node" }
+        "409": { description: "busy: the node is ripping another disc" }
+        "422": { description: "A refusal (see description) or an invalid body" }
+        "503": { description: "node_offline" }
+  /admin/rips/{rip}:
+    get:
+      tags: [Clients]
+      summary: One disc check or rip, with progress, candidates, files and (rips) the log
+      operationId: getRip
+      security: [{ adminToken: [] }]
+      parameters: [{ name: rip, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Rip" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /admin/rips/{rip}/cancel:
+    post:
+      tags: [Clients]
+      summary: Cancel a check or rip (a running rip is told on its next progress call and stops)
+      operationId: cancelRip
+      security: [{ adminToken: [] }]
+      parameters: [{ name: rip, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Rip" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /admin/nodes/{client}/jobs:
     parameters: [{ name: client, in: path, required: true, schema: { type: integer } }]
     get:
@@ -4337,6 +4651,912 @@ paths:
             "*/*": { schema: { type: string, format: binary } }
         "206": { description: Partial content (Range request) }
         "404": { description: The track has no file }
+  /admin/health:
+    get:
+      tags: [Admin]
+      summary: Server health (the data of Settings › Health)
+      description: "Broker, scheduler and queue worker heartbeats, queue size, last backup and upgrade, radio relay, active alerts and every device with its listener. `ok` is one flag for a badge. See docs/api/admin-health.md."
+      operationId: getAdminHealth
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminHealth" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+  /admin/health/services:
+    get:
+      tags: [Admin]
+      summary: Cached probe results of the external services
+      operationId: listHealthServices
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthServices" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+  /admin/health/services/check:
+    post:
+      tags: [Admin]
+      summary: Run the external-service probes now
+      description: "Runs all probes, or only the ids in `only`; each has an 8 second timeout. Answers with the fresh list."
+      operationId: checkHealthServices
+      security: [{ adminToken: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                only: { type: array, minItems: 1, items: { type: string, example: musicbrainz }, description: "Probe ids from GET /admin/health/services" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthServices" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /admin/clients:
+    get:
+      tags: [Admin]
+      summary: Client registrations (pending first)
+      operationId: listAdminClients
+      security: [{ adminToken: [] }]
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [pending, approved] } }
+      responses:
+        "200":
+          description: OK (the API token is never in the list)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/AdminClient" } }
+                  pending: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+  /admin/clients/{client}:
+    parameters:
+      - { name: client, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Admin]
+      summary: One client, with its API token
+      operationId: getAdminClient
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminClientEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Admin]
+      summary: Edit a client (only the keys sent change)
+      operationId: updateClient
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, nullable: true, maxLength: 255 }
+                type: { type: string, enum: [single, multi], description: "A single client keeps at most one device" }
+                device_ids: { type: array, items: { type: integer }, description: "Replaces the list; existing devices only" }
+                roles: { type: array, items: { $ref: "#/components/schemas/NodeRole" }, description: "A node's roles switched on, within what it declared" }
+                hidden_sources: { type: array, items: { type: string }, description: "Library ids the client does not see (replaces the list)" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminClientEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [Admin]
+      summary: Remove a client (its token stops working)
+      operationId: deleteClient
+      security: [{ adminToken: [] }]
+      responses:
+        "200": { description: "{ status: ok }" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /admin/clients/{client}/approve:
+    parameters:
+      - { name: client, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Admin]
+      summary: Approve a pending registration (issues the API token)
+      operationId: approveClient
+      security: [{ adminToken: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type: { type: string, enum: [single, multi], default: single }
+                name: { type: string, nullable: true, maxLength: 255 }
+                roles: { type: array, items: { $ref: "#/components/schemas/NodeRole" }, description: "A node's declared roles to switch on; default none" }
+      responses:
+        "200":
+          description: OK (with the API token)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminClientEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "`not_pending`: already approved" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /admin/clients/{client}/reject:
+    parameters:
+      - { name: client, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Admin]
+      summary: Reject (remove) a pending registration
+      operationId: rejectClient
+      security: [{ adminToken: [] }]
+      responses:
+        "200": { description: "{ status: ok }" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "`not_pending`: an approved client is removed with DELETE" }
+  /admin/clients/{client}/regenerate-token:
+    parameters:
+      - { name: client, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Admin]
+      summary: A new API token for an approved client (the old one stops working)
+      operationId: regenerateClientToken
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK (with the new token)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminClientEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "`not_approved`: a pending registration has no token yet" }
+  /multiroom/presets:
+    get:
+      tags: [Multiroom]
+      summary: Multiroom presets (open, no admin token)
+      operationId: listMultiroomPresets
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/MultiroomPreset" } }
+    post:
+      tags: [Multiroom]
+      summary: Create a preset (the first device is the host)
+      operationId: createMultiroomPreset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, device_ids]
+              properties:
+                name: { type: string, maxLength: 100 }
+                device_ids: { type: array, minItems: 2, items: { type: integer }, description: "Distinct, existing devices; the first is the host" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MultiroomPresetEnvelope" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /multiroom/presets/{preset}:
+    parameters:
+      - { name: preset, in: path, required: true, schema: { type: integer } }
+    put:
+      tags: [Multiroom]
+      summary: Rename or regroup a preset
+      operationId: updateMultiroomPreset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 100 }
+                device_ids: { type: array, minItems: 2, items: { type: integer } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MultiroomPresetEnvelope" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [Multiroom]
+      summary: Delete a preset
+      operationId: deleteMultiroomPreset
+      responses:
+        "200": { description: "{ status: ok }" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /multiroom/presets/{preset}/activate:
+    parameters:
+      - { name: preset, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Multiroom]
+      summary: Make every other device of the preset join the first (the host)
+      operationId: activateMultiroomPreset
+      responses:
+        "200":
+          description: "`ok`, or `partial` when some devices failed (listed in `failed`)"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MultiroomPresetActivation" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "`invalid`: fewer than 2 of the preset's devices still exist" }
+        "502": { description: "`driver_error`: nobody could join (the body also has host, joined, failed)" }
+  /admin/radio-stations:
+    get:
+      tags: [Admin]
+      summary: Every radio station with its identifiers
+      operationId: listAdminRadioStations
+      security: [{ adminToken: [] }]
+      parameters:
+        - { name: q, in: query, schema: { type: string, maxLength: 100 }, description: Name filter }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/AdminRadioStation" } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+    post:
+      tags: [Admin]
+      summary: Add a radio station
+      operationId: createRadioStation
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - { $ref: "#/components/schemas/RadioStationInput" }
+                - { type: object, required: [name] }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminRadioStationEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /admin/radio-stations/search:
+    get:
+      tags: [Admin]
+      summary: Stream finder (radio-browser.info)
+      description: "Plain streams only; an empty list for under 2 characters or an unreachable directory."
+      operationId: searchRadioDirectory
+      security: [{ adminToken: [] }]
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, maxLength: 100 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/RadioDirectoryResult" } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /admin/radio-stations/directory:
+    post:
+      tags: [Admin]
+      summary: Add a stream-finder result as a station (once per stream URL)
+      operationId: addRadioFromDirectory
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - { $ref: "#/components/schemas/RadioDirectoryResult" }
+                - { type: object, required: [name, url] }
+      responses:
+        "201":
+          description: Added
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminRadioStationEnvelope" }
+        "200":
+          description: The station that already has this stream URL
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminRadioStationEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /admin/radio-stations/{station}:
+    parameters:
+      - { name: station, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Admin]
+      summary: One station with its identifiers
+      operationId: getAdminRadioStation
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminRadioStationEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Admin]
+      summary: Change a station (only the keys sent; an empty identifier removes it)
+      operationId: updateRadioStation
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RadioStationInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminRadioStationEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [Admin]
+      summary: Remove a station
+      operationId: deleteRadioStation
+      security: [{ adminToken: [] }]
+      responses:
+        "200": { description: "{ status: ok }" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /admin/device-models:
+    get:
+      tags: [Admin]
+      summary: What a device can be added as
+      operationId: listDeviceModels
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        brand: { type: string, example: Sonos }
+                        product: { type: string }
+                        driver_name: { type: string }
+                        virtual: { type: boolean, description: "No network address (Spotify)" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+  /admin/devices:
+    get:
+      tags: [Admin]
+      summary: Every device, hidden ones too
+      operationId: listAdminDevices
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/AdminDevice" } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+    post:
+      tags: [Admin]
+      summary: Add a device by hand (the driver follows from brand and product)
+      operationId: createDevice
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_name, device_brand_name, device_product_type]
+              properties:
+                device_name: { type: string, maxLength: 255 }
+                device_brand_name: { type: string, description: "From GET /admin/device-models" }
+                device_product_type: { type: string }
+                ip_address: { type: string, description: "Required unless the model is virtual" }
+                hidden: { type: boolean, default: false }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminDeviceEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /admin/devices/{device}:
+    parameters:
+      - { $ref: "#/components/parameters/device" }
+    get:
+      tags: [Admin]
+      summary: One device, with `hidden`
+      operationId: getAdminDevice
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminDeviceEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Admin]
+      summary: Edit a device (only the keys sent)
+      operationId: updateDevice
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                device_name: { type: string, maxLength: 255 }
+                ip_address: { type: string, nullable: true }
+                hidden: { type: boolean, description: "Out of the pickers; the device stays stored and listened to" }
+                device_brand_name: { type: string, description: "Together with device_product_type: picks the driver again" }
+                device_product_type: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminDeviceEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [Admin]
+      summary: Remove a device and its meta
+      operationId: deleteDevice
+      security: [{ adminToken: [] }]
+      responses:
+        "200": { description: "{ status: ok }" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /admin/discovery:
+    get:
+      tags: [Admin]
+      summary: The discovery inbox and the state of the last scan
+      operationId: getDiscovery
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  scan: { $ref: "#/components/schemas/DiscoveryScan" }
+                  data: { type: array, items: { $ref: "#/components/schemas/DiscoveredDevice" } }
+                  ignored: { type: array, items: { $ref: "#/components/schemas/DiscoveredDevice" } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+  /admin/discovery/scan:
+    post:
+      tags: [Admin]
+      summary: Queue a network scan (poll GET /admin/discovery)
+      description: "A scan that is already running is not started twice; the same state comes back."
+      operationId: startDiscoveryScan
+      security: [{ adminToken: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                hosts: { type: array, maxItems: 20, items: { type: string, example: 192.168.1.9 }, description: "Extra addresses probed directly (IPv4 or http(s) URL), for when multicast does not reach the server" }
+      responses:
+        "202":
+          description: Queued, or the scan that runs already
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  scan: { $ref: "#/components/schemas/DiscoveryScan" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+  /admin/discovery/add-all:
+    post:
+      tags: [Admin]
+      summary: Add every find that is not ignored as a device
+      operationId: addAllDiscovered
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  added: { type: integer }
+                  device_ids: { type: array, items: { type: integer } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+  /admin/discovery/{found}/add:
+    parameters:
+      - { name: found, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Admin]
+      summary: Add a find as a device
+      operationId: addDiscovered
+      security: [{ adminToken: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, nullable: true, maxLength: 255, description: "Default: the name it was found with" }
+      responses:
+        "201":
+          description: Added (the find leaves the inbox)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminDeviceEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /admin/discovery/{found}/ignore:
+    parameters:
+      - { name: found, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Admin]
+      summary: Set a find aside
+      operationId: ignoreDiscovered
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/DiscoveredDevice" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /admin/discovery/{found}/restore:
+    parameters:
+      - { name: found, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Admin]
+      summary: Bring an ignored find back
+      operationId: restoreDiscovered
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/DiscoveredDevice" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/sync/targets:
+    get:
+      tags: [Sync]
+      summary: Sync targets (a USB stick on a node, the iOS app's offline library)
+      description: "Admin token. Sync keeps a target filled with a rule-defined part of the library (docs/api/sync.md). Standard and Full profile with own files and ffmpeg (`features.sync`); Control answers `422 not_available_in_profile`."
+      operationId: listSyncTargets
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK, by name
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/SyncTarget" } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+    post:
+      tags: [Sync]
+      summary: Create a sync target (an app target is idempotent on `client_ref`)
+      description: "An `app` target needs the `client_ref` the install keeps (200 and the existing target when it is known); a `node` target needs an approved node that declares the `sync-target` role, one target per node. Rules are validated and defaults filled."
+      operationId: createSyncTarget
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, kind]
+              properties:
+                name: { type: string, maxLength: 100 }
+                kind: { type: string, enum: [app, node] }
+                client_ref: { type: string, maxLength: 64 }
+                node_id: { type: integer }
+                rules: { $ref: "#/components/schemas/SyncRules" }
+      responses:
+        "200": { description: The target of this `client_ref` already existed, content: { application/json: { schema: { $ref: "#/components/schemas/SyncTarget" } } } }
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/SyncTarget" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { description: Validation error (unknown selection type, unknown profile, flat layout for more than one playlist ...), content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /admin/sync/targets/{target}:
+    parameters:
+      - { name: target, in: path, required: true, schema: { type: string }, description: "Target id (a ULID)" }
+    get:
+      tags: [Sync]
+      summary: One sync target with its rules, last report and last run
+      operationId: getSyncTarget
+      security: [{ adminToken: [] }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SyncTarget" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Sync]
+      summary: Rename a target or change its rules (a changed rule set bumps `rules_version`)
+      operationId: updateSyncTarget
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 100 }
+                rules: { $ref: "#/components/schemas/SyncRules" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SyncTarget" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: Validation error, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+    delete:
+      tags: [Sync]
+      summary: Delete a target (files already on it stay; `409` while a job runs)
+      operationId: deleteSyncTarget
+      security: [{ adminToken: [] }]
+      responses:
+        "200": { description: Deleted, content: { application/json: { schema: { type: object, properties: { status: { type: string, enum: [ok] } } } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: A job for this target is running, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /admin/sync/targets/{target}/estimate:
+    parameters:
+      - { name: target, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Sync]
+      summary: What the rules would hold (the stored rules, or the `rules` sent), nothing stored or prepared
+      operationId: estimateSyncTarget
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rules: { $ref: "#/components/schemas/SyncRules" }
+                free_bytes: { type: integer, minimum: 0, description: "Free space of the target; caps the budget" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SyncEstimate" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: Validation error, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /admin/sync/targets/{target}/plan:
+    parameters:
+      - { name: target, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Sync]
+      summary: The stateless plan from what the target holds (its manifest) to what it should hold
+      description: "The client posts `have` (the manifest entries) and gets the changes: add, replace, move, remove and a count of kept entries. Nothing about the target's files is stored. Starts preparing the transcodes the plan needs (at most `SYNC_PREPARE_AHEAD` at once); entries are `preparing` until their artifact is ready, ask again then. Refused with `over_budget` (fill `all`), `nothing_to_sync` or `encoder_unavailable` (each with the estimate)."
+      operationId: planSyncTarget
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SyncPlanRequest" }
+      responses:
+        "200": { description: The plan, content: { application/json: { schema: { $ref: "#/components/schemas/SyncPlan" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: Validation error, or `over_budget` / `nothing_to_sync` / `encoder_unavailable` (these carry `estimate`)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Error" }
+                  - type: object
+                    properties:
+                      estimate: { $ref: "#/components/schemas/SyncEstimate" }
+  /admin/sync/targets/{target}/report:
+    parameters:
+      - { name: target, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Sync]
+      summary: What the executor applied, failed and released (counts and owned totals are kept, never the file list)
+      operationId: reportSyncTarget
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SyncReport" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { status: { type: string, enum: [ok] } } } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: Validation error, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /admin/sync/targets/{target}/run:
+    parameters:
+      - { name: target, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Sync]
+      summary: Sync now on the node of a node target (queues the node job `sync.apply`)
+      description: "`confirm: true` lets a plan with mass deletion (over 30 % of the owned files or over 500) go through; without it the node applies nothing destructive and reports `needs_confirmation`. One job per target: `409 target_busy`."
+      operationId: runSyncTarget
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, properties: { confirm: { type: boolean } } }
+      responses:
+        "202": { description: Queued, content: { application/json: { schema: { type: object, properties: { job_id: { type: string }, status: { type: string, enum: [queued] } } } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "target_busy", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "422": { description: "`not_a_node_target` or `node_unavailable`", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+    delete:
+      tags: [Sync]
+      summary: Cancel the running or queued job of the target (the node finishes the current file, writes its manifest and stops)
+      operationId: cancelSyncRun
+      security: [{ adminToken: [] }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { cancelled: { type: boolean } } } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /admin/sync/targets/{target}/volume:
+    parameters:
+      - { name: target, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Sync]
+      summary: Read the drive of a node target (`scan`) or claim an unmarked one for this target (`claim`)
+      description: "`scan` reports the marker, filesystem, size, free space and what the manifest holds, and writes nothing. `claim` writes `.remoment-sync/target.json` on a volume without a marker; a volume that has one is refused. Nothing is ever formatted. The answer is read from the node job (`GET /admin/nodes/{id}/jobs`)."
+      operationId: volumeSyncTarget
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [action], properties: { action: { type: string, enum: [scan, claim] } } }
+      responses:
+        "202": { description: Queued, content: { application/json: { schema: { type: object, properties: { job_id: { type: string }, status: { type: string, enum: [queued] } } } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "target_busy", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "422": { description: "`not_a_node_target`, `node_unavailable` or a validation error", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /admin/sync/files/{target}/{key}/{fingerprint}:
+    get:
+      tags: [Sync]
+      summary: One file of a sync, with the admin token
+      description: "The same file as the signed URL of a plan, for clients that can send a header. Supports Range. `404 stale` when the fingerprint is not the right one any more (plan again), `409 preparing` while the artifact is being made (ask again shortly, never a failure)."
+      operationId: downloadSyncFile
+      security: [{ adminToken: [] }]
+      parameters:
+        - { name: target, in: path, required: true, schema: { type: string } }
+        - { name: key, in: path, required: true, schema: { type: string }, description: "`track:{id}`" }
+        - { name: fingerprint, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: The file, content: { application/octet-stream: { schema: { type: string, format: binary } } } }
+        "206": { description: Partial content (Range request), content: { application/octet-stream: { schema: { type: string, format: binary } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { description: "`not_found` or `stale`", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "409": { description: "`preparing`", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "502": { description: "`failed`: the artifact could not be made", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /sync/files/{target}/{key}/{fingerprint}:
+    get:
+      tags: [Sync]
+      summary: One file of a sync, signed (no token)
+      description: "The URL from a plan: `expires` and `signature` are the authorization (403 without a valid one), valid 6 hours (`SYNC_URL_HOURS`) and bound to this target, key and fingerprint. Supports Range, so a background download resumes; a re-plan mints fresh URLs."
+      operationId: downloadSyncFileSigned
+      parameters:
+        - { name: target, in: path, required: true, schema: { type: string } }
+        - { name: key, in: path, required: true, schema: { type: string } }
+        - { name: fingerprint, in: path, required: true, schema: { type: string } }
+        - { name: expires, in: query, required: true, schema: { type: integer } }
+        - { name: signature, in: query, required: true, schema: { type: string } }
+      responses:
+        "200": { description: "The file; `X-Sync-Sha256` carries its SHA-256 when known", content: { application/octet-stream: { schema: { type: string, format: binary } } } }
+        "206": { description: Partial content (Range request), content: { application/octet-stream: { schema: { type: string, format: binary } } } }
+        "403": { description: Missing, invalid or expired signature, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "404": { description: "`not_found` or `stale`", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "409": { description: "`preparing`", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "502": { description: "`failed`", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /nodes/sync/plan:
+    post:
+      tags: [Sync]
+      summary: The plan for the node's own target (the node's `sync.apply` job calls this)
+      description: "Bearer node token. A node can only plan for the target bound to it (`403` for another), `401` for an unknown token. Same body and answer as POST /admin/sync/targets/{target}/plan, plus `target_id`."
+      operationId: planSyncNode
+      security: [{ nodeToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - { $ref: "#/components/schemas/SyncPlanRequest" }
+                - type: object
+                  required: [target_id]
+                  properties:
+                    target_id: { type: string }
+      responses:
+        "200": { description: The plan, content: { application/json: { schema: { $ref: "#/components/schemas/SyncPlan" } } } }
+        "401": { description: Unknown node token, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "403": { description: Not the node's target, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "422": { description: "Validation error, over_budget, nothing_to_sync or encoder_unavailable", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /nodes/sync/report:
+    post:
+      tags: [Sync]
+      summary: The node's report after a sync (applied, failed, released, owned totals, free space)
+      operationId: reportSyncNode
+      security: [{ nodeToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - { $ref: "#/components/schemas/SyncReport" }
+                - type: object
+                  required: [target_id]
+                  properties:
+                    target_id: { type: string }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { status: { type: string, enum: [ok] } } } } } }
+        "401": { description: Unknown node token, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "403": { description: Not the node's target, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
 
 components:
   securitySchemes:
@@ -4399,6 +5619,15 @@ components:
           schema: { $ref: "#/components/schemas/Error" }
     NotFound:
       description: Unknown id (also a record merged away by library:merge-duplicates)
+    ValidationError:
+      description: "Laravel validation: `{ message, errors: { field: [messages] } }`"
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message: { type: string }
+              errors: { type: object, additionalProperties: { type: array, items: { type: string } } }
     NotAvailableInProfile:
       description: "`not_available_in_profile`: the feature is not part of the profile this server runs (`GET /api/info` `features.profile`); the body also has `profile`, `required_profile` and `message`"
       content:
@@ -4433,6 +5662,25 @@ components:
               playlist: { type: string }
 
   schemas:
+    QueueHealth:
+      type: object
+      properties:
+        queue: { type: string, example: heavy }
+        state: { type: string, enum: [ok, busy, stuck, paused, unknown] }
+        paused: { type: boolean }
+        pausable: { type: boolean, description: "false for `health`" }
+        waiting: { type: integer }
+        delayed: { type: integer }
+        running: { type: integer, description: "Jobs a worker has reserved" }
+        oldest_waiting_at: { type: string, format: date-time, nullable: true }
+        oldest_age_seconds: { type: integer, nullable: true }
+        workers: { type: integer, nullable: true, description: "Worker processes listening on the queue; null when unknown" }
+        worker: { type: string, enum: [present, absent, unknown] }
+        failed_24h: { type: integer }
+        last_progress_at: { type: string, format: date-time, nullable: true, description: "When a job of the queue last finished" }
+        heartbeat_at: { type: string, format: date-time, nullable: true }
+        lag_after_seconds: { type: integer }
+        lagging: { type: boolean }
     SceneStep:
       type: object
       description: "An operation step (operation + device_id + params) or a delay step (type delay + seconds, 1 to 60)"
@@ -4611,7 +5859,19 @@ components:
             scenes: { type: boolean, description: "GET /scenes exists (true in every profile)" }
             similar_tracks: { type: boolean, description: "At least one own file has a sound embedding (analysis with the ML sidecar, Full profile), so GET /library/tracks/{id}/similar and POST /devices/{id}/library/play-similar can answer. Present only when true; a single track still answers 422 not_analysed until its own file has one. See docs/api/similar-tracks.md." }
             export: { type: boolean, description: "Export from the library as zip is available: the profile has the library and own files, and ffmpeg can transcode (POST /library/exports). Present only when true." }
+            sync: { type: boolean, description: "Sync to offline targets is available (POST /admin/sync/targets/{target}/plan): the profile has the library and own files and ffmpeg can make the transcodes. Present only when true." }
             export_formats: { type: array, items: { type: string, enum: [mp3, aac, opus] }, description: "The formats ffmpeg on this server can make for an export (probed with `ffmpeg -encoders`, cached); present with `export`. Profiles of other formats cannot convert files here." }
+            stems_weights: { type: string, enum: [missing, downloading, ready, failed], description: "State of the opt-in Demucs weights download (see GET /stems/weights), present only with a stems service in a profile that runs deep analysis (cached 30 s). `stems` and `stem_audio` are in deep_analysis_kinds only at `ready`." }
+            discover: { type: boolean, description: "GET /library/discover can answer (the profile has the library). Present only when true." }
+            rip: { type: boolean, description: "The profile takes rip uploads from the ripper app (Full, with own-file storage). Present only when true." }
+            media_servers: { type: boolean, description: "At least one enabled media server has complete credentials (GET /media-servers, GET /devices/{id}/media). Present only when true." }
+            sleep_timer: { type: boolean, description: "The server-side sleep timer POST|GET|DELETE /devices/{id}/sleep exists (every profile; needs a real queue). Present only when true." }
+            nodes: { type: boolean, description: "Nodes (clients with kind node) can register and take jobs (every profile). Present only when true." }
+            line_in: { type: boolean, description: "An approved node has the line-in role switched on, so GET /line-ins lists something. Present only when true." }
+            sub_devices: { type: boolean, description: "host and sub_devices in the device detail and the admin link routes (every profile). Present only when true." }
+            push: { type: boolean, description: "The server holds a VAPID key pair, so POST /push/subscribe can deliver Web Push (web only; a native app does not use it). Present only when true." }
+            ha_discovery: { type: boolean, description: "Home Assistant MQTT discovery is switched on. Present only when true." }
+            podcasts: { type: boolean, description: "Reserved: podcasts are not built yet, the key never appears until they are." }
 
     ExportRequest:
       type: object
@@ -4682,6 +5942,150 @@ components:
             max_gb: { type: number }
             part_gb: { type: number }
             dir_max_gb: { type: number }
+    SyncRules:
+      type: object
+      description: "The rule set of a target (docs/api/sync.md). Defaults are filled on save: profile `EXPORT_DEFAULT_PROFILE`, fill `all` (`priority` with a budget), layout `tree`, reserve 5 %, max churn 25 %."
+      properties:
+        selections:
+          type: array
+          description: "In priority order. A track belongs to the first selection that has it."
+          items:
+            type: object
+            required: [type]
+            properties:
+              type: { type: string, enum: [playlist, album, artist, favorites, recently_added, most_played] }
+              id: { type: integer, description: "playlist, album and artist (ids of merged records resolve through the aliases; an id that no longer exists is skipped with a warning)" }
+              limit: { type: integer, minimum: 1, description: "recently_added and most_played (most_played default 200)" }
+              days: { type: integer, minimum: 1, description: "recently_added and most_played" }
+        profile: { type: string, description: "An export profile (highest, mp3-*, compat, aac-*, opus-*)" }
+        options:
+          type: object
+          properties:
+            loudness: { type: string, enum: [off, album, track], default: off, description: "Baked into transcoded files only; the album mean is taken over the whole album, so a selection change never moves a level" }
+            layout: { type: string, enum: [tree, flat], default: tree, description: "flat (`Artist - Title.ext`) only for exactly one playlist" }
+        budget:
+          type: object
+          properties:
+            bytes: { type: integer, nullable: true, description: "The most the target may hold; null = no cap (free space still caps it)" }
+            reserve_percent: { type: integer, minimum: 0, maximum: 50, default: 5 }
+        fill: { type: string, enum: [all, priority, fill_rest], description: "all: everything or refuse with over_budget; priority: selections in order, whole albums together, the first unit that does not fit stops its selection; fill_rest: priority, then the rest of the budget with favourites, most played and newest. Tracks already on the target stay while they fit (sticky)." }
+        max_churn_percent: { type: integer, minimum: 0, maximum: 100, default: 25, description: "When only the library moved (the manifest's rules_version is the current one), a plan adds and drops at most this percent of the owned bytes; the rest waits for the next sync. 0 = unlimited." }
+    SyncTarget:
+      type: object
+      properties:
+        id: { type: string, description: "ULID; the id written into the marker on a node target's volume" }
+        name: { type: string }
+        kind: { type: string, enum: [app, node] }
+        client_ref: { type: string, nullable: true }
+        node_id: { type: integer, nullable: true }
+        node: { type: object, nullable: true, properties: { id: { type: integer }, name: { type: string, nullable: true } } }
+        rules: { $ref: "#/components/schemas/SyncRules" }
+        rules_version: { type: integer }
+        owned_bytes: { type: integer }
+        owned_count: { type: integer }
+        last_report: { type: object, nullable: true, description: "applied, failed, released counts, failures (first 20), owned_bytes, owned_count, free_bytes" }
+        last_report_at: { type: string, format: date-time, nullable: true }
+        last_run: { type: object, nullable: true, description: "The latest `sync.apply` of a node target: job_id, state (succeeded, failed, lost, expired, cancelled), result_state (done or needs_confirmation), started_at, finished_at, summary, error" }
+        running: { type: boolean, description: "A node job for this target is queued or running" }
+        created_at: { type: string, format: date-time }
+    SyncEstimate:
+      type: object
+      properties:
+        tracks: { type: integer, description: "Tracks the selections give that have an own file" }
+        bytes: { type: integer, description: "Their estimated size" }
+        wanted: { type: integer, description: "What fits the budget and fill policy" }
+        wanted_bytes: { type: integer }
+        copied: { type: integer }
+        transcoded: { type: integer }
+        skipped: { type: integer, description: "Tracks without an own file" }
+        over_budget: { type: boolean }
+        budget_bytes: { type: integer, nullable: true, description: "Usable bytes after the reserve" }
+        deferred: { type: object, properties: { count: { type: integer }, bytes: { type: integer } } }
+        profile: { type: string }
+        fill: { type: string }
+        format: { type: object, nullable: true }
+        warnings: { type: array, items: { $ref: "#/components/schemas/SyncWarning" } }
+    SyncWarning:
+      type: object
+      description: "`no_own_file` (count), `selection_not_found` (type, id), `too_large_for_fat32` (count, examples), `artifact_cache_off` (count)"
+      properties:
+        code: { type: string }
+        count: { type: integer }
+    SyncEntry:
+      type: object
+      description: "A manifest entry: what the target holds"
+      required: [key, fingerprint, path]
+      properties:
+        key: { type: string, description: "`track:{canonical track id}`, survives renames and re-tagging" }
+        fingerprint: { type: string, description: "Which bytes: the file's content hash for a copy, a sha1 of the source and the encode for a transcode (computable without transcoding)" }
+        path: { type: string, description: "Relative to the volume root, `/`-separated" }
+        size: { type: integer }
+        mtime: { type: integer }
+    SyncPlanRequest:
+      type: object
+      required: [have]
+      properties:
+        have: { type: array, items: { $ref: "#/components/schemas/SyncEntry" }, description: "The target's manifest (at most 200000 entries; a duplicate key is a 422)" }
+        free_bytes: { type: integer, minimum: 0, description: "Free space of the target; the budget is held to it plus what the target already owns" }
+        fs: { type: string, description: "Filesystem of the volume (vfat, exfat, ext4 ...): a file over 4 GB is skipped on FAT" }
+        rules_version: { type: integer, description: "The `rules_version` in the target's manifest; equal to the current one means only the library moved (churn limit applies)" }
+    SyncPlanOperation:
+      type: object
+      properties:
+        key: { type: string }
+        path: { type: string }
+        fingerprint: { type: string }
+        size: { type: integer, description: "The real size once the artifact is ready, else the estimate" }
+        sha256: { type: string, nullable: true }
+        state: { type: string, enum: [ready, preparing, failed] }
+        url: { type: string, nullable: true, description: "Signed, relative, valid 6 hours; put the server address in front. Null unless ready." }
+        error: { type: string }
+        from_path: { type: string, description: "replace: the path the old file has" }
+        from_size: { type: integer }
+    SyncPlan:
+      type: object
+      properties:
+        target_id: { type: string }
+        rules_version: { type: integer }
+        add: { type: array, items: { $ref: "#/components/schemas/SyncPlanOperation" } }
+        replace: { type: array, items: { $ref: "#/components/schemas/SyncPlanOperation" } }
+        move:
+          type: array
+          items: { type: object, properties: { key: { type: string }, path: { type: string }, from_path: { type: string } } }
+        keep: { type: integer, description: "Entries that stay as they are (a count, not listed)" }
+        remove:
+          type: array
+          description: "Only entries of the `have` that was sent: only something the server wrote can be removed"
+          items: { type: object, properties: { key: { type: string }, path: { type: string }, size: { type: integer } } }
+        path_conflicts: { type: array, items: { type: object }, description: "Expected empty: the planner avoids paths that another staying entry holds" }
+        totals:
+          type: object
+          properties:
+            bytes_to_add: { type: integer }
+            bytes_freed: { type: integer }
+            net_bytes: { type: integer }
+            wanted: { type: integer }
+            wanted_bytes: { type: integer }
+            copied: { type: integer }
+            transcoded: { type: integer }
+            ready: { type: integer }
+            preparing: { type: integer }
+            failed: { type: integer }
+        warnings: { type: array, items: { $ref: "#/components/schemas/SyncWarning" } }
+        deferred: { type: object, properties: { count: { type: integer }, bytes: { type: integer } }, description: "New tracks held back by the churn limit" }
+        confirm_required: { type: boolean, description: "The plan removes over 30 % of the owned entries or over 500 files (or the selection list is empty): an unattended executor applies nothing destructive" }
+        remove_first: { type: boolean, description: "The additions do not fit in the free space: remove before adding" }
+        budget_bytes: { type: integer, nullable: true }
+    SyncReport:
+      type: object
+      properties:
+        rules_version: { type: integer }
+        applied: { type: array, items: { type: string }, description: "Keys applied" }
+        failed: { type: array, items: { type: object, properties: { key: { type: string }, error: { type: string } } } }
+        released: { type: array, items: { type: string }, description: "Keys the user changed on the target: no longer managed" }
+        owned_bytes: { type: integer }
+        owned_count: { type: integer }
+        free_bytes: { type: integer }
     Export:
       type: object
       properties:
@@ -5990,8 +7394,9 @@ components:
       type: object
       properties:
         id: { type: string }
-        type: { type: string, enum: [ping] }
+        type: { type: string, enum: [ping, line_in.start, line_in.stop, ripper.status, ripper.rip] }
         role: { type: string, nullable: true }
+        progress: { type: object, nullable: true, description: "The last progress the node reported (phase, track, tracks, percent, detail, at)" }
         params: { type: object, additionalProperties: true }
         state: { type: string, enum: [queued, accepted, running, succeeded, failed, cancelled, expired, lost] }
         cancel_requested: { type: boolean }
@@ -6001,6 +7406,69 @@ components:
         error: { type: string, nullable: true }
         created_at: { type: string, format: date-time }
         finished_at: { type: string, format: date-time, nullable: true }
+    Ripper:
+      type: object
+      properties:
+        id: { type: integer, description: "The node's id (client id)" }
+        name: { type: string }
+        node_online: { type: boolean }
+        node_state: { type: string, description: "idle, busy, error, absent or unknown (the node's own report)" }
+        detail: { type: string, nullable: true }
+        drive: { type: string, nullable: true }
+        engine: { type: string, nullable: true }
+        disc:
+          type: object
+          nullable: true
+          properties:
+            present: { type: boolean }
+            audio: { type: boolean }
+            disc_id: { type: string, nullable: true, description: "MusicBrainz disc id computed from the TOC" }
+            tracks: { type: integer }
+            checked_at: { type: string, format: date-time }
+        busy: { type: boolean }
+        rip_id: { type: string, nullable: true }
+        probe_id: { type: string, nullable: true }
+    RipCandidate:
+      type: object
+      properties:
+        release_mbid: { type: string }
+        release_group_mbid: { type: string, nullable: true }
+        artist: { type: string }
+        title: { type: string }
+        year: { type: integer, nullable: true }
+        label: { type: string, nullable: true }
+        catalogue_number: { type: string, nullable: true }
+        country: { type: string, nullable: true }
+        barcode: { type: string, nullable: true }
+        disc: { type: integer }
+        discs: { type: integer }
+        track_count: { type: integer }
+        tracks:
+          type: array
+          items: { type: object, properties: { number: { type: integer }, title: { type: string }, artist: { type: string, nullable: true }, length: { type: integer, nullable: true } } }
+    Rip:
+      type: object
+      description: "A disc check (kind probe) or a rip (kind rip); the id is its job id."
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [probe, rip] }
+        node_id: { type: integer }
+        node_name: { type: string, nullable: true }
+        state: { type: string, enum: [probing, looking_up, no_disc, not_audio, choose_release, queued, ripping, uploading, done, failed, cancelled] }
+        error: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time, nullable: true }
+        disc: { type: object, nullable: true, description: "probe only: present, audio, disc_id, tracks" }
+        lookup: { type: string, nullable: true, enum: [discid, toc, none], description: "probe only: how MusicBrainz matched the disc" }
+        lookup_error: { type: string, nullable: true }
+        candidates: { type: array, nullable: true, items: { $ref: "#/components/schemas/RipCandidate" }, description: "probe only: null while the lookup runs" }
+        release: { type: object, description: "rip only: release_mbid, artist, title, year, barcode, tracks" }
+        disc_id: { type: string, description: "rip only" }
+        progress: { type: object, nullable: true, description: "rip only: phase (ripping, uploading), track, tracks, percent, detail" }
+        percent: { type: integer, nullable: true, description: "rip only: overall, ripping the first 90 %, upload the rest" }
+        files: { type: array, items: { type: integer }, description: "rip only: ids of the files the node uploaded" }
+        warnings: { type: array, items: { type: string } }
+        log: { type: string, nullable: true, description: "rip only, GET /admin/rips/{id} only: the ripper's log" }
     NodeRole:
       type: string
       enum: [ripper, line-in, player, sync-target]
@@ -6096,3 +7564,255 @@ components:
         volume: { type: integer, minimum: 0, maximum: 100 }
         muted: { type: boolean }
         ended: { type: boolean, description: "The track finished; the server sends the next `play` (or `stop`)" }
+    AdminHealth:
+      type: object
+      description: "GET /admin/health; see docs/api/admin-health.md"
+      properties:
+        ok: { type: boolean, description: "Broker up, scheduler and queue worker beating, last backup fresh and no active warning or critical alert" }
+        version: { type: string }
+        broker:
+          type: object
+          properties:
+            ok: { type: boolean }
+            address: { type: string }
+            error: { type: string, nullable: true }
+            ws_url: { type: string }
+        supervisor:
+          type: object
+          properties:
+            running: { type: boolean, nullable: true, description: "null where it cannot be told" }
+        scheduler: { $ref: "#/components/schemas/AdminHealthHeartbeat" }
+        queue_worker: { $ref: "#/components/schemas/AdminHealthHeartbeat" }
+        queue:
+          type: object
+          properties:
+            pending: { type: integer, nullable: true }
+            failed: { type: integer, nullable: true }
+        backup:
+          type: object
+          properties:
+            ok: { type: boolean }
+            last_at: { type: string, format: date-time, nullable: true }
+        upgrade:
+          type: object
+          nullable: true
+          description: "The last entry of the upgrade history"
+          properties:
+            from: { type: string, nullable: true }
+            to: { type: string }
+            at: { type: string, format: date-time }
+            result: { type: string }
+            backup: { type: string, nullable: true }
+        radio_relay:
+          type: object
+          description: "As GET /radio/relays"
+          properties:
+            enabled: { type: boolean }
+            manager: { type: boolean }
+            max: { type: integer }
+            data: { type: array, items: { type: object } }
+        alerts:
+          type: object
+          properties:
+            active: { type: integer }
+            warning_or_critical: { type: integer }
+            data: { type: array, items: { $ref: "#/components/schemas/Alert" } }
+        devices:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              name: { type: string }
+              state: { type: string, nullable: true, enum: [playing, standby, paused, unreachable] }
+              last_seen: { type: string, nullable: true }
+              volume: { type: integer, nullable: true }
+              listener:
+                type: object
+                properties:
+                  running: { type: boolean }
+                  state: { type: string, nullable: true }
+                  since: { type: string, format: date-time, nullable: true }
+                  failures: { type: integer }
+                  last_error: { type: string, nullable: true }
+                  retry_at: { type: string, format: date-time, nullable: true }
+        ip_changes:
+          type: array
+          items:
+            type: object
+            properties:
+              device_id: { type: integer }
+              name: { type: string }
+              from: { type: string, nullable: true }
+              to: { type: string, nullable: true }
+              at: { type: string, format: date-time }
+    AdminHealthHeartbeat:
+      type: object
+      properties:
+        ok: { type: boolean, description: "Beat within the last 3 minutes" }
+        last_beat_at: { type: string, format: date-time, nullable: true }
+    HealthServices:
+      type: object
+      properties:
+        checked_at: { type: string, format: date-time, nullable: true }
+        problems: { type: integer, description: "Probes with status error or warning" }
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, example: musicbrainz }
+              name: { type: string }
+              group: { type: string }
+              status: { type: string, enum: [ok, warning, error, disabled] }
+              message: { type: string, description: "Secrets redacted" }
+    AdminClient:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string, nullable: true }
+        kind: { type: string, enum: [client, node] }
+        type: { type: string, enum: [single, multi] }
+        status: { type: string, enum: [pending, approved] }
+        pairing_code: { type: string, nullable: true, description: "Only while pending" }
+        hardware_id: { type: string, nullable: true }
+        ip_address: { type: string, nullable: true }
+        firmware_version: { type: string, nullable: true }
+        build_number: { type: string, nullable: true }
+        battery:
+          type: object
+          nullable: true
+          properties:
+            level: { type: integer }
+            charging: { type: boolean }
+        last_seen_at: { type: string, format: date-time, nullable: true }
+        approved_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time, nullable: true }
+        devices:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              name: { type: string }
+        hidden_sources: { type: array, items: { type: string } }
+        roles: { type: array, items: { $ref: "#/components/schemas/NodeRole" }, description: "What a node declared" }
+        enabled_roles: { type: array, items: { $ref: "#/components/schemas/NodeRole" }, description: "What the admin switched on" }
+        api_token: { type: string, description: "Only in GET /admin/clients/{id}, approve and regenerate-token, never in the list" }
+    AdminClientEnvelope:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/AdminClient" }
+    MultiroomPreset:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        device_ids: { type: array, items: { type: integer }, description: "In order; the first is the host" }
+        devices:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              name: { type: string }
+    MultiroomPresetEnvelope:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/MultiroomPreset" }
+    MultiroomPresetActivation:
+      type: object
+      properties:
+        status: { type: string, enum: [ok, partial, failed] }
+        host:
+          type: object
+          properties:
+            id: { type: integer }
+            name: { type: string }
+        joined:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              name: { type: string }
+        failed:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              name: { type: string }
+              message: { type: string }
+    RadioStationInput:
+      type: object
+      properties:
+        name: { type: string, maxLength: 255 }
+        genre: { type: string, nullable: true, maxLength: 100 }
+        image_url: { type: string, format: uri, nullable: true }
+        identifiers:
+          type: object
+          additionalProperties: { type: string, nullable: true }
+          description: "Platform => identifier (`url`, `beoradio`, `tunein` ...); `url` must be a URL. An empty value removes that identifier (on create it is skipped). Names are lowercase letters, digits and underscores."
+    AdminRadioStation:
+      allOf:
+        - { $ref: "#/components/schemas/RadioStation" }
+        - type: object
+          properties:
+            image_url: { type: string, nullable: true, description: "The logo as stored" }
+            identifiers: { type: object, additionalProperties: { type: string }, description: "Sorted by platform; {} when none" }
+    AdminRadioStationEnvelope:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/AdminRadioStation" }
+    RadioDirectoryResult:
+      type: object
+      description: "A station of radio-browser.info (a plain stream)"
+      properties:
+        name: { type: string }
+        url: { type: string, format: uri }
+        image_url: { type: string, format: uri, nullable: true }
+        genre: { type: string, nullable: true }
+        codec: { type: string, nullable: true }
+        bitrate: { type: integer, nullable: true }
+        country: { type: string, nullable: true }
+        uuid: { type: string, nullable: true, description: "radio-browser.info id, kept as the radio_browser_uuid identifier" }
+        homepage: { type: string, nullable: true }
+    AdminDevice:
+      allOf:
+        - { $ref: "#/components/schemas/DeviceList" }
+        - type: object
+          properties:
+            hidden: { type: boolean, description: "Out of the pickers; the device stays stored and listened to" }
+    AdminDeviceEnvelope:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/AdminDevice" }
+    DiscoveredDevice:
+      type: object
+      description: "A device a scan found that is not added yet"
+      properties:
+        id: { type: integer }
+        device_name: { type: string }
+        ip_address: { type: string }
+        device_brand_name: { type: string }
+        device_product_type: { type: string }
+        device_driver_name: { type: string }
+        last_seen_at: { type: string, format: date-time, nullable: true }
+        ignored: { type: boolean }
+    DiscoveryScan:
+      type: object
+      properties:
+        state: { type: string, enum: [idle, running, done, failed], description: "failed also when a running scan did not report back for 3 minutes (no queue worker)" }
+        started_at: { type: string, format: date-time, nullable: true }
+        finished_at: { type: string, format: date-time, nullable: true }
+        error: { type: string, nullable: true }
+        result:
+          type: object
+          nullable: true
+          properties:
+            found: { type: integer }
+            new: { type: integer }
+            known: { type: integer }
+            summary: { type: string }
+            diagnostics: { type: array, items: { type: string } }
