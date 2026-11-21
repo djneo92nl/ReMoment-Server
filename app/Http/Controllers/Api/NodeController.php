@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Domain\Node\NodeJobs;
+use App\Domain\Ripper\Rips;
+use App\Http\Controllers\Api\Concerns\AuthenticatesNode;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\NodeJob;
@@ -15,15 +17,7 @@ use Illuminate\Http\Request;
  */
 class NodeController extends Controller
 {
-    private function node(Request $request): Client
-    {
-        $token = $request->bearerToken();
-        $node = $token ? Client::where('api_token', $token)->first() : null;
-
-        abort_if($node === null || !$node->isNode() || $node->status !== 'approved', 401, 'Unknown node token.');
-
-        return $node;
-    }
+    use AuthenticatesNode;
 
     private function job(Client $node, string $id): NodeJob
     {
@@ -57,8 +51,16 @@ class NodeController extends Controller
     public function progress(Request $request, string $job): JsonResponse
     {
         $row = $this->job($this->node($request), $job);
+        $data = $request->validate([
+            'progress' => ['nullable', 'array'],
+            'progress.phase' => ['nullable', 'string', 'max:30'],
+            'progress.track' => ['nullable', 'integer', 'min:0', 'max:999'],
+            'progress.tracks' => ['nullable', 'integer', 'min:0', 'max:999'],
+            'progress.percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'progress.detail' => ['nullable', 'string', 'max:200'],
+        ]);
 
-        if (!NodeJobs::progress($row)) {
+        if (!NodeJobs::progress($row, $data['progress'] ?? null)) {
             return response()->json(['error' => 'conflict', 'message' => "Job is {$row->fresh()->state}."], 409);
         }
 
@@ -78,6 +80,9 @@ class NodeController extends Controller
             return response()->json(['job' => $row->toPayload()]); // idempotent
         }
 
-        return response()->json(['job' => NodeJobs::finish($row, (bool) $data['ok'], $data['result'] ?? null, $data['error'] ?? null)->toPayload()]);
+        $finished = NodeJobs::finish($row, (bool) $data['ok'], $data['result'] ?? null, $data['error'] ?? null);
+        Rips::afterFinish($finished);
+
+        return response()->json(['job' => $finished->toPayload()]);
     }
 }

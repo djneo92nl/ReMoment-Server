@@ -48,6 +48,7 @@ class ReMomentServer extends Server
         Tools\Catalogue::class,
         Tools\External::class,
         Tools\Physical::class,
+        Tools\Rips::class,
         Tools\Tags::class,
         Tools\Scenes::class,
         Tools\Announce::class,

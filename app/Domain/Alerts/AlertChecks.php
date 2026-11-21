@@ -26,7 +26,7 @@ final class AlertChecks
 {
     public function runAll(): void
     {
-        foreach (['scheduler', 'queues', 'backup', 'storage', 'mounts', 'devices', 'nodes', 'exposure'] as $check) {
+        foreach (['scheduler', 'queues', 'backup', 'storage', 'mounts', 'devices', 'nodes', 'rips', 'exposure'] as $check) {
             try {
                 $this->{$check}();
             } catch (\Throwable $e) {
@@ -223,6 +223,12 @@ final class AlertChecks
         foreach (Alerts::active()->where('kind', 'node.offline')->whereNotIn('key', $ids) as $orphan) {
             Alerts::resolve($orphan->kind, $orphan->key);
         }
+    }
+
+    /** rip.failed: a rip on a node failed, was lost or never picked up, in the last `ripper.alert_hours`; resolved when a later rip on that node succeeds or the hours pass. */
+    public function rips(): void
+    {
+        \App\Domain\Ripper\Rips::checkAlerts();
     }
 
     private function device(Device $device, int $raiseOffline, int $raiseListener): void

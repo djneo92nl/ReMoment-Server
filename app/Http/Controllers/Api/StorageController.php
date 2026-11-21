@@ -2,14 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Domain\Analysis\AudioAnalysis;
-use App\Domain\Library\Enrichment;
 use App\Domain\Storage\FileStore;
+use App\Domain\Storage\FileUploads;
 use App\Domain\Storage\LibraryFiles;
 use App\Domain\Storage\PlaybackLoudness;
 use App\Domain\Storage\StorageTasks;
 use App\Http\Controllers\Controller;
-use App\Jobs\AnalyzeAudioFile;
 use App\Models\File;
 use App\Models\Media\Track;
 use App\Models\StorageLocation;
@@ -112,22 +110,7 @@ class StorageController extends Controller
         $request->validate(['file' => ['required', 'file']]);
 
         return $this->guard(function () use ($request) {
-            $upload = $request->file('file');
-            $stream = fopen($upload->getRealPath(), 'rb');
-            try {
-                $file = $this->files->upload($upload->getClientOriginalName(), $stream);
-            } finally {
-                fclose($stream);
-            }
-
-            // Like the browser upload (ProcessLibraryUpload): a new track gets its metadata and analysis queued.
-            $track = $file->tracks()->first();
-            if ($track) {
-                Enrichment::queue($track);
-            }
-            if (AudioAnalysis::enabled()) {
-                AnalyzeAudioFile::dispatch($file);
-            }
+            [$file, $track] = app(FileUploads::class)->ingest($request->file('file'));
 
             return ['file' => $this->file($file), 'track_id' => $track?->id];
         }, 201);

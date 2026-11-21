@@ -17,6 +17,7 @@ docs/
     library.md              Library browse (artists, albums, playlists), favorites, play album/artist/playlist on a device (DLNA or Spotify), playlist artwork
     source-controls.md      Per-source controls (change disc, FM presets) from control profiles: GET/POST /api/devices/{id}/controls, resolution, transports
     physical.md             Physical collection (CDs, records, tapes): items by barcode or by hand, MusicBrainz barcode lookup, CSV import (Discogs export, preview/confirm), ripped discs linked by release id/barcode, `physical` availability provider, wishes closed by owning it
+    rips.md                 Ripping a CD on a node (18.1): GET /api/nodes/rippers (open), POST|GET /api/admin/rips (check the disc, choose the MusicBrainz release, progress, cancel), POST /api/nodes/files (the node's own upload during its rip), Rip object and states, errors; MCP `rips`
     scenes.md               Scenes (8.1): household-wide step lists (operationId + device + params, or delay) run through the REST API; GET/POST /api/scenes, activate, schedule, `last_run`, `features.scenes`; MCP tool `scenes`
     sync-groups.md          Sync groups (fake multiroom) REST API: leader + members, offsets, errors
     sub-devices.md          Sub devices (2a): `host` and `sub_devices` in the device detail, the `sub_devices` capability, admin link routes (`/api/admin/device-links`, `link-suggestions`), MCP `device_links`
@@ -39,6 +40,7 @@ docs/
     profiles.md             Profiles (workstream 1a): Control / Standard / Full, `PROFILE`, the gate table in config/profile.php, how scheduler, workers, routes, nav and containers are gated, SQLite for Control and its conditions, `profile:stress-sqlite`, `profile:upgrade`, what is unverified
     client-devices.md       DB schema, model, controller, admin UI internals
     line-in.md              Line-in as a stream source (18.2, N3): a node's ffmpeg pushes MP3 to Icecast `linein-{node}.mp3`, `GET /api/line-ins`, `POST /api/devices/{id}/line-in`, idle stop, 2 to 5 s latency, unverified on hardware
+    node-ripper.md          Ripping a CD on a node (18.1, N2): `ripper.status` (TOC, MusicBrainz disc id) and `ripper.rip` (cyanrip, tags from the server's release, progress, upload through the node route, cleanup), candidates lookup by disc id/TOC, no table, task tray, `rip.failed` alert, security, all hardware unverified
     node-agent.md           ReMoment Node (workstream 18, 1.1): Go agent plan, `kind: node` registration with roles, MQTT-as-doorbell command channel, job lifecycle, security, phases N0-N5; N0 and N1 built (`node/`)
     offline-sync.md         Sync to offline targets (workstream 18.3, plan; S0 `SyncDiff` built): targets (app, node volume, helper), rules (selections, export profile, budget, fill), key+fingerprint manifest on the target and stateless plan API, artifacts, node job types, iOS pull, deletion rules, phases S0-S6, owner questions
     backup-restore.md       backup:run / backup:restore: archive contents, secrets excluded by default, fresh-install restore, SQLite and SD-card note, upgrade flow

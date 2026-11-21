@@ -3,5 +3,8 @@
         <x-page-header title="Collection" subtitle="CDs, records and tapes on your shelves" />
     </x-slot>
 
-    <livewire:physical-collection />
+    <div class="space-y-6">
+        <livewire:rip-disc />
+        <livewire:physical-collection />
+    </div>
 </x-app-layout>

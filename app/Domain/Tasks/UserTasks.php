@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Cache;
 
 /**
  * What a user started and is still running, for the floating task tray (`Livewire\TaskTray`): exports (read from
- * their rows), and cache-held tasks for deep analysis (stems, sections) and the analysis backlog. Later kinds (sync to
+ * their rows) and CD rips on a node (read from their node jobs), and cache-held tasks for deep analysis (stems, sections) and the analysis backlog. Later kinds (sync to
  * a device) put a task the same way. A task is `queued` (waiting for a worker) or `running`, with a `percent` when
  * known: measured (`done` of `total`), or estimated from the expected duration (`estimated: true`, never past 95), or
  * null (indeterminate). A finished task is forgotten, so it disappears. Cache entries carry a TTL so a worker that
@@ -71,7 +71,7 @@ final class UserTasks
     /** @return list<array{key: string, kind: string, title: string, state: string, percent: ?int, estimated: bool, detail: ?string}> */
     public static function active(): array
     {
-        return [...self::exports(), ...self::cached()];
+        return [...self::exports(), ...self::cached(), ...\App\Domain\Ripper\Rips::tasks()];
     }
 
     /** @return list<array<string, mixed>> */

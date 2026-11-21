@@ -5,6 +5,7 @@ namespace App\Domain\Node;
 use App\Models\Client;
 use App\Models\NodeJob;
 use App\Services\MqttService;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -28,7 +29,29 @@ final class NodeJobs
         // are added when the node fetches the job (see deliver()), so the password is never stored or listed.
         'line_in.start' => ['role' => 'line-in', 'ttl' => 120, 'params' => ['mount' => ['required', 'string', 'regex:/^linein-\d{1,9}\.mp3$/']]],
         'line_in.stop' => ['role' => 'line-in', 'ttl' => 120, 'params' => []],
+        // Ripper (18.1, docs/architecture/node-ripper.md): the drive and the cyanrip binary are the node's own config, never
+        // a param. `meta` is what the server knows of the chosen release; it only becomes tags and file names on the node,
+        // as arguments of the ripper, never a path or a command.
+        'ripper.status' => ['role' => 'ripper', 'ttl' => 60, 'params' => []],
+        'ripper.rip' => ['role' => 'ripper', 'ttl' => 3600, 'params' => [
+            'release_mbid' => ['required', 'uuid'],
+            'disc_id' => ['required', 'string', 'regex:/^[A-Za-z0-9._-]{28}$/'],
+            'meta' => ['required', 'array'],
+            'meta.album' => ['required', 'string', 'max:300'],
+            'meta.artist' => ['required', 'string', 'max:300'],
+            'meta.year' => ['nullable', 'integer', 'min:1000', 'max:9999'],
+            'meta.barcode' => ['nullable', 'string', 'regex:/^\d{8,14}$/'],
+            'meta.label' => ['nullable', 'string', 'max:200'],
+            'meta.catalogue_number' => ['nullable', 'string', 'max:100'],
+            'meta.tracks' => ['required', 'array', 'min:1', 'max:99'],
+            'meta.tracks.*.number' => ['required', 'integer', 'min:1', 'max:99'],
+            'meta.tracks.*.title' => ['required', 'string', 'max:300'],
+            'meta.tracks.*.artist' => ['nullable', 'string', 'max:300'],
+        ]],
     ];
+
+    /** How long the last progress report of a job is kept (a job's progress is live data, the outcome is in `result`). */
+    private const PROGRESS_TTL = 86400;
 
     public static function topic(Client $node): string
     {
@@ -137,10 +160,25 @@ final class NodeJobs
     }
 
     /** Renew the lease and note progress; returns false when the job is no longer the node's to run. */
-    public static function progress(NodeJob $job): bool
+    public static function progress(NodeJob $job, ?array $progress = null): bool
     {
+        if ($progress !== null) {
+            Cache::put(self::progressKey($job), $progress + ['at' => now()->timestamp], self::PROGRESS_TTL);
+        }
+
         return NodeJob::where('id', $job->id)->whereIn('state', ['accepted', 'running'])
             ->update(['state' => 'running', 'lease_until' => now()->addSeconds(self::LEASE_SECONDS), 'updated_at' => now()]) === 1;
+    }
+
+    private static function progressKey(NodeJob $job): string
+    {
+        return "node_job:progress:{$job->id}";
+    }
+
+    /** The last progress the node reported for this job (phase, track, tracks, percent, detail, at), or null. @return array<string, mixed>|null */
+    public static function progressOf(NodeJob $job): ?array
+    {
+        return Cache::get(self::progressKey($job));
     }
 
     /** Store the outcome once; a repeat after a lost answer changes nothing. @param  array<string, mixed>|null  $result */

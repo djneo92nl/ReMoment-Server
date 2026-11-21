@@ -49,6 +49,7 @@ class NodeJob extends Model
             'cancel_requested' => $this->cancel_requested,
             'deadline_at' => $this->deadline_at?->toIso8601String(),
             'lease_until' => $this->lease_until?->toIso8601String(),
+            'progress' => \App\Domain\Node\NodeJobs::progressOf($this),
             'result' => $this->result,
             'error' => $this->error,
             'created_at' => $this->created_at?->toIso8601String(),
