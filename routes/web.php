@@ -122,6 +122,8 @@ Route::get('/library/tracks', [LibraryController::class, 'tracks'])->name('libra
 Route::post('/library/tracks/shuffle', [LibraryController::class, 'shuffleTracks'])->name('library.tracks.shuffle');
 Route::get('/library/favorites', [LibraryController::class, 'favorites'])->name('library.favorites');
 Route::get('/library/wishlist', [LibraryController::class, 'wishlist'])->name('library.wishlist');
+// The Discover hub: rediscover shelves, new releases, listening modes and picks (docs/frontend/discover.md).
+Route::get('/library/discover', fn () => view('library.discover', ['scope' => \App\Domain\Library\LeadingSource::forRequest(request())]))->name('library.discover');
 Route::view('/library/collection', 'library.collection')->name('library.collection');
 // Streaming is a scope of the library page now (your live Spotify above the DLNA shelves); the old page address keeps working.
 Route::redirect('/library/streaming', '/library?scope=streaming')->name('library.streaming');

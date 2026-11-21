@@ -20,6 +20,7 @@
             <x-nav-item :href="route('library.index')" icon="microphone-lines" :active="$libraryActive">Library</x-nav-item>
             @if($libraryActive)
                 <ul class="mt-1 ml-4 space-y-1">
+                    <li><x-nav-item sub :href="route('library.discover')" icon="compass" :active="$on('library.discover')">Discover</x-nav-item></li>
                     <li><x-nav-item sub :href="route('artists.index')" icon="microphone-lines" :active="$on('artists.*')">Artists</x-nav-item></li>
                     <li><x-nav-item sub :href="route('albums.index')" icon="compact-disc" :active="$on('albums.*')">Albums</x-nav-item></li>
                     <li><x-nav-item sub :href="route('playlists.index')" icon="list-ul" :active="$on('playlists.*')">Playlists</x-nav-item></li>

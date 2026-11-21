@@ -97,6 +97,10 @@ Tracks are in best-effort album order (by id — there is no track number column
 
 `{ "data": [ { "key": "transcodes", "title": "Suspected transcodes", "description": "…", "count": 3 }, … ] }` — how many findings each library health report has, in a fixed order: `transcodes`, `damaged`, `clipping`, `duplicates`, `lossy`, `incomplete`, `unlinked`, `missing`, `covers`. Counts only (cached 10 minutes, zero until audio analysis has run); the findings are on the web page `/settings/library-health`. See `docs/architecture/library-health.md` and [sound-and-quality.md](sound-and-quality.md#library-health).
 
+### `GET /api/library/discover`
+
+`{ "data": [ { "key", "title", "description", "kind", "items": [ … + "reason" ] } ] }`: the Discover shelves (forgotten favorites, you used to play, on this day, forgotten artists and songs, new releases, mixes, listening modes, random picks) as sections of items that each carry a reason. See [discover.md](discover.md).
+
 ### `GET /api/library/listening-modes`
 
 `{ "data": [ { "key": "party", "name": "Party", "description": "…", "icon": "champagne-glasses", "track_count": 100 }, … ] }` — the listening modes (focus, party, sleep, workout) the library has at least 5 analysed tracks for; empty until audio analysis has run. Play one with `POST /api/devices/{id}/library/play-listening-mode` `{ "mode": "party" }` → `{ "status": "ok", "mode": "party", "queued": 100 }`: a random selection of up to 100 tracks the device can play. `422` `not_playable` when fewer than 5 qualify on that device, `422` `unsupported` without library playback. See `docs/architecture/listening-modes.md`. Not to be confused with a device's `modes` (shuffle/repeat/liked). Client guidance (when to show the row, errors, icons): [sound-and-quality.md](sound-and-quality.md#listening-modes).

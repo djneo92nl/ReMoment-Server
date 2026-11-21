@@ -1,6 +1,6 @@
-@props(['href', 'src' => null, 'title', 'subtitle' => null, 'colors' => null, 'seed' => '', 'icon' => 'fa-solid fa-music', 'play' => null, 'playLabel' => 'Play', 'round' => false])
+@props(['href', 'src' => null, 'title', 'subtitle' => null, 'colors' => null, 'seed' => '', 'icon' => 'fa-solid fa-music', 'play' => null, 'playLabel' => 'Play', 'round' => false, 'note' => null])
 {{-- A tile for anything that is not an album: a playlist, a radio station, a mixed "recently played" entry. Cover on top, a footer tinted by the
-     cover's colours (App\Domain\Artwork\ArtworkTint), an optional quick-play. `src` is already a processed proxy URL (or null for the placeholder). --}}
+     cover's colours (App\Domain\Artwork\ArtworkTint), an optional quick-play and an optional third line `note` (a reason). `src` is already a processed proxy URL (or null for the placeholder). --}}
 <x-card compact flush class="tint group w-36 shrink-0 snap-start sm:w-40 lg:w-44" style="{{ \App\Domain\Artwork\ArtworkTint::style($colors) }}">
     <div class="relative aspect-square">
         <a href="{{ $href }}" class="block h-full">
@@ -14,6 +14,9 @@
         <a href="{{ $href }}" class="block truncate text-[13px] font-medium leading-tight hover:underline" title="{{ $title }}">{{ $title }}</a>
         @if($subtitle)
             <p class="tint-muted mt-0.5 truncate text-xs leading-tight" title="{{ $subtitle }}">{{ $subtitle }}</p>
+        @endif
+        @if($note)
+            <p class="tint-muted mt-0.5 truncate text-[11px] leading-tight" title="{{ $note }}">{{ $note }}</p>
         @endif
     </div>
 </x-card>

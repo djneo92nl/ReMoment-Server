@@ -1,6 +1,7 @@
 <x-app-layout>
     @php
         $chips = [
+            ['Discover', 'compass', route('library.discover'), 0],
             ['Albums', 'compact-disc', route('albums.index'), $counts['albums']],
             ['Artists', 'microphone-lines', route('artists.index'), $counts['artists']],
             ['Tracks', 'music', route('library.tracks'), $counts['tracks']],

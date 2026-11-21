@@ -54,6 +54,11 @@ Each track row of `/history` (`Livewire\PlayHistory`, radio tracks included) has
 A shelf on `/library` (between the browse shelves and Wishlist; `<x-shelf>` of `<x-media-card>`s, up to 20): albums and EPs of your artists released in the last 90 days or still to come that the library lacks, each linking to the artist page (where the Discography card offers Want, Add or Play). Subtitle: artist and date, or "coming 12 Nov". Left out entirely when there is nothing.
 
 
+### Discover (`/library/discover`)
+
+A chip on the hub and an entry under Library in the menu lead to the Discover hub: rediscover shelves, new releases, mixes, listening modes and random picks. See [discover.md](discover.md).
+
+
 ### Collection (`/library/collection`)
 
 `Livewire\PhysicalCollection`: the physical shelf. An *Add to the collection* card (a barcode finds releases on MusicBrainz, "Use this" fills the form; or type it by hand for tapes and bootlegs: artist, title, year, medium, where it is), filters (search, medium, ripped), and one row per item with the album link when the library has it, a *Ripped* badge, **Mark ripped** and **Remove**. A chip on `/library` links to it. Owning an item shows `Owned` on that album's release-group in the artist's Discography card and closes a wish.

@@ -15,8 +15,8 @@ The building blocks of `DESIGN.md` (`resources/views/components/`). Use them ins
 | `<x-chip>` | link attributes; slot = label (+ muted count) | Pill links for browsing: genre, mood, tempo |
 | `<x-section-heading>` | `title`, `href`, `link` | Uppercase label above a block, with an optional "more →" link |
 | `<x-fav-badge>` | none; put it in a `relative` box | The favourite star in a cover's corner |
-| `<x-shelf>` | `title`, `href`; slot = fixed-width cards | Sideways row with a bold heading and `›` link (library hub) |
-| `<x-media-card>` | `href`, `src`, `title`, `subtitle`, `colors`, `play` (action template), `icon` | Playlist, radio and mixed-recent tiles, tinted by the cover |
+| `<x-shelf>` | `title`, `href`, `subtitle` (one muted line under the heading); slot = fixed-width cards | Sideways row with a bold heading and `›` link (library hub) |
+| `<x-media-card>` | `href`, `src`, `title`, `subtitle`, `colors`, `play` (action template), `icon`, `note` (third line, e.g. a reason) | Playlist, radio and mixed-recent tiles, tinted by the cover |
 | `<x-genre-tile>` | `genre`, `albums` | A genre tinted by the colours its covers share |
 | `<x-quick-play>` | `action` (DeviceAction template) | Round play button on a cover: pinned player plays, else opens the picker |
 | `<x-library-hero>` | `hero`, `scope` | Top of `/library`: name, counts, Shuffle, cover collage |
