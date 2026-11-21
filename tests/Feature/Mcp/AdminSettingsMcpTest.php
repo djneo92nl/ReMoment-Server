@@ -35,6 +35,18 @@ class AdminSettingsMcpTest extends TestCase
     {
         ReMomentServer::tool(Tools\AdminTokens::class, ['action' => 'list'])->assertNotRegistered();
         ReMomentServer::tool(Tools\AnalysisStatus::class, ['action' => 'status'])->assertNotRegistered();
+        ReMomentServer::tool(Tools\LibrarySettings::class, [])->assertNotRegistered();
+    }
+
+    public function test_library_settings_read_and_change(): void
+    {
+        $this->asAdmin();
+
+        ReMomentServer::tool(Tools\LibrarySettings::class, [])->assertOk()->assertSee('leading_source')->assertSee('"add_played_tracks":false');
+        ReMomentServer::tool(Tools\LibrarySettings::class, ['leading_source' => 'files', 'add_played_tracks' => true, 'history_keep_months' => 6])
+            ->assertOk()->assertSee('"leading_source":"files"')->assertSee('"add_played_tracks":true')->assertSee('"history_keep_months":6');
+        ReMomentServer::tool(Tools\LibrarySettings::class, ['history_keep_months' => 0])->assertOk()->assertSee('"history_keep_months":null');
+        ReMomentServer::tool(Tools\LibrarySettings::class, ['leading_source' => 'spotify'])->assertHasErrors();
     }
 
     public function test_admin_tokens(): void

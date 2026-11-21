@@ -7,13 +7,11 @@ use App\Domain\Health\Heartbeat;
 use App\Domain\Health\LibraryReports;
 use App\Domain\Lastfm\ScrobbleSources;
 use App\Domain\Library\LeadingSource;
-use App\Domain\Library\LibrarySettings;
 use App\Integrations\Spotify\MusicPlayerDriver as SpotifyDriver;
 use App\Models\Client;
 use App\Models\Device;
 use App\Models\DeviceMeta;
 use App\Models\DlnaServer;
-use App\Models\Setting;
 use App\Services\Dlna\DlnaLibraryScanner;
 use App\Services\Dlna\DlnaServerDiscovery;
 use App\Services\LastfmSessionService;
@@ -120,10 +118,12 @@ class SettingsController extends Controller
             'leading_source' => ['required', 'in:'.implode(',', LeadingSource::MODES)],
         ]);
 
-        Setting::set(LeadingSource::SETTING, $validated['leading_source']);
-        Setting::set(LibrarySettings::ADD_PLAYED_TRACKS, $request->boolean('add_played_tracks') ? '1' : '0');
-        \App\Domain\Storage\PlaybackLoudness::set($request->boolean('playback_loudness'));
-        Setting::set(\App\Domain\Radio\RadioSettings::NTS_ENABLED, $request->boolean('nts_enabled') ? '1' : '0');
+        app(\App\Domain\Library\LibrarySettingsAdmin::class)->save([
+            'leading_source' => $validated['leading_source'],
+            'add_played_tracks' => $request->boolean('add_played_tracks'),
+            'playback_loudness' => $request->boolean('playback_loudness'),
+            'nts_enabled' => $request->boolean('nts_enabled'),
+        ]);
 
         return redirect()->route('settings.storage', ['tab' => 'library'])->with('success', 'Library settings saved.');
     }
@@ -133,7 +133,7 @@ class SettingsController extends Controller
     {
         $validated = $request->validate(['keep_months' => ['nullable', 'integer', 'min:1', 'max:'.\App\Domain\Stats\PlayRetention::MAX_MONTHS]]);
 
-        \App\Domain\Stats\PlayRetention::setMonths(isset($validated['keep_months']) ? (int) $validated['keep_months'] : null);
+        app(\App\Domain\Library\LibrarySettingsAdmin::class)->save(['history_keep_months' => $validated['keep_months'] ?? null]);
 
         return redirect()->route('history.index')->with('success', 'History retention saved.');
     }
