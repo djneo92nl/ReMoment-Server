@@ -13,7 +13,7 @@ class AudioTags
     }
 
     /**
-     * @return array{artist:?string,album_artist:?string,album:?string,title:?string,year:?string,track_number:?int,disc_number:?int,genres:list<string>,mbid:?string,duration:?int,mime_type:?string,codec:?string,bitrate:?int,sample_rate:?int,bit_depth:?int,channels:?int,replaygain_track_gain:?float,replaygain_album_gain:?float,picture:?array{mime:?string,data:string}}|null
+     * @return array{artist:?string,album_artist:?string,album:?string,title:?string,year:?string,track_number:?int,disc_number:?int,genres:list<string>,mbid:?string,release_mbid:?string,barcode:?string,duration:?int,mime_type:?string,codec:?string,bitrate:?int,sample_rate:?int,bit_depth:?int,channels:?int,replaygain_track_gain:?float,replaygain_album_gain:?float,picture:?array{mime:?string,data:string}}|null
      */
     public static function read(string $localPath): ?array
     {
@@ -42,6 +42,9 @@ class AudioTags
             'disc_number' => ((int) ($tag('part_of_a_set') ?? $tag('discnumber'))) ?: null, // ID3 TPOS or Vorbis DISCNUMBER ("1" or "1/2")
             'genres' => array_values(array_filter($info['comments']['genre'] ?? [])),
             'mbid' => $info['tags']['id3v2']['text']['MusicBrainz Release Track Id'][0] ?? $tag('musicbrainz_trackid'),
+            // The release the disc was ripped as (Vorbis MUSICBRAINZ_ALBUMID, ID3 TXXX "MusicBrainz Album Id") and its barcode: they link a rip to the physical collection.
+            'release_mbid' => strtolower(trim((string) ($info['tags']['id3v2']['text']['MusicBrainz Album Id'][0] ?? $tag('musicbrainz_albumid') ?? ''))) ?: null,
+            'barcode' => preg_replace('/\D/', '', (string) ($info['tags']['id3v2']['text']['BARCODE'][0] ?? $tag('barcode') ?? '')) ?: null,
             'duration' => $int($info['playtime_seconds'] ?? null),
             'mime_type' => $info['mime_type'] ?? null,
             'codec' => $audio['dataformat'] ?? null,

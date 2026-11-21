@@ -9,7 +9,7 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
-#[Description('The physical collection: CDs, records and tapes on the shelf. action: list (optional medium cd|tape|vinyl|minidisc|other, q, ripped), lookup (needs barcode: the releases MusicBrainz knows, to choose from), add (needs artist, title, medium; optional year, barcode, catalogue_number, condition, notes, location, acquired_on, release_group_mbid, release_mbid from a lookup), update (needs id and the fields to change; ripped true marks it ripped), remove (needs id). An item makes its album owned and closes a wish for it. Full shapes: docs/api/physical.md.')]
+#[Description('The physical collection: CDs, records and tapes on the shelf. action: list (optional medium cd|tape|vinyl|minidisc|other, q, ripped), lookup (needs barcode: the releases MusicBrainz knows, to choose from), add (needs artist, title, medium; optional year, barcode, catalogue_number, condition, notes, location, acquired_on, release_group_mbid, release_mbid from a lookup), update (needs id and the fields to change; ripped true marks it ripped), remove (needs id), import (CSV of a collection: with csv text it only previews each row as new, lookup (barcode looked up on MusicBrainz after the import), duplicate or invalid and answers a token (the first 100 rows are listed, the summary counts all); call import again with that token to add the rows; optional default_medium for files without a format column; Discogs collection exports and CSVs with artist, title, medium or format, year, barcode, location columns are recognised). An item makes its album owned and closes a wish for it. Full shapes: docs/api/physical.md.')]
 class Physical extends Tool
 {
     use CallsApi;
@@ -19,7 +19,7 @@ class Physical extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'action' => $schema->string()->enum(['list', 'lookup', 'add', 'update', 'remove'])->required(),
+            'action' => $schema->string()->enum(['list', 'lookup', 'add', 'update', 'remove', 'import'])->required(),
             'id' => $schema->integer()->description('update, remove: the item id'),
             'barcode' => $schema->string()->description('lookup, add: the barcode'),
             'medium' => $schema->string()->enum(['cd', 'tape', 'vinyl', 'minidisc', 'other']),
@@ -29,13 +29,16 @@ class Physical extends Tool
             'release_group_mbid' => $schema->string(), 'release_mbid' => $schema->string(),
             'ripped' => $schema->boolean()->description('update, list: ripped to files'),
             'q' => $schema->string()->description('list: search artist, title or barcode'),
+            'csv' => $schema->string()->description('import: the CSV text (with a header line); previews, writes nothing'),
+            'token' => $schema->string()->description('import: the token of a preview, to add its rows'),
+            'default_medium' => $schema->string()->enum(['cd', 'tape', 'vinyl', 'minidisc', 'other'])->description('import: the medium of rows that have none'),
         ];
     }
 
     public function handle(Request $request): Response
     {
         $data = $request->validate([
-            'action' => 'required|in:list,lookup,add,update,remove', 'id' => 'nullable|integer', 'q' => 'nullable|string|max:100',
+            'action' => 'required|in:list,lookup,add,update,remove,import', 'csv' => 'nullable|string', 'token' => 'nullable|string', 'default_medium' => 'nullable|in:cd,tape,vinyl,minidisc,other', 'id' => 'nullable|integer', 'q' => 'nullable|string|max:100',
             'medium' => 'nullable|in:cd,tape,vinyl,minidisc,other', 'year' => 'nullable|integer', 'ripped' => 'nullable|boolean',
             'barcode' => 'nullable|string', 'artist' => 'nullable|string', 'title' => 'nullable|string', 'catalogue_number' => 'nullable|string',
             'condition' => 'nullable|string', 'notes' => 'nullable|string', 'location' => 'nullable|string', 'acquired_on' => 'nullable|string',
@@ -48,6 +51,11 @@ class Physical extends Tool
             'lookup' => ($data['barcode'] ?? '') === '' ? Response::error('invalid (422): lookup needs a barcode.') : $this->api('GET', 'library/physical/lookup', ['barcode' => $data['barcode']]),
             'add' => $this->api('POST', 'library/physical', $fields),
             'update' => isset($data['id']) ? $this->api('PUT', 'library/physical/'.$data['id'], $fields) : Response::error('invalid (422): update needs an id.'),
+            'import' => match (true) {
+                ($data['token'] ?? '') !== '' => $this->api('POST', 'library/physical/import/'.rawurlencode($data['token']).'/confirm'),
+                ($data['csv'] ?? '') !== '' => $this->api('POST', 'library/physical/import', $this->filled(['csv' => $data['csv'], 'default_medium' => $data['default_medium'] ?? null, 'rows' => 100])),
+                default => Response::error('invalid (422): import needs csv (to preview) or a token (to add the previewed rows).'),
+            },
             default => isset($data['id']) ? $this->api('DELETE', 'library/physical/'.$data['id']) : Response::error('invalid (422): remove needs an id.'),
         };
     }

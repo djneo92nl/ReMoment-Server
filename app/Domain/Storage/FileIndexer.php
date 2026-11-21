@@ -115,6 +115,8 @@ class FileIndexer
         // An own file makes the album owned: closes a wish on its release-group (docs/architecture/availability-layer.md).
         CatalogueLinker::refreshOwnershipQuietly($album);
         \App\Domain\Catalogue\WantedTracks::refreshForTrackQuietly($track);
+        // A ripped CD of the physical collection (release id or barcode in the tags) is marked ripped and tied to this album.
+        \App\Domain\Catalogue\PhysicalRipLink::linkQuietly($file, $album, $tags);
 
         return $track;
     }

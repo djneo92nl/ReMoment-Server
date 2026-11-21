@@ -22,4 +22,12 @@ class AudioTagsFlacTest extends TestCase
         $this->assertSame('373f9354-9f96-405b-9437-e8c3ae18321c', $tags['mbid']);
         $this->assertSame('image/jpeg', $tags['picture']['mime']);
     }
+
+    public function test_it_reads_the_release_the_disc_was_ripped_as(): void
+    {
+        $tags = AudioTags::read(__DIR__.'/../Fixtures/ripper-tagged.flac');
+
+        $this->assertSame('a060c352-c9d6-4717-aab8-95a2965fa8d7', $tags['release_mbid']); // MUSICBRAINZ_ALBUMID: links the rip to the CD on the shelf
+        $this->assertNull($tags['barcode']); // the ripper does not write one
+    }
 }

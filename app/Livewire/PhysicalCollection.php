@@ -2,13 +2,17 @@
 
 namespace App\Livewire;
 
+use App\Domain\Catalogue\PhysicalImport;
 use App\Domain\Catalogue\PhysicalItems;
 use App\Models\Media\PhysicalItem;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 /** The physical collection (CDs, records, tapes): add by barcode or by hand, filter, mark ripped, remove (docs/api/physical.md). */
 class PhysicalCollection extends Component
 {
+    use WithFileUploads;
+
     public string $medium = '';
 
     public string $search = '';
@@ -38,6 +42,83 @@ class PhysicalCollection extends Component
     public string $releaseGroupMbid = '';
 
     public string $releaseMbid = '';
+
+    /** CSV import: the file or pasted text, the medium for rows without one, and the preview that is waiting to be confirmed. */
+    public $csvFile = null;
+
+    public string $csvText = '';
+
+    public string $importMedium = '';
+
+    public ?string $importToken = null;
+
+    public string $importFormat = '';
+
+    /** @var array<string, int> */
+    public array $importSummary = [];
+
+    /** @var list<string> columns of the file that were not used */
+    public array $importUnmapped = [];
+
+    public string $importFilter = '';
+
+    public ?string $importError = null;
+
+    public function previewImport(): void
+    {
+        $this->importError = null;
+        $this->importToken = null;
+        $this->validate([
+            'csvFile' => ['nullable', 'file', 'max:'.(int) (PhysicalImport::MAX_BYTES / 1024)],
+            'csvText' => ['nullable', 'string'],
+            'importMedium' => ['nullable', 'in:'.implode(',', PhysicalItem::MEDIA)],
+        ]);
+
+        $text = $this->csvFile ? (string) file_get_contents($this->csvFile->getRealPath()) : $this->csvText;
+        if (trim($text) === '') {
+            $this->importError = 'Choose a CSV file or paste its text first.';
+
+            return;
+        }
+
+        try {
+            $preview = PhysicalImport::preview($text, $this->importMedium ?: null, [], 0);
+        } catch (\InvalidArgumentException $e) {
+            $this->importError = $e->getMessage();
+
+            return;
+        }
+
+        $this->importToken = $preview['token'];
+        $this->importFormat = $preview['format'];
+        $this->importSummary = $preview['summary'];
+        $this->importUnmapped = $preview['unmapped'];
+        $this->importFilter = '';
+    }
+
+    public function confirmImport(): void
+    {
+        $result = $this->importToken ? PhysicalImport::confirm($this->importToken) : null;
+        if ($result === null) {
+            $this->importError = 'This preview has expired. Choose the file again.';
+            $this->cancelImport(false);
+
+            return;
+        }
+
+        $this->message = "Imported {$result['added']} ".($result['added'] === 1 ? 'row' : 'rows')
+            .($result['queued_lookups'] ? ", {$result['queued_lookups']} barcodes are looked up on MusicBrainz in the background (about one every ".PhysicalImport::LOOKUP_SPACING.' seconds)' : '')
+            .". Skipped {$result['skipped_duplicates']} duplicates and {$result['skipped_invalid']} invalid rows.";
+        $this->cancelImport(false);
+    }
+
+    public function cancelImport(bool $clearMessage = true): void
+    {
+        $this->reset('csvFile', 'csvText', 'importToken', 'importSummary', 'importUnmapped', 'importFilter', 'importFormat');
+        if ($clearMessage) {
+            $this->importError = null;
+        }
+    }
 
     public function lookup(): void
     {
@@ -114,6 +195,22 @@ class PhysicalCollection extends Component
             ->when(trim($this->search) !== '', fn ($q) => $q->where(fn ($w) => $w->where('artist', 'like', '%'.trim($this->search).'%')->orWhere('title', 'like', '%'.trim($this->search).'%')))
             ->orderBy('artist_key')->orderBy('title_key')->limit(300)->get();
 
-        return view('livewire.physical-collection', ['items' => $items, 'total' => PhysicalItem::count(), 'media' => PhysicalItem::MEDIA]);
+        $importRows = [];
+        if ($this->importToken !== null) {
+            $rows = PhysicalImport::rows($this->importToken);
+            if ($rows === null) {
+                $this->importError = 'This preview has expired. Choose the file again.';
+                $this->cancelImport(false);
+            } else {
+                $importRows = array_map([PhysicalImport::class, 'present'], array_slice(
+                    array_values(array_filter($rows, fn ($r) => $this->importFilter === '' || $r['status'] === $this->importFilter)), 0, 100,
+                ));
+            }
+        }
+
+        return view('livewire.physical-collection', [
+            'items' => $items, 'total' => PhysicalItem::count(), 'media' => PhysicalItem::MEDIA,
+            'importRows' => $importRows, 'importStatuses' => PhysicalImport::STATUSES,
+        ]);
     }
 }

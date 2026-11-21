@@ -37,6 +37,66 @@
         </form>
     </x-card>
 
+    {{-- Import: a CSV of the collection (Discogs export or any file with artist, title, medium ...), previewed row by row before anything is added --}}
+    <x-card class="p-5 sm:p-6" data-test="import">
+        <h2 class="mb-4 text-sm font-medium uppercase tracking-wider text-gray-400 dark:text-gray-600"><i class="fa-solid fa-file-csv mr-1.5"></i>Import a CSV</h2>
+        @if($importError)<x-alert type="error" class="mb-3">{{ $importError }}</x-alert>@endif
+
+        @if($importToken === null)
+            <form wire:submit="previewImport" class="space-y-3">
+                <p class="text-sm text-gray-500">A Discogs collection export works as it is. Any other file needs a first line with column names such as artist, title, medium (or format), year, barcode and location. A row with only a barcode is looked up on MusicBrainz.</p>
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <div>
+                        <x-input-label for="csv-file" value="CSV file" />
+                        <input id="csv-file" type="file" wire:model="csvFile" accept=".csv,.tsv,.txt,text/csv,text/plain" class="block w-full text-sm text-gray-700 dark:text-gray-300" data-test="csv-file" />
+                        <x-input-error :messages="$errors->get('csvFile')" class="mt-1" />
+                    </div>
+                    <div>
+                        <x-input-label for="import-medium" value="Medium of rows that have none" />
+                        <x-select id="import-medium" wire:model="importMedium" class="w-full"><option value="">None: skip those rows</option>@foreach($media as $m)<option value="{{ $m }}">{{ ucfirst($m) }}</option>@endforeach</x-select>
+                    </div>
+                </div>
+                <div>
+                    <x-input-label for="csv-text" value="Or paste the text" />
+                    <textarea id="csv-text" wire:model="csvText" rows="4" placeholder="artist,title,medium,year,barcode,location" data-test="csv-text"
+                              class="w-full rounded-xl border-gray-300 bg-white font-mono text-xs shadow-sm focus:border-gray-500 focus:ring-gray-500 dark:border-stone-700 dark:bg-stone-900 dark:text-gray-100"></textarea>
+                </div>
+                <x-secondary-button type="submit" size="md" data-test="preview"><i class="fa-solid fa-eye"></i>Preview</x-secondary-button>
+            </form>
+        @else
+            <div class="space-y-3" data-test="preview-result">
+                <p class="text-sm text-gray-500">{{ $importFormat === 'discogs' ? 'Discogs collection export.' : 'CSV file.' }} {{ number_format($importSummary['rows'] ?? 0) }} rows. Nothing has been added yet.@if($importUnmapped) Columns not used: {{ implode(', ', $importUnmapped) }}.@endif</p>
+                <div class="flex flex-wrap items-center gap-2">
+                    @foreach(['new' => ['success', 'New'], 'lookup' => ['info', 'Look up barcode'], 'duplicate' => ['neutral', 'Duplicate'], 'invalid' => ['danger', 'Invalid']] as $status => [$variant, $label])
+                        <button type="button" wire:click="$set('importFilter', '{{ $importFilter === $status ? '' : $status }}')" class="rounded-full ring-offset-2 {{ $importFilter === $status ? 'ring-2 ring-gray-400' : '' }}" data-test="filter-{{ $status }}">
+                            <x-badge :variant="$variant">{{ $label }}: {{ number_format($importSummary[$status] ?? 0) }}</x-badge>
+                        </button>
+                    @endforeach
+                </div>
+                <x-table>
+                    <x-slot:head><x-table.th>Row</x-table.th><x-table.th>Status</x-table.th><x-table.th>Artist</x-table.th><x-table.th>Title</x-table.th><x-table.th hide="sm">Medium</x-table.th><x-table.th hide="md">Barcode</x-table.th><x-table.th hide="md">Note</x-table.th></x-slot:head>
+                    @foreach($importRows as $r)
+                        <tr data-test="import-row-{{ $r['row'] }}">
+                            <td class="px-4 py-2.5 text-gray-400">{{ $r['row'] }}</td>
+                            <td class="px-4 py-2.5"><x-badge :variant="['new' => 'success', 'lookup' => 'info', 'duplicate' => 'neutral', 'invalid' => 'danger'][$r['status']]">{{ ['new' => 'New', 'lookup' => 'Look up', 'duplicate' => 'Duplicate', 'invalid' => 'Invalid'][$r['status']] }}</x-badge></td>
+                            <td class="px-4 py-2.5 text-gray-900 dark:text-gray-100">{{ $r['artist'] ?? 'from MusicBrainz' }}</td>
+                            <td class="px-4 py-2.5 text-gray-900 dark:text-gray-100">{{ $r['title'] ?? 'from MusicBrainz' }}</td>
+                            <td class="hidden px-4 py-2.5 text-gray-500 sm:table-cell">{{ $r['medium'] ? ucfirst($r['medium']) : '' }}</td>
+                            <td class="hidden px-4 py-2.5 text-gray-500 md:table-cell">{{ $r['barcode'] }}</td>
+                            <td class="hidden px-4 py-2.5 text-xs text-gray-400 md:table-cell">{{ $r['reason'] }}</td>
+                        </tr>
+                    @endforeach
+                </x-table>
+                @if(($importSummary[$importFilter ?: 'rows'] ?? 0) > count($importRows))<p class="text-xs text-gray-400">The first {{ count($importRows) }} rows are shown; all of them are imported.</p>@endif
+                <div class="flex flex-wrap gap-2">
+                    @php($importable = ($importSummary['new'] ?? 0) + ($importSummary['lookup'] ?? 0))
+                    <x-primary-button type="button" size="md" wire:click="confirmImport" :disabled="$importable === 0" data-test="confirm-import"><i class="fa-solid fa-check"></i>Import {{ number_format($importable) }} {{ $importable === 1 ? 'row' : 'rows' }}</x-primary-button>
+                    <x-secondary-button type="button" size="md" wire:click="cancelImport">Cancel</x-secondary-button>
+                </div>
+            </div>
+        @endif
+    </x-card>
+
     <div class="flex flex-wrap items-center gap-3">
         <x-text-input type="search" wire:model.live.debounce.300ms="search" placeholder="Find an artist or title" aria-label="Find in the collection" class="w-56" />
         <x-select wire:model.live="medium" aria-label="Medium">
@@ -64,7 +124,10 @@
                             </p>
                             <p class="truncate text-xs text-gray-400 dark:text-gray-600">{{ $item->artist }}{{ $item->year ? ' · '.$item->year : '' }} · {{ ucfirst($item->medium) }}{{ $item->location ? ' · '.$item->location : '' }}</p>
                         </div>
-                        @if($item->ripped_at)<x-badge variant="success">Ripped</x-badge>@endif
+                        @if($item->ripped_at)
+                            @if($item->album_id)<a href="{{ route('albums.show', $item->album_id) }}" class="flex-none" data-test="ripped-link" title="Open the ripped album"><x-badge variant="success"><i class="fa-solid fa-compact-disc"></i>Ripped</x-badge></a>
+                            @else<x-badge variant="success">Ripped</x-badge>@endif
+                        @endif
                         <button type="button" wire:click="toggleRipped({{ $item->id }})" class="flex-none text-xs text-gray-500 underline hover:text-gray-800 dark:hover:text-gray-300">{{ $item->ripped_at ? 'Not ripped' : 'Mark ripped' }}</button>
                         <button type="button" wire:click="remove({{ $item->id }})" wire:confirm="Remove {{ $item->title }} from the collection?" class="flex-none text-xs text-gray-400 underline hover:text-red-600">Remove</button>
                     </div>

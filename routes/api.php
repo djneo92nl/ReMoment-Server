@@ -149,6 +149,8 @@ Route::get('/library/external/{provider}/playlists/{id}', [ExternalCatalogueCont
 Route::get('/library/physical', [PhysicalController::class, 'index']);
 Route::get('/library/physical/lookup', [PhysicalController::class, 'lookup']);
 Route::post('/library/physical', [PhysicalController::class, 'store']);
+Route::post('/library/physical/import', [PhysicalController::class, 'importPreview']);
+Route::post('/library/physical/import/{token}/confirm', [PhysicalController::class, 'importConfirm']);
 Route::get('/library/physical/{physical}', [PhysicalController::class, 'show']);
 Route::put('/library/physical/{physical}', [PhysicalController::class, 'update']);
 Route::delete('/library/physical/{physical}', [PhysicalController::class, 'destroy']);

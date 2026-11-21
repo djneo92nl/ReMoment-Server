@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Catalogue\PhysicalImport;
 use App\Domain\Catalogue\PhysicalItems;
 use App\Http\Controllers\Controller;
 use App\Models\Media\PhysicalItem;
@@ -65,6 +66,50 @@ class PhysicalController extends Controller
         return response()->json(PhysicalItems::item(PhysicalItems::add($data)), 201);
     }
 
+    /**
+     * CSV import, step one: reads a file (`file`) or pasted text (`csv`), writes nothing and answers what each row would become
+     * plus a `token` to confirm with.
+     */
+    public function importPreview(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'file' => ['nullable', 'file', 'max:'.(int) (PhysicalImport::MAX_BYTES / 1024)],
+            'csv' => ['nullable', 'string'],
+            'default_medium' => ['nullable', Rule::in(PhysicalItem::MEDIA)],
+            'mapping' => ['nullable', 'array'],
+            'mapping.*' => ['string', 'max:100'],
+            'rows' => ['nullable', 'integer', 'min:0', 'max:'.PhysicalImport::MAX_ROWS],
+        ]);
+        if ($refused = $this->refuseClients($request)) {
+            return $refused;
+        }
+
+        $text = $request->hasFile('file') ? (string) file_get_contents($request->file('file')->getRealPath()) : (string) ($data['csv'] ?? '');
+        if (trim($text) === '') {
+            return response()->json(['error' => 'invalid', 'message' => 'Send the CSV as a `file` or as `csv` text.'], 422);
+        }
+
+        try {
+            return response()->json(['status' => 'preview'] + PhysicalImport::preview($text, $data['default_medium'] ?? null, $data['mapping'] ?? [], isset($data['rows']) ? (int) $data['rows'] : null));
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => 'invalid', 'message' => $e->getMessage()], 422);
+        }
+    }
+
+    /** CSV import, step two: adds what the preview showed (rows are classified again, so a row added meanwhile is skipped). */
+    public function importConfirm(Request $request, string $token): JsonResponse
+    {
+        if ($refused = $this->refuseClients($request)) {
+            return $refused;
+        }
+
+        $result = PhysicalImport::confirm($token);
+
+        return $result === null
+            ? response()->json(['error' => 'not_found', 'message' => 'This import preview was not found or has expired. Upload the file again.'], 404)
+            : response()->json(['status' => 'ok'] + $result);
+    }
+
     public function show(Request $request, PhysicalItem $physical): JsonResponse
     {
         if ($refused = $this->refuseClients($request)) {
@@ -103,22 +148,7 @@ class PhysicalController extends Controller
     /** @return array<string, mixed> */
     private function rules(bool $creating): array
     {
-        $required = $creating ? 'required' : 'sometimes';
-
-        return [
-            'artist' => [$required, 'string', 'max:255'],
-            'title' => [$required, 'string', 'max:255'],
-            'medium' => [$required, Rule::in(PhysicalItem::MEDIA)],
-            'year' => ['nullable', 'integer', 'min:1000', 'max:2200'],
-            'barcode' => ['nullable', 'string', 'max:32'],
-            'catalogue_number' => ['nullable', 'string', 'max:64'],
-            'condition' => ['nullable', 'string', 'max:32'],
-            'notes' => ['nullable', 'string', 'max:2000'],
-            'location' => ['nullable', 'string', 'max:255'],
-            'acquired_on' => ['nullable', 'date'],
-            'release_group_mbid' => ['nullable', 'uuid'],
-            'release_mbid' => ['nullable', 'uuid'],
-        ];
+        return PhysicalItems::rules($creating);
     }
 
     private function refuseClients(Request $request): ?JsonResponse

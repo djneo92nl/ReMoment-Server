@@ -6,6 +6,7 @@ use App\Models\Media\Album;
 use App\Models\Media\CatalogueAlbum;
 use App\Models\Media\PhysicalItem;
 use App\Services\MusicBrainz\MusicBrainzClient;
+use Illuminate\Validation\Rule;
 
 /**
  * The physical collection (workstream 6): items by barcode or by hand, tied to the library album and the MusicBrainz
@@ -54,10 +55,57 @@ final class PhysicalItems
         return $found;
     }
 
+    /** Validation rules of an item's fields (the API and the CSV import share them). @return array<string, mixed> */
+    public static function rules(bool $creating): array
+    {
+        $required = $creating ? 'required' : 'sometimes';
+
+        return [
+            'artist' => [$required, 'string', 'max:255'],
+            'title' => [$required, 'string', 'max:255'],
+            'medium' => [$required, Rule::in(PhysicalItem::MEDIA)],
+            'year' => ['nullable', 'integer', 'min:1000', 'max:2200'],
+            'barcode' => ['nullable', 'string', 'max:32'],
+            'catalogue_number' => ['nullable', 'string', 'max:64'],
+            'condition' => ['nullable', 'string', 'max:32'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+            'location' => ['nullable', 'string', 'max:255'],
+            'acquired_on' => ['nullable', 'date'],
+            'release_group_mbid' => ['nullable', 'uuid'],
+            'release_mbid' => ['nullable', 'uuid'],
+        ];
+    }
+
+    /** A barcode as digits only ("0602 537-531159" becomes "0602537531159"); null when there are none. */
+    public static function normalizeBarcode(?string $barcode): ?string
+    {
+        return preg_replace('/\D/', '', (string) $barcode) ?: null;
+    }
+
+    /**
+     * Every way the same product code is written: UPC-A (12 digits), EAN-13 and GTIN-14 only differ by leading zeros.
+     *
+     * @return list<string>
+     */
+    public static function barcodeVariants(?string $barcode): array
+    {
+        $digits = self::normalizeBarcode($barcode);
+        if ($digits === null || ltrim($digits, '0') === '') {
+            return [];
+        }
+
+        $core = ltrim($digits, '0');
+
+        return array_values(array_unique(array_filter(
+            array_map(fn (int $length) => strlen($core) <= $length ? str_pad($core, $length, '0', STR_PAD_LEFT) : null, [strlen($core), 8, 12, 13, 14]),
+        )));
+    }
+
     /** @param  array<string, mixed>  $data  PhysicalItems::FIELDS */
     public static function add(array $data): PhysicalItem
     {
         $item = new PhysicalItem(array_intersect_key($data, array_flip(self::FIELDS)));
+        $item->barcode = self::normalizeBarcode($item->barcode);
         $item->album_id = self::albumFor($item)?->id;
         $item->save();
 
@@ -71,6 +119,7 @@ final class PhysicalItems
     {
         $before = $item->album_id;
         $item->fill(array_intersect_key($data, array_flip(self::FIELDS)));
+        $item->barcode = self::normalizeBarcode($item->barcode);
         if ($item->isDirty(['artist', 'title'])) {
             $item->album_id = self::albumFor($item)?->id;
         }
