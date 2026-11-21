@@ -1,0 +1,60 @@
+{
+    "target_id": "01M7ZRPMN1KXA8PP822W2GKCE9",
+    "rules_version": 1,
+    "add": [
+        {
+            "key": "track:1",
+            "path": "Band/LP/01 - One.mp3",
+            "fingerprint": "2945d08afdd4b3c326ccee6d1ac294a5cbb873c84868cd1b561214b301acf01a",
+            "size": 4000,
+            "sha256": "2945d08afdd4b3c326ccee6d1ac294a5cbb873c84868cd1b561214b301acf01a",
+            "state": "ready",
+            "url": "/api/sync/files/01M7ZRPMN1KXA8PP822W2GKCE9/track:1/2945d08afdd4b3c326ccee6d1ac294a5cbb873c84868cd1b561214b301acf01a?expires=1795310283&signature=0dedd9b72b3734afbd281667ce6ce18fbb7f4c604f5ffda143d0e3e9e9cb0fe4"
+        },
+        {
+            "key": "track:2",
+            "path": "Band/LP/02 - Lossless.mp3",
+            "fingerprint": "e568ff932643faf334c5dcdce8048cf35e6af4ff",
+            "size": 4800000,
+            "sha256": null,
+            "state": "preparing",
+            "url": null
+        }
+    ],
+    "replace": [],
+    "move": [],
+    "keep": 0,
+    "remove": [
+        {
+            "key": "track:900",
+            "path": "old/old.mp3",
+            "size": 5
+        }
+    ],
+    "path_conflicts": [],
+    "totals": {
+        "bytes_to_add": 4804000,
+        "bytes_freed": 5,
+        "net_bytes": 4803995,
+        "wanted": 2,
+        "wanted_bytes": 4804000,
+        "copied": 1,
+        "transcoded": 1,
+        "ready": 1,
+        "preparing": 1,
+        "failed": 0
+    },
+    "warnings": [
+        {
+            "code": "no_own_file",
+            "count": 1
+        }
+    ],
+    "deferred": {
+        "count": 0,
+        "bytes": 0
+    },
+    "confirm_required": true,
+    "remove_first": false,
+    "budget_bytes": null
+}

@@ -884,3 +884,32 @@ func TestOldPartsAreCleanedAndFreshOnesKept(t *testing.T) {
 		t.Fatal("clean-up of partial downloads")
 	}
 }
+
+// testdata/server-plan.json is a real answer of the PHP server (tests/Feature/SyncApiTest builds the same shape): the Go
+// types must read it, nulls included, or the node and the server have drifted apart.
+func TestThePlanOfTheRealServerDecodes(t *testing.T) {
+	b, err := os.ReadFile("testdata/server-plan.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var p Plan
+	if err := json.Unmarshal(b, &p); err != nil {
+		t.Fatal(err)
+	}
+	if p.RulesVersion != 1 || len(p.Add) != 2 || len(p.Remove) != 1 || !p.ConfirmRequired || p.RemoveFirst {
+		t.Fatalf("plan: %+v", p)
+	}
+	ready, preparing := p.Add[0], p.Add[1]
+	if ready.State != "ready" || ready.URL == nil || !strings.HasPrefix(*ready.URL, "/api/sync/files/") || ready.SHA256 == nil || ready.Size != 4000 {
+		t.Fatalf("ready: %+v", ready)
+	}
+	if preparing.State != "preparing" || preparing.URL != nil || preparing.SHA256 != nil {
+		t.Fatalf("preparing: %+v", preparing)
+	}
+	if p.Remove[0].Key != "track:900" || len(p.Warnings) != 1 || p.Warnings[0]["code"] != "no_own_file" {
+		t.Fatalf("plan: %+v", p)
+	}
+	if err := SafePath(ready.Path); err != nil {
+		t.Fatalf("the server's own paths must pass the executor's check: %v", err)
+	}
+}

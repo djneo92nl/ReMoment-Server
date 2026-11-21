@@ -131,9 +131,13 @@ queued ──nudge──▶ queued ──accept──▶ accepted ──▶ runn
 - Silence handling: ffmpeg runs while the job runs; the server stops the job when the last listener leaves (like `removeTarget()`), idle stop after a limit.
 - *Unverified:* Icecast per-mount source credentials in the current `docker/icecast` config; capture glitches on a Pi 2 USB audio class device; whether the mount stays up when the source drops.
 
-### `player`, `sync-target` (18.3, 18.4)
+### `sync-target` (18.3, built 2026-11-21)
 
-Not planned here. They reuse the registration, role switch, job and upload machinery and need their own plan (the sync manifest protocol, offline library). Declared roles `player` and `sync-target` are accepted and stored so the data model does not change later, and the admin UI will not offer jobs for them.
+The node keeps one removable volume filled by the server: job types `sync.scan`, `sync.claim`, `sync.apply` (params: `target_id`, `confirm`; the server adds its `server_id` when the node fetches the job), the volume is `sync.volume_path` in the node's own config (never a param), the plan and report calls are `POST /api/nodes/sync/plan|report` with the node's Bearer token and only for the target bound to it, the files come from signed URLs. The engine is `node/internal/syncer`. Built against fakes, unverified on a real stick. See [offline-sync.md](offline-sync.md) section 14 and [docs/api/sync.md](../api/sync.md).
+
+### `player` (18.4)
+
+Not planned here. It reuses the registration, role switch, job and upload machinery and needs its own plan (an offline library on the node). The declared role `player` is accepted and stored so the data model does not change later, and the admin UI will not offer jobs for it.
 
 ## 7. Phased build, with done-criteria
 

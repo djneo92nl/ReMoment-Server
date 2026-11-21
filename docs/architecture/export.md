@@ -20,6 +20,10 @@ Status: **steps 1 to 5 built, plus AAC, Opus and the loudness option (1.1)** (th
 - A file that got a gain loses its ReplayGain / R128 tags in the output (`replaygain_*`, `r128_*`), because a player would apply the gain a second time; files transcoded without the option keep them.
 - Stored in the export's `options` (`loudness` only when `album` or `track`); the estimate and the job use the same planner.
 
+## ExportTranscoder
+
+`App\Domain\Export\ExportTranscoder` is the per-file encode (one transcode per container with tags, cover and loudness gain, and the ID3v2.3 remux of a copied MP3), factored out of `ExportRunner` so the sync artifacts (`Domain\Sync\SyncArtifacts`) make exactly the same bytes. It needs a writable work directory from its caller.
+
 ## ExportPlanner
 
 `App\Domain\Export\ExportPlanner::plan(iterable $tracks, ?string $profile): ExportPlan` takes tracks in export order and returns one `ExportItem` per track plus totals. `decide(File, profile)` is the per-file rule. Nothing is probed, read or written: it uses `files.codec` (falling back to the extension) and `files.bitrate` (kbit/s, or bit/s above 10000, like `Track::bitrateKbps()`). The file is the track's primary present original (`Proxies::original()`).
@@ -88,4 +92,4 @@ Admin login only, gated with the `library` and `file_storage` features (Control:
 
 Not verified: Opus and m4a playback on real head units and players; the native AAC encoder's quality at 128 kbit/s (libfdk_aac is better but is rarely in ffmpeg builds); the album gain computed from a partial selection (it uses the tracks in the export). A copied MP3 other than in `compat` may still carry ID3v2.4 tags.
 
-Repeated, incremental fills of a USB drive, an MP3 player or the iOS offline library are the sync plan in [offline-sync.md](offline-sync.md): it reuses these profiles, the planner's `decide()`, the naming rules and the loudness option, and differs in identity (keys, fingerprints, a manifest on the target) and in sharing transcoded files by fingerprint.
+Repeated, incremental fills of a USB drive, an MP3 player or the iOS offline library are sync ([offline-sync.md](offline-sync.md), built for S1 and S2 against fakes): it reuses these profiles, the planner's `decide()`, the naming rules and the loudness option, and differs in identity (keys, fingerprints, a manifest on the target) and in sharing transcoded files by fingerprint.

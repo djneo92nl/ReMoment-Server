@@ -7,6 +7,6 @@ Source: `App\Domain\Tasks\UserTasks::active()`.
 - **Export**: read from `exports` rows (`queued`/`running`), measured percent = `files_done / files_total`.
 - **Deep analysis** (stems, sections, stem audio): `DeepAnalysis::request()` puts a task, `AnalyzeTrackDeep` marks it running and removes it however it ends. Percent is *estimated* from `estimateSeconds` (shown `~`, capped at 95).
 - **Analysis backlog** ("Run backlog" on /settings/analysis): task with `total` = queued files; each finished `AnalyzeAudioFile` job advances it, it ends at the total.
-- **Sync to a device** (future): call `UserTasks::put/advance/done` with a `sync:` key.
+- **Sync to a device** (`sync:{target id}`, `Domain\Sync\Syncs`): `Syncs::start()` puts the task, the node's progress reports (`files_done` of `files_total`, through the job's progress route) set it with `UserTasks::set()`, and the result, a cancel or a lost job ends it. Measured percent, shown as "x of y files".
 
 Cache-held tasks have a 12 h TTL so a dead worker never leaves one behind. Not shown: the scheduled nightly analysis (not user-started).

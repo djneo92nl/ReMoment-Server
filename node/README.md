@@ -2,7 +2,7 @@
 
 Headless agent for a Pi or another Linux box (workstream 18; plan and decisions in `docs/architecture/node-agent.md`).
 
-Status: **phase N1 (hello node) plus the N3 line-in and N2 ripper roles (against fakes, unverified on hardware).** It registers as a `node` client, waits for the admin to approve it in Settings › Clients, sends a heartbeat every 30 s, listens for the MQTT doorbell and runs fixed job types fetched over REST. Job types: `ping`, for the `line-in` role `line_in.start` / `line_in.stop` and for the `ripper` role `ripper.status` / `ripper.rip` (see below). Go, stdlib plus the Paho MQTT client, no cgo.
+Status: **phase N1 (hello node) plus the N3 line-in and N2 ripper roles (against fakes, unverified on hardware).** It registers as a `node` client, waits for the admin to approve it in Settings › Clients, sends a heartbeat every 30 s, listens for the MQTT doorbell and runs fixed job types fetched over REST. Job types: `ping`, for the `sync-target` role `sync.scan` / `sync.claim` / `sync.apply` (see below), for the `line-in` role `line_in.start` / `line_in.stop` and for the `ripper` role `ripper.status` / `ripper.rip` (see below). Go, stdlib plus the Paho MQTT client, no cgo.
 
 ```bash
 cd node
@@ -39,3 +39,11 @@ Try it: register, approve in the web UI, then create a job:
 curl -s -X POST http://remoment.local/api/admin/nodes/<id>/jobs -H "Authorization: Bearer <admin token>" \
   -H 'Content-Type: application/json' -d '{"type":"ping","params":{"message":"hi"}}'
 ```
+
+**Sync-target role.** Declare `"roles": ["sync-target"]` and set the volume in the config (never in a job):
+
+```json
+{ "server": "http://remoment.local", "roles": ["sync-target"], "sync": { "volume_path": "/media/usb/STICK" } }
+```
+
+(`REMOMENT_NODE_SYNC_PATH` overrides the path.) The node keeps that one volume filled with what the server plans for the target bound to it (Tools › Sync on the server): `sync.scan` reads the drive (marker, filesystem, free space), `sync.claim` writes `.remoment-sync/target.json` on a drive that has none (never before the admin presses "Use this drive"; nothing is formatted), `sync.apply` downloads what is added or replaced into `.remoment-sync/tmp`, renames it into place, renames moved files, deletes removed ones and writes `.remoment-sync/manifest.json` atomically as it goes. The engine (`internal/syncer`) checks every path itself, only ever touches files of its own manifest, never overwrites a file it does not own, leaves a file the user changed alone, refuses a drive of another server or target, skips mass deletion without a yes and stops when the drive is full. The node is write-only: wait until the job is done, then remove the drive yourself. The service user needs write access to the mount (the unit's `ProtectSystem=strict` needs the path in `ReadWritePaths`). Built against fakes, unverified on a real stick. See `docs/architecture/offline-sync.md` and `docs/api/sync.md`.

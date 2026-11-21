@@ -72,6 +72,9 @@ php artisan similar:index [--status]
 # Remove kept stem audio (`stems/{file id}`, kind `stem_audio`) of files that were removed or changed (scheduled daily 03:30, Full profile); --dry-run counts; see docs/api/stems.md
 php artisan stems:prune [--dry-run]
 
+# Keep the cache of prepared sync files (transcodes shared by every sync target) under SYNC_CACHE_GB, least recently used first, never one used in the last SYNC_PROTECT_MINUTES; also drops rows stuck while preparing and orphan files (hourly, file_storage); see docs/api/sync.md
+php artisan sync:prune
+
 # Helper of scripts/queue-soak/run.sh (the owner's 24-hour queue soak; never run by a test or a session): queue a mixed load of no-op jobs on every queue of the profile, sample queue health and worker memory as one JSON line, write report.md from a samples file; see docs/architecture/queue-management.md
 php artisan queue:soak {enqueue|sample|report} [--per-queue=20] [--input=samples.jsonl] [--output=report.md]
 
