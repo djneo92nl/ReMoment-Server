@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Template of the ReMoment Manager's launchd agent for a Mac (a development machine). install-macos.sh fills the @...@
+     values and installs it as ~/Library/LaunchAgents/nl.remoment.manager.plist. Docker Desktop provides the `docker`
+     command; the SMB and NAS-mount features of the Manager are Linux-only and are not used on a Mac.
+     Design: docs/architecture/manager.md -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>nl.remoment.manager</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>@NODE@</string>
+    <string>@PROJECT_DIR@/manager/server.js</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>REMOMENT_PROJECT_DIR</key><string>@PROJECT_DIR@</string>
+    <key>REMOMENT_COMPOSE_FILE</key><string>@COMPOSE_FILE@</string>
+    <key>REMOMENT_COMPOSE_PROJECT</key><string>@COMPOSE_PROJECT@</string>
+    <key>REMOMENT_MANAGER_HOME</key><string>@HOME_DIR@</string>
+    <key>REMOMENT_MANAGER_PORT</key><string>@PORT@</string>
+    <key>REMOMENT_MANAGER_BIND</key><string>127.0.0.1</string>
+    <!-- launchd starts agents with a minimal PATH; docker lives in one of these. -->
+    <key>PATH</key><string>/usr/local/bin:/opt/homebrew/bin:/Applications/Docker.app/Contents/Resources/bin:/usr/bin:/bin</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>5</integer>
+  <key>StandardOutPath</key><string>@LOG@</string>
+  <key>StandardErrorPath</key><string>@LOG@</string>
+</dict>
+</plist>

@@ -94,6 +94,30 @@ Browse to `http://<host>:<APP_PORT>/` and sign in; with zero devices the admin l
 
 Check what runs: `docker compose -f docker-compose.prod.yml ps`, logs with `... logs -f app`, and `/settings/health` in the browser.
 
+## The Manager (recommended)
+
+The Manager is a small service on the **host**, next to Docker, that shows and restarts your containers, upgrades the app with a backup first, serves your library as a network share and mounts a NAS share to use as a storage location. It keeps working when the app is down, which is the point. It is not a container. Design and API: [../architecture/manager.md](../architecture/manager.md). Not verified on a real host yet.
+
+**Linux with systemd** (Debian, Ubuntu, Raspberry Pi OS):
+
+```bash
+sudo manager/install/install-linux.sh --dry-run     # shows what it would do, changes nothing
+sudo manager/install/install-linux.sh               # installs and starts it
+remoment-manager status                             # log in again first (it sets two variables)
+```
+
+It needs Node.js 18 or newer (`apt install nodejs`). The service runs as **root** by default, because the network share and the NAS mount edit Samba and systemd; if you only want container status, restart and upgrade, `--user <you>` (a user in the `docker` group) is enough. The installer makes the token (a file only root and the app's user can read; it is never printed), a unit file and two settings files: `/etc/remoment-manager/manager.env` (replaced on every run) and `/etc/remoment-manager/local.env` (yours). Run it again after a `git pull` or to change an option; it only changes what differs. Useful options: `--port`, `--lan` (also listen on the network: plain HTTP, a trusted LAN only), `--with-samba` (installs Samba and adds the include line), `--app-uid` (the user the app container runs as; default: the owner of the checkout). For the app's Settings › Manager page to read the token, `MANAGER_HOME` in `.env` must point at the manager's home (default `/var/lib/remoment-manager`, which is what the compose file mounts).
+
+Remove it with `sudo manager/install/uninstall-linux.sh` (add `--purge` to delete its token and audit log too). Shares and NAS mounts it set up keep working on their own.
+
+**macOS** (a development machine, no sudo): `bash manager/install/install-macos.sh`, remove with `bash manager/install/uninstall-macos.sh`. A Mac has no use for the network share or the NAS mount.
+
+**No systemd, or you prefer a container:** start `node manager/server.js` from your own process supervisor with the variables from `manager.env`. Running the Manager inside the compose project is not offered: it would need the Docker socket in a container and could not manage Samba or mounts.
+
+### A NAS as a storage location
+
+With the Manager running: Settings › Manager › *NAS mounts* › Add a mount. Fill in the NAS address, the share (no spaces), the user and password (empty user = guest), *Preview* (it shows the unit files, the same thing as an `/etc/fstab` line and what it will write; the password is not shown), then *Apply*. The share is mounted on first use, so a NAS that is off never blocks the server's start. Mounts are read-only unless you allow writing. Needs `cifs-utils` on the host (`apt install cifs-utils`). When the mount works, *Use as storage location* adds it at Settings › Storage; if a working mount later disappears you get an alert. The NAS password is kept only in a root-only file on the host: not in the database, not in backups, never shown again.
+
 ## Firewall
 
 Open `APP_PORT`, 1883 and 9001 to your LAN (9001 is what browsers use for live updates). Mosquitto allows anonymous connections (`docker/mosquitto/config/mosquitto.conf`): keep these ports off the internet.

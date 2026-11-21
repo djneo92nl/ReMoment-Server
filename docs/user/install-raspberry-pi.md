@@ -36,6 +36,10 @@ You can already run the **Control** profile on a Pi with Docker. This needs a 64
 
 For Standard use `PROFILE=standard` with MariaDB as described on the Docker page. This has not been tried on a Pi: *unverified*.
 
+## The Manager on a Pi
+
+On a Pi with systemd the Manager is installed with `sudo manager/install/install-linux.sh` (see [install-docker.md](install-docker.md#the-manager-recommended)); the finished Pi image will have it preinstalled. It is a small Node.js service; how much memory it uses on a Pi has not been measured. It lets you restart containers and upgrade from the web page when the app misbehaves, and mount a NAS for your music. A Pi on Wi-Fi may not keep up with music over a network share: *unverified*.
+
 ## Moving up later
 
 A Control install can later move to Standard or Full with the command `php artisan profile:upgrade`, which makes a backup first and copies your data into MariaDB. The other direction is not supported.

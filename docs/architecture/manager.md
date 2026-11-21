@@ -1,6 +1,6 @@
 # ReMoment Manager (workstream 10, read-only core)
 
-Code: `manager/` (`server.js`, `bin/remoment-manager`, `test/`). Status: **skeleton built**: status, logs, restart, audit, CLI, and the web page Settings › Manager (admin login, `App\Domain\Manager\ManagerClient`). Upgrade and rollback are built (see "Upgrade and rollback"), and so is **SMB serve** (see "SMB shares", 2026-11-14, tested against fake commands only, never against a real Samba); SMB mount and the Pi image are not (see "Still to do"). Plan: [v1-roadmap.md](v1-roadmap.md) section 10.
+Code: `manager/` (`server.js`, `bin/remoment-manager`, `test/`). Status: **skeleton built**: status, logs, restart, audit, CLI, and the web page Settings › Manager (admin login, `App\Domain\Manager\ManagerClient`). Upgrade and rollback are built (see "Upgrade and rollback"), and so is **SMB serve** (see "SMB shares", 2026-11-14, tested against fake commands only, never against a real Samba), **SMB mount** (a NAS share as a storage location, see "NAS mounts", 2026-11-21, fake `systemctl` only) and the **installers** (systemd unit and script for Linux, launchd agent for a Mac, see "Installers", 2026-11-21, rendered into a scratch directory only); the Pi image is not (see "Still to do"). Plan: [v1-roadmap.md](v1-roadmap.md) section 10.
 
 ## What it is for
 
@@ -14,7 +14,7 @@ A small service on the **host**, outside the app container, that shows and resta
 | Token | **Separate from the admin password**: random 256-bit hex, created on first start, file mode 0600 in a 0700 directory (`~/.remoment-manager/token`, directory from `REMOMENT_MANAGER_HOME`) | The app cannot verify the admin password while it is down. |
 | Binding | **127.0.0.1** by default, port `REMOMENT_MANAGER_PORT` (default 8099); `REMOMENT_MANAGER_BIND=0.0.0.0` (Ansible: `manager_lan: true`) opens the web page to the LAN | Root-equivalent power; the LAN page is opt-in, plain HTTP, and says so on the page. |
 | Updating itself | Later, by its own installer | Not built. |
-| Init files | Examples below only; nothing installs them | Installers come later. |
+| Init files | `manager/install/`: systemd unit + install/uninstall scripts for Linux, launchd agent for a Mac (see "Installers") | Idempotent, token made root-only; run only into a scratch directory so far. |
 
 ## What it controls
 
@@ -50,6 +50,8 @@ remoment-manager audit [--limit N] [--json]
 remoment-manager upgrade [--wait]       starts the upgrade; --wait follows the log and exits 0 (ok) or 1 (failed)
 remoment-manager rollback [--wait]
 remoment-manager upgrade-status [--json]
+remoment-manager smb [status|config|enable|disable|user create|user remove]    see "SMB shares"
+remoment-manager mount [status|add|on|off|remove]                              see "NAS mounts"
 remoment-manager token                  prints the token file's path, never the token
 ```
 
@@ -124,7 +126,7 @@ Code: `manager/smb.js` (wired into `server.js`), `manager/test/smb.test.js` with
 | `exports` | `REMOMENT_SMB_EXPORTS_DIR` (default `EXPORT_SHARE_DIR`, else `/srv/exports`) | read-only, always; finished exports appear here (below) |
 | `inbox` | `REMOMENT_SMB_INBOX_DIR` (default `/srv/inbox`; **set it to the root of the inbox storage location**: the manager cannot read the app's database) | read-write, always; copy albums here, then Import inbox |
 
-Unless guests are allowed, every share is `guest ok = no`, `valid users = <share user>`, `follow symlinks = no`, `wide links = no`; writable ones get create/directory masks 0664/0775 and, when `REMOMENT_SMB_FORCE_USER` is set (the app's unix user), `force user` so the app can read and move what arrives. **Guest access is an opt-in per share** (`guest: true` in the share change, `--guest`, the card's Allow guests with a confirm; off by default, and the card marks an open share): the section then has `guest ok = yes` and no `valid users`, so anyone on the network reads it (and writes it, on the inbox) without a password. The library cannot be guest and writable at once (`422 guest_writable`). Guests also need `map to guest = Bad User` in `[global]` of `smb.conf` (a fragment cannot set it; the installer or admin does, unverified). Otherwise there is one share user for all shares, separate from the admin login and from every other account, no per-share users. A password share cannot be switched on before the user exists; a guest share can.
+Unless guests are allowed, every share is `guest ok = no`, `valid users = <share user>`, `follow symlinks = no`, `wide links = no`; writable ones get create/directory masks 0664/0775 and, when `REMOMENT_SMB_FORCE_USER` is set (the app's unix user), `force user` so the app can read and move what arrives. **Guest access is an opt-in per share** (`guest: true` in the share change, `--guest`, the card's Allow guests with a confirm; off by default, and the card marks an open share): the section then has `guest ok = yes` and no `valid users`, so anyone on the network reads it (and writes it, on the inbox) without a password. The library cannot be guest and writable at once (`422 guest_writable`). Guests need `map to guest = Bad User`: the fragment carries its own `[global]` section with that line (the owner's note, 2026-11-21) whenever a share is on, so no installer or admin step is needed for it (a test checks the section; that Samba merges a second `[global]` from an include is unverified). The `include` line goes at the **end** of `smb.conf` (the fragment brings its own `[global]` and share sections, so it must not split `smb.conf`'s own `[global]`). Otherwise there is one share user for all shares, separate from the admin login and from every other account, no per-share users. A password share cannot be switched on before the user exists; a guest share can.
 
 **Share user.** `POST /smb/user` is the only thing that creates it, an explicit authenticated action (CLI `smb user create`, the card's Create user). The name is `REMOMENT_SMB_USER` (default `remoment-smb`, validated against `^[a-z_][a-z0-9_-]{0,30}$`; never the deploy user). Steps: `id -u` (an existing system account the manager did not create is refused `409 user_exists`, never touched), `useradd --system --no-create-home --shell /usr/sbin/nologin --user-group -- NAME`, then `smbpasswd -a -s NAME` with the generated password on **stdin** (never an argument, never in `ps`). A second call is a password reset. The password is 24 characters from a 56-letter alphabet, made with `crypto.randomBytes`, **returned once in that response** and kept nowhere: not in the audit, not in `smb.json`, not in status, not in any error text (a failing `smbpasswd` has the password stripped from its message). The web card shows it in a box with "I have noted it"; the CLI prints it once. `DELETE /smb/user` removes the Samba entry and, only if the manager made the account, the account; refused `409 shares_enabled` while a share is on.
 
@@ -146,64 +148,91 @@ CLI: `remoment-manager smb [status]`, `smb config`, `smb enable|disable <share> 
 
 **Audit.** `smb share` (service = the share) with `enabled`, `disabled` or `failed (<reason>)`; `smb user` with `created`, `password reset`, `removed` or `failed (...)`. Never a password.
 
-**Security.** Everything runs through the one `run()` (`execFile`, argument arrays, no shell; `run()` got an `input` option for stdin). The only request input is a share name from a fixed list and booleans; the user name and all paths come from the manager's environment and are validated before they reach a command or the file. Root: writing `/etc/samba`, `useradd` and `smbpasswd` need root, and the Ansible unit runs as `remoment`: **SMB needs the manager to run as root** (a drop-in `User=root`) or the fragment and Samba to be writable and the commands permitted otherwise; a failed write says "does the manager run as root?". Not done: the Ansible role does not install Samba or add the include line yet.
+**Security.** Everything runs through the one `run()` (`execFile`, argument arrays, no shell; `run()` got an `input` option for stdin). The only request input is a share name from a fixed list and booleans; the user name and all paths come from the manager's environment and are validated before they reach a command or the file. Root: writing `/etc/samba`, `useradd` and `smbpasswd` need root, and the Ansible unit runs as `remoment`: **SMB needs the manager to run as root** (a drop-in `User=root`) or the fragment and Samba to be writable and the commands permitted otherwise; a failed write says "does the manager run as root?". `manager/install/install-linux.sh --with-samba` installs Samba and appends the include line (with a backup of `smb.conf`); the Ansible role does not yet.
 
 **Exports share, app side.** `EXPORT_SHARE_DIR` (config `export.share_dir`, empty = off; `docker-compose.prod.yml` mounts `${EXPORT_SHARE_DIR:-/srv/exports}` into the app at the same path) is the directory the `exports` share points at. When the export job finishes, `App\Domain\Export\ExportShare::publish()` puts the zip parts in a folder `{title} - {first 8 characters of the export id}`: a hard link when the share directory is on the same disk as the private exports directory, else a copy (so two copies of a large export while it is kept). Folder 0755, files 0644. `ExportRetention` (expiry, the directory cap, an export removed) and `ExportService::cancel()` remove the folder with the export; the retention also sweeps folders of unknown exports once an hour old, **only folders matching the ` - xxxxxxxx` pattern**, so anything else in that directory is never touched. A failure to publish is logged and never fails the export. Tests: `tests/Feature/ExportShareTest.php`.
 
+## NAS mounts (an SMB share of a NAS as a storage location)
+
+Code: `manager/mount.js` (wired into `server.js`), `manager/test/mount.test.js` with `fake-mount.js`; the app side is the NAS mounts card of Settings › Manager (`Livewire\ManagerPanel`), `ManagerClient::mount*()` and the `mount.unavailable` alert (`AlertChecks::mounts`, [alerts.md](alerts.md)). **Every part of it is unverified on a real host**: the tests put fake `systemctl` and `systemd-analyze` first on PATH (real `ls` against temp directories, a fixture `mountinfo`) and prove the files, the order, the refusals and the redaction, not that systemd or the NAS accepts anything. Linux only (systemd, cifs); on a Mac the card works against the API but there is nothing to mount.
+
+**What it writes.** For a mount named `nas`, mount point `REMOMENT_MOUNT_BASE/nas` (default `/mnt/remoment/nas`; a request never picks a path):
+
+| File | Content |
+|---|---|
+| `REMOMENT_MOUNT_CRED_DIR/nas.cred` (default `/etc/remoment-manager/credentials/`, directory 0700, file 0600) | `username=`, `password=`, optional `domain=`. The only place the password is ever stored; absent for a guest mount (no user, option `guest`). |
+| `REMOMENT_MOUNT_UNIT_DIR/<escaped path>.mount` (default `/etc/systemd/system`, mode 0644) | `What=//host/share`, `Where=`, `Type=cifs`, `Options=credentials=…,ro|rw,[vers=…,][uid=,gid=,]file_mode/dir_mode,iocharset=utf8,soft,nosuid,nodev,noexec,_netdev,nofail`, `After=`/`Wants=network-online.target`, `TimeoutSec=30`. Read-only unless the form says writable; SMB1 is not offered. |
+| `…/<escaped path>.automount` | `Where=`, `TimeoutIdleSec=0`, `Before=remote-fs.target docker.service`, `WantedBy=remote-fs.target`. **The automount is what is enabled**: the path exists as a trigger from boot, before Docker starts the app, the share is mounted on first use, and a NAS that is off never blocks boot or the app (`nofail`, `soft`: an unreachable share returns an error instead of hanging). |
+
+The unit name is the systemd escaping of the path (`mnt-remoment-my\x2dnas.mount`; `escapePath()` is tested against `systemd-escape -p`). The same options as an `/etc/fstab` line (`_netdev,nofail,x-systemd.automount`) are shown in the dry run for an admin who prefers fstab; the manager never edits fstab. `REMOMENT_MOUNT_UID` / `REMOMENT_MOUNT_GID` (numeric, the app's user; the installer sets them from `--app-uid`) own the files on the mount so the app can read them.
+
+**Dry run, then an explicit confirm.** Every change has a dry run (`?dry_run=1`) that writes nothing, runs nothing and returns the unit files, the fstab line, the credentials file **with the password hidden** (`password=***`), the list of steps and a `plan` token (SHA-256 of what would be written, never covering the password). A real call must repeat that token as `confirm` (body; `?confirm=` for DELETE): none → `422 confirm_required` (the answer carries the plan), a plan that no longer matches the form → `409 plan_changed`. So what is applied is exactly what was shown. `REMOMENT_MOUNT_DRY_RUN=1` makes every change a dry run. The web card previews first and applies with the preview's token; the CLI prints the plan and says which `--confirm` to repeat.
+
+```
+GET    /mounts                        → { dry_run, method: "systemd", base, problems, data: [Mount] }
+POST   /mounts [?dry_run=1]           { name, host, share, user?, password?, domain?, writable?, version?, confirm? } → { status, name, path, updated } | { dry_run, name, updating, path, plan, config: { mount_unit, automount_unit, fstab, credentials, credentials_file }, actions }
+POST   /mounts/{name}/active [?dry_run=1]   { active, confirm? }      → { status, name, active } | { dry_run, plan, actions }   off = disable the automount and unmount
+DELETE /mounts/{name} [?dry_run=1|?confirm=PLAN]                       → { status, name, removed } | { dry_run, plan, actions }
+```
+
+`Mount` = `{ name, host, share, user, domain, writable, version, path, unit, active, mounted, readable, state, error, lost, last_ok_at, checked_at }`; `state` is `ok` (automount active, a cifs mount in `/proc/self/mountinfo` at the path and the folder lists), `not_mounted` (active but the share did not mount: NAS off or unreachable), `unreadable` (mounted but the listing fails, or the probe did not answer within `REMOMENT_MOUNT_PROBE_SECONDS`, default 5) or `inactive` (switched off on purpose). `lost` is a mount that is not ok and worked before (`last_ok_at`). Same token/session, header and Host rules as every change; errors `404 unknown_mount`, `422 invalid | bad_setup | confirm_required`, `409 busy | plan_changed | mount_busy`, `502 write_failed | config_invalid | daemon_reload_failed | enable_failed`.
+
+**Applying** (add or update; adding a name again updates it): validate every field (name `^[a-z]([a-z0-9-]{0,29}[a-z0-9])?$`, host a plain host name or IPv4 address, share segments of `[A-Za-z0-9_$][A-Za-z0-9_.$-]*` up to four, user, domain, version one of `default|2.0|2.1|3.0|3.1.1`, password up to 128 characters without line breaks or edge spaces, no spaces anywhere that reaches a unit file) → credentials written to `.new`, chmod 0600, renamed → mount point created → both units written to a staging folder inside the unit directory and checked with `systemd-analyze verify` (a rejected unit is never installed and a new credentials file is removed again, `502 config_invalid`) → renamed into place → state saved in `mounts.json` (0600, **no password**) → `systemctl daemon-reload` → (an update first stops the old mount so the new options apply) → `systemctl enable --now <automount>`. The same one-change-at-a-time lock as everything else.
+
+**Off and remove.** Off = `systemctl disable --now` the automount, then `systemctl stop` the mount; a share that is in use is not unmounted: the automount is started again and the answer is `409 mount_busy`. Remove does the same, then deletes both units, the credentials file, the state entry, runs `daemon-reload` and removes the mount-point folder **only when it is empty** (never forced). The web card refuses to remove a mount while a storage location lives on it, and asks the manager for its confirm token itself.
+
+**Status and the alert.** `GET /mounts` probes each mount (`systemctl is-active`, a listing with its own kill timeout that also triggers the automount, the mountinfo file), cached `REMOMENT_MOUNT_CACHE_SECONDS` (default 10) with one probe in flight per mount, and stops waiting after the probe timeout, so a stalled NAS can never stall the manager. A mount that was ok and is not any more is audited (`mount lost`, `mount back`). The app's `alerts:check` (every minute) reads it: `mount.unavailable` per mount, **critical** when it was lost, a warning when it never worked, nothing for a mount that is switched off, resolved when it is back or removed; a manager that does not answer changes nothing.
+
+**Security.** Everything runs through the one `run()` (argument arrays, no shell); only validated request fields reach a file or a command. **The password** travels once, in the body of the confirmed add, over the same link as the manager token (plain HTTP on a LAN page: use a trusted network or a TLS proxy), is written to the 0600 credentials file and **nowhere else**: not in any argument (the mount uses `credentials=<file>`; the CLI takes it from stdin only, `--password-stdin`, and refuses a user without it), not in the audit log, `mounts.json`, a unit file, the fstab preview, any response or any error text (command output has it replaced by `***`). Tested by searching every argument, file and answer for the password. Credentials are not part of the app's backups (they live on the host, outside the app database). Root: writing `/etc/systemd`, `/etc/remoment-manager` and `systemctl enable` need root, like SMB serve (`install-linux.sh` runs the service as root by default).
+
+**In the app.** The card (Settings › Manager, below Network shares) lists the mounts with their state and offers Add (form → Preview → Apply), Unmount / Switch on, Remove and **Use as storage location** (library; inbox too on a writable mount): the entry only, a `StorageLocation` with driver `local` and `root` = the mount path **taken from the manager's answer, never from the browser**, refused unless the mount is ok right now, with a name that cannot collide (`NAS nas`, `NAS nas 2`) and no second entry for the same folder; Settings › Storage does scanning and the rest, and shows the location as unreachable through the existing `storage.unreachable` alert when the folder goes away. The button is hidden in Control (no storage locations). Tests: `tests/Feature/ManagerMountsTest.php`.
+
+**Unverified on a real host** (all of it): systemd accepting the units and `systemd-analyze verify` on units in a staging folder; that `_netdev`, `nofail` and `soft` in a unit's `Options=` are passed through harmlessly to `mount.cifs`; `Before=docker.service` on the automount giving the ordering wanted (and not a boot cycle); `cifs-utils` being installed (the installer does not install it yet); a real NAS (Synology, QNAP, Windows) accepting `vers=` and `credentials=`; the automount triggering on the `ls` probe and a stalled share staying bounded by the probe timeout (a kernel-blocked `ls` is only killed when it wakes); the file indexer and analysis over SMB (slower, no change notifications, a Pi on Wi-Fi may not keep up, see the roadmap); IPv6 hosts and share names with spaces (refused on purpose); and the alert noise of a NAS that flaps (no debounce: one failed probe raises, the next ok one resolves).
+
 ## Tests
 
-`cd manager && node --test test/*.test.js` (no packages). A fake `docker` script (`test/fake-docker.js`) is put first on PATH; it answers `compose config --services`, `compose ps`, `inspect`, `stats`, `compose logs`, `compose restart` with canned output and records every call. No real container is touched. Covered: status shape, crashed and restarting, logs tail cap, exact restart arguments, unknown service gives 404 with no command run, 401, 403 (Host and header), 404/405, 409 while a change runs, 413, audit entries, failed restart, token file mode, the CLI.
+`cd manager && node --test test/*.test.js` (no packages). A fake `docker` script (`test/fake-docker.js`) is put first on PATH; it answers `compose config --services`, `compose ps`, `inspect`, `stats`, `compose logs`, `compose restart` with canned output and records every call. No real container is touched. Covered: status shape, crashed and restarting, logs tail cap, exact restart arguments, unknown service gives 404 with no command run, 401, 403 (Host and header), 404/405, 409 while a change runs, 413, audit entries, failed restart, token file mode, the CLI. `test/smb.test.js` (fake `id`, `useradd`, `smbpasswd`, `testparm`, `systemctl`, `smbcontrol`, `smbstatus`), `test/mount.test.js` (fake `systemctl`, `systemd-analyze`; generators, validation, dry run and confirm, apply order, password redaction over every argument/file/answer, probe states, lost mounts, stalled share, off/remove, CLI) and `test/install.test.js` (the installers run into a scratch root with guard commands that fail the test if `systemctl`, `chown`, a package manager or the macOS service tool is ever called). `cd manager && npm test`.
 
-## Example init files (the Ansible unit is derived from the systemd one; the launchd one is untested)
+## Installers
 
-systemd (`/etc/systemd/system/remoment-manager.service`):
+Files in `manager/install/`; the Ansible install (`ansible/manager.yml`, `templates/remoment-manager.service.j2`) stays as it is and is the way for the Proxmox/Debian target. **Unverified on a real host**: the scripts were only run into a scratch directory (`DESTDIR`) by `manager/test/install.test.js`, where they never call `systemctl`, `chown`, `useradd`, a package manager or `launchctl`; the macOS ones were also linted with `plutil`. Nothing was installed on this machine.
 
-```ini
-[Unit]
-Description=ReMoment Manager
-After=docker.service network.target
-Wants=docker.service
+| Target | Files | Run |
+|---|---|---|
+| Linux with systemd (plain compose host, Debian, Ubuntu, a Pi OS) | `remoment-manager.service` (template), `install-linux.sh`, `uninstall-linux.sh` | `sudo manager/install/install-linux.sh` |
+| macOS (development machine; user agent, no sudo) | `nl.remoment.manager.plist` (template), `install-macos.sh`, `uninstall-macos.sh` | `bash manager/install/install-macos.sh` (the scripts have no executable bit yet: a `chmod +x` was refused in the session that wrote them) |
+| Compose only, no systemd | the note below | by hand |
 
-[Service]
-User=remoment
-Environment=REMOMENT_PROJECT_DIR=/opt/remoment
-Environment=REMOMENT_COMPOSE_FILE=docker-compose.prod.yml
-Environment=REMOMENT_MANAGER_HOME=/var/lib/remoment-manager
-ExecStart=/usr/bin/node /opt/remoment/manager/server.js
-Restart=always
-RestartSec=3
+**`install-linux.sh`** (options: `--project-dir`, `--compose-file`, `--compose-project`, `--home`, `--port`, `--user`, `--app-uid`, `--app-gid`, `--lan`, `--with-samba`, `--node`, `--dry-run`; `--help`). Idempotent: it writes a file only when its content changed, never replaces an existing token, and restarts the service only when something changed. It checks root, systemd, Node 18+, the checkout and (for a non-root user) the docker group; every value that ends up in a unit or env file is limited to `[A-Za-z0-9_./-]`, so nothing can add a line. What it makes:
 
-[Install]
-WantedBy=multi-user.target
-```
+- `/etc/systemd/system/remoment-manager.service` from the template, `User=` the chosen user (default **root**: SMB serve and NAS mounts need it; any user in the `docker` group is enough for containers, status and upgrade), `EnvironmentFile=` the two files below, `Restart=always`, `NoNewPrivileges`.
+- `/etc/remoment-manager/manager.env`: the settings the installer owns (`REMOMENT_PROJECT_DIR`, `…COMPOSE_FILE`, `…COMPOSE_PROJECT`, `…MANAGER_HOME`, `…MANAGER_PORT`, `…MANAGER_BIND`, and for a root service with an app uid `REMOMENT_MANAGER_TOKEN_UID`, `REMOMENT_MOUNT_UID`, `REMOMENT_MOUNT_GID`), replaced on every run; `/etc/remoment-manager/local.env` is yours (SMB paths, `REMOMENT_SMB_FORCE_USER`, `REMOMENT_MOUNT_BASE`), created commented-out and **never touched again**.
+- **The token**: `<home>/token` (default `/var/lib/remoment-manager/token`), 256 random bits from `/dev/urandom` straight into a mode-0600 file, only when absent; it is never printed and never a command argument. The home is 0700. **The app has to read it** (it mounts the manager's home read-only as `MANAGER_HOME`): a root service with `--app-uid` (default: the owner of the checkout, i.e. the user the app container runs as) makes the home 0755 and gives only the token file to that uid; the manager does the same on every start when `REMOMENT_MANAGER_TOKEN_UID` is set and it runs as root (`ensureToken`; ignored for a non-root manager), everything else in the home stays root-only. A non-root service owns the home itself, as under Ansible.
+- `/usr/local/bin/remoment-manager` (link to the CLI) and `/etc/profile.d/remoment-manager.sh` (`REMOMENT_MANAGER_HOME`/`PORT` for the CLI).
+- With `--with-samba` (needs root): installs Samba when `smbd` is missing (`apt-get` or `dnf`), creates the empty fragment `/etc/samba/remoment.conf` and appends `include = /etc/samba/remoment.conf` to the end of `smb.conf` once, after a one-time backup `smb.conf.remoment-backup`. It does not install `cifs-utils` (NAS mounts); `apt install cifs-utils` first.
+- Then `daemon-reload`, `enable`, start or restart, and waits for `/health`. `--lan` binds `0.0.0.0` (plain HTTP, says so).
 
-launchd (`~/Library/LaunchAgents/nl.remoment.manager.plist`):
+**`uninstall-linux.sh`** (`--home`, `--purge`, `--dry-run`): stops and disables the service, removes the unit, `manager.env`, the profile script and the CLI link; **keeps** the home (token, audit log, mount and share state) and `local.env` unless `--purge`, and **never touches** what the manager configured for others: the Samba fragment and include line and the NAS mount units and credentials stay and keep working (even `--purge` leaves `/etc/remoment-manager/credentials`, because the units point at it; it says so, and refuses `/etc`, `/var`, `/usr` ... as `--home`). Safe on a host where it was never installed.
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-  <key>Label</key><string>nl.remoment.manager</string>
-  <key>ProgramArguments</key><array><string>/usr/local/bin/node</string><string>/path/to/ReMomentServer/manager/server.js</string></array>
-  <key>EnvironmentVariables</key><dict><key>REMOMENT_PROJECT_DIR</key><string>/path/to/ReMomentServer</string></dict>
-  <key>RunAtLoad</key><true/><key>KeepAlive</key><true/>
-</dict></plist>
-```
+**macOS.** `install-macos.sh` renders `nl.remoment.manager.plist` (a user LaunchAgent: node, `server.js`, the environment, `PATH` with Docker Desktop's directories, `KeepAlive`, log in `~/Library/Logs/remoment-manager.log`), validates it with `plutil -lint`, writes it only when changed and loads it for the current user; the manager makes its own token on first start in `~/.remoment-manager/token` (0600). `uninstall-macos.sh` unloads and removes it and keeps `~/.remoment-manager` unless `--purge`. SMB serve and NAS mounts are Linux features and have no use here.
+
+**Compose-based variant (a note, not built).** The manager can in principle run as a container in the same compose project (a small Node image with the `docker` CLI, `/var/run/docker.sock` mounted, `network_mode: host`, the project directory mounted at the same path, its home as a volume the app reads read-only). That gives status, logs, restart, features and upgrade; it **cannot** do SMB serve or NAS mounts, which edit the host's Samba and systemd, and it cannot restart itself without a host-side restart policy. It also puts the Docker socket (root-equivalent) in a container on the same network as the app. It is therefore not offered: on a host with systemd use `install-linux.sh`; on a host without systemd start `node manager/server.js` from a process supervisor of your choice (the environment variables are the ones in `manager.env`); the user docs say the same.
 
 ## Still to do (open)
 
 - Neither page has start/stop of single processes yet; the manager's own page has no SMB card (the CLI and Settings › Manager have); the manager's own page has no upgrade button (the CLI and Settings › Manager have). HTTPS for the LAN page (today: a reverse proxy).
 - Processes inside the app container (supervisor: queue, scheduler, listeners), start/stop of single services.
 - Host backup now, diagnostics bundle; registry images for `REMOMENT_UPGRADE_MODE=pull` (none published yet).
-- SMB mount (a NAS share as a storage location) is not built. SMB serve is built but unverified; still open: the installers (install Samba, the `include` line, the root drop-in), per-share users, the `exports` share on installs without `EXPORT_SHARE_DIR` set in `.env`, and the manager's own page card.
-- Installers: Raspberry Pi image, install script for plain compose. (The Ansible install exists: `ansible/manager.yml`, systemd unit from `ansible/templates/remoment-manager.service.j2`; syntax-checked only, not run against a host.)
+- SMB mount and SMB serve are built but unverified (see "NAS mounts" and "SMB shares"); still open: the Ansible role does not install Samba, `cifs-utils` or the include line (the shell installer does Samba only), per-share users, the `exports` share on installs without `EXPORT_SHARE_DIR` set in `.env`, the manager's own page has no cards for SMB or mounts, a debounce for a flapping NAS, and the NAS password only changing by adding the mount again (no "change password" button).
+- Installers: the Linux and macOS scripts are built but unverified on a host; open: the Raspberry Pi image (preinstalled manager), a `.deb` or similar so the manager updates with the OS, and an installer for hosts without systemd. (The Ansible install exists: `ansible/manager.yml`, systemd unit from `ansible/templates/remoment-manager.service.j2`; syntax-checked only, not run against a host.)
 - How the manager updates itself (decision c) and the init system per target (decision d).
 - Go instead of Node, if the Pi measurements say so.
 
 ## Unverified
 
-- SMB serve (all of it): Samba accepting the fragment, `testparm -s` on a fragment without `[global]`, `smbcontrol smbd reload-config` picking it up, `smbpasswd -a -s` reading two lines from stdin, `smbstatus --json` field names (`sessions`, `tcons`, `username`, `remote_machine`, `service`), a Mac/Windows/Linux client mounting the shares, the `force user` file ownership, hard links across the mounts (a copy is the fallback), systemd unit names other than `smbd` (`REMOMENT_SMB_SERVICE`), running the manager as root.
+- SMB serve (all of it): Samba accepting the fragment (now with its own `[global]` section, included at the end of `smb.conf`), `testparm -s` on that fragment, `smbcontrol smbd reload-config` picking it up, `smbpasswd -a -s` reading two lines from stdin, `smbstatus --json` field names (`sessions`, `tcons`, `username`, `remote_machine`, `service`), a Mac/Windows/Linux client mounting the shares, the `force user` file ownership, hard links across the mounts (a copy is the fallback), systemd unit names other than `smbd` (`REMOMENT_SMB_SERVICE`), running the manager as root.
 
 - Against a real compose stack: the field names of `docker compose ps --format json` (`ID`, `Service`, `State`, `Health`, `ExitCode`, NDJSON on current Compose, an array on older) and `docker stats`/`inspect` output are written from memory and the fake, not checked against a live Docker; the status tests only prove the parsing of that shape.
 - A Pi (armv7, 1 GB): the cost of `docker stats --no-stream` per status call (about a second on a laptop) and Node's footprint.
-- The init files above.
+- The installers (`manager/install/`): a real `systemctl enable --now`, the token hand-over with `chown` to the app uid (and that the app container can then read it through the read-only mount), `apt-get install samba`, the include line at the end of `smb.conf`, `launchctl bootstrap` of the plist, `plutil` accepting the plist on every macOS version, Node 18 on the target (Debian 13 ships 20), and the installer's checks on a host with a different `id`/`stat`.
+- NAS mounts (all of it): see the end of "NAS mounts".

@@ -1,0 +1,23 @@
+# Template of the ReMoment Manager's systemd unit. install-linux.sh fills the @...@ values and installs it as
+# /etc/systemd/system/remoment-manager.service. Do not edit the installed copy: re-running the installer replaces it.
+# Settings live in two files: /etc/remoment-manager/manager.env (written by the installer, replaced on every run) and
+# /etc/remoment-manager/local.env (yours, never touched: SMB paths, REMOMENT_SMB_FORCE_USER, REMOMENT_MOUNT_BASE ...).
+# Design: docs/architecture/manager.md
+[Unit]
+Description=ReMoment Manager
+Documentation=file://@PROJECT_DIR@/docs/architecture/manager.md
+After=docker.service network.target
+Wants=docker.service
+
+[Service]
+User=@USER@
+EnvironmentFile=/etc/remoment-manager/manager.env
+EnvironmentFile=-/etc/remoment-manager/local.env
+ExecStart=@NODE@ @PROJECT_DIR@/manager/server.js
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

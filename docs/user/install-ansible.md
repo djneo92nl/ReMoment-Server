@@ -60,3 +60,14 @@ ansible-playbook -i ansible/inventory.yml ansible/deploy.yml --ask-vault-pass
 - `deploy.yml`: clone, `.env` from the template, image build, start, `composer install`, `npm ci`, `npm run build`, `migrate`, admin seed, `storage:link`, restart. Safe to re-run; re-running it is also how you update (see [upgrading-and-backups.md](upgrading-and-backups.md)).
 
 Then open `app_url` and continue with [first-run.md](first-run.md). After deploying, add `music_dir` and `library_dir` as storage locations at `/settings/storage`.
+
+## The Manager
+
+`manager.yml` installs the Manager (the host service that shows and restarts containers, upgrades with a backup and sets up network shares) as a systemd unit; run it after `deploy.yml`:
+
+```bash
+ansible-playbook -i ansible/inventory.yml ansible/manager.yml --ask-become-pass
+```
+
+Settings are `manager_*` in `group_vars/all.yml` (`manager_lan`, `manager_open` and `manager_port`; defaults listen on 127.0.0.1 only). The token is a file in `manager_home` that the deploy user and the app container can read, never printed. Network shares and NAS mounts need root: the Ansible unit runs as the deploy user, so for those either add a drop-in with `User=root` or use `manager/install/install-linux.sh` instead, which runs as root by default (`sudo manager/install/install-linux.sh --dry-run` first; do not run both for the same host). A NAS share is added in the app at Settings › Manager › *NAS mounts*, see [install-docker.md](install-docker.md#a-nas-as-a-storage-location). Not verified on a real host yet.
+
