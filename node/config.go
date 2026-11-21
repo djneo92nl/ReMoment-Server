@@ -9,7 +9,7 @@ import (
 
 // Config is read from a JSON file (default /etc/remoment-node.json) and overridden by REMOMENT_NODE_* variables.
 type Config struct {
-	// Server is the base address of the ReMoment server, e.g. http://remoment.local (no mDNS discovery yet).
+	// Server is the base address of the ReMoment server, e.g. http://remoment.local . Empty: the node finds the server by mDNS (_remoment._tcp) when it starts.
 	Server string `json:"server"`
 	// StateDir holds the token (mode 0600). Default /var/lib/remoment-node.
 	StateDir string `json:"state_dir"`
@@ -61,9 +61,6 @@ func loadConfig(path string) (*Config, error) {
 		c.NoMQTT = true
 	}
 	c.Server = strings.TrimRight(c.Server, "/")
-	if c.Server == "" {
-		return nil, fmt.Errorf("no server address: set \"server\" in the config file or REMOMENT_NODE_SERVER")
-	}
 	if c.HardwareID == "" {
 		b, err := os.ReadFile("/etc/machine-id")
 		if err != nil || len(strings.TrimSpace(string(b))) == 0 {

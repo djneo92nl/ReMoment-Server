@@ -52,16 +52,29 @@ func main() {
 	if err != nil {
 		log.Fatalf("config: %v", err)
 	}
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+	done := make(chan struct{})
+	go func() { <-stop; close(done) }()
+
+	if cfg.Server == "" { // no server configured: browse mDNS, else the address a previous run saved
+		cfg.Server = resolveServer(cfg, mdnsBrowser{}, log.Printf, func(d time.Duration) bool {
+			select {
+			case <-done:
+				return false
+			case <-time.After(d):
+				return true
+			}
+		})
+		if cfg.Server == "" {
+			return
+		}
+	}
 	n := &Node{cfg: cfg, api: newAPI(cfg.Server), started: time.Now(), nudge: make(chan struct{}, 1)}
 	n.lineIn = newLineIn(cfg.LineIn, n.logf)
 	defer n.lineIn.Stop()
 	n.ripper = newRipper(cfg.Ripper, cfg.StateDir, n.logf)
 	n.ripper.cleanStale() // what an interrupted rip left behind
-
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
-	done := make(chan struct{})
-	go func() { <-stop; close(done) }()
 
 	if err := n.run(done); err != nil {
 		if errors.Is(err, errUnauthorized) {
