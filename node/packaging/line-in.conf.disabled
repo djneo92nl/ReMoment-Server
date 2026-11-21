@@ -1,0 +1,11 @@
+# Drop-in for a node with the line-in role (docs/architecture/line-in.md): the base unit hides devices, which hides the
+# sound card. Enable with:
+#   sudo install -D /lib/systemd/system/remoment-node.service.d/line-in.conf.disabled /etc/systemd/system/remoment-node.service.d/line-in.conf
+#   sudo systemctl daemon-reload && sudo systemctl restart remoment-node
+# Unverified on a real Pi.
+[Service]
+PrivateDevices=no
+DevicePolicy=closed
+DeviceAllow=char-alsa rw
+SupplementaryGroups=audio
+MemoryMax=128M

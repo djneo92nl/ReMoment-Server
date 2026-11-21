@@ -1,0 +1,10 @@
+ReMoment Node
+Copyright the ReMoment contributors.
+
+Licensed under the GNU Affero General Public License, version 3 or later.
+On Debian systems the full text is in /usr/share/common-licenses/AGPL-3 when
+the base-files package ships it; otherwise see https://www.gnu.org/licenses/agpl-3.0.html.
+
+The binary statically links github.com/eclipse/paho.mqtt.golang (EPL-2.0 / EDL-1.0),
+github.com/hashicorp/mdns (MIT), github.com/miekg/dns (BSD-3-Clause), github.com/gorilla/websocket (BSD-2-Clause)
+and parts of golang.org/x (BSD-3-Clause).

@@ -1,0 +1,103 @@
+name: Node
+
+# The Go node agent in node/ (docs/architecture/node-agent.md). Separate from laravel.yml on purpose: it only runs
+# when the node, its packaging or this file changes, and on a version tag it publishes the .deb files.
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "node/**"
+      - "VERSION"
+      - ".github/workflows/node.yml"
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "node/**"
+      - "VERSION"
+      - ".github/workflows/node.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: node
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: node/go.mod
+          cache-dependency-path: node/go.sum
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+      - name: go vet
+        run: go vet ./...
+      - name: go test -race
+        run: go test -race ./...
+
+  package:
+    needs: test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: node
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: node/go.mod
+          cache-dependency-path: node/go.sum
+      - name: Version
+        # a tag v1.2.3 builds 1.2.3; anything else builds the VERSION file plus the run number
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          else
+            echo "VERSION=$(cat ../VERSION)" >> "$GITHUB_ENV"
+          fi
+          echo "BUILD=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+      - name: Cross-compile linux/arm (GOARM=7) and linux/arm64
+        run: make armv7 arm64
+      - name: Build the .deb files (armhf, arm64)
+        run: make deb
+      - name: Check the packages
+        run: |
+          for f in dist/*.deb; do
+            dpkg-deb --info "$f"
+            dpkg-deb --contents "$f"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: remoment-node-deb
+          path: node/dist/*.deb
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: remoment-node-binaries
+          path: |
+            node/dist/remoment-node-linux-armv7
+            node/dist/remoment-node-linux-arm64
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: remoment-node-deb
+          path: dist
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes "ReMoment $GITHUB_REF_NAME"
+          gh release upload "$GITHUB_REF_NAME" dist/*.deb --clobber

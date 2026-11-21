@@ -1,0 +1,32 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+configure)
+    if ! getent passwd remoment >/dev/null; then
+        adduser --system --group --home /var/lib/remoment-node --no-create-home \
+            --gecos "ReMoment Node" remoment
+    fi
+    # audio: line-in capture; cdrom: the ripper's drive
+    for g in audio cdrom; do
+        if getent group "$g" >/dev/null; then
+            adduser --quiet remoment "$g" || true
+        fi
+    done
+    install -d -o remoment -g remoment -m 0700 /var/lib/remoment-node
+
+    if [ -d /run/systemd/system ]; then
+        systemctl daemon-reload || true
+        if [ -z "$2" ]; then
+            # fresh install: enable, do not start (the admin may want to edit the config first)
+            systemctl enable remoment-node.service || true
+            echo "remoment-node is enabled but not started. Start it with: sudo systemctl start remoment-node" >&2
+        else
+            # upgrade: restart only if it was running
+            systemctl try-restart remoment-node.service || true
+        fi
+    fi
+    ;;
+esac
+
+exit 0

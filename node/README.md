@@ -11,7 +11,7 @@ make build           # dist/remoment-node-linux-{armv7,arm64,amd64}
 REMOMENT_NODE_SERVER=http://remoment.local REMOMENT_NODE_STATE_DIR=/tmp/node go run .
 ```
 
-Config: JSON file (`-config`, default `/etc/remoment-node.json`, see `dist/remoment-node.example.json`), overridden by `REMOMENT_NODE_SERVER`, `REMOMENT_NODE_STATE_DIR`, `REMOMENT_NODE_HARDWARE_ID` (default `/etc/machine-id`), `REMOMENT_NODE_ROLES` (comma separated), `REMOMENT_NODE_NO_MQTT=1`. The server address is configured (no mDNS discovery yet). The token is kept in `<state_dir>/token`, mode 0600. If the server says the token is unknown (revoked), the node exits with status 2; delete the token file to register again.
+Config: JSON file (`-config`, default `/etc/remoment-node.json`; `/etc/remoment-node/config.json` in the package, see `dist/remoment-node.example.json`), overridden by `REMOMENT_NODE_SERVER`, `REMOMENT_NODE_STATE_DIR`, `REMOMENT_NODE_HARDWARE_ID` (default `/etc/machine-id`), `REMOMENT_NODE_ROLES` (comma separated), `REMOMENT_NODE_NO_MQTT=1`. With no `server` set, the node finds the server by mDNS (`_remoment._tcp`, see Install below). The token is kept in `<state_dir>/token`, mode 0600. If the server says the token is unknown (revoked), the node exits with status 2; delete the token file to register again.
 
 `dist/remoment-node.service` is an example systemd unit (dynamic user, confined, 64 MB limit). Unverified on a real Pi.
 
@@ -32,6 +32,31 @@ Config: JSON file (`-config`, default `/etc/remoment-node.json`, see `dist/remom
 ```
 
 (`REMOMENT_NODE_RIPPER_DEVICE` overrides the device; `temp_dir` defaults to `<state_dir>/rips`; `offset` is the drive's AccurateRip read offset, left out when null.) Needs `cyanrip` on the node, the node user in the `cdrom` group and, under systemd, the drop-in `dist/remoment-node.service.d/ripper.conf` (the base unit hides devices and caps memory at 64 MB). The node reads the TOC of the disc itself (Linux CD-ROM ioctls) and computes the MusicBrainz disc id for `ripper.status`; `ripper.rip` runs `ionice -c 3 nice cyanrip` in `<temp_dir>/rip-<job id>`, reports progress every 2 s, uploads each FLAC to `POST /api/nodes/files` with the node's own token, and removes the directory. One rip at a time; a cancel from the admin kills cyanrip. It never ejects the disc. The command is built by a pure, unit-tested function (`ripArgs`); the tests use a fake cyanrip and a fake drive. Nothing has run with a real drive or a real cyanrip. See `docs/architecture/node-ripper.md`.
+
+## Install on a Pi (`.deb`)
+
+Packages for Raspberry Pi OS and Debian (armhf = 32-bit Pi 2/3, arm64 = 64-bit) come from the CI run of `.github/workflows/node.yml` (artifact `remoment-node-deb`) or, for a tagged release, from the release page. Build them yourself with `make deb` (needs `dpkg-deb`, so on Debian/Ubuntu or in a `debian` container).
+
+```bash
+sudo apt install ./remoment-node_1.0.0-1_armhf.deb      # or _arm64.deb; apt pulls adduser and systemd
+sudo systemctl start remoment-node                       # installed and enabled, not started
+journalctl -u remoment-node -f                           # shows the pairing code
+```
+
+1. **First run.** The install creates the `remoment` user (groups `audio` and `cdrom`), `/var/lib/remoment-node` (token, mode 0700) and `/etc/remoment-node/config.json`. The service is enabled for boot but not started, so you can edit the config first; with the default config it needs nothing.
+2. **Finding the server.** With `"server": ""` the node browses mDNS for `_remoment._tcp` (the server's Avahi record; TXT `path=/api`, `api_version=1`), saves the address it found in `/var/lib/remoment-node/server` and uses that one if a later start finds nothing. Set `"server": "http://192.168.1.20"` (or `REMOMENT_NODE_SERVER`) to skip discovery; a configured address always wins. mDNS needs UDP 5353 on the LAN and does not cross VLANs or a Docker bridge: then set the address.
+3. **Registering.** The node registers and logs a pairing code. Approve it in the web UI under Settings › Clients; the node picks up its token by itself. If the token is ever revoked the node stops with status 2: delete `/var/lib/remoment-node/token` and start it again.
+4. **Roles.** Declare what the machine can do in `/etc/remoment-node/config.json` (`"roles": ["ripper"]` plus the `ripper` block above), `sudo systemctl restart remoment-node`, then switch the role on in Settings › Clients. Roles that touch hardware need a systemd drop-in, because the base unit hides devices and caps memory at 64 MB; the package ships them switched off:
+   ```bash
+   # ripper (CD drive, 384 MB) / line-in (sound card, 128 MB)
+   sudo install -D /lib/systemd/system/remoment-node.service.d/ripper.conf.disabled /etc/systemd/system/remoment-node.service.d/ripper.conf
+   sudo install -D /lib/systemd/system/remoment-node.service.d/line-in.conf.disabled /etc/systemd/system/remoment-node.service.d/line-in.conf
+   sudo systemctl daemon-reload && sudo systemctl restart remoment-node
+   ```
+   `ripper` also needs `cyanrip` installed (`Suggests`), `line-in` needs `ffmpeg` (`Recommends`). `sync-target` needs a drop-in with `ReadWritePaths=/media/usb/STICK` (your mount).
+5. **Upgrading and removing.** `apt install ./newer.deb` keeps your config (dpkg asks only if you and the package both changed it) and restarts a running node. `apt remove` stops it, keeps token and config; `apt purge` deletes them and the `remoment` user.
+
+Without the package: copy the binary from `dist/`, use `dist/remoment-node.service` (dynamic user) as the unit and run as in the first block. All of this is **unverified on a real Raspberry Pi OS**; the package tree and scripts are tested statically (`packaging_test.go`) and a `.deb` was built and inspected in a Debian container.
 
 Try it: register, approve in the web UI, then create a job:
 

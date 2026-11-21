@@ -1,0 +1,32 @@
+# ReMoment Node as installed by the .deb (node/packaging). The manual example is ../dist/remoment-node.service.
+# Roles that need a device (ripper, line-in) or a writable volume (sync-target) are opened with a drop-in: see
+# /lib/systemd/system/remoment-node.service.d/ and docs/architecture/node-agent.md. Unverified on a real Pi.
+[Unit]
+Description=ReMoment Node
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/remoment-node -config /etc/remoment-node/config.json
+Restart=on-failure
+# exit status 2 = the server does not know the token any more: do not loop, an admin has to look
+RestartPreventExitStatus=2
+RestartSec=5
+User=remoment
+Group=remoment
+SupplementaryGroups=audio cdrom
+StateDirectory=remoment-node
+StateDirectoryMode=0700
+Environment=REMOMENT_NODE_STATE_DIR=/var/lib/remoment-node
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+MemoryMax=64M
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,21 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+remove|purge)
+    if [ -d /run/systemd/system ]; then
+        systemctl disable remoment-node.service >/dev/null 2>&1 || true
+        systemctl daemon-reload || true
+    fi
+    ;;
+esac
+
+if [ "$1" = "purge" ]; then
+    # the token, the saved server address and the config
+    rm -rf /var/lib/remoment-node /etc/remoment-node
+    if getent passwd remoment >/dev/null; then
+        deluser --quiet --system remoment || true
+    fi
+fi
+
+exit 0

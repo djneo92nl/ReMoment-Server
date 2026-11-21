@@ -1,0 +1,13 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+remove|deconfigure)
+    # not on upgrade: the postinst of the new version restarts it
+    if [ -d /run/systemd/system ]; then
+        systemctl stop remoment-node.service || true
+    fi
+    ;;
+esac
+
+exit 0

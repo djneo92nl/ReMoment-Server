@@ -35,3 +35,5 @@ Thumbs.db
 /node/dist/remoment-node-*
 /node/node
 __pycache__/
+/node/dist/*.deb
+/node/dist/pkg-*

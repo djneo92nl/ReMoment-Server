@@ -24,6 +24,7 @@ The RAM and CPU figures are estimates; nothing has been measured on a Pi yet. De
    - [Docker Compose](install-docker.md): technical.
    - [Ansible on Proxmox](install-ansible.md): technical.
    - [Raspberry Pi](install-raspberry-pi.md): plain language; the Pi image is not built yet.
+   - Optional, later: [a helper Node](install-node.md) on a Pi for line-in, CD ripping or offline sync (1.1).
 2. [First run](first-run.md): the setup wizard and the admin login.
 3. [Adding devices](adding-devices.md) and the [hardware table](hardware.md) (placeholder).
 4. [Troubleshooting](troubleshooting.md).

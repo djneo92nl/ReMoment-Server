@@ -1,0 +1,16 @@
+Package: remoment-node
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: ReMoment <noreply@remoment.invalid>
+Installed-Size: @SIZE@
+Depends: adduser, systemd
+Recommends: ffmpeg
+Suggests: cyanrip
+Section: sound
+Priority: optional
+Homepage: https://github.com/remoment/remoment-server
+Description: ReMoment Node, a headless helper for a ReMoment server
+ Registers with the server (found by mDNS or set in the config), waits for
+ the admin to approve it and then runs the roles the admin switches on:
+ line-in, CD ripper and offline sync target. Static Go binary, no
+ dependencies besides systemd.
