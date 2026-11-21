@@ -36,7 +36,7 @@ php artisan app:upgrade [--check] [--json] [--force] [--no-maintenance] [--healt
 php artisan diagnostics:bundle [--path=]
 
 # Backup (database + safe settings + manifest, no secrets unless --with-secrets; scheduled nightly, keeps BACKUP_KEEP) and restore on a fresh `migrate`; see docs/architecture/backup-restore.md
-php artisan backup:run [--path=] [--keep=N] [--no-db] [--with-secrets]
+php artisan backup:run [--path=] [--keep=N] [--no-db] [--with-secrets] [--no-copy]   # then copies the archive to Setting backup_copy_path if set (atomic, same retention, a failure is the backup.copy_failed alert, never a failed backup; not with --with-secrets)
 php artisan backup:restore {archive} [--force]
 
 # Copy the data of a SQLite file into the configured MariaDB (after `php artisan migrate`); see docs/architecture/database.md

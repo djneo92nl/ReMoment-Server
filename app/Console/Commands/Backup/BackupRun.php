@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands\Backup;
 
+use App\Domain\Backup\BackupCopy;
 use App\Domain\Backup\BackupStatus;
 use App\Domain\Backup\BackupWriter;
 use Illuminate\Console\Command;
@@ -13,7 +14,8 @@ class BackupRun extends Command
         {--path= : Directory for the archive (default: config backup.path, BACKUP_PATH)}
         {--keep= : Archives to keep afterwards (default: config backup.keep, BACKUP_KEEP)}
         {--no-db : Leave the database out (manifest and safe settings only)}
-        {--with-secrets : ALSO write credentials (admin login, OAuth tokens, client tokens) into the archive}';
+        {--with-secrets : ALSO write credentials (admin login, OAuth tokens, client tokens) into the archive}
+        {--no-copy : Do not copy the archive to the optional second location (Setting backup_copy_path)}';
 
     protected $description = 'Write a timestamped backup archive (database, safe settings, manifest) and prune old ones';
 
@@ -41,6 +43,20 @@ class BackupRun extends Command
         foreach (array_slice(BackupStatus::archives($dir), 0, -$keep) as $old) {
             if (@unlink($old)) {
                 $this->line('Removed old backup '.basename($old));
+            }
+        }
+
+        // The optional second copy (a mounted share or drive). It never fails the backup: a problem is an alert.
+        if ($secrets && BackupCopy::path()) {
+            $this->warn('Not copied to the second location: an archive with credentials stays where you put it.');
+        } elseif (!$this->option('no-copy') && ($copy = BackupCopy::copy($file, $keep))) {
+            if ($copy['ok']) {
+                $this->info('Copied to '.$copy['file']);
+                foreach ($copy['removed'] ?? [] as $name) {
+                    $this->line('Removed old backup '.$name.' from the copy');
+                }
+            } else {
+                $this->warn('Backup copy failed (the backup itself is fine): '.$copy['message']);
             }
         }
 

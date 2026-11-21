@@ -5,7 +5,7 @@
 ## Commands
 
 ```bash
-php artisan backup:run [--path=] [--keep=N] [--no-db] [--with-secrets]
+php artisan backup:run [--path=] [--keep=N] [--no-db] [--with-secrets] [--no-copy]
 php artisan backup:restore {archive} [--force]
 ```
 
@@ -79,6 +79,17 @@ Exit codes: 0 ok, 10 upgrade available (`--check`), 1 blocked/declined, 2 backup
 
 The ReMoment Manager runs this command for the web and the CLI and follows its `rollback` block on request ([manager.md](manager.md), "Upgrade and rollback"). **Not built:** pulling code (you install the new version first), a rollback that runs by itself (the Manager's rollback is an admin's click). Not verified against a real MariaDB or a started stack; the tests use SQLite and an extra migration path.
 
+## A second copy (`backup_copy_path`)
+
+An **optional path** (decided 2026-11-20; no cloud, no credentials in the app): a mounted NAS share or a USB drive. Set it on **Settings › Health › System & devices** (the *Backup copy* card, with a *Test write* button) or with `GET|PUT /api/admin/backup/copy-path` ([admin-backup.md](../api/admin-backup.md), MCP `server_health`); it is Setting `backup_copy_path`, an absolute directory. `App\Domain\Backup\BackupCopy` does the work.
+
+- After `backup:run` has written (and pruned) its archive, the archive is copied there: to `….zip.partial`, size checked, then renamed, so a half-copied file never carries a backup name and a vanished share leaves no broken archive. Mode 0600. Free space is checked first.
+- **Same retention** on the target: only files named `remoment-backup-YYYYMMDD-HHMMSS.zip` are pruned to `BACKUP_KEEP` (or `--keep`); other files in that directory are never touched.
+- **Never fails the backup.** A missing, unmounted, unwritable or full target makes `backup:run` print a warning and still exit 0, raises the `backup.copy_failed` alert (warning; [alerts.md](alerts.md)) and is kept in Setting `backup_copy_status` (shown on the card and in the API as `last_copy`); the next working copy resolves the alert.
+- The directory is **never created** by the app (an unmounted share would otherwise turn into a local folder and the "copy" would sit on the same disk). The path must be absolute, without `..`, and not the backup directory itself; saving it runs a test-write first.
+- An archive made with `--with-secrets` is **not** copied (it holds credentials, see above); `--no-copy` skips the copy for one run. `app:upgrade`'s own pre-migration backup is not copied either.
+- On Docker the path is a path **inside the container**: mount the share into it (`docker-compose.prod.yml` volume) or let the host mount it under a path the app directory already covers. *Not verified on a real NAS or USB drive*: only on a local directory in tests (a network share that hangs rather than fails could stall the nightly run).
+
 ## Not in the backup: your music files
 
 Own audio files (`MUSIC_DIR`, `LIBRARY_DIR`, S3 locations) are yours and large. Back them up with what you use for the rest of your files (rsync, restic, Proxmox backup of the mount, S3 versioning). After restoring on a new machine, mount them at the same paths and run `php artisan library:scan-files`; the database already knows the files (tracks, playlists, plays) and matches them.
@@ -87,7 +98,7 @@ Own audio files (`MUSIC_DIR`, `LIBRARY_DIR`, S3 locations) are yours and large. 
 
 The default directory `storage/app/backups` is inside the app directory, which `docker-compose.prod.yml` bind-mounts into the container (`.:/var/www/html`), so archives survive a container recreate and the Ansible redeploy (`git` leaves untracked files alone). It is a different volume from MariaDB's named volume, but the **same disk**.
 
-- **Copy archives off the machine** (a NAS, another host, cloud storage): a backup on the disk that dies is not a backup. Point `BACKUP_PATH` at a mounted share, or sync the directory with cron/rsync.
+- **Copy archives off the machine** (a NAS, another host, cloud storage): a backup on the disk that dies is not a backup. Set a [second copy](#a-second-copy-backup_copy_path) on a mounted share or drive, point `BACKUP_PATH` at one, or sync the directory with cron/rsync (cloud storage: that is your sync tool's job, the app has no cloud access).
 - **Control profile on a Raspberry Pi (SQLite on an SD card):** SD cards corrupt on power loss, taking the database and the backups next to it. Keep the archives on a USB stick or network share (`BACKUP_PATH`), or copy them off nightly. A restore is then: fresh image, `migrate`, `backup:restore`.
 
 ## Upgrade flow
