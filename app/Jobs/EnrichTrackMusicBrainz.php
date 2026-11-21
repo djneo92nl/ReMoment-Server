@@ -84,6 +84,8 @@ class EnrichTrackMusicBrainz implements ShouldBeUnique, ShouldQueue
         $recording = $mb->get("recording/{$recordingMbid}", ['inc' => 'isrcs+artist-rels+work-rels+work-level-rels+artist-credits+releases']) ?? [];
         $best ??= ['artist-credit' => $recording['artist-credit'] ?? [], 'releases' => $recording['releases'] ?? []];
 
+        $this->saveRecordingFacts($track, $recording);
+
         if ($isrc = $recording['isrcs'][0] ?? null) {
             Enrichment::save($track, 'isrc', $isrc, 'string', Enrichment::MUSICBRAINZ);
         }
@@ -103,6 +105,21 @@ class EnrichTrackMusicBrainz implements ShouldBeUnique, ShouldQueue
 
             Enrichment::queueAlbum($track->album->setRelation('artist', $track->artist));
         }
+    }
+
+    /**
+     * What MusicBrainz calls the recording (title, credited artist, year of the first release): kept so a file whose
+     * tags disagree can be listed as a suggestion without a new lookup (docs/api/suggestions.md).
+     */
+    private function saveRecordingFacts(Track $track, array $recording): void
+    {
+        $save = Enrichment::saver($track, Enrichment::MUSICBRAINZ);
+        $credit = collect($recording['artist-credit'] ?? [])
+            ->map(fn ($c) => ($c['name'] ?? $c['artist']['name'] ?? '').($c['joinphrase'] ?? ''))->implode('');
+
+        $save('mb_title', $recording['title'] ?? null);
+        $save('mb_artist', $credit);
+        $save('mb_year', preg_match('/^(\d{4})/', (string) ($recording['first-release-date'] ?? ''), $m) ? $m[1] : null);
     }
 
     private function releaseOf(array $recording, string $albumName): ?string

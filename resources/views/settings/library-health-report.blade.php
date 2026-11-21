@@ -4,7 +4,9 @@
     </x-slot>
 
     <div class="max-w-4xl space-y-4">
-        @if($rows->isEmpty())
+        @if($key === 'suggestions')
+            <livewire:tag-suggestions />
+        @elseif($rows->isEmpty())
             <x-empty-state icon="circle-check" title="Nothing to report" text="No findings in this report." />
         @else
             <x-card flush>

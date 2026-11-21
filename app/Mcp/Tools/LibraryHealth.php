@@ -10,7 +10,7 @@ use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
-#[Description('Library health reports on the own audio files (docs/api/library-health.md). Without `report`: how many findings each report has (GET /api/library/health). With `report` (transcodes, damaged, clipping, duplicates, lossy, incomplete, unlinked, missing, covers: albums with no, tiny, non-square or differing embedded cover): its findings, each with a reason and, for albums in the physical collection, that item (the re-rip list); page with `cursor`. Findings need the Full profile (not_available_in_profile elsewhere), except `covers`, which works in Standard too. Open to everyone.')]
+#[Description('Library health reports on the own audio files (docs/api/library-health.md). Without `report`: how many findings each report has (GET /api/library/health). With `report` (transcodes, damaged, clipping, duplicates, lossy, incomplete, unlinked, missing, covers: albums with no, tiny, non-square or differing embedded cover, suggestions: tag and cover suggestions from MusicBrainz, each finding carries a `suggestion` with its id for library_suggestions): its findings, each with a reason and, for albums in the physical collection, that item (the re-rip list); page with `cursor`. Findings need the Full profile (not_available_in_profile elsewhere), except `covers`, which works in Standard too. Open to everyone.')]
 #[IsReadOnly]
 class LibraryHealth extends Tool
 {
@@ -19,7 +19,7 @@ class LibraryHealth extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'report' => $schema->string()->enum(['transcodes', 'damaged', 'clipping', 'duplicates', 'lossy', 'incomplete', 'unlinked', 'missing', 'covers'])->description('Omit for the counts of every report'),
+            'report' => $schema->string()->enum(['transcodes', 'damaged', 'clipping', 'duplicates', 'lossy', 'incomplete', 'unlinked', 'missing', 'covers', 'suggestions'])->description('Omit for the counts of every report'),
             'cursor' => $schema->string()->description('next_cursor of the previous page'),
             'limit' => $schema->integer()->description('1-200, default 100')->min(1)->max(200),
         ];

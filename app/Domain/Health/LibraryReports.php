@@ -41,6 +41,7 @@ final class LibraryReports
             'unlinked' => ['title' => 'Files without a track', 'description' => 'Files in storage that no track plays.'],
             'missing' => ['title' => 'Missing files', 'description' => 'Files that were indexed and are no longer on disk.'],
             'covers' => ['title' => 'Cover problems', 'description' => 'Albums with no cover, a tiny or non-square cover, or an embedded cover that differs from the one in use. Needs the cover size, recorded when a cover is processed (artwork:measure-covers fills older ones).'],
+            'suggestions' => ['title' => 'Tag and cover suggestions', 'description' => 'Files whose tags disagree with the recording the audio fingerprint found (title, artist, a missing year), albums with a poor cover that MusicBrainz has a front image for, and inconsistent track numbers within an album. Nothing is applied by itself: accept writes the tag into the file or fetches the cover, dismiss hides it.'],
         ];
     }
 
@@ -69,6 +70,7 @@ final class LibraryReports
             'duplicates' => DB::query()->fromSub(self::duplicateGroups(), 'groups')->count(),
             'incomplete' => self::incomplete()->count(),
             'covers' => count(self::coverProblems()),
+            'suggestions' => Suggestions::count(),
             default => self::query($key)->count(),
         };
     }
@@ -91,6 +93,11 @@ final class LibraryReports
                 'title' => "{$r['artist']} · {$r['album']}",
                 'detail' => implode('; ', $r['reasons']),
                 'url' => route('albums.show', $r['album_id']),
+            ]),
+            'suggestions' => collect(array_slice(Suggestions::all(), 0, $limit))->map(fn ($s) => [
+                'title' => $s['title'],
+                'detail' => $s['reason'].($s['suggested'] !== null && $s['kind'] === 'tag' ? "\n".ucfirst($s['field']).': '.($s['current'] ?? '(none)').' → '.$s['suggested'] : ''),
+                'url' => $s['album_id'] ? route('albums.show', $s['album_id']) : null,
             ]),
             'unlinked', 'missing' => self::query($key)->orderBy('files.path')->limit($limit)->get(['files.path', 'files.size'])->map(fn ($r) => [
                 'title' => $r->path,
@@ -115,6 +122,8 @@ final class LibraryReports
             'incomplete' => self::incomplete()->orderByRaw('(have - total) asc')->orderBy('albums.id')->offset($offset)->limit($limit)->get()->map(fn ($r) => self::finding($key, 'album', "{$r->artist} · {$r->album}", "{$r->have} of {$r->total} tracks", albumId: (int) $r->album_id))->all(),
             'covers' => array_map(fn ($r) => self::finding($key, 'album', "{$r['artist']} · {$r['album']}", implode('; ', $r['reasons']), albumId: $r['album_id'], artistId: $r['artist_id']),
                 array_slice(self::coverProblems(), $offset, $limit)),
+            'suggestions' => array_map(fn ($s) => self::finding($key, $s['kind'], $s['title'], $s['reason'], $s['track_id'], $s['album_id'], $s['artist_id'], suggestion: array_diff_key($s, array_flip(['title', 'reason', 'track_id', 'album_id', 'artist_id']))),
+                array_slice(Suggestions::all(), $offset, $limit)),
             'unlinked', 'missing' => self::query($key)->orderBy('files.path')->orderBy('files.id')->offset($offset)->limit($limit)
                 ->get(['files.path', 'files.size', 'files.extension'])->map(fn ($r) => self::finding($key, 'file', $r->path, self::size((int) $r->size), file: ['path' => $r->path, 'extension' => $r->extension, 'size' => (int) $r->size]))->all(),
             default => self::trackFindings($key, $limit, $offset),
@@ -125,11 +134,11 @@ final class LibraryReports
         return array_map(fn ($f) => ['physical' => $withPhysical && $f['album_id'] ? ($physical[$f['album_id']] ?? []) : null] + $f, $findings);
     }
 
-    private static function finding(string $report, string $kind, string $title, string $reason, ?int $trackId = null, ?int $albumId = null, ?int $artistId = null, ?array $file = null, ?array $copies = null): array
+    private static function finding(string $report, string $kind, string $title, string $reason, ?int $trackId = null, ?int $albumId = null, ?int $artistId = null, ?array $file = null, ?array $copies = null, ?array $suggestion = null): array
     {
         return [
             'report' => $report, 'kind' => $kind, 'title' => $title, 'reason' => $reason,
-            'track_id' => $trackId, 'album_id' => $albumId, 'artist_id' => $artistId, 'file' => $file, 'copies' => $copies,
+            'track_id' => $trackId, 'album_id' => $albumId, 'artist_id' => $artistId, 'file' => $file, 'copies' => $copies, 'suggestion' => $suggestion,
         ];
     }
 
@@ -330,7 +339,7 @@ final class LibraryReports
      *
      * @return list<array{album_id: int, artist_id: int|null, album: string, artist: string, reasons: list<string>}>
      */
-    private static function coverProblems(): array
+    public static function coverProblems(): array
     {
         $morph = (new Album)->getMorphClass();
         $meta = fn (string $key) => '(select value from metadata where metadata.metadatable_id = albums.id and metadata.metadatable_type = \''.$morph.'\' and metadata.key = \''.$key.'\' limit 1)';
