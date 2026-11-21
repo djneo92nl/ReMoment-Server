@@ -61,7 +61,7 @@
 
             <div class="lg:col-span-3 space-y-12 min-w-0">
                 @if(rescue(fn () => $device->driver instanceof \App\Integrations\Philips\VideoPlayerDriver, false))
-                    <livewire:jellyfin-shelf :device="$device" :key="'jellyfin-'.$device->id" />
+                    <livewire:media-shelf :device="$device" :key="'media-'.$device->id" />
                 @endif
                 @if(in_array('queue', $capabilities))
                     <livewire:device-queue :device="$device" :key="'queue-'.$device->id" />

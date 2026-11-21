@@ -7,7 +7,7 @@ use App\Domain\Device\DeviceCache;
 use App\Domain\Media\NowPlaying;
 use App\Domain\Media\Source;
 use App\Integrations\Philips\VideoPlayerDriver;
-use App\Livewire\JellyfinShelf;
+use App\Livewire\MediaShelf;
 use App\Models\Device;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
@@ -50,7 +50,7 @@ class JellyfinShelfTest extends TestCase
     {
         $this->fakeServer();
 
-        Livewire::test(JellyfinShelf::class, ['device' => $this->tv()])
+        Livewire::test(MediaShelf::class, ['device' => $this->tv()])
             ->call('load')
             ->assertSee('Continue watching')
             ->assertSee('A Film')
@@ -62,20 +62,24 @@ class JellyfinShelfTest extends TestCase
     {
         $this->fakeServer();
 
-        Livewire::test(JellyfinShelf::class, ['device' => $this->tv('com.netflix.ninja')])->call('load')->assertDontSee('Continue watching');
+        Livewire::test(MediaShelf::class, ['device' => $this->tv('com.netflix.ninja')])->call('load')->assertDontSee('Continue watching');
     }
 
     public function test_tapping_a_tile_starts_it_in_the_tvs_session_from_its_position(): void
     {
         $this->fakeServer();
 
-        Livewire::test(JellyfinShelf::class, ['device' => $this->tv()])->call('play', 'm1', 250);
+        // The card passes the tile's namespaced id and its resume position in seconds.
+        $device = $this->tv();
+        $server = \App\Models\MediaServer::firstOrFail();
+
+        Livewire::test(MediaShelf::class, ['device' => $device])->call('play', "{$server->id}:m1", 25);
 
         Http::assertSent(fn (Request $r) => $r->method() === 'POST'
             && str_contains($r->url(), '/Sessions/sess1/Playing')
             && str_contains($r->url(), 'playCommand=PlayNow')
             && str_contains($r->url(), 'itemIds=m1')
-            && str_contains($r->url(), 'startPositionTicks=250'));
+            && str_contains($r->url(), 'startPositionTicks=250000000'));
     }
 
     public function test_the_api_lists_and_plays(): void

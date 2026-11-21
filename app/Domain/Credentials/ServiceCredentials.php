@@ -347,6 +347,8 @@ final class ServiceCredentials
                     'Set the address of your Jellyfin server in "Base URL" (for example http://192.168.1.20:8096).',
                 ],
                 terms: 'Your own Jellyfin server: nothing leaves your network.',
+                // The server becomes a row of `media_servers` once its key is set (docs/architecture/media-servers.md).
+                onChanged: fn () => \App\Domain\MediaServers\MediaServers::syncFromCredentials('jellyfin'),
             ),
         ];
     }

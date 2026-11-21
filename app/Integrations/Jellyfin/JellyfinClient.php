@@ -3,19 +3,22 @@
 namespace App\Integrations\Jellyfin;
 
 use App\Domain\Credentials\ServiceCredentials;
+use App\Models\MediaServer;
 use Illuminate\Support\Facades\Http;
 
-/** The Jellyfin server's REST API, read-only here: the sessions (logged-in clients) and what each plays. */
+/** The REST API of one Jellyfin server (a `media_servers` row): the sessions (logged-in clients), the watch lists and the play command. */
 class JellyfinClient
 {
-    public static function configured(): bool
+    public function __construct(private readonly MediaServer $server) {}
+
+    public function configured(): bool
     {
-        return ServiceCredentials::configured('jellyfin');
+        return ServiceCredentials::configured($this->server->credentialId());
     }
 
-    public static function baseUrl(): string
+    public function baseUrl(): string
     {
-        return ServiceCredentials::baseUrl('jellyfin');
+        return $this->server->baseUrl();
     }
 
     /** @return array<int, array<string, mixed>> `GET /Sessions`: Client, DeviceName, RemoteEndPoint, NowPlayingItem, PlayState */
@@ -27,7 +30,7 @@ class JellyfinClient
     /** The user whose watch list is shown: the configured one, else the server's first. */
     public function userId(): ?string
     {
-        $configured = ServiceCredentials::value('jellyfin', 'user_id');
+        $configured = ServiceCredentials::value($this->server->credentialId(), 'user_id');
 
         return $configured !== '' ? $configured : ($this->get('/Users')[0]['Id'] ?? null);
     }
@@ -61,19 +64,19 @@ class JellyfinClient
     {
         Http::timeout(5)
             ->withHeaders($this->headers())
-            ->post(self::baseUrl()."/Sessions/{$sessionId}/Playing?".http_build_query(['playCommand' => 'PlayNow', 'itemIds' => $itemId, 'startPositionTicks' => $startTicks]))
+            ->post($this->baseUrl()."/Sessions/{$sessionId}/Playing?".http_build_query(['playCommand' => 'PlayNow', 'itemIds' => $itemId, 'startPositionTicks' => $startTicks]))
             ->throw();
     }
 
     /** @return array<string, mixed> */
     private function get(string $path, array $query = []): array
     {
-        return Http::timeout(4)->withHeaders($this->headers())->get(self::baseUrl().$path, $query)->throw()->json() ?? [];
+        return Http::timeout(4)->withHeaders($this->headers())->get($this->baseUrl().$path, $query)->throw()->json() ?? [];
     }
 
     /** @return array<string, string> */
     private function headers(): array
     {
-        return ['Authorization' => 'MediaBrowser Token="'.ServiceCredentials::value('jellyfin', 'api_key').'"'];
+        return ['Authorization' => 'MediaBrowser Token="'.ServiceCredentials::value($this->server->credentialId(), 'api_key').'"'];
     }
 }

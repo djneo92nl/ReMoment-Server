@@ -6,13 +6,13 @@ use App\Domain\Device\DeviceCache;
 use App\Domain\Device\State;
 use App\Domain\Media\NowPlaying;
 use App\Domain\Media\Source;
+use App\Domain\MediaServers\DeviceMedia;
+use App\Domain\MediaServers\MediaServers;
 use App\Events\Device\NowPlayingEnded;
 use App\Events\Device\NowPlayingUpdated;
 use App\Events\Device\ProgressUpdated;
 use App\Integrations\Cast\CastConnection;
 use App\Integrations\Cast\CastNowPlaying;
-use App\Integrations\Jellyfin\JellyfinClient;
-use App\Integrations\Jellyfin\JellyfinNowPlaying;
 use App\Integrations\Philips\VideoPlayerDriver;
 use App\Integrations\Upnp\Services\DeviceListener as UpnpListener;
 
@@ -30,8 +30,6 @@ class DeviceListener extends UpnpListener
     /** Packages that are the TV's menu or launcher: the TV is on, at its home screen. */
     private const IDLE_PACKAGES = ['com.google.android.tvlauncher', 'com.google.android.apps.tv.launcherx', 'org.droidtv.nettvbrowser', 'me.efesser.flauncher'];
 
-    private const JELLYFIN_PACKAGE = 'org.jellyfin.androidtv';
-
     private const CAST_EVERY_SECONDS = 5;
 
     private const CAST_RETRY_AFTER_FAILURE_SECONDS = 300;
@@ -45,9 +43,9 @@ class DeviceListener extends UpnpListener
 
     private bool $macKnown = false;
 
-    private int $nextJellyfinCheck = 0;
+    private int $nextMediaServerCheck = 0;
 
-    private ?NowPlaying $lastJellyfin = null;
+    private ?NowPlaying $lastMediaServer = null;
 
     private int $nextUpnpCheck = 0;
 
@@ -126,23 +124,19 @@ class DeviceListener extends UpnpListener
         }
     }
 
-    /** What the Jellyfin server says this TV plays, every few seconds; null without a key or a playing item. */
-    private function jellyfinNowPlaying(): ?NowPlaying
+    /** What the media servers linked to this TV (Jellyfin) say plays in their app on it, every few seconds; null without a server or a playing item. */
+    private function mediaServerNowPlaying(): ?NowPlaying
     {
-        if (!JellyfinClient::configured()) {
-            return null;
+        if (now()->timestamp < $this->nextMediaServerCheck) {
+            return $this->lastMediaServer;
         }
 
-        if (now()->timestamp < $this->nextJellyfinCheck) {
-            return $this->lastJellyfin;
-        }
-
-        $this->nextJellyfinCheck = now()->timestamp + self::CAST_EVERY_SECONDS;
+        $this->nextMediaServerCheck = now()->timestamp + self::CAST_EVERY_SECONDS;
 
         try {
-            return $this->lastJellyfin = JellyfinNowPlaying::forClient((new JellyfinClient)->sessions(), (string) $this->device->ip_address, JellyfinClient::baseUrl());
+            return $this->lastMediaServer = DeviceMedia::nowPlaying($this->device);
         } catch (\Throwable) {
-            return $this->lastJellyfin = null;
+            return $this->lastMediaServer = null;
         }
     }
 
@@ -187,9 +181,9 @@ class DeviceListener extends UpnpListener
         $reading = $this->castReading();
         $cast = $reading['now'] ?? null;
 
-        // Cast says nothing about the native Jellyfin app: its own server does.
-        if ($cast?->track === null && $package === self::JELLYFIN_PACKAGE) {
-            $cast = $this->jellyfinNowPlaying() ?? $cast;
+        // Cast says nothing about a media server's native app (Jellyfin): its own server does.
+        if ($cast?->track === null && MediaServers::isClientPackage($package)) {
+            $cast = $this->mediaServerNowPlaying() ?? $cast;
         }
 
         if ($reading['standby'] ?? false) {

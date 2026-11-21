@@ -2,7 +2,7 @@
 
 One registry and one settings page for the keys of the external services, so each service is not its own form, storage rule and health probe, and so a hosted relay can later stand in for the user's own keys without a rewrite. Every public install brings its own keys (Spotify Development Mode allows 5 users per Client ID; Last.fm, Discogs, AcoustID and TheAudioDB have their own terms).
 
-Page: **Settings › Services & keys** (`/settings/services`, admin login, Livewire `App\Livewire\ServiceCredentialsManager`). Services in 1.0: Spotify, Last.fm, Discogs, AcoustID, TheAudioDB, and Jellyfin (a media server on your own network, for TV now playing).
+Page: **Settings › Services & keys** (`/settings/services`, admin login, Livewire `App\Livewire\ServiceCredentialsManager`). Services in 1.0: Spotify, Last.fm, Discogs, AcoustID, TheAudioDB, and Jellyfin (a media server on your own network, for TV now playing and its watch lists). Jellyfin is also a row of `media_servers` that points at these credentials (`credential = 'jellyfin'`); saving a complete key creates the row through the declaration's `onChanged` hook, see [media-servers.md](media-servers.md).
 
 ## The registry
 
