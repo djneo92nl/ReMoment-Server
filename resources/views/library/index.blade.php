@@ -49,6 +49,9 @@
             </section>
         @endif
 
+        {{-- Audiobooks, long tracks and podcast episodes with a bookmark (8.3); empty without any --}}
+        <livewire:continue-listening />
+
         {{-- What was played last: albums, playlists and radio stations together --}}
         {{-- Recently played tracks as compact rows: the scope's own plays (Streaming also merges in what you played on Spotify) --}}
         <livewire:recent-tracks :scope="$scope" :key="'recent-tracks-'.$scope" />

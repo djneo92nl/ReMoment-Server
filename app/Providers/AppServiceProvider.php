@@ -25,6 +25,7 @@ use App\Listeners\Device\PublishProgressToMqtt;
 use App\Listeners\Device\PublishQueueToMqtt;
 use App\Listeners\Device\PublishStateToMqtt;
 use App\Listeners\Device\PublishVolumeToMqtt;
+use App\Listeners\Device\RecordPlaybackPosition;
 use App\Listeners\Device\StorePlaybackHistory;
 use App\Listeners\Device\SwitchToDefaultSource;
 use App\Listeners\Device\SyncGroupMirror;
@@ -100,9 +101,11 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(ProgressUpdated::class, UpdateDeviceCache::class);
         Event::listen(ProgressUpdated::class, PublishProgressToMqtt::class);
         Event::listen(ProgressUpdated::class, SyncGroupMirror::class);
+        Event::listen(ProgressUpdated::class, RecordPlaybackPosition::class); // the resume position of long tracks and episodes (8.3)
         Event::listen(NowPlayingEnded::class, UpdateDeviceCache::class);
         Event::listen(NowPlayingEnded::class, TrackSubDeviceLinks::class);
         Event::listen(NowPlayingEnded::class, [ClosePlaybackHistory::class, 'handle']);
+        Event::listen(NowPlayingEnded::class, RecordPlaybackPosition::class);
         // First: a device above its volume limit is set back (VolumeLimits); the report itself still goes on.
         Event::listen(VolumeUpdated::class, EnforceVolumeLimit::class);
         Event::listen(VolumeUpdated::class, UpdateDeviceCache::class);

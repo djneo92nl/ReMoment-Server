@@ -3,6 +3,8 @@
 namespace App\Domain\Library;
 
 use App\Domain\Device\SpotifyRouting;
+use App\Domain\Resume\PlaybackPositions;
+use App\Domain\Resume\ResumeOnPlay;
 use App\Integrations\Contracts\LibraryPlaybackInterface;
 use App\Models\Device;
 use App\Models\DeviceMeta;
@@ -193,7 +195,14 @@ class LibraryPlayback
             return $this->playSpotifyAlbum($device, $album, $start, $shuffle);
         }
 
-        return $this->playTracks($device, self::albumTracks($album), $start, $shuffle, $album, $source);
+        $tracks = self::albumTracks($album);
+
+        // An audiobook album plays on from the chapter that has a bookmark (8.3), unless a track was asked for or `resume=false`.
+        if ($start === null && !$shuffle && $source !== 'spotify' && ResumeOnPlay::wanted()) {
+            $start = PlaybackPositions::bookmarkedTrack($tracks);
+        }
+
+        return $this->playTracks($device, $tracks, $start, $shuffle, $album, $source);
     }
 
     /**
@@ -247,6 +256,7 @@ class LibraryPlayback
 
         if (self::canPlayDlna($device) && $track->getDlnaUrl()) {
             $this->onDriver(fn () => $device->driver->playLibraryTrack($track));
+            ResumeOnPlay::afterTrack($device, $track);
 
             return new PlaybackResult(PlaybackResult::VIA_DLNA, 1, 1);
         }
@@ -402,6 +412,7 @@ class LibraryPlayback
 
             if ($playable > 0) {
                 $this->onDriver(fn () => $device->driver->playLibraryTracks($ordered));
+                ResumeOnPlay::afterTrack($device, $ordered->first(fn (Track $t) => (bool) $t->getDlnaUrl()));
 
                 return new PlaybackResult(PlaybackResult::VIA_DLNA, $playable, $tracks->count());
             }
