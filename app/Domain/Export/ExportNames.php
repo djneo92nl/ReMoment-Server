@@ -45,17 +45,41 @@ final class ExportNames
             return $this->unique('', $base, $extension);
         }
 
-        $number = $trackNumber ? str_pad((string) $trackNumber, 2, '0', STR_PAD_LEFT) : str_pad((string) $position, 2, '0', STR_PAD_LEFT);
-        $prefix = ($discNumber && $discNumber > 1 ? "{$discNumber}-" : '').$number;
-        $directory = self::clean($artist, 'Unknown Artist').'/'.self::clean($album, 'Unknown Album').'/';
+        [$directory, $base] = self::treeParts($artist, $album, $title, $trackNumber, $discNumber, $position);
 
-        return $this->unique($directory, "{$prefix} - {$title}", $extension);
+        return $this->unique($directory, $base, $extension);
+    }
+
+    /**
+     * The folder and file base name of the tree layout as a function of the track alone (no collision handling, no
+     * extension): `Artist/Album/` and `01 - Title`. `$position` stands in for a missing track number (export order);
+     * sync passes null and gets no number prefix then, so a name never depends on the selection.
+     *
+     * @return array{0: string, 1: string}
+     */
+    public static function treeParts(?string $artist, ?string $album, ?string $title, ?int $trackNumber, ?int $discNumber, ?int $position = null): array
+    {
+        $number = $trackNumber ?: $position;
+        $number = $number ? str_pad((string) $number, 2, '0', STR_PAD_LEFT) : null;
+        $prefix = ($discNumber && $discNumber > 1 ? "{$discNumber}-" : '').($number ?? '');
+        $name = self::clean($title, 'Untitled');
+
+        return [
+            self::clean($artist, 'Unknown Artist').'/'.self::clean($album, 'Unknown Album').'/',
+            $prefix === '' ? $name : "{$prefix} - {$name}",
+        ];
+    }
+
+    /** Cuts a base name to FILE_MAX like `unique()` does, so a planner can predict the final name. */
+    public static function limit(string $base): string
+    {
+        return rtrim(mb_substr($base, 0, self::FILE_MAX), '. ');
     }
 
     /** A path nothing else in this export uses; a duplicate gets " (2)", " (3)" ... before the extension. */
     private function unique(string $directory, string $base, string $extension): string
     {
-        $base = rtrim(mb_substr($base, 0, self::FILE_MAX), '. ');
+        $base = self::limit($base);
         $path = "{$directory}{$base}.{$extension}";
         for ($n = 2; isset($this->used[mb_strtolower($path)]); $n++) {
             $path = "{$directory}{$base} ({$n}).{$extension}";

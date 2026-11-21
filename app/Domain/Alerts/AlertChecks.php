@@ -28,7 +28,7 @@ final class AlertChecks
 {
     public function runAll(): void
     {
-        foreach (['scheduler', 'queues', 'backup', 'storage', 'mounts', 'devices', 'nodes', 'rips', 'exposure'] as $check) {
+        foreach (['scheduler', 'queues', 'backup', 'storage', 'mounts', 'devices', 'nodes', 'rips', 'syncs', 'exposure'] as $check) {
             try {
                 $this->{$check}();
             } catch (\Throwable $e) {
@@ -208,6 +208,14 @@ final class AlertChecks
         $ids = Device::pluck('id')->map(fn ($id) => (string) $id)->all();
         foreach (Alerts::active()->whereIn('kind', ['device.offline', 'listener.down'])->whereNotIn('key', $ids) as $orphan) {
             Alerts::resolve($orphan->kind, $orphan->key);
+        }
+    }
+
+    /** Ends sync targets whose node job was lost, expired or cancelled without a result, so the tray and the page do not hang. */
+    public function syncs(): void
+    {
+        if (Profile::allows('file_storage')) {
+            \App\Domain\Sync\Syncs::reconcile();
         }
     }
 

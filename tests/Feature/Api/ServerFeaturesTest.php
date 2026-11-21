@@ -68,7 +68,7 @@ class ServerFeaturesTest extends TestCase
         $features = $this->features();
 
         $this->assertSame('control', $features['profile']);
-        foreach (['discover', 'rip', 'export', 'export_formats', 'similar_tracks'] as $key) {
+        foreach (['discover', 'rip', 'export', 'export_formats', 'sync', 'similar_tracks'] as $key) {
             $this->assertArrayNotHasKey($key, $features, $key);
         }
         // What every profile has.

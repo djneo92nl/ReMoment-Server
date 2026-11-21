@@ -36,6 +36,15 @@ final class Tools
                 'feature' => 'file_storage',
                 'description' => 'Take albums, artists and playlists as a zip for an MP3 player or car radio, and follow the exports.',
             ],
+            [
+                'key' => 'sync',
+                'label' => 'Sync',
+                'icon' => 'arrows-rotate',
+                'route' => 'tools.sync',
+                'routes' => ['tools.sync'],
+                'feature' => 'file_storage',
+                'description' => 'Keep a USB stick or an MP3 player filled with part of the library, and change only what is needed.',
+            ],
         ];
     }
 

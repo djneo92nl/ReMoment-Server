@@ -54,6 +54,8 @@ Schedule::command('stems:prune')->dailyAt('03:30')->when(fn () => Profile::allow
 Schedule::command('library:scan-files --queue')->dailyAt('03:30')->when(fn () => Profile::allows('file_storage'));
 // Finished exports older than EXPORT_KEEP_HOURS and the exports/ directory over EXPORT_DIR_MAX_GB (docs/architecture/export.md)
 Schedule::command('export:prune')->hourly()->withoutOverlapping(30)->when(fn () => Profile::allows('file_storage'));
+// The shared cache of prepared sync files, kept under SYNC_CACHE_GB (docs/architecture/offline-sync.md section 5)
+Schedule::command('sync:prune')->hourly()->withoutOverlapping(30)->when(fn () => Profile::allows('file_storage'));
 
 // Folds duplicate artists/albums/tracks together (ids of merged records disappear), so weekly and off-hours.
 Schedule::command('library:merge-duplicates --force')->weeklyOn(0, '04:00')->withoutOverlapping(240)->when(fn () => Profile::allows('library'));

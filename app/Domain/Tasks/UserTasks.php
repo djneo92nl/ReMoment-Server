@@ -62,6 +62,29 @@ final class UserTasks
         self::save($key, $task);
     }
 
+    /** Sets the progress of a task to an absolute value (a sync reports files done of total); the task ends at its total. */
+    public static function set(string $key, int $done, int $total): void
+    {
+        $task = Cache::get(self::entry($key));
+
+        if (!$task) {
+            return;
+        }
+
+        $task['done'] = $done;
+        $task['total'] = $total;
+        $task['state'] = 'running';
+        $task['started_at'] ??= now()->timestamp;
+
+        if ($total > 0 && $done >= $total) {
+            self::done($key);
+
+            return;
+        }
+
+        self::save($key, $task);
+    }
+
     public static function done(string $key): void
     {
         Cache::forget(self::entry($key));

@@ -48,7 +48,15 @@ final class NodeJobs
             'meta.tracks.*.title' => ['required', 'string', 'max:300'],
             'meta.tracks.*.artist' => ['nullable', 'string', 'max:300'],
         ]],
+        // Sync target (18.3, docs/architecture/offline-sync.md section 6): the volume is the node's own config, never a param;
+        // a job only names the target. The server id is added when the node fetches the job (see deliver()).
+        'sync.scan' => ['role' => 'sync-target', 'ttl' => 120, 'params' => ['target_id' => self::TARGET_ID]],
+        'sync.claim' => ['role' => 'sync-target', 'ttl' => 120, 'params' => ['target_id' => self::TARGET_ID]],
+        'sync.apply' => ['role' => 'sync-target', 'ttl' => 600, 'params' => ['target_id' => self::TARGET_ID, 'confirm' => ['nullable', 'boolean']]],
     ];
+
+    /** The id of a sync target: a ULID. */
+    public const TARGET_ID = ['required', 'string', 'regex:/^[0-9a-z]{26}$/i'];
 
     /** How long the last progress report of a job is kept (a job's progress is live data, the outcome is in `result`). */
     private const PROGRESS_TTL = 86400;
@@ -105,6 +113,11 @@ final class NodeJobs
     public static function deliver(NodeJob $job): array
     {
         $payload = $job->toPayload();
+
+        // The sync jobs carry this server's id: the node writes it into the marker and refuses a volume of another server.
+        if (str_starts_with($job->type, 'sync.')) {
+            $payload['params'] = ((array) ($job->params ?? [])) + ['server_id' => \App\Domain\Sync\Syncs::serverId()];
+        }
 
         if ($job->type === 'line_in.start') {
             $payload['params'] = ((array) ($job->params ?? [])) + [

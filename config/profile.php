@@ -99,7 +99,8 @@ return [
             'library/wishlist', 'library/collection',
         ],
         'file_storage' => [
-            'settings/storage', 'settings/storage/*', 'stream/*', 'tools/export',
+            'settings/storage', 'settings/storage/*', 'stream/*', 'tools/export', 'tools/sync',
+            'api/admin/sync/*', 'api/sync/*', 'api/nodes/sync/*',
             'api/admin/storage/*', 'api/admin/files/*', 'api/admin/tracks/*',
             'api/library/exports', 'api/library/exports/*',
         ],

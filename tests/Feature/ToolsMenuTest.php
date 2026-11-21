@@ -31,7 +31,7 @@ class ToolsMenuTest extends TestCase
     {
         config(['profile.current' => 'standard']);
 
-        $this->assertSame(['export'], array_column(Tools::available(), 'key'));
+        $this->assertSame(['export', 'sync'], array_column(Tools::available(), 'key'));
         $this->get('/tools')->assertOk()->assertSee('data-tool="export"', false)->assertDontSee('data-tool="mixer"', false);
         $this->get('/mixer')->assertRedirectContains('/not-in-profile');
     }

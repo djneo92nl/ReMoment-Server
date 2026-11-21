@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Domain\Node\NodeJobs;
 use App\Domain\Ripper\Rips;
+use App\Domain\Sync\Syncs;
 use App\Http\Controllers\Api\Concerns\AuthenticatesNode;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
@@ -58,11 +59,18 @@ class NodeController extends Controller
             'progress.tracks' => ['nullable', 'integer', 'min:0', 'max:999'],
             'progress.percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'progress.detail' => ['nullable', 'string', 'max:200'],
+            'progress.files_done' => ['nullable', 'integer', 'min:0'],
+            'progress.files_total' => ['nullable', 'integer', 'min:0'],
+            'progress.bytes_done' => ['nullable', 'integer', 'min:0'],
+            'progress.bytes_total' => ['nullable', 'integer', 'min:0'],
+            'progress.current' => ['nullable', 'string', 'max:200'],
         ]);
 
         if (!NodeJobs::progress($row, $data['progress'] ?? null)) {
             return response()->json(['error' => 'conflict', 'message' => "Job is {$row->fresh()->state}."], 409);
         }
+
+        str_starts_with($row->type, 'sync.') && Syncs::progress($row, $data['progress'] ?? []);
 
         return response()->json(['cancel_requested' => $row->fresh()->cancel_requested]);
     }
@@ -82,6 +90,7 @@ class NodeController extends Controller
 
         $finished = NodeJobs::finish($row, (bool) $data['ok'], $data['result'] ?? null, $data['error'] ?? null);
         Rips::afterFinish($finished);
+        str_starts_with($finished->type, 'sync.') && Syncs::finished($finished);
 
         return response()->json(['job' => $finished->toPayload()]);
     }

@@ -63,6 +63,8 @@ final class ServerFeatures
             // Export from the library as zip (docs/api/export.md): library and own files in the profile, and ffmpeg can transcode.
             'export' => self::export() ? true : null,
             'export_formats' => self::export() ? ExportFormats::availableIds() : null,
+            // Sync to offline targets (docs/api/sync.md): library and own files in the profile, ffmpeg can make the transcodes.
+            'sync' => self::export() ? true : null,
             // Rip upload from the ripper app (admin files route): Full profile with the own-file storage.
             'rip' => Profile::allows('rip_upload') && Profile::allows('file_storage') ? true : null,
             // At least one enabled media server with complete credentials (docs/api/media-servers.md).

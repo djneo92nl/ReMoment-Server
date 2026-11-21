@@ -22,7 +22,7 @@ final class InfoFeatures
             'sleep_timer' => true,
             'nodes' => true,
             'sub_devices' => true,
-        ] + (Tools::available(Tools::ffmpeg()) ? ['export' => true, 'export_formats' => ExportFormats::availableIds()] : []);
+        ] + (Tools::available(Tools::ffmpeg()) ? ['export' => true, 'sync' => true, 'export_formats' => ExportFormats::availableIds()] : []);
     }
 
     /** Asserts the whole `features` object (key order is not part of the contract). @param array<string, mixed> $varying */
