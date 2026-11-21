@@ -14,7 +14,7 @@ It is meant for a **home network**. The REST API and MQTT have no authentication
 |---|---|---|---|
 | **Control** | Controls devices: playback, volume, sources, multiroom, radio, play history, alerts, backup, REST API, MQTT, web UI. No music library. | SQLite | Raspberry Pi 2 or 3, wall panels (ESP32) and a few devices. A Pi 2 is unverified: it needs 32-bit images (see [install-raspberry-pi.md](install-raspberry-pi.md)). |
 | **Standard** | Control plus a music library: DLNA and own-file indexing, metadata and artwork, Spotify browsing, wishlist. | MariaDB | Raspberry Pi 3 (1 GB) and up, or an x86/arm64 machine or LXC with 2 GB. |
-| **Full** | Standard plus audio analysis (loudness, BPM, key, mood), deep analysis of a track, library health reports, rip upload. | MariaDB | x86 or arm64, 2 cores and 4 GB RAM or more; 6 GB+ for the mood models. |
+| **Full** | Standard plus audio analysis (loudness, BPM, key, mood), deep analysis of a track, library health reports, rip upload. | MariaDB | x86-64 (or arm64 without BPM, key and mood), 2 cores and 4 GB RAM or more; 6 GB+ for the mood models. The Essentia part has no arm64 build. |
 
 The RAM and CPU figures are estimates; nothing has been measured on a Pi yet. Details: [system requirements](../architecture/system-requirements.md), [profiles](../architecture/profiles.md).
 

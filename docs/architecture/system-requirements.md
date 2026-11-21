@@ -12,18 +12,18 @@ One Docker/supervisor stack: the PHP 8.4 app (served by FrankenPHP in classic mo
 |---------|----------|----------|------------|----------|
 | **Control** | Device control: listeners, REST API, MQTT, live web UI, radio, play history, alerts, backup. No library, no analysis. | SQLite (named volume, WAL) | app, redis, mosquitto | Raspberry Pi 2 and up. A Pi 2 is 32-bit armv7: every image of the stack needs an armv7 build (unverified); if one is missing the floor is a Pi 3 (arm64). |
 | **Standard** | Control plus the library: DLNA/Spotify library scan, metadata enrichment, artwork, own-file indexing, catalogue sync | MariaDB | plus mariadb | Raspberry Pi 3 (1 GB) and up, or an x86/arm64 LXC with 2 GB |
-| **Full** | Everything: audio analysis (loudness, waveform, quality, Chromaprint/AcoustID, BPM/key/mood), deep analysis (sections, stems), library health reports | MariaDB | plus the analysis sidecar and optionally structure, stems and Meilisearch | x86 or arm64, 2 cores, 4 GB RAM for tier 0 analysis and Essentia; see below |
+| **Full** | Everything: audio analysis (loudness, waveform, quality, Chromaprint/AcoustID, BPM/key/mood), deep analysis (sections, stems), library health reports | MariaDB | plus the analysis sidecar and optionally structure, stems and Meilisearch | x86 or arm64, 2 cores, 4 GB RAM for tier 0 analysis; **Essentia (BPM, key, mood) and the sidecar need x86-64**, see below |
 
 Sizing inside Full:
 
 | Tier | Features | Hardware |
 |------|----------|----------|
 | Recommended | Tier 0 analysis with a usable backlog | x86 or arm64, 2 cores, 2–4 GB RAM (e.g. a small Proxmox LXC). A Pi 3 runs it, but analysis is slow. |
-| Essentia | Plus BPM, key, danceability (light sidecar build) | 64-bit, 4 GB RAM, 2–4 cores |
-| Essentia + ML | Plus mood, arousal/valence, voice vs. instrumental, genre (TensorFlow models) | 64-bit x86 or arm64, 6 GB+ RAM (`proxmox_ct_memory` 6144+), 4+ cores, ~1 GB disk for the models (downloaded on first start into the `remoment-analysis-models` volume). `essentia-tensorflow` does not exist for 32-bit ARM. |
+| Essentia | Plus BPM, key, danceability (light sidecar build) | **x86-64 only**, 4 GB RAM, 2–4 cores. No Linux arm64 or armv7 wheel exists, so on arm64 the sidecar does not build (see [audio-analysis.md](audio-analysis.md#architectures)) |
+| Essentia + ML | Plus mood, arousal/valence, voice vs. instrumental, genre (TensorFlow models) | **x86-64 only**, 6 GB+ RAM (`proxmox_ct_memory` 6144+), 4+ cores, ~1 GB disk for the models (downloaded on first start into the `remoment-analysis-models` volume). `essentia-tensorflow` has no Linux arm64 or armv7 wheel and no source archive. |
 | Stems | Per-stem loudness lanes of one track, on demand | 64-bit, about 1.5 GB RAM extra and minutes of CPU per track ([stems-service.md](stems-service.md)) |
 
-A good single target for everything: a 4-core, 8 GB arm64/x86 mini PC (or an LXC with 6 GB) with `profile: full` and `analysis_essentia_ml: true`.
+A good single target for everything: a 4-core, 8 GB **x86-64** mini PC (or an LXC with 6 GB) with `profile: full` and `analysis_essentia_ml: true`. An arm64 machine (Pi 4/5, arm64 NAS) runs Control, Standard and Full **without** the Essentia sidecar (set `analysis_enabled: false`); it can use a sidecar on another x86-64 machine through `ANALYSIS_ESSENTIA_URL`. Checked on PyPI 2026-11-21, no image built.
 
 The RAM and load figures are **estimates, not measurements**; the per-profile budget on a real Pi 2 and Pi 3 is workstream 9b item 4 and has not been measured. See [profiles.md](profiles.md#not-verified).
 

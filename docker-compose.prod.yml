@@ -128,6 +128,7 @@ services:
 
     # Opt-in audio analysis (BPM, key, mood): docker compose --profile analysis up -d, then set
     # ANALYSIS_ENABLED=true and ANALYSIS_ESSENTIA_URL=http://127.0.0.1:8090 (docs/architecture/audio-analysis.md).
+    # x86-64 hosts only: Essentia has no Linux arm64 or armv7 wheel, so the image does not build there (the Dockerfile says so).
     analysis:
         profiles: [analysis]
         build:

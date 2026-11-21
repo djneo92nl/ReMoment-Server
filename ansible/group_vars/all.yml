@@ -125,6 +125,8 @@ mqtt_ws_url: ''
 # Essentia container (BPM, key, mood), see docs/architecture/audio-analysis.md.
 # Adds the `analysis` compose profile and the ANALYSIS_* settings to .env.
 # Follows the profile: only `full` runs the analysis sidecar (env.j2 ignores it for the other profiles).
+# x86-64 hosts only: Essentia has no Linux arm64/armv7 wheel, so on an arm64 host (Pi 4/5, arm64 LXC) set this to false;
+# tier 0 analysis still runs. See docs/architecture/audio-analysis.md, "Architectures".
 analysis_enabled: "{{ profile == 'full' }}"
 # true = the TensorFlow build (mood, arousal/valence, instrumental, genre): a large image,
 # ~1 GB of models and a lot of CPU/RAM. Raise proxmox_ct_memory (6144+) and proxmox_ct_cores for it.

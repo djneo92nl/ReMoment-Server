@@ -11,7 +11,7 @@ Off by default (`ANALYSIS_ENABLED=true` turns it on). It is CPU heavy, so it run
 | 0 | the app container | loudness (LUFS, loudness range, true peak) with `ffmpeg`'s `ebur128` filter, which also proves the file decodes; waveform (RMS with per-track contrast, plus raw peaks); quality (spectral cutoff and a transcode verdict, clipping, mono / phase, silence, decoder warnings: see *Quality* below); ReplayGain read from the tags; Chromaprint fingerprint (`fpcalc`); AcoustID lookup | `ffmpeg` and `fpcalc` (`libchromaprint-tools`, in `docker/8.4/Dockerfile`); `ACOUSTID_API_KEY` for the lookup (without one the fingerprint is stored, nothing is looked up) |
 | 1 | the `analysis` sidecar (`docker/analysis`, compose profile `analysis`) | Essentia: BPM, key, mode, danceability; with the ML build also mood, arousal/valence, voice vs instrumental, genre | `ANALYSIS_ESSENTIA_URL` |
 
-A Pi 2/3 runs tier 0 only (its app image has the tools; the sidecar is optional and `essentia-tensorflow` is not available on 32-bit ARM). `ffprobe` is not used: getID3 already stores codec, bitrate, sample rate, bit depth and channels on `files` and in the track metadata.
+A Pi runs tier 0 only (its app image has the tools). **The Essentia sidecar is x86-64 only**, with or without the ML models: see [Architectures](#architectures). `ffprobe` is not used: getID3 already stores codec, bitrate, sample rate, bit depth and channels on `files` and in the track metadata.
 
 ## Configuration (`config/analysis.php`)
 
@@ -82,6 +82,26 @@ ANALYSIS_ESSENTIA_ML_BUILD=1 docker compose --profile analysis up -d --build ana
 ```
 
 `fetch_models.sh` downloads the models from essentia.upf.edu; the URLs and the model input/output names in `app.py` follow Essentia's model pages and were written without running the container, so check them against https://essentia.upf.edu/models.html when a model is skipped (`/health` lists the models that did load; a missing one only drops its features).
+
+### Architectures
+
+What is actually true, checked against PyPI on 2026-11-21 (the JSON API of `essentia` and `essentia-tensorflow`; **no image was built** for this):
+
+| Platform | Sidecar without ML (`essentia`) | Sidecar with ML (`essentia-tensorflow`) |
+|---|---|---|
+| Linux x86-64 | **Supported.** Wheel `manylinux_2_17_x86_64` for CPython 3.9-3.13 (2.1b6.dev1389; the image's Python 3.11 gets this one) | **Supported.** Same wheel tags (about 290 MB), plus ~1 GB of models and the RAM below |
+| Linux arm64 / aarch64 (Pi 4/5, arm64 NAS, LXC, cloud arm) | **Unsupported.** No aarch64 wheel in any release; the newest source archive is 2.1b6.dev234 (needs Essentia's full C++ build, not tried) | **Unsupported.** No aarch64 wheel and no source archive at all |
+| Linux armv7 / 32-bit ARM (Pi 2) | **Unsupported** (no wheel) | **Unsupported** |
+| macOS arm64 (Apple Silicon) | Wheels exist for CPython 3.9-3.14 (`macosx_15_0_arm64`), so a host virtualenv works; **Docker on a Mac is Linux**, so the compose file pins `linux/amd64` and runs it emulated (slow) | the same |
+
+So "supported without ML models" does **not** hold on arm64 either: the light build needs the same missing wheel. Both releases are PyPI *pre-releases* (`2.1b6.devN`; the stable line stopped at `2.1b5`), which pip picks because nothing else exists. The ML build needs TensorFlow inside the wheel and about 6 GB RAM (an estimate, unmeasured); both are x86-64 here.
+
+What follows:
+
+- `docker/analysis/Dockerfile` **stops at once on a non-x86-64 machine** with a message that points here (instead of failing minutes into `pip install`). `ansible/group_vars/all.yml` says to set `analysis_enabled: false` on an arm64 host; today `profile: full` turns it on without checking the architecture.
+- **Tier 0 is unaffected** and runs everywhere (ffmpeg, Chromaprint/AcoustID, quality, waveform, loudness): leave `ANALYSIS_ESSENTIA_URL` unset and the Essentia stage is simply not run. BPM, key, danceability, mood, similar tracks (the embedding) and "mixes well with" need the sidecar.
+- A 64-bit ARM server can still use it by pointing `ANALYSIS_ESSENTIA_URL` at a sidecar on an x86-64 machine on the LAN (the app posts a mono WAV to it; it needs no access to the music).
+- **Not done** (workstream 12.10): building Essentia from source for aarch64 in the image (a long, cacheable multi-arch CI build; unverified that the 2.1b6.dev234 archive or upstream's current source builds in a slim image), or another BPM/key extractor on arm64.
 
 ## Reducing CPU load
 
