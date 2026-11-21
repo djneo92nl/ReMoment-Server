@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Domain\Clients\ClientAdmin;
 use App\Domain\Library\LibrarySources;
 use App\Domain\Node\NodeRoles;
 use App\Models\Client;
@@ -51,16 +52,10 @@ class ClientManager extends Component
             'approveRoles.*' => ['string', 'in:'.implode(',', NodeRoles::names())],
         ]);
 
-        $client = Client::findOrFail($this->approvingId);
-        $client->update([
-            'enabled_roles' => $client->isNode()
-                ? NodeRoles::normalize(array_intersect($this->approveRoles, $client->roles ?? []))
-                : null,
-            'status' => 'approved',
+        ClientAdmin::approve(Client::findOrFail($this->approvingId), [
             'type' => $this->approveType,
-            'name' => trim($this->approveName) ?: null,
-            'api_token' => Client::generateToken(),
-            'approved_at' => now(),
+            'name' => $this->approveName,
+            'roles' => $this->approveRoles,
         ]);
 
         $this->approvingId = null;
@@ -69,7 +64,7 @@ class ClientManager extends Component
 
     public function reject(int $clientId): void
     {
-        Client::findOrFail($clientId)->delete();
+        ClientAdmin::delete(Client::findOrFail($clientId));
         session()->flash('success', 'Client registration rejected and removed.');
     }
 
@@ -96,22 +91,13 @@ class ClientManager extends Component
             'editHiddenSources.*' => ['string', 'in:'.implode(',', array_keys(LibrarySources::all()))],
         ]);
 
-        $client = Client::findOrFail($this->editing);
-
-        $deviceIds = array_map('intval', $this->editDeviceIds);
-        if ($this->editType === 'single' && count($deviceIds) > 1) {
-            $deviceIds = [reset($deviceIds)];
-        }
-
-        $client->update([
-            'name' => trim($this->editName) ?: null,
+        ClientAdmin::update(Client::findOrFail($this->editing), [
+            'name' => $this->editName,
             'type' => $this->editType,
-            'enabled_roles' => $client->isNode()
-                ? NodeRoles::normalize(array_intersect($this->editRoles, $client->roles ?? []))
-                : null,
-            'hidden_sources' => LibrarySources::normalize($this->editHiddenSources) ?: null,
+            'device_ids' => $this->editDeviceIds,
+            'roles' => $this->editRoles,
+            'hidden_sources' => $this->editHiddenSources,
         ]);
-        $client->devices()->sync($deviceIds);
 
         $this->editing = null;
         session()->flash('success', 'Client updated.');
@@ -124,7 +110,7 @@ class ClientManager extends Component
 
     public function regenerateToken(int $clientId): void
     {
-        Client::findOrFail($clientId)->update(['api_token' => Client::generateToken()]);
+        ClientAdmin::regenerateToken(Client::findOrFail($clientId));
         session()->flash('success', 'API token regenerated.');
     }
 
@@ -132,17 +118,14 @@ class ClientManager extends Component
     {
         $client = Client::findOrFail($clientId);
         $name = $client->name ?? "Client #{$clientId}";
-        $client->delete();
+        ClientAdmin::delete($client);
         session()->flash('success', "{$name} removed.");
     }
 
     public function render()
     {
         return view('livewire.client-manager', [
-            'clients' => Client::with('devices')
-                ->orderByRaw("status = 'pending' DESC")
-                ->orderBy('created_at', 'desc')
-                ->get(),
+            'clients' => ClientAdmin::all(),
             'allDevices' => Device::orderBy('device_name')->get(),
             'librarySources' => LibrarySources::all(),
         ]);

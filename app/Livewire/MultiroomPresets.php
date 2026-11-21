@@ -2,8 +2,7 @@
 
 namespace App\Livewire;
 
-use App\Integrations\Contracts\MultiRoomInterface;
-use App\Models\Device;
+use App\Domain\Multiroom\Presets;
 use App\Models\MultiroomPreset;
 use Livewire\Component;
 
@@ -22,24 +21,13 @@ class MultiroomPresets extends Component
 
     public function render()
     {
-        $presets = MultiroomPreset::all()->map(function (MultiroomPreset $preset) {
-            $devices = Device::whereIn('id', $preset->device_ids)->get(['id', 'device_name']);
-
-            return [
+        return view('livewire.multiroom-presets', [
+            'presets' => Presets::all()->map(fn (MultiroomPreset $preset) => [
                 'id' => $preset->id,
                 'name' => $preset->name,
-                'devices' => $devices->map(fn ($d) => ['id' => $d->id, 'name' => $d->device_name])->all(),
-            ];
-        });
-
-        $multiroomDevices = Device::all()->filter(function (Device $device) {
-            return is_a($device->device_driver, MultiRoomInterface::class, true);
-        })->map(fn ($d) => ['id' => $d->id, 'name' => $d->device_name])
-            ->values();
-
-        return view('livewire.multiroom-presets', [
-            'presets' => $presets,
-            'multiroomDevices' => $multiroomDevices,
+                'devices' => Presets::toArray($preset)['devices'],
+            ]),
+            'multiroomDevices' => Presets::multiroomDevices(),
         ]);
     }
 
@@ -53,10 +41,7 @@ class MultiroomPresets extends Component
             'newDeviceIds.min' => 'Select at least 2 devices.',
         ]);
 
-        MultiroomPreset::create([
-            'name' => trim($this->newName),
-            'device_ids' => array_values(array_map('intval', $this->newDeviceIds)),
-        ]);
+        Presets::create($this->newName, $this->newDeviceIds);
 
         $this->newName = '';
         $this->newDeviceIds = [];
@@ -71,30 +56,12 @@ class MultiroomPresets extends Component
             return;
         }
 
-        $deviceMap = Device::whereIn('id', $preset->device_ids)->get()->keyBy('id');
-        $devices = collect($preset->device_ids)->map(fn ($id) => $deviceMap->get($id))->filter()->values();
-        if ($devices->count() < 2) {
+        $result = Presets::activate($preset);
+
+        if ($result['too_few']) {
             $this->setFeedback('Preset needs at least 2 devices.', true);
-
-            return;
-        }
-
-        $host = $devices->first();
-        $errors = [];
-
-        foreach ($devices->skip(1) as $guest) {
-            try {
-                $driver = $guest->driver;
-                if ($driver instanceof MultiRoomInterface) {
-                    $driver->joinSession($host);
-                }
-            } catch (\Throwable $e) {
-                $errors[] = $guest->device_name.': '.$e->getMessage();
-            }
-        }
-
-        if ($errors) {
-            $this->setFeedback('Some devices failed: '.implode('; ', $errors), true);
+        } elseif ($result['failed']) {
+            $this->setFeedback('Some devices failed: '.collect($result['failed'])->map(fn ($f) => $f['device']->device_name.': '.$f['message'])->implode('; '), true);
         } else {
             $this->setFeedback('Preset "'.$preset->name.'" activated.');
         }
@@ -102,7 +69,9 @@ class MultiroomPresets extends Component
 
     public function delete(int $presetId): void
     {
-        MultiroomPreset::find($presetId)?->delete();
+        if ($preset = MultiroomPreset::find($presetId)) {
+            Presets::delete($preset);
+        }
         $this->setFeedback('Preset deleted.');
     }
 
