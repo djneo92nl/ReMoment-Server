@@ -12,6 +12,36 @@
       - group_vars/vault.yml
 
   tasks:
+      # Backup first, from the app that is still running the OLD code and schema (before the git update, the build and
+      # the migrations), so the archive can be restored with the version it came from. A first deploy has no running app,
+      # so nothing happens. A failing backup stops the play: nothing has been changed yet. Switch off with
+      # -e backup_before_deploy=false (e.g. when the running version is too old to have `backup:run`).
+      - name: Look for a running app container
+        ansible.builtin.command:
+            cmd: docker compose -f docker-compose.prod.yml ps --status running -q app
+            chdir: "{{ app_dir }}"
+        register: running_app
+        failed_when: false
+        changed_when: false
+        when: backup_before_deploy | default(true) | bool
+
+      - name: Back up before deploying
+        ansible.builtin.command:
+            cmd: >
+                docker compose -f docker-compose.prod.yml exec -T -u sail app
+                php artisan backup:run
+            chdir: "{{ app_dir }}"
+        when:
+            - backup_before_deploy | default(true) | bool
+            - running_app.stdout | default('') | length > 0
+        register: pre_deploy_backup
+        changed_when: true
+
+      - name: Show the backup result
+        ansible.builtin.debug:
+            msg: "{{ pre_deploy_backup.stdout_lines | default([]) | last | default('') }}"
+        when: pre_deploy_backup is not skipped
+
       - name: Clone or update repository
         ansible.builtin.git:
             repo: "{{ app_repo }}"
@@ -181,3 +211,30 @@
             cmd: docker compose -f docker-compose.prod.yml restart app
             chdir: "{{ app_dir }}"
         changed_when: true
+
+      # The deploy is only done when the API answers again: GET /api/info with the right contract version and the
+      # profile this play wrote to .env. FrankenPHP needs a moment after the restart, hence the retries (about 2 minutes).
+      # Runs on the target against the published app port.
+      - name: Wait for GET /api/info
+        ansible.builtin.uri:
+            url: "http://127.0.0.1:{{ app_port | default(80) }}/api/info"
+            return_content: true
+            status_code: 200
+        register: api_info
+        retries: 24
+        delay: 5
+        until: api_info.status is defined and api_info.status == 200
+
+      - name: Check the API contract version and the profile
+        ansible.builtin.assert:
+            that:
+                - api_info.json.api_version is defined
+                - api_info.json.version is defined
+                - (api_info.json.features.profile | default('')) == (profile | default('standard'))
+            fail_msg: >-
+                /api/info answers, but looks wrong: version {{ api_info.json.version | default('?') }},
+                api_version {{ api_info.json.api_version | default('?') }},
+                profile {{ api_info.json.features.profile | default('?') }} (expected {{ profile | default('standard') }})
+            success_msg: >-
+                ReMoment {{ api_info.json.version }} is up (api_version {{ api_info.json.api_version }},
+                profile {{ api_info.json.features.profile }})
