@@ -142,11 +142,13 @@ The API is open by default; only what could be overwritten or broken by accident
 |---|---|---|
 | `GET /api/devices`, play/pause/volume, library browse, scenes, podcasts list | 200 | 200 |
 | `PUT /api/devices/{id}/info` (rename) | 200 (open, decided 2026-10-26) | 200 |
+| `PUT /api/devices/{id}/sources/{source_id}` (hide, reorder), `POST .../sources/activate`, sound adjustment, Bluetooth | 200 (open, 2026-11-22) | 200 |
+| `POST/PUT/DELETE /api/admin/devices*` (add, edit address, delete), `PUT /api/admin/devices/{id}/volume-limits` | 401 | 200 |
 | `GET /api/devices/{id}/network`, `PUT .../network/*` | **401** | 200 |
 | `/api/admin/*` (tokens, clients, health, queues, storage, library settings, rips, sync, backup copy path, HA package) | 401 | 200 |
 | `POST /api/nodes/*` | 401 without the node's own Bearer token; an admin token must not work here either | node token: 200 |
 
-Note any ESP client or the iOS app that breaks on a 401 here: that is the cost of the network-settings gate.
+The rule is in [../api/admin-auth.md](../api/admin-auth.md): public unless it can break the connection. No known client changes the network settings; note any that breaks on a 401 here.
 
 ## 4. What each result decides
 

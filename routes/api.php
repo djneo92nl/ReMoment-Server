@@ -101,6 +101,8 @@ Route::post('/devices/{device}/media/play', [MediaController::class, 'play']);
 
 Route::get('/devices/{device}/sources', [DeviceController::class, 'sources']);
 Route::post('/devices/{device}/sources/activate', [DeviceController::class, 'activateSource']);
+// Show/hide and reorder a source: a display preference, open like the web page (decided 2026-11-22); the admin path below is kept as an alias
+Route::put('/devices/{device}/sources/{sourceId}', [DeviceController::class, 'updateSource'])->where('sourceId', '[^/]+');
 
 Route::get('/devices/{device}/controls', [SourceControlsController::class, 'index']);
 Route::post('/devices/{device}/controls/{control}', [SourceControlsController::class, 'run']);

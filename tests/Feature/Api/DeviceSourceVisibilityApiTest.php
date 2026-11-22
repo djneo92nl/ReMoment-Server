@@ -41,6 +41,15 @@ class DeviceSourceVisibilityApiTest extends TestCase
         $this->putJson("/api/admin/devices/{$device->id}/sources/MUSIC", ['hidden' => true])->assertUnauthorized();
     }
 
+    public function test_the_open_route_needs_no_token(): void
+    {
+        $device = $this->deviceWithSource();
+
+        $this->putJson("/api/devices/{$device->id}/sources/MUSIC", ['hidden' => true, 'sort_order' => 2])
+            ->assertOk()
+            ->assertExactJson(['source_id' => 'MUSIC', 'hidden' => true, 'sort_order' => 2]);
+    }
+
     public function test_hides_and_reorders_a_source(): void
     {
         $device = $this->deviceWithSource();
