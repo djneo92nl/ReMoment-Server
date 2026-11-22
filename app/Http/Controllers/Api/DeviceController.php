@@ -12,7 +12,10 @@ use App\Domain\Device\RepeatMode;
 use App\Domain\Device\SourceSync;
 use App\Domain\Device\SpotifyRouting;
 use App\Domain\Device\VolumeLimits;
+use App\Domain\Library\ArtistTour;
+use App\Domain\Library\DailyMix;
 use App\Domain\Library\IdAliases;
+use App\Domain\Library\Journey;
 use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibraryPlayback;
 use App\Domain\Library\LibrarySources;
@@ -557,6 +560,115 @@ class DeviceController extends Controller
         return $this->playFromLibrary(
             fn () => $library->playTracks($device, $tracks, $seed),
             ['seed' => $seed->id, 'queued' => $tracks->count()],
+        );
+    }
+
+    /** Plays a journey from one track to another through the sound space (`Journey`), once. */
+    public function libraryPlayJourney(Request $request, Device $device, LibraryPlayback $library): JsonResponse
+    {
+        app(IdAliases::class)->resolveInput($request, ['from_track_id' => 'track', 'to_track_id' => 'track']);
+        $data = $request->validate([
+            'from_track_id' => ['required', 'integer', 'exists:tracks,id'],
+            'to_track_id' => ['required', 'integer', 'exists:tracks,id', 'different:from_track_id'],
+            'length' => ['nullable', 'integer', 'between:'.Journey::MIN_LENGTH.','.Journey::MAX_LENGTH],
+            'client' => ['nullable', 'string', 'max:100'],
+            'scope' => ['nullable', 'in:'.implode(',', LeadingSource::apiScopes())],
+        ]);
+
+        if ($error = $this->assertReachable($device)) {
+            return $error;
+        }
+
+        if (!LibraryPlayback::availableFor($device)) {
+            return $this->unsupported('library_playback');
+        }
+
+        $client = $request->filled('client') ? Client::byApiToken((string) $request->input('client')) : null;
+        $from = Track::findOrFail($data['from_track_id']);
+        $to = Track::findOrFail($data['to_track_id']);
+        $journey = new Journey($from, $to, LibrarySources::hiddenForRequest($client, $request->input('scope')), $device);
+
+        if ($end = $journey->missing()) {
+            return response()->json(['error' => 'not_analysed', 'message' => "The {$end} track has no sound embedding yet.", 'track' => $end], 422);
+        }
+
+        foreach ([$from, $to] as $end) {
+            if (!LibraryPlayback::trackPlayable($end, $device)) {
+                return response()->json(['error' => 'not_playable', 'message' => "{$end->name} can not be played on {$device->device_name}."], 422);
+            }
+        }
+
+        $steps = $journey->steps(isset($data['length']) ? (int) $data['length'] : null);
+        if ($steps === []) {
+            return response()->json(['error' => 'not_playable', 'message' => 'Not enough analysed tracks this device can play to build this journey.'], 422);
+        }
+
+        $tracks = Journey::tracks($steps);
+
+        return $this->playFromLibrary(
+            fn () => $library->playTracks($device, $tracks, $from),
+            ['from' => $from->id, 'to' => $to->id, 'queued' => $tracks->count()],
+        );
+    }
+
+    /** Plays a tour through one artist's tracks (`ArtistTour`), once. */
+    public function libraryPlayArtistTour(Request $request, Device $device, LibraryPlayback $library): JsonResponse
+    {
+        app(IdAliases::class)->resolveInput($request, ['artist_id' => 'artist']);
+        $data = $request->validate([
+            'artist_id' => ['required', 'integer', 'exists:artists,id'],
+            'length' => ['nullable', 'integer', 'between:4,60'],
+            'client' => ['nullable', 'string', 'max:100'],
+            'scope' => ['nullable', 'in:'.implode(',', LeadingSource::apiScopes())],
+        ]);
+
+        if ($error = $this->assertReachable($device)) {
+            return $error;
+        }
+
+        if (!LibraryPlayback::availableFor($device)) {
+            return $this->unsupported('library_playback');
+        }
+
+        $client = $request->filled('client') ? Client::byApiToken((string) $request->input('client')) : null;
+        $picks = ArtistTour::picks(Artist::findOrFail($data['artist_id']), LibrarySources::hiddenForRequest($client, $request->input('scope')), $device, isset($data['length']) ? (int) $data['length'] : null);
+        if ($picks === []) {
+            return response()->json(['error' => 'not_playable', 'message' => 'This artist has too few tracks this device can play for a tour.'], 422);
+        }
+
+        $tracks = ArtistTour::tracks($picks);
+
+        return $this->playFromLibrary(
+            fn () => $library->playTracks($device, $tracks),
+            ['artist' => (int) $data['artist_id'], 'queued' => $tracks->count()],
+        );
+    }
+
+    /** Plays today's daily mix (`DailyMix`): songs you loved, deep cuts and albums you never played, in turns. */
+    public function libraryPlayDailyMix(Request $request, Device $device, LibraryPlayback $library): JsonResponse
+    {
+        $request->validate([
+            'client' => ['nullable', 'string', 'max:100'],
+            'scope' => ['nullable', 'in:'.implode(',', LeadingSource::apiScopes())],
+        ]);
+
+        if ($error = $this->assertReachable($device)) {
+            return $error;
+        }
+
+        if (!LibraryPlayback::availableFor($device)) {
+            return $this->unsupported('library_playback');
+        }
+
+        $client = $request->filled('client') ? Client::byApiToken((string) $request->input('client')) : null;
+        $tracks = DailyMix::tracks(DailyMix::picks(LibrarySources::hiddenForRequest($client, $request->input('scope')), null, $device));
+        if ($tracks->isEmpty()) {
+            return response()->json(['error' => 'not_playable', 'message' => 'There is no daily mix this device can play (nothing forgotten or unplayed yet).'], 422);
+        }
+
+        return $this->playFromLibrary(
+            fn () => $library->playTracks($device, $tracks),
+            ['queued' => $tracks->count()],
         );
     }
 

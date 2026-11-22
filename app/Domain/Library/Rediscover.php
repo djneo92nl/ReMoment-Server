@@ -37,6 +37,13 @@ final class Rediscover
 
     public const NOT_PLAYED_IN_A_YEAR = 'not_played_in_a_year';
 
+    // The shelves that need no play history: what you own and never heard, and what came out on this day.
+    public const BURIED_TREASURE = 'buried_treasure';
+
+    public const DEEP_CUTS = 'deep_cuts';
+
+    public const RELEASED_ON_THIS_DAY = 'released_on_this_day';
+
     /**
      * Section key => title, description and the kind of item. The order is the order of the shelves.
      *
@@ -51,6 +58,9 @@ final class Rediscover
             self::FORGOTTEN_ARTISTS => ['title' => 'Artists you left behind', 'kind' => 'artist', 'description' => 'Artists you loved and have not played for a while.'],
             self::FORGOTTEN_TRACKS => ['title' => 'Songs you loved', 'kind' => 'track', 'description' => 'Favorite or often played songs that have not been on for a while.'],
             self::NOT_PLAYED_IN_A_YEAR => ['title' => 'Not played in a year', 'kind' => 'album', 'description' => 'Albums you tried once and have not touched for a year.'],
+            self::BURIED_TREASURE => ['title' => 'Buried treasure', 'kind' => 'album', 'description' => 'Albums in your library that you have never played.'],
+            self::DEEP_CUTS => ['title' => 'Deep cuts', 'kind' => 'track', 'description' => 'Songs you never played, on albums you love.'],
+            self::RELEASED_ON_THIS_DAY => ['title' => 'Released on this day', 'kind' => 'album', 'description' => 'Albums that came out around this date in an earlier year.'],
         ];
     }
 
@@ -79,6 +89,9 @@ final class Rediscover
             self::FORGOTTEN_ARTISTS => self::forgottenArtists($hidden, $limit, $now),
             self::FORGOTTEN_TRACKS => self::forgottenTracks($hidden, $limit, $now),
             self::NOT_PLAYED_IN_A_YEAR => self::notPlayedInAYear($hidden, $limit, $now),
+            self::BURIED_TREASURE => self::buriedTreasure($hidden, $limit, $now),
+            self::DEEP_CUTS => self::deepCuts($hidden, $limit, $now),
+            self::RELEASED_ON_THIS_DAY => self::releasedOnThisDay($hidden, $limit, $now),
             default => [],
         });
     }
@@ -183,6 +196,82 @@ final class Rediscover
             ->limit($limit), 'tracks.favorited_at');
     }
 
+    /**
+     * Albums owned for at least `buried_days` and never played (a left join: no play at all). Needs no history, so a new or imported
+     * library has it. `ref_at` is when the album was added, which the reason shows. The pick is shuffled by the date.
+     */
+    private static function buriedTreasure(array $hidden, int $limit, CarbonImmutable $now): array
+    {
+        return self::dailyShuffle(self::rows(self::albums($hidden)
+            ->whereNull('pa.play_days')
+            ->where('albums.created_at', '<', self::cutoff($now, 'buried_days'))
+            ->addSelect('albums.created_at as ref_at')
+            ->orderBy('albums.id')
+            ->limit((int) config('discover.pool'))), $limit, $now, self::BURIED_TREASURE);
+    }
+
+    /** Tracks never played on albums that are favorites or were played on `album_min_days` days: the songs you skipped past. */
+    private static function deepCuts(array $hidden, int $limit, CarbonImmutable $now): array
+    {
+        $trackPlays = Play::query()->whereNotNull('plays.track_id')->groupBy('plays.track_id')->selectRaw('plays.track_id');
+        $albumPlays = Play::query()
+            ->join('tracks as t', 't.id', '=', 'plays.track_id')
+            ->whereNotNull('t.album_id')
+            ->groupBy('t.album_id')
+            ->selectRaw('t.album_id, COUNT(DISTINCT DATE(plays.played_at)) AS play_days');
+
+        return self::dailyShuffle(self::rows(LibrarySources::tracks(Track::query(), $hidden)
+            ->join('albums', 'albums.id', '=', 'tracks.album_id')
+            ->leftJoinSub($trackPlays, 'pt', 'pt.track_id', '=', 'tracks.id')
+            ->leftJoinSub($albumPlays, 'pa', 'pa.album_id', '=', 'albums.id')
+            ->whereNull('pt.track_id')
+            ->where(fn (Builder $q) => $q->whereNotNull('albums.favorited_at')->orWhere('pa.play_days', '>=', (int) config('discover.album_min_days')))
+            ->select('tracks.id')
+            ->orderBy('tracks.id')
+            ->limit((int) config('discover.pool'))), $limit, $now, self::DEEP_CUTS);
+    }
+
+    /**
+     * Albums released within `released_window` days of today's date in an earlier year (up to `released_years` back), the most
+     * recent first. One range per year. A tag often gives only the year or the month, which `ReleaseDate` stores as the 1st, so a
+     * release on a 1st is left out: it would turn up on every 1st of a month for a day nobody knows.
+     */
+    private static function releasedOnThisDay(array $hidden, int $limit, CarbonImmutable $now): array
+    {
+        $window = max(0, (int) config('discover.released_window'));
+        $ranges = [];
+        for ($ago = 1; $ago <= max(1, (int) config('discover.released_years')); $ago++) {
+            $day = $now->subYearsNoOverflow($ago);
+            $ranges[] = [$day->subDays($window)->startOfDay()->toDateTimeString(), $day->addDays($window)->endOfDay()->toDateTimeString()];
+        }
+
+        $rows = self::rows(LibrarySources::albums(Album::query()->whereHas('tracks'), $hidden)
+            ->where(function (Builder $q) use ($ranges) {
+                foreach ($ranges as $range) {
+                    $q->orWhereBetween('albums.released_at', $range);
+                }
+            })
+            ->select('albums.id', 'albums.released_at as ref_at')
+            ->orderByDesc('albums.released_at')->orderBy('albums.id')
+            ->limit($limit * 3));
+
+        return array_slice(array_values(array_filter($rows, fn (array $row) => substr((string) $row['ref_at'], 8, 2) !== '01')), 0, $limit);
+    }
+
+    /**
+     * The same rows in an order that is fixed for a day and different tomorrow (a seeded shuffle of the date and the shelf), cut to
+     * `$limit`. A shelf of things you never heard would otherwise show the same oldest albums until you play them.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<array<string, mixed>>
+     */
+    public static function dailyShuffle(array $rows, int $limit, CarbonInterface $now, string $salt): array
+    {
+        $randomizer = new \Random\Randomizer(new \Random\Engine\Mt19937(crc32($now->toDateString().$salt)));
+
+        return array_slice($randomizer->shuffleArray($rows), 0, $limit);
+    }
+
     /** Albums of the scope with their play days and last play (a left join: never played is null). */
     private static function albums(array $hidden): Builder
     {
@@ -210,7 +299,7 @@ final class Rediscover
 
     /**
      * @param  string|null  $favoriteColumn  the column that says it is a favorite; without one the row is not
-     * @return list<array{id: int, favorite: bool, play_days: int, plays: int, last_played_at: ?string}>
+     * @return list<array{id: int, favorite: bool, play_days: int, plays: int, last_played_at: ?string, ref_at: ?string}>
      */
     private static function rows(Builder $query, ?string $favoriteColumn = null): array
     {
@@ -225,6 +314,8 @@ final class Rediscover
             // Only a track row carries a play count of its own; an album or artist counts days.
             'plays' => (int) ($row->getAttributes()['play_count'] ?? 0),
             'last_played_at' => $row->last_played_at,
+            // A date a shelf has instead of a play: when the album was added, or its release date.
+            'ref_at' => $row->getAttributes()['ref_at'] ?? null,
         ])->all();
     }
 }

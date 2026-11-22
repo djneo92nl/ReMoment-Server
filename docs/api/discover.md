@@ -44,9 +44,14 @@ A section with no items is **left out**, so a small or new library answers a sho
 | `not_played_in_a_year` | `album` | Albums tried a few times (fewer than `album_min_days` days) and not played for `long_ago_days` (365). | `play_days`, `last_played_at` |
 | `mixes_well` | `track` | **Full.** Tracks that mix well with the analysed own-file track played last within 30 days: the existing [mixes-with](library.md) rules (tempo, also half and double time, and Camelot key), closest first. Left out without such a play. Carries `seed` `{ id, name, artist_name, bpm, camelot }`. | `bpm`, `camelot`, `key_relation`, `tempo_relation`, `tempo_diff_percent` |
 | `listening_modes` | `mode` | **Full.** The listening modes with enough analysed tracks, as in `GET /api/library/listening-modes`. Play one with `POST /api/devices/{id}/library/play-listening-mode`. | `key`, `name`, `description`, `icon`, `track_count` |
+| `daily_mix` | `track` | **Your daily mix** (the shelf comes first after `new_releases`): songs you loved and have not played for a while, deep cuts and one track of buried-treasure albums, taken in turns (`discover.daily_mix` counts, at least `min_tracks`, else left out). The same mix all day, a new one tomorrow. Play it with `POST /api/devices/{id}/library/play-daily-mix`. | `reason` says which kind |
+| `buried_treasure` | `album` | Albums added at least `buried_days` (60) ago and never played. Needs no play history, so a new or imported library has it. A date-seeded shuffle of up to `pool` (500) candidates: the same all day, new tomorrow. | `reason` "In your library for 6 months, never played" |
+| `deep_cuts` | `track` | Tracks never played on albums that are favorites or were played on `album_min_days` days. Same daily shuffle. | `reason` "Never played, from {album}" |
+| `released_on_this_day` | `album` | Albums released within `released_window` (2) days of today's date in an earlier year (up to `released_years` back), the most recent first. A release dated the 1st of a month is left out (a tag with only a year or month is stored as the 1st). | `reason` "Released 20 years ago, on 21 Nov 2006" |
+| `similar_tracks` | `track` | **Full, with sound embeddings.** Tracks that sound like the track with an embedding played last within `mix_seed_days` (`SimilarTracks`). Left out without such a play. Carries `seed` `{ id, name, artist_name }`. | `similarity`, `distance`; reason "Sounds like {track} by {artist}" |
 | `random_albums` | `album` | Albums of the scope at random. | – |
 
-The sections come in this order: `new_releases`, the rediscover shelves, `mixes_well`, `listening_modes`, `random_albums`. A later workstream (similar tracks) adds its own section in the same shape.
+The sections come in this order: `new_releases`, `daily_mix`, the rediscover shelves (`forgotten_favorites`, `used_to_play`, `on_this_day`, `forgotten_artists`, `forgotten_tracks`, `not_played_in_a_year`, `buried_treasure`, `deep_cuts`, `released_on_this_day`), `mixes_well`, `similar_tracks`, `listening_modes`, `random_albums`.
 
 ## How "loved" and "forgotten" are decided
 
@@ -67,3 +72,7 @@ Each rediscover shelf is one aggregate query over `plays`; its selection (ids an
 - `422` for an unknown section key, a `limit` outside 1 to 60 or an unknown `scope`.
 
 MCP: `browse_library` with `kind: "discover"` (parameters `sections`, `limit`, `seed`, `scope`); it goes through this endpoint (`docs/api/mcp.md`).
+
+## Play the daily mix: `POST /api/devices/{id}/library/play-daily-mix`
+
+Body (all optional): `client`, `scope`. Plays today's mix once, only what the device can play: `200 {status: "ok", queued: n}`. `422 not_playable` when nothing is left to bring back, `422 unsupported` without library playback. MCP: `play_from_library` with `type: "daily_mix"`. Standard and Full (it reads plays and favorites only).

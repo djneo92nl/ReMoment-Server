@@ -61,6 +61,9 @@
             <section id="{{ $id }}" data-test="{{ $section['key'] }}">
                 <h2 class="text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">{{ $section['title'] }}</h2>
                 <p class="mb-3 mt-0.5 text-sm text-gray-500">{{ $section['description'] }}</p>
+                @if($section['key'] === \App\Domain\Library\DailyMix::KEY)
+                    <div class="mb-3"><x-secondary-button size="sm" wire:click="playDailyMix" data-test="play-daily-mix"><i class="fa-solid fa-play text-xs text-gray-400 dark:text-gray-500"></i>Play today's mix</x-secondary-button></div>
+                @endif
                 <div class="grid gap-x-4 gap-y-1 sm:grid-cols-2 xl:grid-cols-3" data-test="track-rows">
                     @foreach($section['items'] as $item)
                         <div class="group flex items-center gap-3 rounded-2xl px-2 py-2 hover:bg-gray-100 dark:hover:bg-stone-900" data-test="track-{{ $item['id'] }}">

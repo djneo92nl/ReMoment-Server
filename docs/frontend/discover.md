@@ -24,9 +24,11 @@ In order: *New from your artists* (catalogue cards, linking to the artist page w
 
 Shelves use `<x-shelf subtitle>` and `<x-media-card note>`, two optional props added for this page ([components.md](components.md)). No new element otherwise (DESIGN.md §7).
 
-## Slot for similar tracks
+## Shelves without play history, the daily mix and similar tracks
 
-`Discover::sections()` has a marked `SLOT similar_tracks` where the similar-tracks workstream adds its section once `features.similar_tracks` exists: one more entry of the same shape (`key`, `title`, `description`, `kind: "track"`, `items` with `reason`). The API lists it and this page draws it as soon as it is in the list; nothing else changes. Add its title to `Discover::titles()`.
+- **Buried treasure, Deep cuts, Released on this day** are `Rediscover` shelves like the others, but they need no history, so a new or imported library is not empty. Picks are a seeded shuffle of the date (`Rediscover::dailyShuffle`): the same all day, new tomorrow. Details and thresholds: [the API doc](../api/discover.md), `config/discover.php`.
+- **Your daily mix** (`Domain\Library\DailyMix`) is the first track shelf. It alternates songs you loved, deep cuts and one track of buried-treasure albums; the shelf has a *Play today's mix* button (`DiscoverHub::playDailyMix`, on the pinned player) and the API `POST /api/devices/{id}/library/play-daily-mix`.
+- **Because you played X** (`similar_tracks`, Full with embeddings) is `SimilarTracks::items()` for the track with an embedding played last; the slot that was marked in `Discover::sections()` is filled.
 
 ## Tests
 

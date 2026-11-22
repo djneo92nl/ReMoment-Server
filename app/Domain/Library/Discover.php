@@ -5,6 +5,7 @@ namespace App\Domain\Library;
 use App\Domain\Artwork\LibraryItemArtwork;
 use App\Domain\Catalogue\CatalogueItems;
 use App\Domain\Profile\Profile;
+use App\Domain\Similar\Embeddings;
 use App\Models\Media\Album;
 use App\Models\Media\Artist;
 use App\Models\Media\Track;
@@ -36,6 +37,8 @@ final class Discover
 
     public const MIXES_WELL = 'mixes_well';
 
+    public const SIMILAR_TRACKS = 'similar_tracks';
+
     public const LISTENING_MODES = 'listening_modes';
 
     public const RANDOM_ALBUMS = 'random_albums';
@@ -47,7 +50,7 @@ final class Discover
      */
     public static function keys(): array
     {
-        return [self::NEW_RELEASES, ...Rediscover::keys(), self::MIXES_WELL, self::LISTENING_MODES, self::RANDOM_ALBUMS];
+        return [self::NEW_RELEASES, DailyMix::KEY, ...Rediscover::keys(), self::MIXES_WELL, self::SIMILAR_TRACKS, self::LISTENING_MODES, self::RANDOM_ALBUMS];
     }
 
     /**
@@ -70,6 +73,10 @@ final class Discover
             $sections[] = self::newReleases($limit, $now);
         }
 
+        if ($wanted(DailyMix::KEY)) {
+            $sections[] = self::dailyMix($hidden, $now);
+        }
+
         foreach (Rediscover::sections() as $key => $section) {
             if ($wanted($key)) {
                 $sections[] = self::rediscover($key, $section, $hidden, $limit, $now);
@@ -80,9 +87,9 @@ final class Discover
             $sections[] = self::mixesWell($hidden, $limit, $now);
         }
 
-        // SLOT similar_tracks: the similar-tracks workstream adds its section here once `features.similar_tracks` exists, as one more
-        // `$sections[] = ...` of the same plain shape (a `track` section needs nothing else: the API lists it and the hub page renders
-        // any section by its kind).
+        if ($wanted(self::SIMILAR_TRACKS) && Profile::allows('analysis') && Embeddings::any()) {
+            $sections[] = self::similarTracks($hidden, $limit, $now);
+        }
 
         if ($wanted(self::LISTENING_MODES) && Profile::allows('analysis')) {
             $sections[] = self::listeningModes();
@@ -100,8 +107,10 @@ final class Discover
     {
         return [
             self::NEW_RELEASES => 'New from your artists',
+            DailyMix::KEY => 'Your daily mix',
             ...array_map(fn (array $s) => $s['title'], Rediscover::sections()),
             self::MIXES_WELL => 'Mixes well with what you just played',
+            self::SIMILAR_TRACKS => 'Because you played something',
             self::LISTENING_MODES => 'Listening modes',
             self::RANDOM_ALBUMS => 'Picked for you',
         ];
@@ -121,7 +130,7 @@ final class Discover
 
         $items = match ($section['kind']) {
             'artist' => self::artistItems($rows, $hidden, $now, $key),
-            'track' => self::trackItems($rows, $now),
+            'track' => self::trackItems($rows, $now, $key),
             default => self::albumItems($rows, $now, $key),
         };
 
@@ -164,7 +173,7 @@ final class Discover
     }
 
     /** @param  list<array{id: int, favorite: bool, play_days: int, plays: int, last_played_at: ?string}>  $rows */
-    private static function trackItems(array $rows, CarbonImmutable $now): array
+    private static function trackItems(array $rows, CarbonImmutable $now, string $key): array
     {
         $tracks = Track::query()->with(['artist', 'album'])->whereIn('id', array_column($rows, 'id'))->get()->keyBy('id');
         LibraryItemArtwork::preload(LibraryItemArtwork::urlsOfAlbums($tracks->map->album->filter()));
@@ -173,7 +182,7 @@ final class Discover
         foreach ($rows as $row) {
             if ($track = $tracks->get($row['id'])) {
                 $items[] = ApiItems::track($track) + ['favorite' => $row['favorite'], 'plays' => $row['plays'], 'last_played_at' => self::iso($row['last_played_at'])]
-                    + ['reason' => self::reason(Rediscover::FORGOTTEN_TRACKS, $row, $now)];
+                    + ['reason' => $key === Rediscover::DEEP_CUTS ? self::deepCutReason($track) : self::reason($key, $row, $now)];
             }
         }
 
@@ -195,6 +204,17 @@ final class Discover
         $last = $row['last_played_at'] === null ? null : CarbonImmutable::parse($row['last_played_at']);
         $ago = $last?->diffForHumans($now, CarbonInterface::DIFF_RELATIVE_TO_NOW);
 
+        if ($key === Rediscover::BURIED_TREASURE) {
+            return 'In your library for '.CarbonImmutable::parse($row['ref_at'])->diffForHumans($now, CarbonInterface::DIFF_ABSOLUTE).', never played';
+        }
+
+        if ($key === Rediscover::RELEASED_ON_THIS_DAY) {
+            $date = CarbonImmutable::parse($row['ref_at']);
+            $years = max(1, $now->year - $date->year);
+
+            return 'Released '.$years.' '.($years === 1 ? 'year' : 'years').' ago, on '.$date->format('j M Y');
+        }
+
         if ($key === Rediscover::ON_THIS_DAY) {
             return 'Played on '.$last->format('j M Y').' ('.$ago.')';
         }
@@ -213,6 +233,11 @@ final class Discover
         $parts[] = $last === null ? 'not played yet' : 'last played '.$ago;
 
         return ucfirst(implode(', ', $parts));
+    }
+
+    private static function deepCutReason(Track $track): string
+    {
+        return 'Never played'.($track->album ? ', from '.$track->album->name : '');
     }
 
     private static function iso(?string $at): ?string
@@ -299,6 +324,45 @@ final class Discover
 
         return self::section(self::MIXES_WELL, 'Tracks with a similar tempo and a compatible key.', 'track', $items, 'Mixes well with '.$seed->name)
             + ['seed' => ['id' => $seed->id, 'name' => $seed->name, 'artist_name' => $seed->artist?->name, 'bpm' => $source['bpm'], 'camelot' => $source['camelot']]];
+    }
+
+    /** The daily mix as a track shelf; each item says why it is in it (`DailyMix`). Null when the library has nothing to bring back. */
+    private static function dailyMix(array $hidden, CarbonImmutable $now): ?array
+    {
+        $picks = DailyMix::picks($hidden, $now);
+        if ($picks === []) {
+            return null;
+        }
+
+        $tracks = Track::query()->with(['artist', 'album'])->whereIn('id', array_column($picks, 'track_id'))->get()->keyBy('id');
+        LibraryItemArtwork::preload(LibraryItemArtwork::urlsOfAlbums($tracks->map->album->filter()));
+
+        $items = [];
+        foreach ($picks as $pick) {
+            if ($track = $tracks->get($pick['track_id'])) {
+                $items[] = ApiItems::track($track) + ['reason' => $pick['reason']];
+            }
+        }
+
+        return self::section(DailyMix::KEY, 'Songs you loved, deep cuts and albums you never played, the same all day and new tomorrow.', 'track', $items);
+    }
+
+    /** Tracks that sound like the one you played last (the sound embedding, `SimilarTracks`). Null without such a play. */
+    private static function similarTracks(array $hidden, int $limit, CarbonImmutable $now): ?array
+    {
+        $id = Play::query()
+            ->join('track_files', fn ($join) => $join->on('track_files.track_id', '=', 'plays.track_id')->where('track_files.is_primary', true))
+            ->join('file_embeddings', 'file_embeddings.file_id', '=', 'track_files.file_id')
+            ->where('plays.played_at', '>=', $now->subDays(max(1, (int) config('discover.mix_seed_days')))->toDateTimeString())
+            ->orderByDesc('plays.played_at')->orderByDesc('plays.id')
+            ->value('plays.track_id');
+        $seed = $id === null ? null : Track::query()->with('artist')->find($id);
+        if ($seed === null) {
+            return null;
+        }
+
+        return self::section(self::SIMILAR_TRACKS, 'Songs that sound like the one you played last.', 'track', (new SimilarTracks($seed, $hidden))->items($limit), 'Because you played '.$seed->name)
+            + ['seed' => ['id' => $seed->id, 'name' => $seed->name, 'artist_name' => $seed->artist?->name]];
     }
 
     /** The analysed own-file track played last within `mix_seed_days`, or null. */

@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Domain\Library\DailyMix;
 use App\Domain\Library\Discover;
 use App\Domain\Library\LeadingSource;
 use App\Domain\Library\LibraryPlayback;
@@ -53,6 +54,32 @@ class DiscoverHub extends Component
 
         try {
             app(LibraryPlayback::class)->playTrack($device, $track);
+        } catch (\Throwable $e) {
+            $this->notice = $e->getMessage();
+        }
+    }
+
+    /** Plays today's daily mix on the player pinned in this browser (what the player can play, in turns). */
+    public function playDailyMix(): void
+    {
+        $this->notice = null;
+        $device = app(SelectedDevice::class)->device();
+
+        if ($device === null) {
+            $this->notice = 'Pick a player in the bar below first.';
+
+            return;
+        }
+
+        $tracks = DailyMix::tracks(DailyMix::picks(LeadingSource::hidden($this->scope), null, $device));
+        if ($tracks->isEmpty()) {
+            $this->notice = 'Nothing in today\'s mix can be played on this player.';
+
+            return;
+        }
+
+        try {
+            app(LibraryPlayback::class)->playTracks($device, $tracks);
         } catch (\Throwable $e) {
             $this->notice = $e->getMessage();
         }

@@ -42,4 +42,29 @@ return [
     /* "Mixes well with ..." starts from the most recent play of an analysed track within this many days. */
     'mix_seed_days' => 30,
 
+    /*
+    | Shelves that need no play history (so a new or imported library is not empty): "buried treasure" are albums in the library for
+    | at least `buried_days` and never played; every such shelf picks from at most `pool` candidates, shuffled by the date (the same
+    | picks all day, new ones tomorrow).
+    */
+    'buried_days' => 60,
+
+    'pool' => 500,
+
+    /* "Released on this day": albums whose release date is within this many days of today's date in an earlier year, up to this many years back. */
+    'released_window' => 2,
+
+    'released_years' => 70,
+
+    /* The daily mix: how many tracks of each kind, and the least it needs to be shown. */
+    'daily_mix' => [
+        'forgotten_tracks' => 8,
+        'deep_cuts' => 6,
+        'buried_treasure' => 6,
+        'min_tracks' => 5,
+    ],
+
+    /* An artist tour (docs/api/artist-tour.md): how many tracks it has at most. */
+    'tour_length' => 15,
+
 ];
