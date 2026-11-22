@@ -136,6 +136,12 @@ final class SmartFields
                     fn ($s) => self::metadata($s, Track::class, 'tracks.id', ['explicit'])->where('metadata.value', '1')
                 ))),
 
+            new SmartField('lyrics_language', 'Lyrics language', SmartField::SELECT, self::IS,
+                fn (Builder $q, string $op, $v) => self::negatable($q, $op === 'is_not', fn ($w) => $w->whereExists(
+                    fn ($s) => self::metadata($s, Track::class, 'tracks.id', ['lyrics_language'])->where('metadata.value', (string) $v)
+                )),
+                fn () => collect(self::metadataValues('lyrics_language'))->mapWithKeys(fn ($code) => [$code => \App\Domain\Lyrics\LyricsLanguage::NAMES[$code] ?? strtoupper($code)])->all()),
+
             new SmartField('lossless', 'Lossless file', SmartField::BOOL, self::YES_NO,
                 fn (Builder $q, string $op) => self::negatable($q, $op === 'no', fn ($w) => $w->whereExists(
                     fn ($s) => self::metadata($s, Track::class, 'tracks.id', ['mime_type'])->whereIn('metadata.value', self::LOSSLESS)

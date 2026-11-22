@@ -22,5 +22,13 @@ return [
     'ha_discovery_enabled' => (bool) env('HA_DISCOVERY_ENABLED', false),
     'ha_discovery_prefix' => env('HA_DISCOVERY_PREFIX', 'homeassistant'),
 
+    // The opt-in command path (a button per scene, `remoment/ha/command/#`): the Setting ha_commands_enabled wins over
+    // this default (`php artisan ha:commands on|off`). Needs discovery on as well.
+    'ha_commands_enabled' => (bool) env('HA_COMMANDS_ENABLED', false),
+    // Abuse protection: commands accepted per minute across all topics; the same command inside `ha_command_debounce`
+    // seconds is dropped (a doubled message, an automation that fires twice).
+    'ha_command_rate' => (int) env('HA_COMMAND_RATE', 30),
+    'ha_command_debounce' => (int) env('HA_COMMAND_DEBOUNCE', 2),
+
     'public_ws_port' => (int) env('MQTT_PUBLIC_WS_PORT', 9001),
 ];

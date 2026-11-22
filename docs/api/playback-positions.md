@@ -4,7 +4,7 @@ Workstream 8.3. The server keeps a **bookmark** for a long track or a podcast ep
 
 ## What gets a bookmark
 
-A track keeps a bookmark when it is at least `resume.min_minutes` long (config `config/resume.php`, env `RESUME_MIN_MINUTES`, default 20) **or** one of its genres is an audiobook or podcast genre (`resume.genres`: `audiobook`, `podcast`, `spoken word`, `hörbuch`, `luisterboek` …). A podcast episode always has one ([podcasts.md](podcasts.md)). Songs never do. Code: `App\Domain\Resume\PlaybackPositions`.
+A track keeps a bookmark when it is at least `resume.min_minutes` long (config `config/resume.php`, env `RESUME_MIN_MINUTES`, default 20) **or** one of its genres is an audiobook or podcast genre (`resume.genres`: `audiobook`, `podcast`, `spoken word`, `hörbuch`, `luisterboek` …). A podcast episode always has one ([podcasts.md](podcasts.md)): playing it from the server remembers it as what plays on the device, its progress keeps the bookmark, and finishing it marks the episode played. Songs never do. Code: `App\Domain\Resume\PlaybackPositions`.
 
 ## How it is kept
 

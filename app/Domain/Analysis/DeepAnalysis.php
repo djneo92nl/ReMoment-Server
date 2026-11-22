@@ -2,6 +2,7 @@
 
 namespace App\Domain\Analysis;
 
+use App\Domain\Similar\SectionEmbeddings;
 use App\Domain\Tasks\UserTasks;
 use App\Jobs\AnalyzeTrackDeep;
 use App\Models\File;
@@ -14,9 +15,10 @@ use Illuminate\Support\Facades\Http;
 /**
  * Deep analysis of ONE track on request (workstream 16): per-track results that are too slow or too rare to compute
  * for the whole library, so they are admin-triggered, stored, and never part of the nightly run (`stem_audio` keeps the
- * stems as audio files for the apps' mixer, see StemAudio). Each KIND is backed by
- * an `OnDemandStage` that says where its result is stored, which service computes it and on which queue it runs;
- * `mood` gets a row in KINDS when it exists. See docs/api/deep-analysis.md.
+ * stems as audio files for the apps' mixer, see StemAudio; `mood` is the mood curve of 16.3 and `section_sound` the
+ * per-section embeddings of 16.5, both on the Essentia sidecar's ML build). Each KIND is backed by
+ * an `OnDemandStage` that says where its result is stored, which service computes it and on which queue it runs.
+ * See docs/api/deep-analysis.md.
  *
  * States per kind and file: `none`, `queued`, `running` (cache markers set by the endpoint and the job, with a TTL so a
  * dead worker never leaves one behind), `done` (stored, current file, current stage version), `failed` (last run at this
@@ -25,7 +27,7 @@ use Illuminate\Support\Facades\Http;
 final class DeepAnalysis
 {
     /** kind => the on-demand stage that computes it. */
-    public const KINDS = ['sections' => 'structure', 'stems' => 'stems', 'stem_audio' => 'stem_audio'];
+    public const KINDS = ['sections' => 'structure', 'stems' => 'stems', 'stem_audio' => 'stem_audio', 'mood' => 'mood', 'section_sound' => 'section_sound'];
 
     /** How long a `queued` marker lasts: the analysis queue can be busy with the nightly run for hours. */
     private const QUEUED_TTL = 43200;
@@ -89,12 +91,19 @@ final class DeepAnalysis
             return false;
         }
 
-        return Cache::remember(self::healthKey($stage->key(), $url), 60, function () use ($url) {
+        return Cache::remember(self::healthKey($stage->key(), $url), 60, function () use ($url, $stage) {
             try {
                 $response = Http::timeout(3)->get(rtrim($url, '/').'/health');
 
                 // A service that reports its weights (the stems service: opt-in download) is available only once they are ready.
-                return $response->ok() && (bool) $response->json('ok') && ($response->json('weights') ?? StemWeights::READY) === StemWeights::READY;
+                $ready = $response->ok() && (bool) $response->json('ok') && ($response->json('weights') ?? StemWeights::READY) === StemWeights::READY;
+
+                // A kind that needs one of the Essentia sidecar's ML models is offered only when that model is loaded.
+                if ($ready && $stage instanceof NeedsSidecarModel) {
+                    return in_array($stage->sidecarModel(), (array) $response->json('models'), true);
+                }
+
+                return $ready;
             } catch (\Throwable) {
                 return false;
             }
@@ -225,6 +234,16 @@ final class DeepAnalysis
 
         if ($kind === 'stem_audio') {
             StemAudio::delete($file); // the kept files go with their record
+        }
+
+        if ($kind === 'section_sound') {
+            SectionEmbeddings::delete($file); // the vectors go with their manifest
+        }
+
+        // The sound of the sections belongs to these section boundaries: new sections need it computed again.
+        if ($kind === 'sections' && $analysis !== null && ($analysis->stages['section_sound'] ?? null) !== null) {
+            self::forget($file, 'section_sound');
+            $analysis = $file->analysis()->first();
         }
 
         if ($analysis === null || ($analysis->stages[$stage->key()] ?? null) === null && ($analysis->errors[$stage->key()] ?? null) === null) {

@@ -150,17 +150,6 @@ class StorageController extends Controller
         )));
     }
 
-    public function tags(Request $request, File $file): JsonResponse
-    {
-        $data = $request->validate([
-            'title' => ['nullable', 'string'], 'artist' => ['nullable', 'string'], 'album' => ['nullable', 'string'],
-            'album_artist' => ['nullable', 'string'], 'year' => ['nullable', 'string', 'max:10'],
-            'track_number' => ['nullable', 'integer', 'min:0'], 'disc_number' => ['nullable', 'integer', 'min:0'], 'genre' => ['nullable', 'string'],
-        ]);
-
-        return $this->guard(fn () => $this->file($this->files->writeTags($file, array_filter($data, fn ($v) => $v !== null))));
-    }
-
     public function verify(File $file): JsonResponse
     {
         return response()->json(['result' => $this->files->verify($file)]);

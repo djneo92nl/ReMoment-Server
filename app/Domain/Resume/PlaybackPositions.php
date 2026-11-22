@@ -2,6 +2,7 @@
 
 namespace App\Domain\Resume;
 
+use App\Domain\Podcasts\Podcasts;
 use App\Models\Media\Track;
 use App\Models\PlaybackPosition;
 use Illuminate\Support\Collection;
@@ -74,7 +75,7 @@ final class PlaybackPositions
         $position = max(0, $position);
 
         if (self::finished($position, $duration)) {
-            self::clear($kind, $itemId);
+            self::finish($kind, $itemId);
 
             return null;
         }
@@ -92,13 +93,29 @@ final class PlaybackPositions
     /** Sets a position by hand (an app that tracks playback itself), also in the first seconds and for any duration. */
     public static function set(string $kind, int $itemId, int $position, ?int $duration = null): ?PlaybackPosition
     {
-        if ($position <= 0 || self::finished($position, $duration)) {
+        if ($position > 0 && self::finished($position, $duration)) {
+            self::finish($kind, $itemId);
+
+            return null;
+        }
+
+        if ($position <= 0) {
             self::clear($kind, $itemId);
 
             return null;
         }
 
         return PlaybackPosition::updateOrCreate(['kind' => $kind, 'item_id' => $itemId], ['position' => $position, 'duration' => $duration]);
+    }
+
+    /** The item played to its end: the bookmark goes, and a podcast episode counts as played. */
+    public static function finish(string $kind, int $itemId): void
+    {
+        self::clear($kind, $itemId);
+
+        if ($kind === PlaybackPosition::EPISODE) {
+            Podcasts::episodeFinished($itemId);
+        }
     }
 
     public static function clear(string $kind, int $itemId): bool

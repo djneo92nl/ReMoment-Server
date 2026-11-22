@@ -126,6 +126,7 @@ Route::get('/library/wishlist', [LibraryController::class, 'wishlist'])->name('l
 // The Discover hub: rediscover shelves, new releases, listening modes and picks (docs/frontend/discover.md).
 Route::get('/library/discover', fn () => view('library.discover', ['scope' => \App\Domain\Library\LeadingSource::forRequest(request())]))->name('library.discover');
 Route::view('/library/collection', 'library.collection')->name('library.collection');
+Route::view('/library/podcasts', 'library.podcasts')->name('library.podcasts'); // subscriptions and episodes (docs/frontend/podcasts.md)
 // Streaming is a scope of the library page now (your live Spotify above the DLNA shelves); the old page address keeps working.
 Route::redirect('/library/streaming', '/library?scope=streaming')->name('library.streaming');
 
@@ -184,6 +185,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/settings/dlna/{server}/scan', [SettingsController::class, 'dlnaScan'])->name('settings.dlna.scan');
 
     Route::get('/settings/storage', fn () => view('settings.storage'))->name('settings.storage');
+    Route::get('/settings/storage/albums/{album}', fn (\App\Models\Media\Album $album) => view('settings.storage-album', ['album' => $album]))->name('settings.storage.album');
     Route::post('/settings/storage/uploads', [\App\Http\Controllers\LibraryUploadController::class, 'start'])->name('settings.storage.uploads.start');
     Route::post('/settings/storage/uploads/{id}', [\App\Http\Controllers\LibraryUploadController::class, 'receive'])->name('settings.storage.uploads.receive');
 
@@ -194,6 +196,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings/mqtt', [SettingsController::class, 'mqtt'])->name('settings.mqtt');
     Route::post('/settings/mqtt/home-assistant', [SettingsController::class, 'homeAssistantSave'])->name('settings.mqtt.home-assistant');
     Route::post('/settings/mqtt/home-assistant/publish', [SettingsController::class, 'homeAssistantPublish'])->name('settings.mqtt.home-assistant.publish');
+    Route::get('/settings/mqtt/home-assistant/package', [SettingsController::class, 'homeAssistantPackage'])->name('settings.mqtt.home-assistant.package');
 
     Route::get('/settings/services', fn () => view('settings.services'))->name('settings.services');
     Route::get('/settings/spotify', [SettingsController::class, 'spotify'])->name('settings.spotify');

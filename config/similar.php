@@ -31,4 +31,7 @@ return [
 
     /** sqlite-vec returns the nearest rows of the whole library; this many times the wanted count are asked for, so a scope filter still leaves enough. */
     'vec_overfetch' => 4,
+
+    /* A journey from one track to another (docs/api/journey.md): tracks in the queue, the two ends included (4 to 30). */
+    'journey_length' => 12,
 ];

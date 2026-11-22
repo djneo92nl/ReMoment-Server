@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Domain\Library\Enrichment;
 use App\Domain\Library\Normalizer;
+use App\Domain\Library\RelatedWorks;
 use App\Jobs\Concerns\EnrichesFromSource;
 use App\Models\Media\Track;
 use App\Services\MusicBrainz\MusicBrainzClient;
@@ -81,10 +82,11 @@ class EnrichTrackMusicBrainz implements ShouldBeUnique, ShouldQueue
 
         Enrichment::save($track, 'mbid', $recordingMbid, 'string', Enrichment::MUSICBRAINZ);
 
-        $recording = $mb->get("recording/{$recordingMbid}", ['inc' => 'isrcs+artist-rels+work-rels+work-level-rels+artist-credits+releases']) ?? [];
+        $recording = $mb->get("recording/{$recordingMbid}", ['inc' => 'isrcs+artist-rels+recording-rels+work-rels+work-level-rels+artist-credits+releases']) ?? [];
         $best ??= ['artist-credit' => $recording['artist-credit'] ?? [], 'releases' => $recording['releases'] ?? []];
 
         $this->saveRecordingFacts($track, $recording);
+        RelatedWorks::save($track, RelatedWorks::parse($recording));
 
         if ($isrc = $recording['isrcs'][0] ?? null) {
             Enrichment::save($track, 'isrc', $isrc, 'string', Enrichment::MUSICBRAINZ);

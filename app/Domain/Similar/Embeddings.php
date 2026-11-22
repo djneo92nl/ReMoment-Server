@@ -106,6 +106,21 @@ final class Embeddings
         Cache::increment(self::GENERATION_KEY);
     }
 
+    /** The packed vector of a track's primary file, null while it has no current embedding (none, or made from an older file). */
+    public static function ofTrack(int $trackId): ?string
+    {
+        $vector = \Illuminate\Support\Facades\DB::table('track_files')
+            ->join('file_embeddings', 'file_embeddings.file_id', '=', 'track_files.file_id')
+            ->join('file_analyses', 'file_analyses.file_id', '=', 'track_files.file_id')
+            ->where('track_files.track_id', $trackId)
+            ->where('track_files.is_primary', true)
+            ->where('file_embeddings.model', self::MODEL)
+            ->where(fn ($q) => $q->whereNull('file_embeddings.content_hash')->orWhereColumn('file_embeddings.content_hash', 'file_analyses.content_hash'))
+            ->value('file_embeddings.vector');
+
+        return is_resource($vector) ? stream_get_contents($vector) : $vector;
+    }
+
     /** The cosine similarity of two stored (normalised) vectors, -1 to 1. */
     public static function dot(string $a, string $b): float
     {

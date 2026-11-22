@@ -3,10 +3,12 @@
 namespace App\Livewire;
 
 use App\Domain\Library\LibraryPlayback;
+use App\Domain\Podcasts\EpisodePlayback;
 use App\Domain\Resume\PlaybackPositions;
 use App\Domain\Resume\PositionItems;
 use App\Models\Media\Track;
 use App\Models\PlaybackPosition;
+use App\Models\PodcastEpisode;
 use App\Support\SelectedDevice;
 use Livewire\Component;
 
@@ -33,6 +35,8 @@ class ContinueListening extends Component
         try {
             if ($kind === PlaybackPosition::TRACK && ($track = Track::find($id))) {
                 app(LibraryPlayback::class)->playTrack($device, $track);   // resumes at the bookmark by itself
+            } elseif ($kind === PlaybackPosition::EPISODE && ($episode = PodcastEpisode::with('podcast')->find($id))) {
+                EpisodePlayback::play($device, $episode);                  // so does an episode
             }
         } catch (\Throwable $e) {
             $this->notice = $e->getMessage();

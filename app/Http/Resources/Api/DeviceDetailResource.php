@@ -8,6 +8,7 @@ use App\Domain\Device\DeviceRouting;
 use App\Domain\Device\RemoteKey;
 use App\Domain\Device\State;
 use App\Domain\Library\NowPlayingLibrary;
+use App\Domain\Library\NowPlayingMood;
 use App\Domain\Library\NowPlayingSections;
 use App\Domain\Library\NowPlayingStems;
 use App\Domain\Library\NowPlayingWaveform;
@@ -58,12 +59,16 @@ class DeviceDetailResource extends JsonResource
                     $nowPlaying += $stems;
                 }
 
+                if (($mood = NowPlayingMood::for($cachedNowPlaying)) !== null) {
+                    $nowPlaying['mood_curve'] = $mood;
+                }
+
                 $track = $this->resolveTrack($cachedNowPlaying);
                 if ($track) {
                     $plain = $track->lyricsPlain();
                     $synced = $track->lyricsSynced();
                     if ($plain !== null || $synced !== null) {
-                        $nowPlaying['lyrics'] = ['plain' => $plain, 'synced' => $synced];
+                        $nowPlaying['lyrics'] = ['plain' => $plain, 'synced' => $synced, 'language' => \App\Domain\Lyrics\LyricsAnalysis::language($track)];
                     }
                 }
             }

@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Domain\Library\Enrichment;
+use App\Domain\Lyrics\LyricsAnalysis;
 use App\Jobs\Concerns\EnrichesFromSource;
 use App\Models\Media\Track;
 use App\Services\MetadataHttp;
@@ -78,6 +79,7 @@ class EnrichTrackLyrics implements ShouldBeUnique, ShouldQueue
         }
 
         Enrichment::markDone($track, Enrichment::LRCLIB);
+        LyricsAnalysis::apply($track->unsetRelation('metadata'));
     }
 
     private function none(Track $track): void

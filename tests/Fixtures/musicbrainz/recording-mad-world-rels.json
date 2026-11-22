@@ -1,0 +1,139 @@
+{
+ "id": "11ab867b-e1d4-4cd0-bc6b-3b8d78174c87",
+ "title": "Mad World",
+ "length": 184000,
+ "disambiguation": "",
+ "artist-credit": [
+  {
+   "name": "Gary Jules",
+   "joinphrase": "",
+   "artist": {
+    "country": "US",
+    "type": "Person",
+    "id": "3d65bead-6eae-4012-8665-d5f593ea4a62",
+    "sort-name": "Jules, Gary",
+    "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+    "disambiguation": "",
+    "name": "Gary Jules"
+   }
+  }
+ ],
+ "first-release-date": "2004",
+ "relations": [
+  {
+   "attributes": [
+    "cover"
+   ],
+   "target-credit": "",
+   "begin": null,
+   "type": "performance",
+   "ended": false,
+   "attribute-ids": {
+    "cover": "1e8536bd-6eda-3822-8e78-1c0f4d3d2113"
+   },
+   "type-id": "a3005666-a872-32c3-ad06-98af558e99b0",
+   "attribute-values": {},
+   "source-credit": "",
+   "end": null,
+   "work": {
+    "title": "Mad World",
+    "type": "Song",
+    "id": "879ba403-a134-3b8d-85e2-06bc4a22d339",
+    "relations": [
+     {
+      "begin": null,
+      "target-credit": "",
+      "attributes": [],
+      "attribute-ids": {},
+      "ended": false,
+      "type": "arrangement",
+      "attribute-values": {},
+      "source-credit": "",
+      "type-id": "51975ed8-bbfa-486b-9f28-5947f4370299",
+      "direction": "forward",
+      "work": {
+       "disambiguation": "arr. McIntosh",
+       "languages": [],
+       "type-id": null,
+       "attributes": [],
+       "iswcs": [],
+       "language": null,
+       "id": "352fa85f-5868-46a6-98f3-c4c562f996df",
+       "title": "Mad World",
+       "type": null
+      },
+      "target-type": "work",
+      "end": null
+     },
+     {
+      "attributes": [],
+      "begin": null,
+      "target-credit": "",
+      "type": "musical quotation",
+      "attribute-ids": {},
+      "ended": false,
+      "type-id": "c5decae0-535c-4730-aa5f-ab78eadd98ba",
+      "source-credit": "",
+      "attribute-values": {},
+      "end": null,
+      "direction": "backward",
+      "target-type": "work",
+      "work": {
+       "language": null,
+       "id": "6327220b-8ddd-4e04-8fdc-b24004164035",
+       "type": "Song",
+       "title": "Двигай телом",
+       "languages": [],
+       "disambiguation": "",
+       "type-id": "f061270a-2fd6-32f1-a641-f0f8676d14e6",
+       "iswcs": [],
+       "attributes": []
+      }
+     },
+     {
+      "end": null,
+      "direction": "forward",
+      "target-type": "work",
+      "work": {
+       "iswcs": [],
+       "attributes": [],
+       "type-id": "f061270a-2fd6-32f1-a641-f0f8676d14e6",
+       "disambiguation": "",
+       "languages": [],
+       "type": "Song",
+       "title": "Mad Mares",
+       "id": "bdbf0585-9a7c-455e-b065-3684ec888c57",
+       "language": null
+      },
+      "type-id": "7440b539-19ab-4243-8c03-4f5942ca2218",
+      "source-credit": "",
+      "attribute-values": {},
+      "type": "other version",
+      "attribute-ids": {
+       "parody": "d73de9d3-934b-419c-8c83-2e48a5773b14"
+      },
+      "ended": false,
+      "attributes": [
+       "parody"
+      ],
+      "begin": null,
+      "target-credit": ""
+     }
+    ],
+    "language": "eng",
+    "iswcs": [
+     "T-010.478.817-1",
+     "T-930.300.502-9"
+    ],
+    "attributes": [],
+    "type-id": "f061270a-2fd6-32f1-a641-f0f8676d14e6",
+    "disambiguation": "",
+    "languages": [
+     "eng"
+    ]
+   },
+   "target-type": "work",
+   "direction": "forward"
+  }
+ ]
+}

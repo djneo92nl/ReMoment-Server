@@ -13,8 +13,17 @@ class Scene extends Model
     protected static function booted(): void
     {
         // The device listeners read the triggers of all scenes from one cached index (SceneTriggers::index).
-        static::saved(fn () => SceneTriggers::forgetIndex());
-        static::deleted(fn () => SceneTriggers::forgetIndex());
+        static::saved(function (self $scene) {
+            SceneTriggers::forgetIndex();
+            // A run only changes its last_run_* columns: no new discovery config for that.
+            if ($scene->wasRecentlyCreated || $scene->wasChanged('name')) {
+                \App\Domain\HomeAssistant\Hooks::scenes();
+            }
+        });
+        static::deleted(function () {
+            SceneTriggers::forgetIndex();
+            \App\Domain\HomeAssistant\Hooks::scenes();
+        });
     }
 
     protected $casts = [

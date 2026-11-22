@@ -2,6 +2,7 @@
 
 namespace App\Domain\Library;
 
+use App\Domain\Concerts\ConcertSettings;
 use App\Domain\Radio\RadioSettings;
 use App\Domain\Stats\PlayRetention;
 use App\Domain\Storage\PlaybackLoudness;
@@ -13,7 +14,7 @@ use App\Models\Setting;
  */
 class LibrarySettingsAdmin
 {
-    /** @return array{leading_source: string, leading: string, add_played_tracks: bool, playback_loudness: bool, nts_enabled: bool, history_keep_months: ?int} */
+    /** @return array{leading_source: string, leading: string, add_played_tracks: bool, playback_loudness: bool, nts_enabled: bool, history_keep_months: ?int, concerts_enabled: bool, concerts_location: ?string} */
     public function current(): array
     {
         return [
@@ -23,6 +24,8 @@ class LibrarySettingsAdmin
             'playback_loudness' => PlaybackLoudness::enabled(),
             'nts_enabled' => RadioSettings::ntsEnabled(),
             'history_keep_months' => PlayRetention::months(),
+            'concerts_enabled' => ConcertSettings::enabled(),
+            'concerts_location' => ConcertSettings::location(),
         ];
     }
 
@@ -43,6 +46,13 @@ class LibrarySettingsAdmin
         }
         if (array_key_exists('history_keep_months', $data)) {
             PlayRetention::setMonths($data['history_keep_months'] !== null ? (int) $data['history_keep_months'] : null);
+        }
+
+        if (isset($data['concerts_enabled'])) {
+            ConcertSettings::setEnabled((bool) $data['concerts_enabled']);
+        }
+        if (array_key_exists('concerts_location', $data)) {
+            ConcertSettings::setLocation($data['concerts_location']);
         }
 
         return $this->current();

@@ -65,8 +65,10 @@ paths:
   /devices:
     get:
       tags: [Devices]
-      summary: All devices
+      summary: All devices (players hidden by the housekeeping are left out)
       operationId: listDevices
+      parameters:
+        - { name: include_hidden, in: query, schema: { type: boolean }, description: "Also the players hidden after PLAYERS_HIDE_AFTER_DAYS days without a report; other hidden devices are listed either way" }
       responses:
         "200":
           description: OK
@@ -1992,6 +1994,8 @@ paths:
         - { name: lossless_suspect_max, in: query, schema: { type: number, minimum: 0, maximum: 1 }, description: "At most this suspicion of a transcode (lossy files have no value and never match)" }
         - { name: measured_bit_depth_min, in: query, schema: { type: integer, minimum: 1 } }
         - { name: clipping, in: query, schema: { type: integer, enum: [0, 1] }, description: "1 = clipping suspected, 0 = not" }
+        - { name: lyrics_language, in: query, schema: { type: string, pattern: "^[a-z]{2}$", example: nl }, description: "ISO 639-1 code of the language detected from the track's stored lyrics (`GET /library/tracks/{id}` details `lyrics_language`). Needs no analysis: any track with lyrics. See docs/api/lyrics.md" }
+        - { name: explicit, in: query, schema: { type: integer, enum: [0, 1] }, description: "1 = flagged explicit by its source (Spotify) or, when the source gave none, found by the lyrics word list; 0 = no flag at all. See docs/api/lyrics.md" }
         - name: letter
           in: query
           description: "Start at the first track whose sort key (track name with `name`, artist name with `artist`) is at or after this letter (`#` = the start). Ignored with `added`, `plays` and with a cursor."
@@ -2030,6 +2034,78 @@ paths:
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/TrackWaveform" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
+  /library/tracks/{track}/related:
+    parameters:
+      - name: track
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Library]
+      summary: Works related to a track from MusicBrainz relationships (cover of, remix of, samples, arrangement, other versions)
+      operationId: listTrackRelatedWorks
+      description: "What the track's MusicBrainz recording lookup said, stored by the enrichment job (no request is made here): empty for a track that was never matched or was enriched before this existed. Each item has a `label` in the server's wording, the MusicBrainz `target` (`recording` or `work`), its `mbid`, a `title`, an optional `artist` (for a cover: who wrote the song, when MusicBrainz says) and `detail` (the disambiguation), and the library `track` it is when the library has it (a recording by its MusicBrainz id, a work by the tracks performing it), else null. `versions` lists the other library tracks performing the same MusicBrainz work. Direction of the recording-to-recording relations (remix, samples ...) is unverified against more than the work relations. See docs/api/related-works.md."
+      parameters:
+        - { $ref: "#/components/parameters/client" }
+        - { $ref: "#/components/parameters/scope" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  canonical_id: { type: integer }
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        relation: { type: string, enum: [cover_of, remix, samples_material, medley, edit, remaster, arrangement, other_version, musical_quotation, based_on, revision_of] }
+                        label: { type: string, example: Cover of }
+                        target: { type: string, enum: [recording, work] }
+                        mbid: { type: string }
+                        title: { type: string }
+                        artist: { type: string, nullable: true }
+                        detail: { type: string, nullable: true }
+                        track: { allOf: [{ $ref: "#/components/schemas/SearchTrack" }], nullable: true, description: "The library track, when it is in the library" }
+                  versions: { type: array, items: { $ref: "#/components/schemas/SearchTrack" } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/NotAvailableInProfile" }
+  /library/concerts:
+    get:
+      tags: [Library]
+      summary: Upcoming concerts of the artists in the library (MusicBrainz events, opt-in)
+      operationId: listConcerts
+      description: "Soonest first, only events that have not happened yet. Off until `concerts_enabled` is set (`PUT /admin/library/settings`): then `enabled` is false and `data` empty. `location` is the setting's text (cities or countries, comma separated; an event passes when any term is in its venue, city or address), `location=` overrides it for this call, `all=1` ignores it. Cached 10 minutes, no request to MusicBrainz is made here (the daily `concerts:sync` does). Coverage is whatever MusicBrainz editors entered, so empty means none known. See docs/api/concerts.md."
+      parameters:
+        - { name: artist_id, in: query, schema: { type: integer } }
+        - { name: location, in: query, schema: { type: string, maxLength: 200, example: "Netherlands, Amsterdam" } }
+        - { name: all, in: query, schema: { type: boolean } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ConcertList" } } } }
+        "422": { $ref: "#/components/responses/NotAvailableInProfile" }
+  /library/artists/{artist}/concerts:
+    parameters:
+      - name: artist
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Library]
+      summary: Upcoming concerts of one artist
+      operationId: listArtistConcerts
+      description: "Like `GET /library/concerts` for one artist (same `location`, `all` and `limit`). See docs/api/concerts.md."
+      parameters:
+        - { name: location, in: query, schema: { type: string, maxLength: 200 } }
+        - { name: all, in: query, schema: { type: boolean } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ConcertList" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/NotAvailableInProfile" }
   /library/tracks/{track}/mixes-with:
     parameters:
       - name: track
@@ -2078,6 +2154,75 @@ paths:
                   next_cursor: { type: string, nullable: true }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { description: "`not_analysed`: the track has no tempo and key yet" }
+  /library/journey:
+    get:
+      tags: [Library]
+      summary: A journey from one track to another through the sound space
+      operationId: getLibraryJourney
+      description: "A list of `length` tracks (4 to 30, default 12, both ends included) that move step by step from the `from` track to the `to` track by their sound embeddings; each item has `step`, `of`, `progress` (0 to 1) and a `reason`. Candidates are the analysed own files of the scope (and what `device_id` can play); a step prefers another artist than the step before. Needs the sound embedding of both ends (Full profile). `422 not_analysed` (with `track`: `from` or `to`), `422 not_enough_tracks`. See docs/api/journey.md."
+      parameters:
+        - { name: from, in: query, required: true, schema: { type: integer } }
+        - { name: to, in: query, required: true, schema: { type: integer } }
+        - { name: length, in: query, schema: { type: integer, minimum: 4, maximum: 30 } }
+        - { name: device_id, in: query, description: Keep to tracks this device can play, schema: { type: integer } }
+        - { $ref: "#/components/parameters/client" }
+        - { $ref: "#/components/parameters/scope" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      allOf:
+                        - { $ref: "#/components/schemas/SearchTrack" }
+                        - type: object
+                          properties:
+                            step: { type: integer }
+                            of: { type: integer }
+                            progress: { type: number }
+                            reason: { type: string }
+        "422": { description: "`not_analysed` or `not_enough_tracks`" }
+  /library/artists/{artist}/tour:
+    parameters:
+      - name: artist
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Library]
+      summary: A guided tour through one artist's tracks
+      operationId: getArtistTour
+      description: "Up to `length` tracks (4 to 60, default 15): the artist's three most played songs first, then one song of each album, the oldest album first and the song of it you played least, round and round. Each item has `step` and a `reason`. Plays and release dates only (Standard and Full). `422 not_enough_tracks` below four tracks. See docs/api/artist-tour.md."
+      parameters:
+        - { name: length, in: query, schema: { type: integer, minimum: 4, maximum: 60 } }
+        - { name: device_id, in: query, description: Keep to tracks this device can play, schema: { type: integer } }
+        - { $ref: "#/components/parameters/client" }
+        - { $ref: "#/components/parameters/scope" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  canonical_id: { type: integer }
+                  data:
+                    type: array
+                    items:
+                      allOf:
+                        - { $ref: "#/components/schemas/SearchTrack" }
+                        - type: object
+                          properties:
+                            step: { type: integer }
+                            reason: { type: string }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "`not_enough_tracks`" }
   /library/tracks/{track}/similar:
     parameters:
       - name: track
@@ -2226,6 +2371,45 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/FavoriteBody" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /library/tracks/{track}/similar-sections:
+    parameters:
+      - name: track
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Library]
+      summary: Sections of other tracks that sound like one section of this track, most alike first
+      operationId: listSimilarSections
+      description: "Open (no admin token), Full profile. Needs the sound of this track's sections (deep analysis kind `section_sound`, after `sections`); candidates are the other tracks whose section sound was analysed too (it is requested per track, never across the library), one best section per track. 422 `not_analysed` (with the kind's `state`) while this track has none, 404 `unknown_section`. See docs/api/section-similarity.md."
+      security: []
+      parameters:
+        - { name: section, in: query, description: "Index of the section (default the first one with a sound vector)", schema: { type: integer, minimum: 0 } }
+        - { name: limit, in: query, description: "How many matches (1-25, default 10)", schema: { type: integer, minimum: 1, maximum: 25 } }
+        - { $ref: "#/components/parameters/client" }
+        - { $ref: "#/components/parameters/scope" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [canonical_id, section, sections, data]
+                properties:
+                  canonical_id: { type: integer }
+                  section: { $ref: "#/components/schemas/SectionRef" }
+                  sections: { type: array, items: { $ref: "#/components/schemas/SectionRef" }, description: "The sections of this track that can be searched" }
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        track: { $ref: "#/components/schemas/SearchTrack" }
+                        section: { $ref: "#/components/schemas/SectionRef" }
+                        similarity: { type: number, example: 0.91, description: "Cosine similarity of the two sections' sound vectors" }
+        "404": { description: "`unknown_section`", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "422": { description: "`not_analysed`, or a validation error", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
   /library/tracks/{track}/deep-analysis:
     parameters:
       - { name: track, in: path, required: true, schema: { type: integer }, description: "Library track id (a merged id resolves to the survivor). The track needs an own audio file on this server." }
@@ -2249,7 +2433,7 @@ paths:
         "202": { description: "`queued`", content: { application/json: { schema: { $ref: "#/components/schemas/DeepAnalysisRequest" } } } }
         "409": { description: "`not_available`: STRUCTURE_URL / STEMS_URL unset or the service failed its health check", content: { application/json: { schema: { $ref: "#/components/schemas/DeepAnalysisRequest" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
-        "422": { description: "`unknown_kind`, `no_file` (the track has no own file), or a validation error", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "422": { description: "`unknown_kind`, `no_file` (the track has no own file), `sections_required` (kind `section_sound` without stored sections), or a validation error", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
     get:
       tags: [Library]
       summary: State of the deep analysis of one track, per kind
@@ -2272,6 +2456,8 @@ paths:
                       sections: { $ref: "#/components/schemas/DeepAnalysisState" }
                       stems: { $ref: "#/components/schemas/DeepAnalysisState" }
                       stem_audio: { $ref: "#/components/schemas/DeepAnalysisState" }
+                      mood: { $ref: "#/components/schemas/DeepAnalysisState" }
+                      section_sound: { $ref: "#/components/schemas/DeepAnalysisState" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { description: "`no_file`", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
   /stems/weights:
@@ -2652,7 +2838,7 @@ paths:
         "422": { description: "Invalid cursor or filter", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
   /library/health/{report}:
     parameters:
-      - { name: report, in: path, required: true, schema: { type: string, enum: [transcodes, damaged, clipping, duplicates, lossy, incomplete, unlinked, missing, covers] } }
+      - { name: report, in: path, required: true, schema: { type: string, enum: [transcodes, damaged, clipping, duplicates, lossy, incomplete, unlinked, missing, covers, suggestions] } }
     get:
       tags: [Library]
       summary: The findings of one library health report
@@ -3176,6 +3362,70 @@ paths:
                 type: object
                 properties:
                   status: { type: string, example: ok }
+                  queued: { type: integer }
+        "422": { $ref: "#/components/responses/DeviceError" }
+  /devices/{device}/library/play-journey:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    post:
+      tags: [Library playback]
+      summary: Play a journey between two tracks
+      operationId: playJourney
+      description: "Plays the journey of GET /library/journey once, only what the device can play, starting with `from_track_id`. 422 `not_analysed`, `not_playable` (an end cannot be played here, or too few tracks), `unsupported` without library playback. Full profile. See docs/api/journey.md."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from_track_id, to_track_id]
+              properties:
+                from_track_id: { type: integer }
+                to_track_id: { type: integer }
+                length: { type: integer, minimum: 4, maximum: 30 }
+                client: { type: string }
+                scope: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  from: { type: integer }
+                  to: { type: integer }
+                  queued: { type: integer }
+        "422": { $ref: "#/components/responses/DeviceError" }
+  /devices/{device}/library/play-artist-tour:
+    parameters: [{ $ref: "#/components/parameters/device" }]
+    post:
+      tags: [Library playback]
+      summary: Play an artist tour
+      operationId: playArtistTour
+      description: "Plays the tour of GET /library/artists/{id}/tour once, only what the device can play. 422 `not_playable` below four playable tracks, `unsupported` without library playback. See docs/api/artist-tour.md."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [artist_id]
+              properties:
+                artist_id: { type: integer }
+                length: { type: integer, minimum: 4, maximum: 60 }
+                client: { type: string }
+                scope: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  artist: { type: integer }
                   queued: { type: integer }
         "422": { $ref: "#/components/responses/DeviceError" }
   /devices/{device}/library/play-playlist:
@@ -3736,6 +3986,507 @@ paths:
                   error: { type: string }
                   message: { type: string }
                   retry_after: { type: integer }
+  /devices/{id}/network:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Devices]
+      summary: Network status of a device (capability `network_settings`; admin token)
+      operationId: getDeviceNetwork
+      security: [{ adminToken: [] }]
+      description: "Admin token since 2026-10-26: a wrong network value can lock a device out. Every other device setting, renaming included, stays open. See docs/api/device-settings.md."
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  active_interface: { type: string, enum: [wired, wireless] }
+                  interfaces: { type: array, items: { type: string }, description: "Never `none`" }
+                  internet_reachable: { type: boolean, nullable: true }
+                  wired: { type: object, additionalProperties: true, description: "type, status, dhcp, address, subnet_mask, gateway, preferred_dns, alternative_dns, …" }
+                  wireless: { type: object, additionalProperties: true, description: "type, status, ssid, frequency, quality, signal, security, dhcp, address, …" }
+                  wifi_networks:
+                    type: array
+                    items: { type: object, properties: { ssid: { type: string }, frequency: { type: string }, security: { type: string }, configured: { type: boolean }, active: { type: boolean } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "`unsupported`: the device has no `network_settings`" }
+        "502": { description: "`driver_error`" }
+        "503": { description: "`unreachable`" }
+  /devices/{id}/network/interface:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    put:
+      tags: [Devices]
+      summary: Switch the active interface (admin token)
+      operationId: setDeviceNetworkInterface
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [interface]
+              properties:
+                interface: { type: string, enum: [wired, wireless] }
+      responses:
+        "200": { $ref: "#/components/responses/NetworkChanged" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "Validation error, `invalid` (for example wireless with no Wi-Fi set up) or `unsupported`" }
+        "502": { description: "`driver_error`" }
+        "503": { description: "`unreachable`" }
+  /devices/{id}/network/wired:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    put:
+      tags: [Devices]
+      summary: DHCP or a static wired setup (admin token)
+      operationId: setDeviceWiredNetwork
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [dhcp]
+              properties:
+                dhcp: { type: boolean }
+                address: { type: string, format: ipv4, nullable: true, description: "Required with dhcp=false" }
+                subnet_mask: { type: string, format: ipv4, nullable: true }
+                gateway: { type: string, format: ipv4, nullable: true }
+                preferred_dns: { type: string, format: ipv4, nullable: true }
+                alternative_dns: { type: string, format: ipv4, nullable: true }
+      responses:
+        "200": { $ref: "#/components/responses/NetworkChanged" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "Validation error or `invalid` (a static setup is checked first: mask contiguous, gateway inside the subnet)" }
+        "502": { description: "`driver_error`" }
+        "503": { description: "`unreachable`" }
+  /devices/{id}/network/wifi:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    put:
+      tags: [Devices]
+      summary: Join a Wi-Fi network (admin token)
+      operationId: joinDeviceWifi
+      security: [{ adminToken: [] }]
+      description: "The passphrase is accepted but never returned. The device cannot scan, so the name is typed."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ssid]
+              properties:
+                ssid: { type: string, maxLength: 32 }
+                passphrase: { type: string, nullable: true }
+                security: { type: string, nullable: true, example: wpa2PskTkip }
+      responses:
+        "200": { $ref: "#/components/responses/NetworkChanged" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "502": { description: "`driver_error`" }
+        "503": { description: "`unreachable`" }
+  /admin/library/settings:
+    get:
+      tags: [Admin]
+      summary: Library settings of Settings › Storage › Library (and the history retention); `library` profile feature
+      operationId: getAdminLibrarySettings
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminLibrarySettings" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/NotAvailableInProfile" }
+    put:
+      tags: [Admin]
+      summary: Change library settings (only the keys sent)
+      operationId: updateAdminLibrarySettings
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                leading_source: { type: string, enum: [auto, files, dlna, all] }
+                add_played_tracks: { type: boolean }
+                playback_loudness: { type: boolean }
+                nts_enabled: { type: boolean }
+                concerts_enabled: { type: boolean }
+                concerts_location: { type: string, nullable: true, maxLength: 200, description: "Empty or null = everywhere" }
+                history_keep_months: { type: integer, nullable: true, minimum: 1, maximum: 600, description: "null keeps the play history forever" }
+      responses:
+        "200":
+          description: The settings after the change
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminLibrarySettings" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /admin/library/maintenance/{action}:
+    parameters:
+      - { name: action, in: path, required: true, schema: { type: string, enum: [scan_dlna, verify_files, enrich, merge_duplicates, sync_genres, refresh_smart_playlists] } }
+    post:
+      tags: [Admin]
+      summary: Run a library maintenance action (the `library:*` command of the same name)
+      operationId: runLibraryMaintenance
+      security: [{ adminToken: [] }]
+      description: "`scan_dlna` and `verify_files` are queued (`status: queued`); the others run inside the request and answer with `status` ok or failed and the command's `output`. `merge_duplicates` cannot be undone: run it with `dry_run` first, then `confirm`."
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dry_run: { type: boolean, description: "enrich, merge_duplicates: only report" }
+                confirm: { type: boolean, description: "merge_duplicates: required when not a dry run" }
+                limit: { type: integer, minimum: 1, maximum: 5000, description: "enrich: max items to queue (default 200)" }
+                only: { type: string, enum: [metadata, artist-images], description: "enrich: one part only" }
+                server: { type: string, description: "scan_dlna: IP of one DLNA server" }
+                root: { type: string, description: "scan_dlna: folder to start in" }
+                playlist_id: { type: integer, description: "refresh_smart_playlists: one playlist" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [queued, ok, failed] }
+                  command: { type: string }
+                  output: { type: string }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { description: Unknown action }
+        "422": { description: "Validation error, or `confirmation_required` (merge_duplicates without `dry_run` or `confirm`)" }
+  /admin/storage/locations:
+    get:
+      tags: [Admin]
+      summary: Storage locations (secrets never shown); `file_storage` profile feature
+      operationId: listStorageLocations
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/StorageLocation" } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/NotAvailableInProfile" }
+    post:
+      tags: [Admin]
+      summary: Add a storage location (local folder or S3 bucket)
+      operationId: createStorageLocation
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StorageLocationInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StorageLocation" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /admin/storage/locations/{location}:
+    parameters:
+      - { name: location, in: path, required: true, schema: { type: integer } }
+    put:
+      tags: [Admin]
+      summary: Change a location (only the keys sent)
+      operationId: updateStorageLocation
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StorageLocationInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StorageLocation" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [Admin]
+      summary: Remove an empty location
+      operationId: deleteStorageLocation
+      security: [{ adminToken: [] }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/StatusOk" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "`not_empty`: the location still has files (delete or move them first)" }
+  /admin/storage/locations/{location}/test:
+    parameters:
+      - { name: location, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Admin]
+      summary: Check that the location can be listed (credentials, root path)
+      operationId: testStorageLocation
+      security: [{ adminToken: [] }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/StatusOk" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { description: "`unreachable`; `message` has the reason" }
+  /admin/storage/locations/{location}/scan:
+    parameters:
+      - { name: location, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Admin]
+      summary: Index the files of a location (inline, or queued with `queue=1`)
+      operationId: scanStorageLocation
+      security: [{ adminToken: [] }]
+      parameters:
+        - { name: queue, in: query, schema: { type: boolean }, description: "Run on the queue instead of inside the request" }
+      responses:
+        "200":
+          description: Scanned inline
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  changed: { type: integer }
+                  counts: { type: object, additionalProperties: { type: integer } }
+        "202": { description: "Queued (`status: queued`)" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "`busy`: a scan of this location is already queued or running" }
+        "422": { description: "`inbox`: the inbox is not scanned, import it" }
+        "502": { description: "`scan_failed`" }
+  /admin/storage/import:
+    post:
+      tags: [Admin]
+      summary: Move (or copy, with `keep`) everything in the inbox into the library
+      operationId: importStorageInbox
+      security: [{ adminToken: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { keep: { type: boolean, description: "Copy instead of move" } } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  imported: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { description: "`invalid`, for example no inbox or library location" }
+        "502": { description: "`storage_error`" }
+  /admin/storage/reorganize:
+    post:
+      tags: [Admin]
+      summary: Move library files to their naming-scheme paths (`dry_run` lists the moves)
+      operationId: reorganizeStorage
+      security: [{ adminToken: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { dry_run: { type: boolean } } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  dry_run: { type: boolean }
+                  moves:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        file_id: { type: integer }
+                        from: { type: string }
+                        to: { type: string }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { description: "`invalid`" }
+        "502": { description: "`storage_error`" }
+  /admin/files:
+    post:
+      tags: [Admin]
+      summary: Upload one audio file into the library (multipart)
+      operationId: uploadLibraryFile
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "201":
+          description: Stored and indexed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  file: { $ref: "#/components/schemas/StorageFile" }
+                  track_id: { type: integer, nullable: true }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "502": { description: "`storage_error`" }
+  /admin/files/{file}:
+    parameters:
+      - { name: file, in: path, required: true, schema: { type: integer } }
+    delete:
+      tags: [Admin]
+      summary: Delete one file from disk and the index
+      operationId: deleteLibraryFile
+      security: [{ adminToken: [] }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/StatusOk" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "`invalid`" }
+        "502": { description: "`storage_error`" }
+  /admin/files/{file}/move:
+    parameters:
+      - { name: file, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Admin]
+      summary: Move or rename a file (optionally to another location)
+      operationId: moveLibraryFile
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [path]
+              properties:
+                path: { type: string, maxLength: 1000 }
+                storage_location_id: { type: integer, nullable: true }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/StorageFile" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "502": { description: "`storage_error`" }
+  /admin/files/{file}/tags:
+    parameters:
+      - { name: file, in: path, required: true, schema: { type: integer } }
+    put:
+      tags: [Admin]
+      summary: Write tags into the audio file (only the keys sent)
+      operationId: writeLibraryFileTags
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string, nullable: true }
+                artist: { type: string, nullable: true }
+                album: { type: string, nullable: true }
+                album_artist: { type: string, nullable: true }
+                year: { type: string, nullable: true, maxLength: 10 }
+                track_number: { type: integer, nullable: true, minimum: 0 }
+                disc_number: { type: integer, nullable: true, minimum: 0 }
+                genre: { type: string, nullable: true }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/StorageFile" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "502": { description: "`storage_error`: the tag tool failed" }
+  /admin/files/{file}/verify:
+    parameters:
+      - { name: file, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Admin]
+      summary: Re-hash one file and flag it present, changed or missing
+      operationId: verifyLibraryFile
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result: { type: string, enum: [ok, missing, changed] }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /admin/tracks/{track}/files:
+    parameters:
+      - { name: track, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Admin]
+      summary: The files behind one track (originals and converted profiles)
+      operationId: listTrackFiles
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      allOf:
+                        - { $ref: "#/components/schemas/StorageFile" }
+                        - type: object
+                          properties:
+                            role: { type: string }
+                            profile: { type: string, nullable: true }
+                            is_primary: { type: boolean }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Admin]
+      summary: Delete a track's files and the track
+      operationId: deleteTrackFiles
+      security: [{ adminToken: [] }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/StatusOk" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "`invalid`" }
+        "502": { description: "`storage_error`" }
   /admin/storage/playback-loudness:
     get:
       tags: [Admin]
@@ -3797,6 +4548,175 @@ paths:
                 properties:
                   status: { type: string, example: ok }
         "401": { $ref: "#/components/responses/Unauthenticated" }
+  /admin/analysis:
+    get:
+      tags: [Admin]
+      summary: Audio analysis status (per stage progress, what runs now, schedule); `analysis` profile feature
+      operationId: getAdminAnalysis
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminAnalysisStatus" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/NotAvailableInProfile" }
+  /admin/analysis/problems:
+    get:
+      tags: [Admin]
+      summary: The newest failed stages (up to 200 rows), optionally of one stage
+      operationId: listAdminAnalysisProblems
+      security: [{ adminToken: [] }]
+      parameters:
+        - { name: stage, in: query, schema: { type: string, enum: [loudness, waveform, quality, fingerprint, acoustid, essentia] } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  limit: { type: integer }
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        file_id: { type: integer }
+                        path: { type: string }
+                        stage: { type: string }
+                        message: { type: string, nullable: true }
+                        attempts: { type: integer }
+                        gave_up: { type: boolean, description: "True once attempts reached `max_attempts`; retry resets it" }
+                        at: { type: string, nullable: true }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /admin/analysis/run:
+    post:
+      tags: [Admin]
+      summary: Queue one batch now (the size of a nightly run)
+      operationId: runAdminAnalysisBacklog
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  queued: { type: integer, description: "0 = nothing left to analyse" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { description: "`analysis_disabled`: ANALYSIS_ENABLED is off" }
+  /admin/analysis/files/{file}/analyse:
+    parameters:
+      - { name: file, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Admin]
+      summary: Queue every stage of one file
+      operationId: analyseAdminFile
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: queued }
+                  file_id: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "`analysis_disabled`" }
+  /admin/analysis/files/{file}/retry:
+    parameters:
+      - { name: file, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Admin]
+      summary: Forget one stage's error and attempts and queue just that stage
+      operationId: retryAdminAnalysisStage
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stage]
+              properties:
+                stage: { type: string, enum: [loudness, waveform, quality, fingerprint, acoustid, essentia] }
+      responses:
+        "200":
+          description: "`status` is `queued`, or `cleared` when analysis is off (the error is forgotten, nothing queued)"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [queued, cleared] }
+                  file_id: { type: integer }
+                  stage: { type: string }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "`not_analysed`: the file has no analysis row yet; use analyse" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /admin/tokens:
+    get:
+      tags: [Admin]
+      summary: App sign-ins (most recently used first; the calling token is marked `current`; never a hash)
+      operationId: listAdminTokens
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/AdminTokenInfo" } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+    delete:
+      tags: [Admin]
+      summary: Revoke every token (`keep_current=1` spares the caller's own)
+      operationId: revokeAllAdminTokens
+      security: [{ adminToken: [] }]
+      parameters:
+        - { name: keep_current, in: query, schema: { type: boolean } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  revoked: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+  /admin/tokens/{token}:
+    parameters:
+      - { name: token, in: path, required: true, schema: { type: integer } }
+    delete:
+      tags: [Admin]
+      summary: Sign one app out (revoking the calling token is the same as signing out)
+      operationId: revokeAdminToken
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /admin/announcements/clips:
     post:
       tags: [Admin]
@@ -3899,6 +4819,49 @@ paths:
                       uid: { type: string }
                       at: { type: string }
         "401": { $ref: "#/components/responses/Unauthenticated" }
+  /admin/suggestions/{id}/accept:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string }, description: "`suggestion.id` of a finding of GET /library/health/suggestions, e.g. `title:412`" }
+    post:
+      tags: [Admin]
+      summary: Apply a tag or cover suggestion
+      operationId: acceptSuggestion
+      security: [{ adminToken: [] }]
+      description: "A tag suggestion is written into the file through the tag editor (the same writer as PUT /admin/files/{id}/tags: it rewrites the user's file and re-indexes it); a cover suggestion queues the fetch of the MusicBrainz release's front image from the Cover Art Archive. Never done automatically. 422 for a suggestion that is not open or has no value to apply, 502 when the file cannot be written. See docs/api/suggestions.md."
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [applied, queued] }
+                  id: { type: string }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { description: "Not an open suggestion, or nothing to apply", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "502": { description: "The file could not be written", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /admin/suggestions/{id}/dismiss:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Admin]
+      summary: Dismiss a suggestion
+      operationId: dismissSuggestion
+      security: [{ adminToken: [] }]
+      description: "Hides the suggested value until MusicBrainz offers a different one. See docs/api/suggestions.md."
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [dismissed] }
+                  id: { type: string }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { description: "Not an open suggestion", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
   /admin/tags/{tag}:
     parameters:
       - { name: tag, in: path, required: true, schema: { type: integer } }
@@ -4514,8 +5477,10 @@ paths:
   /players:
     get:
       tags: [Players]
-      summary: The existing players, so a new client can take one over
+      summary: The existing players, so a new client can take one over (players hidden by the housekeeping are left out)
       operationId: listPlayers
+      parameters:
+        - { name: include_hidden, in: query, schema: { type: boolean }, description: "Also the players hidden after PLAYERS_HIDE_AFTER_DAYS days without a report" }
       responses:
         "200":
           description: OK
@@ -4698,6 +5663,90 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/HealthServices" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /admin/backup/copy-path:
+    get:
+      tags: [Admin]
+      summary: The optional second copy of every backup
+      description: "The directory `backup:run` copies each new archive to (a mounted NAS share or USB drive; a path only, no cloud) and the result of the last copy. `path` is null when no copy is set. See docs/api/admin-backup.md."
+      operationId: getBackupCopyPath
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BackupCopy" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+    put:
+      tags: [Admin]
+      summary: Set or clear the backup copy directory
+      description: "Writes and removes a small test file in the directory first; a missing, unwritable or relative path (or the backup directory itself) is `422` and nothing is saved. The directory is never created. An empty or null `path` switches the copy off."
+      operationId: setBackupCopyPath
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [path]
+              properties:
+                path: { type: string, nullable: true, maxLength: 500, example: /mnt/nas/remoment-backups }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BackupCopy" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /admin/backup/copy-path/test:
+    post:
+      tags: [Admin]
+      summary: Test-write to the backup copy directory
+      description: "Writes and removes a small file in `path` (default: the saved path). Does not save anything and never creates the directory."
+      operationId: testBackupCopyPath
+      security: [{ adminToken: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                path: { type: string, nullable: true, maxLength: 500 }
+      responses:
+        "200":
+          description: The result (`ok` false is an answer, not an error)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  path: { type: string }
+                  ok: { type: boolean }
+                  message: { type: string }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /admin/ha/package:
+    get:
+      tags: [Admin]
+      summary: Home Assistant rest_command package (YAML download)
+      description: "The file `php artisan ha:package` writes, from the same code: one `rest_command` per scene-capable operation of this contract, addressed to `base_url`. Not verified in a running Home Assistant. See docs/api/admin-ha.md."
+      operationId: getHomeAssistantPackage
+      security: [{ adminToken: [] }]
+      parameters:
+        - name: base_url
+          in: query
+          required: false
+          description: "The server origin Home Assistant calls, without `/api` (default: APP_URL, else http://remoment.local)"
+          schema: { type: string, format: uri, maxLength: 255, example: "http://remoment.local" }
+      responses:
+        "200":
+          description: "The YAML file, sent as an attachment named remoment.yaml"
+          content:
+            application/yaml: { schema: { type: string } }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "422": { $ref: "#/components/responses/ValidationError" }
   /admin/clients:
@@ -5423,10 +6472,29 @@ paths:
           application/json:
             schema: { $ref: "#/components/schemas/SyncReport" }
       responses:
-        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { status: { type: string, enum: [ok] } } } } } }
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { status: { type: string, enum: [ok] }, plays: { $ref: "#/components/schemas/SyncPlaysResult" } } } } } }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { description: Validation error, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /admin/sync/targets/{target}/plays:
+    parameters:
+      - { name: target, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Sync]
+      summary: Offline plays of an app target, stored with their original time and scrobbled; idempotent
+      description: "Up to 500 per call; send again until the answer arrives, a play already stored (same track and start on this target) counts as `duplicates`. Written to the history with source `offline`; scrobbled to Last.fm with the original time when younger than 14 days. A node target answers `422 not_an_app_target`."
+      operationId: uploadSyncPlays
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [plays], properties: { plays: { type: array, maxItems: 500, items: { $ref: "#/components/schemas/SyncOfflinePlay" } } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SyncPlaysResult" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "Validation error or `not_an_app_target`", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
   /admin/sync/targets/{target}/run:
     parameters:
       - { name: target, in: path, required: true, schema: { type: string } }
@@ -5558,6 +6626,417 @@ paths:
         "401": { description: Unknown node token, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
         "403": { description: Not the node's target, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
 
+  /library/positions:
+    get:
+      tags: [Library]
+      summary: Resume positions, most recently kept first ("continue listening")
+      operationId: listPlaybackPositions
+      description: "The bookmarks of long tracks (at least `resume.min_minutes` long, or an audiobook or podcast by genre) and podcast episodes, household-wide. Playing such an item from the server resumes at its position; `resume=false` on a play request starts from the beginning. The position is kept from the progress a device reports and cleared when the item finishes. Standard and Full profiles. See docs/api/playback-positions.md."
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 30 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/PlaybackPosition" } }
+  /library/positions/{kind}/{id}:
+    parameters:
+      - { name: kind, in: path, required: true, schema: { type: string, enum: [track, episode] } }
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    put:
+      tags: [Library]
+      summary: Set a resume position by hand (a position at the end of the item clears it)
+      operationId: setPlaybackPosition
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [position]
+              properties:
+                position: { type: integer, minimum: 0, description: "Seconds; 0 clears the bookmark" }
+                duration: { type: integer, minimum: 1, description: "Seconds; defaults to the item's own duration" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  kind: { type: string }
+                  id: { type: integer }
+                  position: { type: integer }
+                  cleared: { type: boolean, description: "True when the position was 0 or inside the end tail, so no bookmark is kept" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: Invalid position, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+    delete:
+      tags: [Library]
+      summary: Clear a resume position
+      operationId: clearPlaybackPosition
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { status: { type: string, example: ok } } } } } }
+  /podcasts:
+    get:
+      tags: [Library]
+      summary: Podcast subscriptions with their unplayed counts
+      operationId: listPodcasts
+      description: "Podcasts (8.2, docs/api/podcasts.md): RSS subscriptions of the household, A to Z. Standard and Full profiles (`features.podcasts`)."
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/Podcast" } }
+  /podcasts/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Library]
+      summary: One podcast
+      operationId: getPodcast
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: "#/components/schemas/Podcast" } } } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /podcasts/{id}/episodes:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Library]
+      summary: Episodes of one podcast, newest first
+      operationId: listPodcastEpisodes
+      parameters:
+        - { name: unplayed, in: query, schema: { type: boolean } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - { name: cursor, in: query, schema: { type: string }, description: "`next_cursor` of the previous page (opaque, keyset on published_at and id)" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PodcastEpisodePage" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: Bad cursor, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /podcasts/{id}/mark-played:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Library]
+      summary: Mark every episode of a podcast played (their bookmarks are cleared)
+      operationId: markPodcastPlayed
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { status: { type: string, example: ok }, changed: { type: integer } } } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /podcast-episodes:
+    get:
+      tags: [Library]
+      summary: Episodes of every podcast, newest first (`unplayed=true` is "new episodes")
+      operationId: listAllPodcastEpisodes
+      parameters:
+        - { name: unplayed, in: query, schema: { type: boolean } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PodcastEpisodePage" } } } }
+        "422": { description: Bad cursor, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /podcast-episodes/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Library]
+      summary: One episode, with where it stopped
+      operationId: getPodcastEpisode
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: "#/components/schemas/PodcastEpisode" } } } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /podcast-episodes/{id}/played:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    put:
+      tags: [Library]
+      summary: Mark an episode played or unplayed
+      operationId: setPodcastEpisodePlayed
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                played: { type: boolean, default: true }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { status: { type: string, example: ok }, id: { type: integer }, played: { type: boolean } } } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /devices/{id}/podcast-episodes/{episode}/play:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+      - { name: episode, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Playback]
+      summary: Play a podcast episode on a device (capability `stream_url`)
+      operationId: playPodcastEpisode
+      description: "The device fetches the publisher's enclosure URL itself. Where the episode stopped is restored a few seconds after the start (the device needs `seek`); `resume=false` starts from the beginning. 422 `unsupported` without `stream_url`, 503 `unreachable`, 502 `driver_error`."
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                resume: { type: boolean, default: true }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  episode_id: { type: integer }
+                  title: { type: string }
+                  resume_position: { type: integer, nullable: true, description: "Second the episode continues from, null when it starts from the beginning" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: Unsupported, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "503": { description: Device unreachable, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /admin/podcasts:
+    post:
+      tags: [Admin]
+      summary: Subscribe to a podcast by RSS address
+      operationId: addPodcast
+      security: [{ adminToken: [] }]
+      description: "The feed is fetched at once: 422 `invalid_feed` when it cannot be read or is not RSS, 409 `already_subscribed` (with the existing podcast in `data`) when it is known."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [feed_url]
+              properties:
+                feed_url: { type: string, maxLength: 2000, description: "http or https (feed:// is read as http)" }
+      responses:
+        "201": { description: Subscribed, content: { application/json: { schema: { type: object, properties: { data: { $ref: "#/components/schemas/Podcast" } } } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { description: Already subscribed, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "422": { description: Not a readable podcast feed, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /admin/podcasts/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    put:
+      tags: [Admin]
+      summary: Change how many episodes of a podcast are kept
+      operationId: updatePodcast
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [keep_episodes]
+              properties:
+                keep_episodes: { type: integer, nullable: true, minimum: 0, maximum: 5000, description: "Newest episodes kept; 0 keeps all, null the server default. Older ones are pruned at once, except those with a bookmark." }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: "#/components/schemas/Podcast" } } } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Admin]
+      summary: Unsubscribe (removes the episodes and their bookmarks)
+      operationId: removePodcast
+      security: [{ adminToken: [] }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { status: { type: string, example: ok } } } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /admin/podcasts/{id}/refresh:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Admin]
+      summary: Check a feed for new episodes now
+      operationId: refreshPodcast
+      security: [{ adminToken: [] }]
+      description: "A conditional GET. `status` is `updated`, `unchanged` or `failed` (the reason is `last_error` of the podcast). 429 `too_soon` within 5 minutes of the last check."
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { status: { type: string, enum: [updated, unchanged, failed] }, data: { $ref: "#/components/schemas/Podcast" } } } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { description: Checked a moment ago, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /admin/files/{id}/tags:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer }, description: "File id" }
+    get:
+      tags: [Admin]
+      summary: The tags an own file holds now (read from the file)
+      operationId: getFileTags
+      security: [{ adminToken: [] }]
+      description: "Tag editor (8.4, docs/api/tag-editor.md). Standard and Full profiles."
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/TaggedFile" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Admin]
+      summary: Change tags of an own file (safe copy-and-swap, cover and other tags kept)
+      operationId: updateFileTags
+      security: [{ adminToken: [] }]
+      description: "A missing field is left alone; list a field in `clear` to remove it. The file is indexed again, matched to its track, laid out in the library structure unless `organize` is false, and enrichment is queued. Files in an inbox location are refused (422). The last edit can be undone."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TagChanges" }
+      responses:
+        "200": { description: The file after the edit, content: { application/json: { schema: { $ref: "#/components/schemas/TaggedFile" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "Invalid field, nothing to change, inbox file or unsupported format", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "502": { description: "The disk or ffmpeg failed; the file is as it was", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /admin/files/{id}/tags/undo:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Admin]
+      summary: Undo the last tag edit of a file (tags, cover and path)
+      operationId: undoFileTags
+      security: [{ adminToken: [] }]
+      responses:
+        "200": { description: The file after the undo, content: { application/json: { schema: { $ref: "#/components/schemas/TaggedFile" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "Nothing to undo, or the file changed after its last edit", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /admin/files/{id}/cover:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Admin]
+      summary: Set the embedded cover of a file (JPEG or PNG, at least 100 px, at most 10 MB)
+      operationId: setFileCover
+      security: [{ adminToken: [] }]
+      description: "mp3, flac and m4a only (an Ogg or Opus cover is refused with 422)."
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { type: object, properties: { image: { type: string, format: binary } } }
+          application/json:
+            schema: { type: object, properties: { image_base64: { type: string, description: "Base64 of the picture, optionally as a data: URI" } } }
+      responses:
+        "200": { description: The file after the edit, content: { application/json: { schema: { $ref: "#/components/schemas/TaggedFile" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "Not a usable picture, inbox file or unsupported format", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+    delete:
+      tags: [Admin]
+      summary: Take the embedded cover out of a file
+      operationId: removeFileCover
+      security: [{ adminToken: [] }]
+      responses:
+        "200": { description: The file after the edit, content: { application/json: { schema: { $ref: "#/components/schemas/TaggedFile" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "Inbox file or unsupported format", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /admin/albums/{id}/tags:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer }, description: "Album id" }
+    get:
+      tags: [Admin]
+      summary: Every own file of an album with the tags it holds
+      operationId: getAlbumTags
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  album_id: { type: integer }
+                  name: { type: string }
+                  can_undo: { type: boolean }
+                  editable: { type: boolean }
+                  files:
+                    type: array
+                    items:
+                      allOf:
+                        - { $ref: "#/components/schemas/FileTagState" }
+                        - type: object
+                          properties:
+                            file_id: { type: integer }
+                            path: { type: string }
+                            track_id: { type: integer, nullable: true }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Admin]
+      summary: Change every own file of an album (album fields for all, track fields per file)
+      operationId: updateAlbumTags
+      security: [{ adminToken: [] }]
+      description: "`tags` apply to every file, `files[file id]` to single ones. Files that cannot be edited (inbox, unsupported format) are skipped and named; a failing file is named and the others go ahead. `album_id` in the answer is the album the files are in now (a new album name is another record)."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tags: { $ref: "#/components/schemas/TagChanges" }
+                files: { type: object, additionalProperties: { $ref: "#/components/schemas/TagChanges" }, description: "File id => title, track_number, artist, disc_number" }
+                clear: { type: array, items: { type: string, enum: [title, artist, album, album_artist, year, track_number, disc_number, genre] } }
+                organize: { type: boolean, default: true }
+      responses:
+        "200": { description: What happened per file, content: { application/json: { schema: { $ref: "#/components/schemas/AlbumTagResult" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "No own files, nothing to change or an invalid field", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /admin/albums/{id}/tags/undo:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Admin]
+      summary: Undo the last edit of every file of an album that has one
+      operationId: undoAlbumTags
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  album_id: { type: integer }
+                  undone: { type: array, items: { type: integer } }
+                  failed: { type: array, items: { type: object, properties: { file_id: { type: integer }, error: { type: string } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "No edit of this album to undo", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /admin/albums/{id}/cover:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Admin]
+      summary: Set the cover of an album (embedded in every own file and used as the album picture)
+      operationId: setAlbumCover
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { type: object, properties: { image: { type: string, format: binary } } }
+          application/json:
+            schema: { type: object, properties: { image_base64: { type: string } } }
+      responses:
+        "200": { description: What happened per file, content: { application/json: { schema: { $ref: "#/components/schemas/AlbumTagResult" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "Not a usable picture or no own files", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
 components:
   securitySchemes:
     adminToken:
@@ -5617,6 +7096,15 @@ components:
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
+    NetworkChanged:
+      description: "Applied, not read back (the device may answer on a new address): wait, then `GET /devices/{id}/network`"
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, example: ok }
+              message: { type: string }
     NotFound:
       description: Unknown id (also a record merged away by library:merge-duplicates)
     ValidationError:
@@ -5662,6 +7150,131 @@ components:
               playlist: { type: string }
 
   schemas:
+    PodcastArtwork:
+      type: object
+      nullable: true
+      description: "The cover through the artwork pipeline (never the publisher's URL); null until it is processed"
+      properties:
+        proxy_120: { type: string, nullable: true }
+        proxy_320: { type: string, nullable: true }
+        proxy_512: { type: string, nullable: true }
+        colors: { description: "Two or more CSS colours taken from the cover" }
+    Podcast:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        author: { type: string, nullable: true }
+        description: { type: string, nullable: true, description: "Plain text" }
+        site_url: { type: string, nullable: true }
+        feed_url: { type: string }
+        language: { type: string, nullable: true }
+        artwork: { $ref: "#/components/schemas/PodcastArtwork" }
+        episode_count: { type: integer }
+        unplayed_count: { type: integer }
+        latest_episode_at: { type: string, nullable: true, description: "Publication time of the newest episode" }
+        keep_episodes: { type: integer, nullable: true, description: "Own retention setting; null = the server default" }
+        last_checked_at: { type: string, nullable: true, format: date-time }
+        last_error: { type: string, nullable: true, description: "Why the last check failed; null while the feed works" }
+    PodcastEpisode:
+      type: object
+      properties:
+        id: { type: integer }
+        podcast_id: { type: integer }
+        podcast_title: { type: string, nullable: true }
+        title: { type: string }
+        description: { type: string, nullable: true, description: "Plain text" }
+        published_at: { type: string, nullable: true, format: date-time }
+        duration: { type: integer, nullable: true, description: "Seconds, when the feed says" }
+        season: { type: integer, nullable: true }
+        number: { type: integer, nullable: true }
+        played: { type: boolean }
+        played_at: { type: string, nullable: true, format: date-time }
+        position: { type: integer, nullable: true, description: "Seconds the episode stopped at (the resume bookmark), null without one" }
+        enclosure:
+          type: object
+          properties:
+            url: { type: string, description: "The publisher's audio URL; the server never downloads or relays it" }
+            type: { type: string, nullable: true }
+            size: { type: integer, nullable: true }
+        artwork: { $ref: "#/components/schemas/PodcastArtwork" }
+    PodcastEpisodePage:
+      type: object
+      properties:
+        data: { type: array, items: { $ref: "#/components/schemas/PodcastEpisode" } }
+        next_cursor: { type: string, nullable: true }
+    TagChanges:
+      type: object
+      description: "A missing or null field is left alone."
+      properties:
+        title: { type: string }
+        artist: { type: string }
+        album: { type: string }
+        album_artist: { type: string }
+        year: { type: string, example: "1999", description: "Four digits, or a date" }
+        track_number: { type: integer, minimum: 0, description: "0 removes" }
+        disc_number: { type: integer, minimum: 0, description: "0 removes" }
+        genre: { type: string }
+        clear: { type: array, items: { type: string, enum: [title, artist, album, album_artist, year, track_number, disc_number, genre] }, description: "Fields to remove (single file only; an empty string cannot be sent)" }
+        organize: { type: boolean, default: true, description: "Also move the file to the library layout for its new tags (single file only)" }
+    FileTagState:
+      type: object
+      properties:
+        tags:
+          type: object
+          description: "Read from the file; every value a string, empty when the file has none"
+          properties:
+            title: { type: string }
+            artist: { type: string }
+            album: { type: string }
+            album_artist: { type: string }
+            year: { type: string }
+            track_number: { type: string }
+            disc_number: { type: string }
+            genre: { type: string }
+        has_cover: { type: boolean }
+        can_undo: { type: boolean, description: "The last edit can be undone (the file has not changed since)" }
+        editable: { type: boolean, description: "False for inbox files, formats that cannot be written, or a server without ffmpeg" }
+        cover_editable: { type: boolean, description: "False for Ogg and Opus" }
+    TaggedFile:
+      allOf:
+        - { $ref: "#/components/schemas/FileTagState" }
+        - type: object
+          properties:
+            id: { type: integer }
+            storage_location_id: { type: integer }
+            path: { type: string }
+            hash: { type: string }
+            size: { type: integer }
+            mime_type: { type: string, nullable: true }
+            codec: { type: string, nullable: true }
+            bitrate: { type: integer, nullable: true }
+            sample_rate: { type: integer, nullable: true }
+            bit_depth: { type: integer, nullable: true }
+            duration: { type: integer, nullable: true }
+            status: { type: string, enum: [present, missing] }
+            track_id: { type: integer, nullable: true }
+    AlbumTagResult:
+      type: object
+      properties:
+        album_id: { type: integer, description: "The album the files are in now" }
+        edited: { type: array, items: { type: integer }, description: "File ids rewritten" }
+        skipped: { type: array, items: { type: object, properties: { file_id: { type: integer }, reason: { type: string, enum: [inbox, unsupported] } } } }
+        failed: { type: array, items: { type: object, properties: { file_id: { type: integer }, error: { type: string } } } }
+    PlaybackPosition:
+      type: object
+      properties:
+        kind: { type: string, enum: [track, episode] }
+        id: { type: integer, description: "Track id or podcast episode id" }
+        position: { type: integer, description: "Seconds" }
+        duration: { type: integer, nullable: true }
+        percent: { type: integer, nullable: true }
+        updated_at: { type: string, format: date-time }
+        title: { type: string }
+        subtitle: { type: string, nullable: true, description: "Artist and album, or the podcast" }
+        album_id: { type: integer, nullable: true }
+        podcast_id: { type: integer, nullable: true }
+        artwork: { $ref: "#/components/schemas/LibraryArtwork" }
     QueueHealth:
       type: object
       properties:
@@ -5825,6 +7438,151 @@ components:
       properties:
         error: { type: string, example: unauthenticated }
         message: { type: string }
+    AdminAnalysisStatus:
+      type: object
+      properties:
+        enabled: { type: boolean, description: "ANALYSIS_ENABLED" }
+        files: { type: integer, description: "Own files in scope" }
+        complete: { type: integer }
+        backlog: { type: integer, description: "Files with a stage waiting or failed (will retry)" }
+        with_problems: { type: integer }
+        queued_jobs: { type: integer, description: "AnalyzeAudioFile jobs in the queue" }
+        files_last_24h: { type: integer }
+        last_activity_at: { type: string, format: date-time, nullable: true }
+        max_attempts: { type: integer }
+        schedule:
+          type: object
+          properties:
+            night_files: { type: integer }
+            night_hours: { type: number }
+            seconds_per_file: { type: number, nullable: true, description: "Null until measured" }
+            nights_to_clear_backlog: { type: integer }
+            backlog_hours: { type: number, nullable: true }
+        current:
+          type: object
+          nullable: true
+          properties:
+            stage: { type: string, description: "A stage key or `decode` (the shared decode)" }
+            file_id: { type: integer }
+            path: { type: string }
+            started_at: { type: string, format: date-time }
+        decode_seconds_per_file: { type: number, nullable: true }
+        sidecar:
+          type: object
+          nullable: true
+          description: "The Essentia sidecar's health; null when no URL is set or analysis is off"
+          properties:
+            ok: { type: boolean }
+            essentia: { type: string, nullable: true }
+            ml: { type: boolean }
+            models: { type: array, items: { type: string } }
+            error: { type: string, nullable: true }
+        stages:
+          type: array
+          items:
+            type: object
+            properties:
+              key: { type: string }
+              description: { type: string }
+              version: { type: string }
+              enabled: { type: boolean }
+              reason: { type: string, nullable: true, description: "Why a stage does not run" }
+              done: { type: integer }
+              pending: { type: integer }
+              stale: { type: integer, description: "Of pending: done before, will run again" }
+              failed: { type: integer, description: "Failed, will retry" }
+              gave_up: { type: integer }
+              seconds_per_file: { type: number, nullable: true }
+    StatusOk:
+      type: object
+      properties:
+        status: { type: string, example: ok }
+    StorageLocation:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        driver: { type: string, enum: [local, s3] }
+        role: { type: string, enum: [library, inbox] }
+        config: { type: object, additionalProperties: true, description: "Without `key` and `secret`: those never leave the server" }
+        files_count: { type: integer }
+        last_scanned_at: { type: string, format: date-time, nullable: true }
+    StorageLocationInput:
+      type: object
+      properties:
+        name: { type: string, maxLength: 100, description: "Unique; required on create" }
+        driver: { type: string, enum: [local, s3], description: "Required on create" }
+        role: { type: string, enum: [library, inbox] }
+        config:
+          type: object
+          description: "Required on create. `root` for local, `bucket` for s3"
+          properties:
+            root: { type: string }
+            bucket: { type: string }
+            key: { type: string, nullable: true }
+            secret: { type: string, nullable: true }
+            region: { type: string, nullable: true }
+            endpoint: { type: string, nullable: true }
+            prefix: { type: string, nullable: true }
+            use_path_style_endpoint: { type: boolean, nullable: true }
+    StorageFile:
+      type: object
+      properties:
+        id: { type: integer }
+        storage_location_id: { type: integer }
+        path: { type: string }
+        hash: { type: string }
+        size: { type: integer }
+        mime_type: { type: string, nullable: true }
+        codec: { type: string, nullable: true }
+        bitrate: { type: integer, nullable: true }
+        sample_rate: { type: integer, nullable: true }
+        bit_depth: { type: integer, nullable: true }
+        duration: { type: number, nullable: true }
+        status: { type: string, enum: [present, missing] }
+    Concert:
+      type: object
+      properties:
+        id: { type: integer }
+        artist_id: { type: integer }
+        artist_name: { type: string, nullable: true }
+        name: { type: string, description: "The MusicBrainz event name" }
+        type: { type: string, nullable: true, description: "Concert, Festival, Launch event ..." }
+        starts_on: { type: string, format: date }
+        ends_on: { type: string, format: date, nullable: true, description: "A multi-day event" }
+        starts_at: { type: string, nullable: true, example: "20:00", description: "HH:MM local time when MusicBrainz has one" }
+        venue: { type: string, nullable: true }
+        city: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        latitude: { type: number, nullable: true }
+        longitude: { type: number, nullable: true }
+        url: { type: string, description: "The event on musicbrainz.org" }
+    ConcertList:
+      type: object
+      properties:
+        enabled: { type: boolean, description: "The opt-in setting; false = `data` is empty by choice" }
+        location: { type: string, nullable: true, description: "The place filter applied, null = everywhere" }
+        data: { type: array, items: { $ref: "#/components/schemas/Concert" } }
+    AdminLibrarySettings:
+      type: object
+      properties:
+        concerts_enabled: { type: boolean, description: "Opt-in: ask MusicBrainz for upcoming events of library artists (docs/api/concerts.md)" }
+        concerts_location: { type: string, nullable: true, description: "Cities or countries, comma separated; null = everywhere" }
+        leading_source: { type: string, enum: [auto, files, dlna, all], description: "The setting" }
+        leading: { type: string, enum: [files, dlna, all], description: "What `auto` resolves to now" }
+        add_played_tracks: { type: boolean }
+        playback_loudness: { type: boolean }
+        nts_enabled: { type: boolean }
+        history_keep_months: { type: integer, nullable: true }
+    AdminTokenInfo:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string, nullable: true, description: "The `device_name` given at sign-in" }
+        last_used_at: { type: string, format: date-time, nullable: true }
+        last_used_ip: { type: string, nullable: true }
+        created_at: { type: string, format: date-time, nullable: true }
+        current: { type: boolean, description: "True for the token that made this request" }
     ServerInfo:
       type: object
       required: [name, version, api_version, base_url, api_base_url, artwork_base_url, mqtt]
@@ -5870,8 +7628,8 @@ components:
             line_in: { type: boolean, description: "An approved node has the line-in role switched on, so GET /line-ins lists something. Present only when true." }
             sub_devices: { type: boolean, description: "host and sub_devices in the device detail and the admin link routes (every profile). Present only when true." }
             push: { type: boolean, description: "The server holds a VAPID key pair, so POST /push/subscribe can deliver Web Push (web only; a native app does not use it). Present only when true." }
+            podcasts: { type: boolean, description: "Podcasts are available (GET /api/podcasts; Standard and Full). Present only when true." }
             ha_discovery: { type: boolean, description: "Home Assistant MQTT discovery is switched on. Present only when true." }
-            podcasts: { type: boolean, description: "Reserved: podcasts are not built yet, the key never appears until they are." }
 
     ExportRequest:
       type: object
@@ -5977,6 +7735,7 @@ components:
         name: { type: string }
         kind: { type: string, enum: [app, node] }
         client_ref: { type: string, nullable: true }
+        server_id: { type: string, description: "This server's id, written into the marker of a volume (one stick belongs to one server); the helper CLI needs it to claim a drive" }
         node_id: { type: integer, nullable: true }
         node: { type: object, nullable: true, properties: { id: { type: integer }, name: { type: string, nullable: true } } }
         rules: { $ref: "#/components/schemas/SyncRules" }
@@ -6086,6 +7845,23 @@ components:
         owned_bytes: { type: integer }
         owned_count: { type: integer }
         free_bytes: { type: integer }
+        plays: { type: array, maxItems: 500, items: { $ref: "#/components/schemas/SyncOfflinePlay" }, description: "App targets only: offline plays, same as POST …/plays (the answer then carries `plays`)" }
+    SyncOfflinePlay:
+      type: object
+      required: [client_id, track_id, started_at, played_seconds]
+      properties:
+        client_id: { type: string, maxLength: 64, description: "The app's own id for the play (a UUID); echoed in `rejected`" }
+        track_id: { type: integer, description: "The number of the sync key `track:{id}`; merged ids resolve" }
+        started_at: { type: string, format: date-time, description: "When the play started, on the phone's clock (offset included)" }
+        played_seconds: { type: integer, minimum: 0, maximum: 86400 }
+    SyncPlaysResult:
+      type: object
+      properties:
+        accepted: { type: integer }
+        duplicates: { type: integer, description: "Same track and start on this target already stored" }
+        rejected: { type: array, items: { type: object, properties: { client_id: { type: string }, error: { type: string, enum: [bad_started_at, unknown_track] } } } }
+        scrobbled: { type: integer, description: "Queued for Last.fm with their original time (the usual half-track rule applies in the job)" }
+        too_old: { type: integer, description: "Stored in the history but older than 14 days: not scrobbled" }
     Export:
       type: object
       properties:
@@ -6151,8 +7927,8 @@ components:
 
     DeepAnalysisKind:
       type: string
-      enum: [sections, stems, stem_audio]
-      description: "`sections` (where the music changes), `stems` (loudness lanes of vocals, drums, bass, other, and instrumental ranges) and `stem_audio` (the same separation, and the four stems kept as audio files for a mixer, listed by GET /library/tracks/{track}/stems; it fills `stems` too); `mood` is planned (workstream 16). An unknown kind is a 422."
+      enum: [sections, stems, stem_audio, mood, section_sound]
+      description: "`sections` (where the music changes), `stems` (loudness lanes of vocals, drums, bass, other, and instrumental ranges), `stem_audio` (the same separation, and the four stems kept as audio files for a mixer, listed by GET /library/tracks/{track}/stems; it fills `stems` too), `mood` (arousal and valence over the track, `mood_curve`) and `section_sound` (one sound vector per section, for GET /library/tracks/{track}/similar-sections; needs the sections first: 422 `sections_required` otherwise). `mood` and `section_sound` run on the analysis sidecar's ML build. An unknown kind is a 422."
     DeepAnalysisRequest:
       type: object
       required: [status, queued, estimate]
@@ -6164,6 +7940,8 @@ components:
           description: "An ESTIMATE from the track length, measured on a fast machine; a small PC is slower."
           properties:
             sections_seconds: { type: integer }
+            mood_seconds: { type: integer, description: "Estimate for kind `mood`, from the track length (not measured on real hardware)" }
+            section_sound_seconds: { type: integer, description: "Estimate for kind `section_sound`, from the track length (not measured on real hardware)" }
             stems_seconds: { type: integer, description: "5 s + 0.5 s per second of audio by default; 1.5-2.5 s per second on a small PC" }
             stem_audio_seconds: { type: integer, description: "The stems estimate plus encoding the four files (0.05 s per second of audio by default)" }
             stems_ram_mb: { type: integer, description: "RAM the stems service needs while it works" }
@@ -6185,7 +7963,7 @@ components:
       type: object
       properties:
         report: { type: string }
-        kind: { type: string, enum: [track, album, file, group], description: "`track`: one track's file; `album`: an incomplete album, or an album with a cover problem (`covers`); `file`: a file without a track, or missing; `group`: duplicate recordings (see `copies`)" }
+        kind: { type: string, enum: [track, tag, cover, album, file, group], description: "`track`: one track's file; `album`: an incomplete album, an album with a cover problem (`covers`) or inconsistent track numbers (`suggestions`); `tag` and `cover`: a suggestion with a value to apply (`suggestions`); `file`: a file without a track, or missing; `group`: duplicate recordings (see `copies`)" }
         title: { type: string, description: "`Artist · Track`, `Artist · Album` or a file path" }
         reason: { type: string, description: "One line, in the server's wording: `FLAC, spectrum ends at 16.5 kHz (95% sure)`, `3 of 12 tracks`. A transcode is only ever suspected." }
         track_id: { type: integer, nullable: true }
@@ -6210,6 +7988,19 @@ components:
               size: { type: integer }
               track_id: { type: integer, nullable: true }
               description: { type: string, example: "MP3 · 192 kbps · spectrum ends at 19.0 kHz" }
+        suggestion:
+          type: object
+          nullable: true
+          description: "Only in the `suggestions` report (docs/api/suggestions.md): what to apply and how to refer to it in POST /admin/suggestions/{id}/accept|dismiss"
+          properties:
+            id: { type: string, example: "title:412", description: "`{field}:{track id}`, `cover:{album id}` or `track_numbers:{album id}`" }
+            kind: { type: string, enum: [tag, cover, album] }
+            field: { type: string, enum: [title, artist, year, cover, track_numbers] }
+            current: { type: string, nullable: true, description: "What the file's tag says now (null when it has none)" }
+            suggested: { type: string, nullable: true, description: "The value MusicBrainz gives; for `cover` the MusicBrainz release id the front image comes from; null when there is nothing to apply" }
+            can_apply: { type: boolean }
+            source: { type: string, enum: [musicbrainz, coverartarchive, files] }
+            file_id: { type: integer, nullable: true }
         physical:
           type: array
           nullable: true
@@ -6485,7 +8276,8 @@ components:
           description: "MusicBrainz credits by role (`composer`, `instrument` as `Name (guitar)` …); empty object when none"
           additionalProperties: { type: array, items: { type: string } }
         isrc: { type: string, nullable: true }
-        explicit: { type: boolean, nullable: true }
+        lyrics_language: { type: string, nullable: true, example: nl, description: "ISO 639-1 code detected locally from the stored lyrics; null when there are none or the language could not be told" }
+        explicit: { type: boolean, nullable: true, description: "From the source (Spotify) or, when it gave none, a guess from the lyrics; true or null, never a guessed false" }
         popularity: { type: integer, nullable: true, description: "Spotify, 0 to 100" }
         listeners: { type: integer, nullable: true, description: Last.fm }
         playcount: { type: integer, nullable: true, description: Last.fm }
@@ -6500,6 +8292,10 @@ components:
         stems: { type: object, nullable: true, additionalProperties: true, description: "Null until requested (deep analysis); see TrackStems" }
         vocal_ratio: { type: number, nullable: true }
         instrumental: { type: array, nullable: true, items: { type: object, additionalProperties: true }, description: "Instrumental ranges (stems); null until requested" }
+        mood_curve:
+          allOf: [{ $ref: "#/components/schemas/MoodCurve" }]
+          nullable: true
+          description: Null until requested (deep analysis kind `mood`)
     SoundFilter:
       type: object
       description: "Criteria over the analysis of a track's own audio file; all given criteria must hold. Same names and meaning as the query parameters of GET /library/tracks. Raw values, no normalisation. `camelot` and `mood` take a comma-separated string or a list."
@@ -6917,6 +8713,7 @@ components:
           properties:
             plain: { type: string, nullable: true }
             synced: { type: string, nullable: true, description: LRC text with [mm:ss.xx] stamps }
+            language: { type: string, nullable: true, description: "ISO 639-1 code detected from the lyrics" }
         waveform:
           type: array
           description: Present when the playing track is a library track with an analysed own file. 0-100 heights, RMS contrast-normalised per track.
@@ -6924,6 +8721,26 @@ components:
         stems: { $ref: "#/components/schemas/TrackStems" }
         vocal_ratio: { type: number, minimum: 0, maximum: 1, description: "Share of the track that is not instrumental. Present with `stems`." }
         instrumental: { $ref: "#/components/schemas/InstrumentalRanges" }
+        mood_curve: { $ref: "#/components/schemas/MoodCurve" }
+
+    SectionRef:
+      type: object
+      required: [index, start, end]
+      properties:
+        index: { type: integer, description: Position in the track's sections }
+        start: { type: number, description: Seconds }
+        end: { type: number }
+        label: { type: string, nullable: true, description: "Repetition letter, never verse or chorus" }
+
+    MoodCurve:
+      type: object
+      description: "Mood of a track over time (deep analysis kind `mood`, workstream 16.3): arousal (calm to intense) and valence (negative to positive), one integer 0-100 per `window` seconds from the start, from a model's estimate (not a measurement). Draw it as a strip; the top is intense."
+      required: [method, window, arousal, valence]
+      properties:
+        method: { type: string, example: deam-msd-musicnn-2 }
+        window: { type: number, example: 3, description: Seconds per point }
+        arousal: { type: array, items: { type: integer, minimum: 0, maximum: 100 } }
+        valence: { type: array, items: { type: integer, minimum: 0, maximum: 100 }, description: Same length as `arousal` }
 
     Artwork:
       type: object
@@ -7480,6 +9297,8 @@ components:
         name: { type: string }
         kind: { $ref: "#/components/schemas/PlayerKind" }
         state: { type: string }
+        last_seen: { type: string, format: date-time, nullable: true, description: "Last registration or state report (rewritten at most once a minute)" }
+        hidden: { type: boolean, description: "True for a player the housekeeping hid; only listed with `include_hidden=1`" }
     PlayerKind:
       type: string
       description: Display only. `retro` is for old handhelds and computers.
@@ -7490,6 +9309,7 @@ components:
       properties:
         token: { type: string, description: "From the first registration; omit the first time" }
         adopt_device_id: { type: integer, description: "Take over this existing player (only when `token` is not known)" }
+        adopt_by_name: { type: boolean, description: "Opt in: without a known token, take over the offline player with the same `name` and `kind` (hidden ones too; the one that reported last) instead of adding a new one. A live player is never taken. The old tokens keep working" }
         name: { type: string }
         kind: { $ref: "#/components/schemas/PlayerKind" }
         capabilities:
@@ -7651,6 +9471,21 @@ components:
       properties:
         ok: { type: boolean, description: "Beat within the last 3 minutes" }
         last_beat_at: { type: string, format: date-time, nullable: true }
+    BackupCopy:
+      type: object
+      description: "GET and PUT /admin/backup/copy-path; see docs/api/admin-backup.md"
+      properties:
+        path: { type: string, nullable: true, description: "The directory the archives are copied to; null = no copy" }
+        keep: { type: integer, description: "Archives kept there (BACKUP_KEEP, as in the backup directory)" }
+        last_copy:
+          type: object
+          nullable: true
+          description: "The last copy attempt; null before the first"
+          properties:
+            ok: { type: boolean }
+            message: { type: string }
+            at: { type: string, format: date-time }
+            file: { type: string, nullable: true }
     HealthServices:
       type: object
       properties:

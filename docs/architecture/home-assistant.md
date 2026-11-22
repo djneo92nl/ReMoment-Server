@@ -19,7 +19,7 @@ Code in `App\Domain\HomeAssistant\` (`HomeAssistant` settings, `EntityCatalog`, 
   - One sensor per device, "{name} source": state is the source in the cached now playing (never `in_use`), attributes the visible sources, `input` and `device_id` (`remoment/ha/sources/{deviceId}`). Attached to the server device, not the speaker's own HA device (no MAC lookup; open question 3 stays open).
   - `event` entities, non-retained payloads `{"event_type": …, …}` on `remoment/ha/events/{entity}`: `alert` (`raised`/`resolved`, bridged from `Alerts::publish`), `scene_activated` (`activated`, with `status` and `source`), `client_pending`, `track_started`, `state_changed` (event type is the new state, with `previous`), `source_changed` (with `source` and `input` for a TV). Playback events carry `device_id` and `device`. They are only published while discovery is on, and `track_started`/`source_changed` are deduplicated per device (`ha_track_*`, `ha_source_*`; the first source seen is not an event).
 - **Differences from the plan:** `StatsSnapshot` was written new instead of moving the queries out of `StatsController` (the stats page is untouched); one aggregate `external_services` sensor instead of one per service; no `ha:publish-discovery` name (it is `ha:discovery`); the `ha:package` YAML is offered as a download on `/settings/mqtt` and `GET /api/admin/ha/package` ([admin-ha.md](../api/admin-ha.md)).
-- **Never:** `media_player` entities, command topics, or a subscriber.
+- **Never:** `media_player` entities, transport/volume/queue entities. (The server did not subscribe at first; the opt-in command path below was added 2026-11-21.)
 - **Unverified in a real Home Assistant:** the whole thing was tested with a fake publisher only. Not yet seen: that HA accepts the `object_id` + `unique_id` pair and the `device` block, that the `none` rendered for a missing battery or top item shows as unknown, that `event` entities fire from the payload shape, that `expire_after` and the availability topic together behave as intended, and the HA minimum version (`event` entities need 2023.8). The broker must be the one HA uses (open question 1).
 
 ## What is exposed
@@ -87,9 +87,30 @@ rest_command:
 
 **Unverified:** the file has only been parsed (Symfony YAML in `tests/Unit/Scenes/HaPackageTest.php`), never loaded by a running Home Assistant; the template syntax follows HA's `rest_command` documentation. Query parameters (none of the listed operations has one) appear only when required. See [action-layer.md](action-layer.md) section 8.
 
-**Later, optional:** an MQTT command path (a `button` per scene, a source `select`) means the server subscribes to `remoment/ha/+/set`. That is a new `mqtt:listen` process next to `device:listen`; decide when the REST package proves too clumsy. Open question 4 below.
+**Optional, built 2026-11-21:** an MQTT command path, see [Commands from Home Assistant](#commands-from-home-assistant-opt-in-built-2026-11-21). A source `select` is not built.
 
 **Still not exposed:** players as `media_player` entities (HA has its own integrations for every speaker). A TV is the same: its power, input and now playing reach HA as the source sensor and events above, not as a second TV entity.
+
+## Commands from Home Assistant (opt-in, built 2026-11-21)
+
+The server **subscribes** to exactly one filter, `remoment/ha/command/#`, and only while both opt-ins are on. It is the one place where a message on the broker makes the server do something, so it is narrow, off by default, and tested with a recorder instead of a broker (`tests/Feature/HomeAssistant/HomeAssistantCommandsTest.php`).
+
+- **Switches.** Discovery on (`/settings/mqtt`) **and** commands on: Setting `ha_commands_enabled` (falls back to `HA_COMMANDS_ENABLED`, default off), set with `php artisan ha:commands on|off` (no argument shows the state; the buttons appear or go at once). There is no switch on the settings page yet. Needs the `home_assistant` profile feature (every profile).
+- **Process.** `php artisan ha:listen` (`HaListenCommand`, `CommandSubscriber`), supervisor program `ha-commands` started by `START_HA_COMMANDS` (profile worker `ha-commands`, feature `home_assistant`). While the opt-in is off it idles **without a broker connection**; it follows both switches every five seconds, disconnects when switched off, and reconnects with a growing wait (2 to 60 s) when the broker is away. Same pattern as `scenes:listen`.
+- **Commands** (`CommandHandler`):
+
+| Topic | Payload | Does |
+|---|---|---|
+| `remoment/ha/command/scene/{id}` | any (the button sends `PRESS`) | starts the scene on the queue with source `home_assistant` (as a trigger does) |
+| `remoment/ha/command/operation` | `{"operation": "setVolume", "device_id": 3, "params": {"volume": 30}, "request_id": "abc"}` | runs **one operation of the scene allow-list** through `SceneRunner`, so through `ApiBridge` and the REST route's own validation |
+
+- **Allow-list.** An operation passes `SceneOperations::validateStep`: a guest-level operation of `openapi.yaml` that changes something, minus `config/scene-operations.php` `exclude` and disabled ones. Hence never an admin-token operation (sync, settings, tokens, nodes, backup), never sign-in or registration, never `createScene`/`updateScene`/`deleteScene`/`activateScene` (a command cannot run or edit scenes except through the scene button), never a `delay`. Unknown, excluded and admin operations answer `not_allowed`; a malformed step `invalid`.
+- **Result.** Every accepted or refused command is answered on `remoment/ha/events/command_result` (non-retained, an `event` entity `Command result` with event types `ok` and `error`): `{"event_type": "ok"|"error", "command": "operation", "request_id": "abc", "ok": false, "error": "not_allowed", "message": "…", "operation": …, "device_id": …, "status": <HTTP status of the call>, "at": …}`. Error codes: `not_found`, `unknown_command`, `invalid`, `not_allowed`, `busy`, `debounced`, `rate_limited`, `too_large`, `failed` (the API refused or the device did not take it; `message` is the API's error). A scene button's success only says the scene was queued; the outcome of its steps is the `scene_activated` event.
+- **Discovery.** A `button` entity per scene on the server device (`unique_id` `remoment_scene_{id}`, `command_topic` `remoment/ha/command/scene/{id}`, `payload_press` `PRESS`), present only while commands are on; created, renamed and deleted scenes update it (a scene's own runs do not republish anything). The `command_result` event entity is always part of discovery.
+- **Loop and abuse protection.** Retained messages are ignored (a broker replays them on every connect). The results go to a topic this process does not subscribe to, so an answer can never be a command. At most `mqtt.ha_command_rate` (30, `HA_COMMAND_RATE`) commands a minute across all topics, then `rate_limited`; the same command (same scene, or same operation, device and params) within `mqtt.ha_command_debounce` (2 s, `HA_COMMAND_DEBOUNCE`) is dropped as `debounced`; a scene that is running or ended in the last 15 s is not started again (`busy`, the scene loop guard); payloads over 4 KB are refused; error answers are limited to 10 a minute so a flood of bad messages is not echoed. A scene may not use `remoment/ha/command/#` as an MQTT trigger (`scenes.triggers.blocked_topics`), or one press would start it twice. An HA automation that reacts to `scene_activated` by pressing the same button is stopped by the guard and the debounce.
+- **Trust.** Anyone who can publish to the broker can send these commands: the broker's own access control is the boundary, as it already is for scene MQTT triggers. The allow-list is what limits the damage (no admin action, no data deletion beyond what a scene may do, e.g. `clearQueue`).
+- **Not built:** a source `select`, a settings-page switch, per-command authentication, a retained "last result".
+- **Unverified in a real Home Assistant and on a real broker:** that HA's `button` entity publishes `PRESS` as configured, that `ha:listen` holds a subscription across broker restarts (the loop is the same as `scenes:listen`; reconnect is untested against a real broker), and the event entity's rendering of the result payload.
 
 ## Phases (1 to 6 built; 7 is `ha:package`)
 
@@ -115,4 +136,4 @@ A faked `MqttService` asserts payloads, retain flags, deduplication and removal.
 1. Does HA use the same Mosquitto broker as ReMoment? If not, a Mosquitto bridge is needed first.
 2. Which stats windows matter (today, 7d, 30d, all time)?
 3. Is a MAC stored for ASE, Sonos and DLNA devices (see Device layout)?
-4. Should source switching, and scene start, ever be offered as an opt-in `select`/`button` over MQTT? The REST package covers it for now; an MQTT command path means a subscriber process (see Automations).
+4. Answered 2026-11-21: scene start is an opt-in `button` over MQTT and any scene-allow-listed operation an opt-in command (see Commands from Home Assistant). A source `select` is still open.

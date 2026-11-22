@@ -188,10 +188,18 @@
                                         <dd style="max-width:32rem"><livewire:track-sections lazy :track-id="$track->id" :key="'sections-'.$track->id" /></dd>
                                         <dt class="text-gray-400 dark:text-gray-600">Stems</dt>
                                         <dd style="max-width:32rem"><livewire:track-stems lazy :track-id="$track->id" :key="'stems-'.$track->id" /></dd>
+                                        <dt class="text-gray-400 dark:text-gray-600">Mood</dt>
+                                        <dd style="max-width:32rem"><livewire:track-mood lazy :track-id="$track->id" :key="'mood-'.$track->id" /></dd>
+                                        <dt class="text-gray-400 dark:text-gray-600">Sections like</dt>
+                                        <dd style="max-width:44rem"><livewire:section-similar lazy :track-id="$track->id" :key="'section-similar-'.$track->id" /></dd>
                                         @if($hasSimilar)
                                             <dt class="text-gray-400 dark:text-gray-600">Similar</dt>
                                             <dd style="max-width:44rem"><livewire:track-similar lazy :track-id="$track->id" :limit="6" title="" :key="'similar-'.$track->id" /></dd>
                                         @endif
+                                    @endif
+                                    @if($track->metaValue('mbid'))
+                                        <dt class="text-gray-400 dark:text-gray-600">Related</dt>
+                                        <dd style="max-width:44rem"><livewire:track-related lazy :track-id="$track->id" :key="'related-'.$track->id" /></dd>
                                     @endif
                                     @if($quality)
                                         <dt class="text-gray-400 dark:text-gray-600">Quality</dt>

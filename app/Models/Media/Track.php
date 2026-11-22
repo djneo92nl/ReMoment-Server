@@ -239,12 +239,14 @@ class Track extends Model
     {
         $sections = $this->sections();
         $stems = $this->stems();
+        $mood = $this->moodCurve();
 
         return [
             'genres' => $this->genres(),
             'quality' => $this->audioQuality(),
             'credits' => (object) $this->credits(),
             'isrc' => $this->metaValue('isrc'),
+            'lyrics_language' => \App\Domain\Lyrics\LyricsAnalysis::language($this),
             'explicit' => ($e = $this->metaValue('explicit')) !== null ? $e === '1' : null,
             'popularity' => $this->metaInt('spotify_popularity'),
             'listeners' => $this->metaInt('lastfm_listeners'),
@@ -255,6 +257,30 @@ class Track extends Model
             'stems' => $stems['stems'] ?? null,
             'vocal_ratio' => $stems['vocal_ratio'] ?? null,
             'instrumental' => $stems['instrumental'] ?? null,
+            'mood_curve' => $mood,
+        ];
+    }
+
+    /**
+     * The mood over time of the track's own audio file when someone asked for it (deep analysis, `mood` kind), else
+     * null: { method, window, arousal, valence }, the window in seconds and the two lists integers 0-100, one per window.
+     *
+     * @return array{method: string, window: float, arousal: list<int>, valence: list<int>}|null
+     */
+    public function moodCurve(): ?array
+    {
+        $a = $this->relationLoaded('analysis') ? $this->analysis : $this->analysis()->first();
+        $stored = $a?->mood_curve;
+
+        if (!is_array($stored) || empty($stored['arousal']) || !is_array($stored['valence'] ?? null)) {
+            return null;
+        }
+
+        return [
+            'method' => (string) ($stored['method'] ?? 'deam-msd-musicnn-2'),
+            'window' => (float) ($stored['window'] ?? 3),
+            'arousal' => $stored['arousal'],
+            'valence' => $stored['valence'],
         ];
     }
 

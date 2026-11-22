@@ -39,6 +39,9 @@ class ReMomentServer extends Server
         Tools\MultiroomPresets::class,
         Tools\ManageDevices::class,
         Tools\Clients::class,
+        Tools\AdminTokens::class,
+        Tools\AnalysisStatus::class,
+        Tools\LibrarySettings::class,
         Tools\RadioStations::class,
         Tools\ServerHealth::class,
         Tools\DeviceLinks::class,
@@ -69,7 +72,11 @@ class ReMomentServer extends Server
         Tools\PlaybackHistory::class,
         Tools\LibraryOverview::class,
         Tools\LibraryHealth::class,
+        Tools\LibrarySuggestions::class,
         Tools\ListeningStats::class,
         Tools\ListeningInsights::class,
+        Tools\ContinueListening::class,
+        Tools\Podcasts::class,
+        Tools\EditTags::class,
     ];
 }

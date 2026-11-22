@@ -11,6 +11,7 @@ use App\Jobs\PollRadioTitle;
 use App\Jobs\PrepareSyncArtifact;
 use App\Jobs\ProcessArtwork;
 use App\Jobs\ProcessLibraryUpload;
+use App\Jobs\RefreshPodcast;
 use App\Jobs\ReportRadioClick;
 use App\Jobs\RestoreAfterAnnouncement;
 use App\Jobs\RunScene;
@@ -110,6 +111,7 @@ class QueueWorkerConfigTest extends TestCase
             BuildSdCardExport::class => fn () => new BuildSdCardExport,
             RunScene::class => fn () => new RunScene(1),
             ScanForDevices::class => fn () => new ScanForDevices,
+            RefreshPodcast::class => fn () => new RefreshPodcast(1),
             RunStorageTask::class => fn () => new RunStorageTask('scan'),
             ProcessArtwork::class => fn () => new ProcessArtwork('http://x/y.jpg'),
             SoakNoop::class => fn () => new SoakNoop,

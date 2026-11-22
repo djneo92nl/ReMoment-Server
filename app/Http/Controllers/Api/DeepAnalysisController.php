@@ -8,7 +8,7 @@ use App\Models\Media\Track;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
-/** Deep analysis of one track on request (sections, stems); admin token. See docs/api/deep-analysis.md. */
+/** Deep analysis of one track on request (sections, stems, mood, section sound); no login. See docs/api/deep-analysis.md. */
 class DeepAnalysisController extends Controller
 {
     public function store(Request $request, Track $track): JsonResponse
@@ -22,7 +22,14 @@ class DeepAnalysisController extends Controller
             return $this->noFile();
         }
 
-        $result = DeepAnalysis::request($file, $data['kinds']);
+        // The sound of the sections needs the sections: ask for them first, or in the same request (they queue first).
+        if (in_array('section_sound', $data['kinds'], true) && !in_array('sections', $data['kinds'], true) && empty($file->analysis()->first()?->sections['items'])) {
+            return response()->json(['error' => 'sections_required', 'message' => 'The sound of the sections needs the sections of the track: request `sections` first (or together with `section_sound`).'], 422);
+        }
+
+        // `sections` queue ahead of `section_sound` on the single analysis worker.
+        $kinds = array_values(array_unique(in_array('section_sound', $data['kinds'], true) ? [...array_diff($data['kinds'], ['section_sound']), 'section_sound'] : $data['kinds']));
+        $result = DeepAnalysis::request($file, $kinds);
         $estimate = [];
         foreach (DeepAnalysis::kinds() as $kind) {
             $estimate["{$kind}_seconds"] = DeepAnalysis::estimateSeconds($kind, $track->duration);

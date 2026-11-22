@@ -8,12 +8,12 @@ Tracks, albums and artists get extra data from outside services, stored in the p
 
 | Job | Source | Writes |
 |-----|--------|--------|
-| `EnrichTrackMusicBrainz` | `musicbrainz` | track `mbid`, `isrc`, `credits` (producer, composer, performers … `[{role, name, detail?}]`); artist `mbid`; album `mbid` (only the release whose title is the album's). Queues the two jobs below |
+| `EnrichTrackMusicBrainz` | `musicbrainz` | track `mbid`, `isrc`, `mb_title`, `mb_artist`, `mb_year` (what MusicBrainz calls the recording: [suggestions.md](../api/suggestions.md)), `work_mbid`, `related_works` ([related-works.md](../api/related-works.md)), `credits` (producer, composer, performers … `[{role, name, detail?}]`); artist `mbid`; album `mbid` (only the release whose title is the album's). Queues the two jobs below |
 | `EnrichTrackLastfm` | `lastfm` | track `lastfm_listeners`, `lastfm_playcount`, `tags` (needs `LASTFM_API_KEY`) |
 | `EnrichAlbumLastfm` | `lastfm` | album `lastfm_summary`, `lastfm_listeners`, `lastfm_playcount`, `tags` |
 | `EnrichArtistMusicBrainz` | `musicbrainz`, `wikipedia` | once per artist with an `mbid`: `genres` (curated, else top tags), `country`, `area`, `artist_type`, `begin_date`, `end_date`, `links` (official, wikidata, discogs, bandcamp, allmusic, lastfm, instagram … json); from Wikipedia (via the Wikidata id) `wikidata_id`, `wikipedia_extract`, `wikipedia_url` |
 | `EnrichAlbumMusicBrainz` | `musicbrainz`, `wikipedia` | once per album with an `mbid`: `label`, `catalog_number`, `barcode`, `country`, `release_date`, `release_type` (album, ep, single …), `secondary_types` (json), `track_count`, `disc_count`, `release_group_mbid`, `genres`; fills `albums.released_at` when empty; Wikipedia summary of the release group; **when the album has no image** its front cover from the Cover Art Archive (queued through `ProcessArtwork`) |
-| `EnrichTrackLyrics` | `lrclib` | track `lyrics_plain` (empty = none exist), `lyrics_synced` |
+| `EnrichTrackLyrics` | `lrclib` | track `lyrics_plain` (empty = none exist), `lyrics_synced`; then locally `lyrics_language` and a guessed `explicit` (source `lyrics`, [lyrics.md](../api/lyrics.md)) |
 | `EnrichTrackSpotify` | `spotify` | track `spotify_popularity`, `explicit`, `isrc`; artist `spotify_id`, `spotify_popularity`, `genres` (only when MusicBrainz gave none). Spotify-source tracks, when connected |
 | `EnrichArtistLastfm` | `lastfm` | artist `bio`, `similar_artists`, `lastfm_listeners`, `lastfm_playcount`, `tags` |
 | `EnrichArtistAudioDb` | `audiodb` | artist `images` (`{thumb, fanart, fanart2-4, wide_thumb, logo, banner}`), `mood`, `style`, `audiodb_bio`; needs the MusicBrainz artist id. TheAudioDB's public key `123` works (the old `2` answers 404 for everything now) (`AUDIODB_API_KEY` for a supporter key) |

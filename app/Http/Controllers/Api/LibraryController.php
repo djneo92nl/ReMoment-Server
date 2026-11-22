@@ -30,6 +30,7 @@ use App\Domain\Library\SimilarTracks;
 use App\Domain\Library\SmartPlaylist\SmartPlaylistDescriber;
 use App\Domain\Library\SoundFilter;
 use App\Domain\Library\SpotifyCatalog;
+use App\Domain\Lyrics\LyricsFilter;
 use App\Domain\Stats\PlayTotals;
 use App\Http\Controllers\Controller;
 use App\Jobs\LookupSpotifyAvailability;
@@ -194,7 +195,7 @@ class LibraryController extends Controller
             'sort' => ['nullable', 'in:name,artist,added,plays,plr,bpm,arousal'],
             'include' => ['nullable', 'in:analysis'],
             'count_only' => ['nullable', 'boolean'],
-        ] + SoundFilter::rules());
+        ] + SoundFilter::rules() + LyricsFilter::rules());
         $hidden = $this->hiddenSources($request);
         $offset = $this->decodeCursor($request->query('cursor'));
         $sort = $request->query('sort', 'name');
@@ -203,6 +204,9 @@ class LibraryController extends Controller
         $query = LibrarySources::tracks(Track::query(), $hidden);
         if ($criteria !== []) {
             SoundFilter::apply($query, $criteria);
+        }
+        if (LyricsFilter::present($request->query())) {
+            LyricsFilter::apply($query, $request->query());
         }
 
         if ($request->boolean('count_only')) {

@@ -63,6 +63,12 @@ php artisan library:scan [--server=192.168.1.20] [--root=Muziek]   # --root: sta
 # Queue MusicBrainz/lyrics/Spotify/Last.fm/TheAudioDB/Discogs enrichment for tracks, artists and albums still missing a source, plus Spotify photos for artists without one (scheduled daily; artists with a Spotify id are fetched 50 per request, others looked up by exact name). --only=metadata|artist-images runs one part
 php artisan library:enrich [--only=metadata --only=artist-images] [--limit=200] [--dry-run]
 
+# Upcoming concerts of library artists from MusicBrainz events (opt-in setting `concerts_enabled`; scheduled daily 03:10 only while on): queues one lookup per artist not read in --days, drops past concerts (docs/api/concerts.md)
+php artisan concerts:sync [--limit=100] [--days=7] [--dry-run]
+
+# Detect the language (and a guessed explicit flag) of stored lyrics not looked at yet; local, no requests (scheduled daily 03:20; docs/api/lyrics.md)
+php artisan library:lyrics-analysis [--limit=2000] [--redo]
+
 # Audio analysis of the own files (loudness, fingerprint + AcoustID, BPM/key/mood via the optional Essentia sidecar); needs ANALYSIS_ENABLED=true, runs on the `analysis` queue (scheduled nightly). --now with --file runs inline
 php artisan library:analyze [--limit=100] [--stage=loudness|waveform|quality|fingerprint|acoustid|essentia] [--file=ID --now] [--dry-run]
 
@@ -88,6 +94,10 @@ php artisan push:test [--message=]
 # Home Assistant MQTT discovery (opt-in: switch on /settings/mqtt or HA_DISCOVERY_ENABLED): publish the retained configs + states of the "ReMoment Server" device (stats, health, clients, sources, event entities; never media_player), or clear them with --remove; the scheduler republishes every 5 minutes while on; unverified in a real HA; see docs/architecture/home-assistant.md
 php artisan ha:discovery [--remove]
 
+# Home Assistant command path (opt-in, needs discovery on): `ha:commands on|off` (no argument shows the state; scene buttons appear or go), `ha:listen` is the supervised subscriber to remoment/ha/command/# (program ha-commands; idles until both are on); scene buttons and scene-allow-listed operations only, results on remoment/ha/events/command_result; unverified in a real HA; see docs/architecture/home-assistant.md
+php artisan ha:commands [on|off]
+php artisan ha:listen
+
 # Home Assistant rest_command package (YAML) for the scene-capable operations of config/scene-operations.php, generated from docs/api/openapi.yaml; unverified in a running HA; see docs/architecture/home-assistant.md
 php artisan ha:package [--output=remoment.yaml] [--base-url=http://remoment.local]
 
@@ -96,6 +106,9 @@ php artisan history:prune [--months=N] [--dry-run]
 
 # Hide ReMoment Players that have not reported for PLAYERS_HIDE_AFTER_DAYS (default 30; never deletes; scheduled daily 04:10); see docs/api/players.md
 php artisan players:hide-stale [--days=N] [--dry-run]
+
+# Queue a refresh job for every podcast feed that is due (scheduled every 30 min where the profile has podcasts; conditional GET, spaced out, back-off on failure); --force ignores the interval, --now fetches here instead of queueing; see docs/api/podcasts.md
+php artisan podcasts:refresh [--force] [--podcast=ID] [--now]
 
 # Re-select the tracks of smart (rule-based) playlists (scheduled daily)
 php artisan playlists:refresh-smart [--playlist=ID]

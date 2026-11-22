@@ -29,7 +29,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
     && if [ "$ESSENTIA_ML" = "1" ]; then pip install --no-cache-dir essentia-tensorflow; else pip install --no-cache-dir essentia; fi
 
-COPY app.py fetch_models.sh ./
+COPY app.py curve.py fetch_models.sh ./
 RUN chmod +x fetch_models.sh
 
 VOLUME /models

@@ -21,6 +21,7 @@ final class InfoFeatures
             'rip' => true,
             'sleep_timer' => true,
             'nodes' => true,
+            'podcasts' => true,
             'sub_devices' => true,
         ] + (Tools::available(Tools::ffmpeg()) ? ['export' => true, 'sync' => true, 'export_formats' => ExportFormats::availableIds()] : []);
     }

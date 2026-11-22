@@ -426,8 +426,8 @@ class LibraryApiTest extends TestCase
                 ],
                 'playable' => true,
                 'tracks' => [
-                    ['id' => $one->id, 'name' => 'Intro', 'duration' => 200, 'playable' => true, 'favorite' => false, 'plays' => 0, 'last_played_at' => null, 'details' => ['genres' => [], 'quality' => null, 'credits' => [], 'isrc' => null, 'explicit' => null, 'popularity' => null, 'listeners' => null, 'playcount' => null, 'analysis' => null, 'sections' => null, 'sections_reason' => null, 'stems' => null, 'vocal_ratio' => null, 'instrumental' => null]],
-                    ['id' => $two->id, 'name' => 'Apocalypse Please', 'duration' => 200, 'playable' => false, 'favorite' => false, 'plays' => 0, 'last_played_at' => null, 'details' => ['genres' => [], 'quality' => null, 'credits' => [], 'isrc' => null, 'explicit' => null, 'popularity' => null, 'listeners' => null, 'playcount' => null, 'analysis' => null, 'sections' => null, 'sections_reason' => null, 'stems' => null, 'vocal_ratio' => null, 'instrumental' => null]],
+                    ['id' => $one->id, 'name' => 'Intro', 'duration' => 200, 'playable' => true, 'favorite' => false, 'plays' => 0, 'last_played_at' => null, 'details' => ['genres' => [], 'quality' => null, 'credits' => [], 'isrc' => null, 'lyrics_language' => null, 'explicit' => null, 'popularity' => null, 'listeners' => null, 'playcount' => null, 'analysis' => null, 'sections' => null, 'sections_reason' => null, 'stems' => null, 'vocal_ratio' => null, 'instrumental' => null, 'mood_curve' => null]],
+                    ['id' => $two->id, 'name' => 'Apocalypse Please', 'duration' => 200, 'playable' => false, 'favorite' => false, 'plays' => 0, 'last_played_at' => null, 'details' => ['genres' => [], 'quality' => null, 'credits' => [], 'isrc' => null, 'lyrics_language' => null, 'explicit' => null, 'popularity' => null, 'listeners' => null, 'playcount' => null, 'analysis' => null, 'sections' => null, 'sections_reason' => null, 'stems' => null, 'vocal_ratio' => null, 'instrumental' => null, 'mood_curve' => null]],
                 ],
             ]);
 

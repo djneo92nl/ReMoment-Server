@@ -6,6 +6,7 @@ use App\Domain\Profile\Profile;
 use App\Domain\System\InstalledVersion;
 use App\Models\Client;
 use App\Models\Device;
+use App\Models\Scene;
 
 /**
  * Every Home Assistant entity ReMoment publishes, as discovery configs (docs/architecture/home-assistant.md).
@@ -34,6 +35,8 @@ final class EntityCatalog
         'track_started' => ['Track started', ['started']],
         'state_changed' => ['Playback state changed', ['playing', 'paused', 'standby', 'unreachable']],
         'source_changed' => ['Source changed', ['changed']],
+        // The answer to a command from Home Assistant (CommandHandler): `ok` or `error`, with the command, request_id and error code.
+        'command_result' => ['Command result', ['ok', 'error']],
     ];
 
     /**
@@ -78,6 +81,14 @@ final class EntityCatalog
                 'json_attributes_topic' => "remoment/ha/sources/{$device->id}", 'json_attributes_template' => '{{ {"sources": value_json.sources, "input": value_json.input, "device_id": value_json.device_id} | tojson }}',
                 'icon' => 'mdi:import', 'expire_after' => self::EXPIRE_AFTER,
             ]);
+        }
+        // The opt-in command path: one button per scene (CommandHandler). Switched off, the buttons are not listed and so are removed.
+        if (HomeAssistant::commandsActive()) {
+            foreach (Scene::orderBy('id')->get(['id', 'name', 'icon']) as $scene) {
+                $add('button', "scene_{$scene->id}", [
+                    'name' => $scene->name, 'command_topic' => CommandHandler::PREFIX."scene/{$scene->id}", 'payload_press' => 'PRESS', 'icon' => 'mdi:play-box-outline',
+                ]);
+            }
         }
         foreach (self::EVENTS as $id => [$name, $types]) {
             $add('event', "event_{$id}", [

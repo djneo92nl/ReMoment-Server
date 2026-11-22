@@ -1,6 +1,8 @@
 """Essentia analysis sidecar: POST /analyze (a mono WAV) answers BPM, key, danceability and, when the
 TensorFlow models are installed, mood, arousal/valence, voice/instrumental and genre, plus the
-Discogs-EffNet embedding of the track (the mean over its patches, for "similar tracks"). GET /health says what is available. The Laravel app (App\\Domain\\Analysis\\Stages\\EssentiaStage) is the only client."""
+Discogs-EffNet embedding of the track (the mean over its patches, for "similar tracks"). POST /curve (arousal and valence per
+window of a few seconds, workstream 16.3) and POST /section-embeddings (one EffNet vector per time range, 16.5) keep the per-patch
+predictions /analyze averages away. GET /health says what is available. The Laravel app (App\\Domain\\Analysis\\Stages\\EssentiaStage) is the only client."""
 
 import json
 import os
@@ -10,7 +12,9 @@ import threading
 
 import essentia
 import essentia.standard as es
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+
+import curve
 
 MODEL_DIR = os.environ.get("MODEL_DIR", "/models")
 WANT_ML = os.environ.get("ESSENTIA_ML") == "1"
@@ -201,3 +205,55 @@ def analyze(audio: UploadFile = File(...)):
             result = _classic(tmp.name)
             result.update(_ml(tmp.name))
     return result
+
+
+def _load_16k(path):
+    audio = es.MonoLoader(filename=path, sampleRate=16000, resampleQuality=4)()
+    return audio, len(audio) / 16000.0
+
+
+@app.post("/curve")
+def mood_curve(audio: UploadFile = File(...), window: float = Form(3.0)):
+    """Arousal and valence (0-1) over the track: one point per `window` seconds (1-30), the mean of the DEAM predictions of
+    the MusiCNN patches that fall in it. Needs the `deam` model (503 without it)."""
+    if "musicnn" not in _models or "deam" not in _models:
+        raise HTTPException(status_code=503, detail="The mood models (msd-musicnn, deam) are not loaded; see /health.")
+    window = max(1.0, min(30.0, window))
+    with tempfile.NamedTemporaryFile(suffix=".wav") as tmp:
+        shutil.copyfileobj(audio.file, tmp)
+        tmp.flush()
+        with _lock:
+            samples, duration = _load_16k(tmp.name)
+            rows = _models["deam"](_models["musicnn"](samples))
+    if duration <= 0 or len(rows) == 0:
+        raise HTTPException(status_code=422, detail="No audio to analyse.")
+    points = curve.window_means(rows, duration, curve.PATCH_MUSICNN, window)
+    # DEAM scores run 1-9; column 0 is valence, column 1 arousal (as in /analyze).
+    unit = lambda v: round(max(0.0, min(1.0, (v - 1.0) / 8.0)), 3)  # noqa: E731
+    return {"version": 1, "method": "deam-msd-musicnn-2", "duration": round(duration, 2), "window": window,
+            "valence": [unit(p[0]) for p in points], "arousal": [unit(p[1]) for p in points]}
+
+
+@app.post("/section-embeddings")
+def section_embeddings(audio: UploadFile = File(...), sections: str = Form(...)):
+    """The mean Discogs-EffNet embedding of each time range in `sections` (a JSON list of [start, end] seconds, at most 64):
+    the sound of a section, for finding sections of other tracks that sound like it. Needs the effnet model (503 without it)."""
+    if "effnet" not in _models:
+        raise HTTPException(status_code=503, detail="The effnet model is not loaded; see /health.")
+    try:
+        ranges = [(float(a), float(b)) for a, b in json.loads(sections)]
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=422, detail="`sections` must be a JSON list of [start, end] pairs.")
+    if not ranges or len(ranges) > 64 or any(b <= a or a < 0 for a, b in ranges):
+        raise HTTPException(status_code=422, detail="`sections` needs 1-64 ranges with end after start.")
+    with tempfile.NamedTemporaryFile(suffix=".wav") as tmp:
+        shutil.copyfileobj(audio.file, tmp)
+        tmp.flush()
+        with _lock:
+            samples, duration = _load_16k(tmp.name)
+            rows = _models["effnet"](samples)
+    if duration <= 0 or len(rows) == 0:
+        raise HTTPException(status_code=422, detail="No audio to analyse.")
+    means = curve.range_means(rows, duration, curve.PATCH_EFFNET, ranges)
+    return {"version": 1, "model": "discogs-effnet-bs64-1", "duration": round(duration, 2),
+            "sections": [{"start": a, "end": b, "embedding": [round(float(x), 6) for x in m]} for (a, b), m in zip(ranges, means)]}

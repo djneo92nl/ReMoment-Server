@@ -20,6 +20,9 @@ trait ManagesTrackExtras
 
     public ?string $lyricsSynced = null;
 
+    /** ISO 639-1 code detected from the lyrics (App\Domain\Lyrics), null when unknown. */
+    public ?string $lyricsLanguage = null;
+
     /** Set once the playing track was added from here: the page to open it on. */
     public ?string $addedUrl = null;
 
@@ -36,6 +39,7 @@ trait ManagesTrackExtras
             $this->currentTrackId = $signature;
             $this->lyricsPlain = null;
             $this->lyricsSynced = null;
+            $this->lyricsLanguage = null;
             $this->addedUrl = null;
             $this->addFailure = null;
 
@@ -43,6 +47,7 @@ trait ManagesTrackExtras
             if ($track) {
                 $this->lyricsPlain = $track->lyricsPlain();
                 $this->lyricsSynced = $track->lyricsSynced();
+                $this->lyricsLanguage = \App\Domain\Lyrics\LyricsAnalysis::language($track);
             }
         }
 

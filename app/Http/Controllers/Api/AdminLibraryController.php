@@ -30,6 +30,8 @@ class AdminLibraryController extends Controller
             'add_played_tracks' => ['sometimes', 'boolean'],
             'playback_loudness' => ['sometimes', 'boolean'],
             'nts_enabled' => ['sometimes', 'boolean'],
+            'concerts_enabled' => ['sometimes', 'boolean'],
+            'concerts_location' => ['sometimes', 'nullable', 'string', 'max:200'],
             'history_keep_months' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:'.PlayRetention::MAX_MONTHS],
         ]);
 

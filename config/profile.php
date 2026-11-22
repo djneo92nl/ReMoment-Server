@@ -69,13 +69,14 @@ return [
 
         'library' => ['label' => 'Library browsing, playlists, library cache, artwork prerender, Spotify browse', 'profiles' => ['standard', 'full']],
         'enrichment' => ['label' => 'Metadata enrichment (MusicBrainz, Wikipedia, Last.fm, lyrics ...)', 'profiles' => ['standard', 'full']],
+        'podcasts' => ['label' => 'Podcasts: RSS subscriptions, episodes streamed to speakers, resume', 'profiles' => ['standard', 'full']],
         'dlna' => ['label' => 'DLNA servers and scan', 'profiles' => ['standard', 'full']],
         'file_storage' => ['label' => 'Own files: storage locations, indexing, import, streaming to speakers', 'profiles' => ['standard', 'full']],
         'catalogue' => ['label' => 'Catalogue sync, wishlist, new releases, physical collection', 'profiles' => ['standard', 'full']],
 
         'cover_health' => ['label' => 'Cover health report (albums with no, tiny or non-square cover); needs no analysis', 'profiles' => ['standard', 'full']],
         'analysis' => ['label' => 'Audio analysis (loudness, fingerprints, Essentia) and library health reports', 'profiles' => ['full']],
-        'deep_analysis' => ['label' => 'Deep analysis of one track: sections (structure) and stems', 'profiles' => ['full']],
+        'deep_analysis' => ['label' => 'Deep analysis of one track: sections (structure), stems, mood over time and the sound of sections', 'profiles' => ['full']],
         'rip_upload' => ['label' => 'Rip upload from the ripper app', 'profiles' => ['full']],
         'search_engine' => ['label' => 'Meilisearch (optional, unused by the app today)', 'profiles' => ['full']],
     ],
@@ -89,10 +90,10 @@ return [
     'routes' => [
         // Play history and statistics work in every profile (the history feature); narrow rows come before `library`.
         'history' => ['api/library/stats', 'api/library/history', 'api/devices/*/history'],
-        'deep_analysis' => ['api/library/tracks/*/deep-analysis', 'api/library/tracks/*/deep-analysis/*', 'api/library/tracks/*/stems', 'api/library/tracks/*/stems/*', 'api/stems/weights', 'api/admin/stems/weights', 'mixer'],
+        'deep_analysis' => ['api/library/tracks/*/deep-analysis', 'api/library/tracks/*/deep-analysis/*', 'api/library/tracks/*/similar-sections', 'api/library/tracks/*/stems', 'api/library/tracks/*/stems/*', 'api/stems/weights', 'api/admin/stems/weights', 'mixer'],
         'rip_upload' => ['api/admin/files', 'api/admin/rips', 'api/admin/rips/*', 'api/admin/rips/*/cancel', 'api/nodes/rippers', 'api/nodes/files'],
         'cover_health' => ['api/library/health/covers', 'settings/library-health/covers'],
-        'analysis' => ['api/library/tracks/*/mixes-with', 'api/library/tracks/*/similar', 'api/devices/*/library/play-similar', 'settings/analysis', 'settings/analysis/*', 'settings/library-health', 'settings/library-health/*', 'api/library/health', 'api/library/health/*'],
+        'analysis' => ['api/library/tracks/*/mixes-with', 'api/library/tracks/*/similar', 'api/devices/*/library/play-similar', 'api/library/journey', 'api/devices/*/library/play-journey', 'settings/analysis', 'settings/analysis/*', 'api/admin/analysis', 'api/admin/analysis/*', 'settings/library-health', 'settings/library-health/*', 'api/library/health', 'api/library/health/*'],
         'catalogue' => [
             'api/library/wishlist', 'api/library/new-releases', 'api/library/wanted-tracks', 'api/library/wanted-tracks/*',
             'api/library/catalogue/*', 'api/library/physical', 'api/library/physical/*', 'api/library/artists/*/discography',
@@ -101,14 +102,15 @@ return [
         'file_storage' => [
             'settings/storage', 'settings/storage/*', 'stream/*', 'tools/export', 'tools/sync',
             'api/admin/sync/*', 'api/sync/*', 'api/nodes/sync/*',
-            'api/admin/storage/*', 'api/admin/files/*', 'api/admin/tracks/*',
+            'api/admin/storage/*', 'api/admin/files/*', 'api/admin/tracks/*', 'api/admin/albums/*', 'api/admin/suggestions/*',
             'api/library/exports', 'api/library/exports/*',
         ],
+        'podcasts' => ['api/podcasts', 'api/podcasts/*', 'api/podcast-episodes', 'api/podcast-episodes/*', 'api/devices/*/podcast-episodes/*', 'api/admin/podcasts', 'api/admin/podcasts/*', 'library/podcasts'],
         'dlna' => ['settings/dlna', 'settings/dlna/*'],
         'library' => [
             'library', 'library/*', 'artists', 'artists/*', 'albums', 'albums/*', 'genres', 'genres/*', 'playlists', 'playlists/*',
             'tracks/*', 'external/*', 'spotify/tracks/*', 'settings/library', 'settings/library/*', 'settings/clients/artwork-export', 'settings/clients/artwork-export/*',
-            'api/library/*', 'api/devices/*/library/*', 'party/*',
+            'api/library/*', 'api/devices/*/library/*', 'party/*', 'api/admin/library/*',
         ],
     ],
 
@@ -126,6 +128,8 @@ return [
         'stems-queue' => ['features' => 'deep_analysis', 'env' => 'START_STEMS_QUEUE'],
         // The MQTT subscriber of scene triggers (`scenes:listen`); the scenes feature is in every profile today.
         'scene-triggers' => ['features' => 'scenes', 'env' => 'START_SCENE_TRIGGERS'],
+        // The MQTT subscriber of Home Assistant commands (`ha:listen`); idles until discovery and commands are switched on.
+        'ha-commands' => ['features' => 'home_assistant', 'env' => 'START_HA_COMMANDS'],
     ],
 
     /*

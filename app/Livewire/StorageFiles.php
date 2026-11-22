@@ -3,9 +3,8 @@
 namespace App\Livewire;
 
 use App\Domain\Library\Enrichment;
-use App\Domain\Storage\AudioTags;
-use App\Domain\Storage\FileStore;
 use App\Domain\Storage\LibraryFiles;
+use App\Domain\Storage\TagEditor;
 use App\Domain\Storage\TrackSuggestions;
 use App\Models\File;
 use App\Models\StorageLocation;
@@ -15,6 +14,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 
 /**
@@ -24,6 +24,7 @@ use Livewire\WithPagination;
  */
 class StorageFiles extends Component
 {
+    use WithFileUploads;
     use WithPagination;
 
     public const PER_PAGE = 50;
@@ -54,6 +55,15 @@ class StorageFiles extends Component
     /** @var array<string, string> */
     public array $tags = [];
 
+    /** The tags as the file holds them: only what differs is written. @var array<string, string> */
+    public array $original = [];
+
+    /** A new cover picked for the file being edited (not written until Write tags). */
+    public $cover = null;
+
+    /** What the file allows: an inbox file or a format ffmpeg cannot write is shown but not editable. */
+    public array $state = ['has_cover' => false, 'can_undo' => false, 'editable' => true, 'cover_editable' => true];
+
     /** Hint for the suggestions: what the file could be. */
     public string $cueTitle = '';
 
@@ -83,10 +93,9 @@ class StorageFiles extends Component
     public function startEdit(int $id): void
     {
         $file = File::with(['tracks.artist', 'tracks.album'])->findOrFail($id);
-        $store = new FileStore($file->location);
 
         try {
-            $read = $store->withLocalPath($file->path, fn (string $local) => AudioTags::read($local)) ?? [];
+            $state = app(TagEditor::class)->read($file);
         } catch (\Throwable $e) {
             $this->toast($e->getMessage(), error: true);
 
@@ -94,16 +103,9 @@ class StorageFiles extends Component
         }
 
         $this->editing = $id;
-        $this->tags = [
-            'title' => (string) ($read['title'] ?? ''),
-            'artist' => (string) ($read['artist'] ?? ''),
-            'album' => (string) ($read['album'] ?? ''),
-            'album_artist' => (string) ($read['album_artist'] ?? ''),
-            'year' => (string) ($read['year'] ?? ''),
-            'track_number' => (string) ($read['track_number'] ?? ''),
-            'disc_number' => (string) ($read['disc_number'] ?? ''),
-            'genre' => implode('; ', $read['genres'] ?? []),
-        ];
+        $this->tags = $this->original = $state['tags'];
+        $this->state = array_diff_key($state, ['tags' => 1]);
+        $this->cover = null;
 
         $this->cueTitle = $this->tags['title'] !== '' ? $this->tags['title'] : (string) preg_replace('/^\d+\s*[-._)]*\s*/', '', pathinfo($file->path, PATHINFO_FILENAME));
         $this->cueArtist = $this->tags['artist'] !== '' && strcasecmp($this->tags['artist'], 'Unknown Artist') !== 0 ? $this->tags['artist'] : '';
@@ -147,14 +149,25 @@ class StorageFiles extends Component
     public function cancelEdit(): void
     {
         $this->editing = null;
+        $this->cover = null;
     }
 
-    public function saveTags(LibraryFiles $files): void
+    public function saveTags(LibraryFiles $files, TagEditor $editor): void
     {
         $file = File::findOrFail($this->editing);
+        $changes = array_diff_assoc(array_map('trim', $this->tags), $this->original);
 
         try {
-            $files->retag($file, array_map('trim', $this->tags));
+            $cover = $this->cover ? $editor->coverFrom((string) file_get_contents($this->cover->getRealPath())) : null;
+            if ($changes === [] && $cover === null) {
+                $this->toast('Nothing changed.');
+                $this->editing = null;
+
+                return;
+            }
+
+            $file = $editor->edit($file, $changes, $cover);
+            $files->enrich($file);
         } catch (\Throwable $e) {
             $this->toast($e->getMessage(), error: true);
 
@@ -162,7 +175,48 @@ class StorageFiles extends Component
         }
 
         $this->editing = null;
-        $this->toast('Tags written, the file is matched again and enrichment is queued.');
+        $this->cover = null;
+        $this->toast('Saved: the file is rewritten, matched again and enrichment is queued. Undo is in the editor.');
+    }
+
+    public function updatedCover(): void
+    {
+        $this->validate(['cover' => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:10240']]);
+    }
+
+    /** Takes the picture out of the file (undoable). */
+    public function removeCover(TagEditor $editor): void
+    {
+        $file = File::findOrFail($this->editing);
+
+        try {
+            $editor->edit($file, cover: false, organize: false);
+        } catch (\Throwable $e) {
+            $this->toast($e->getMessage(), error: true);
+
+            return;
+        }
+
+        $this->startEdit($file->id);
+        $this->toast('The cover was removed from the file.');
+    }
+
+    /** Puts the file back as it was before its last edit. */
+    public function undoEdit(LibraryFiles $files, TagEditor $editor): void
+    {
+        $file = File::findOrFail($this->editing);
+
+        try {
+            $file = $editor->undo($file);
+            $files->enrich($file);
+        } catch (\Throwable $e) {
+            $this->toast($e->getMessage(), error: true);
+
+            return;
+        }
+
+        $this->startEdit($file->id);
+        $this->toast('The last edit was undone.');
     }
 
     public function rematch(int $id, LibraryFiles $files): void

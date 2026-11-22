@@ -35,12 +35,13 @@ Kept in step with `config/profile.php` by `tests/Unit/ProfileDocsTest.php`.
 | `alerts` | Alerts, health and backup | yes | yes | yes |
 | `library` | Library browsing, playlists, library cache, artwork prerender, Spotify browse | – | yes | yes |
 | `enrichment` | Metadata enrichment (MusicBrainz, Wikipedia, Last.fm, lyrics ...) | – | yes | yes |
+| `podcasts` | Podcasts: RSS subscriptions, episodes streamed to speakers, resume | – | yes | yes |
 | `dlna` | DLNA servers and scan | – | yes | yes |
 | `file_storage` | Own files: storage locations, indexing, import, streaming to speakers | – | yes | yes |
 | `catalogue` | Catalogue sync, wishlist, new releases, physical collection | – | yes | yes |
 | `cover_health` | Cover health report (albums with no, tiny or non-square cover); needs no analysis | – | yes | yes |
 | `analysis` | Audio analysis (loudness, fingerprints, Essentia) and library health reports | – | – | yes |
-| `deep_analysis` | Deep analysis of one track: sections (structure) and stems | – | – | yes |
+| `deep_analysis` | Deep analysis of one track: sections (structure), stems, mood over time and the sound of sections | – | – | yes |
 | `rip_upload` | Rip upload from the ripper app | – | – | yes |
 | `search_engine` | Meilisearch (optional, unused by the app today) | – | – | yes |
 <!-- capability-table:end -->
@@ -85,6 +86,7 @@ Nothing is deleted: the code paths stay, only the entry points are gated. Livewi
 | `storage-queue`, `heavy-queue` (`heavy,catalogue`) | – | yes | yes |
 | `analysis-queue`, `stems-queue` | – | – | yes |
 | `scene-triggers` (`scenes:listen`, the MQTT subscriber of scene triggers; feature `scenes`, so every profile today; `START_SCENE_TRIGGERS`) | yes | yes | yes |
+| `ha-commands` (`ha:listen`, the Home Assistant command subscriber; feature `home_assistant`, every profile; `START_HA_COMMANDS`; idles without a broker connection until discovery and `ha:commands on` are both set) | yes | yes | yes |
 
 The play history is written by a queued listener (`StorePlaybackHistory`). Control runs it on the `history` queue with exactly one worker, so SQLite has one writer for it (`Profile::historyQueue()`, `viaQueue()`); the other profiles keep the default queue as before. `tests/Unit/ProfileSupervisorTest.php` renders the effective program list per profile from `docker/8.4/profile-env.sh` and checks it against `config('profile.workers')`; render it yourself with `PROFILE=control bash docker/8.4/profile-env.sh`. The supervisor config needs the new `START_*` variables, so **rebuild the image** (`docker compose build`) after pulling: an old image's entrypoint does not set them and supervisor refuses to start.
 

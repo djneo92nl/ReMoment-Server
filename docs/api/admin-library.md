@@ -11,7 +11,7 @@ POST /api/admin/library/maintenance/{action}   { options }                 → {
 ## Settings
 
 ```json
-{ "leading_source": "auto", "leading": "files", "add_played_tracks": false, "playback_loudness": false, "nts_enabled": false, "history_keep_months": null }
+{ "leading_source": "auto", "leading": "files", "add_played_tracks": false, "playback_loudness": false, "nts_enabled": false, "history_keep_months": null, "concerts_enabled": false, "concerts_location": null }
 ```
 
 | Key | Values | Notes |
@@ -20,6 +20,8 @@ POST /api/admin/library/maintenance/{action}   { options }                 → {
 | `add_played_tracks` | bool | add a played track that is not in the library to it (default off) |
 | `playback_loudness` | bool | level the loudness of converted streams; same switch as `PUT /api/admin/storage/playback-loudness` |
 | `nts_enabled` | bool | NTS Radio, which reads NTS' unofficial website data: opt-in, off by default |
+| `concerts_enabled` | bool | opt-in: ask MusicBrainz once a day for upcoming events of library artists ([concerts.md](concerts.md)); off by default; Standard and Full |
+| `concerts_location` | text or `null` | cities or countries, comma separated, matched against the venue, city and address; `null` or empty = everywhere |
 | `history_keep_months` | 1 to 600, or `null` | months of play history the daily `history:prune` keeps; `null` keeps everything |
 
 `history_keep_months` lives on the History page in the web UI; it is here so one call reads and sets everything. Spotify and Last.fm connections, scrobbling toggles and the Spotify Connect name mapping stay on the web (decided, see the 8b roadmap).

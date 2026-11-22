@@ -29,6 +29,16 @@ final class Hooks
         ]));
     }
 
+    /** A scene was created, renamed or deleted: its button appears, changes name or goes (only while the command path is on). */
+    public static function scenes(): void
+    {
+        if (!HomeAssistant::commandsActive()) {
+            return;
+        }
+
+        self::run(fn (DiscoveryPublisher $p) => $p->publishConfigs());
+    }
+
     /** A client was created, changed or approved: state now, the config when it is new, renamed or became approved. */
     public static function client(Client $client): void
     {

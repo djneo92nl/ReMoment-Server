@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\Cache;
  *
  * Convention: a key is present (true) only when the server really has the capability enabled and the profile allows it;
  * a client treats a missing key as false. Three keys are always present because they are not yes/no: `profile`,
- * `analysis` (an empty Sound page needs an explanation) and nothing else. A feature that is not built yet (`podcasts`)
+ * `analysis` (an empty Sound page needs an explanation) and nothing else. A feature that is not built yet
  * has no key until it is. Adding a key never bumps `api_version`.
  *
  * Every check is cheap (config, a setting, a row, or something cached for a minute): the endpoint is called by every
@@ -73,6 +73,8 @@ final class ServerFeatures
             'sleep_timer' => true,
             // Nodes (workstream 18): clients with kind `node` register and take jobs (docs/architecture/node-agent.md): every profile.
             'nodes' => true,
+            // Podcasts: GET /api/podcasts, episodes streamed to speakers, resume (docs/api/podcasts.md); Standard and Full.
+            'podcasts' => Profile::allows('podcasts') ? true : null,
             // A node with the line-in role is switched on, so GET /api/line-ins lists something (docs/architecture/line-in.md).
             'line_in' => Profile::allows('line_in') && self::lineIn() ? true : null,
             // Sub devices: host and sub_devices in the device detail, the admin link routes (docs/api/sub-devices.md): every profile.

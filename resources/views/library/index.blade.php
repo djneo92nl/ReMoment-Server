@@ -10,6 +10,7 @@
             ['Radio', 'radio', route('radio.index'), $counts['radio']],
             ['Favorites', 'heart', route('library.favorites'), $counts['favorites']],
             ['Collection', 'record-vinyl', route('library.collection'), \App\Models\Media\PhysicalItem::count()],
+            ['Podcasts', 'podcast', route('library.podcasts'), \App\Models\Podcast::count()],
         ];
     @endphp
 

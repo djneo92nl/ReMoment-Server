@@ -54,7 +54,7 @@ class RecordPlaybackPosition
 
         // The end is never waited for: a finish clears the bookmark at once.
         if (PlaybackPositions::finished($event->progress, $duration)) {
-            PlaybackPositions::clear($kind, $itemId);
+            PlaybackPositions::finish($kind, $itemId);
 
             return;
         }
@@ -81,7 +81,7 @@ class RecordPlaybackPosition
             [$kind, $itemId, $position, $duration] = $last;
 
             if (PlaybackPositions::finished((int) $position, $duration)) {
-                PlaybackPositions::clear($kind, $itemId);
+                PlaybackPositions::finish($kind, $itemId);
             }
         }
     }

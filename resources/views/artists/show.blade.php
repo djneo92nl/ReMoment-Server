@@ -109,6 +109,10 @@
                     <livewire:catalogue :artist-id="$artist->id" :key="'catalogue-'.$artist->id" />
                 @endif
 
+                @if(\App\Domain\Profile\Profile::allows('enrichment'))
+                    <livewire:concerts-shelf :artist-id="$artist->id" :key="'concerts-'.$artist->id" />
+                @endif
+
                 @if($similarArtists->isNotEmpty())
                     <x-shelf title="Similar artists">
                         @foreach($similarArtists as $similarArtist)

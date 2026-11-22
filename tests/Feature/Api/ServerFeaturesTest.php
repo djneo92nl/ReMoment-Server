@@ -37,9 +37,9 @@ class ServerFeaturesTest extends TestCase
         $this->assertTrue($features['alerts']);
         $this->assertSame('full', $features['profile']);
         $this->assertIsBool($features['analysis']);
-        InfoFeatures::assertFeatures($this->getJson('/api/info'), ['alerts' => true, 'scenes' => true, 'profile' => 'full', 'deep_analysis' => false, 'analysis' => false]);
-        // Not built yet, or nothing switched on: no key at all (a client reads a missing key as false).
-        foreach (['podcasts', 'media_servers', 'line_in', 'push', 'ha_discovery', 'similar_tracks', 'stems_weights', 'deep_analysis_kinds'] as $key) {
+        InfoFeatures::assertFeatures($this->getJson('/api/info'), ['alerts' => true, 'scenes' => true, 'profile' => 'full', 'deep_analysis' => false, 'analysis' => false, 'podcasts' => true]);
+        // Nothing switched on: no key at all (a client reads a missing key as false).
+        foreach (['media_servers', 'line_in', 'push', 'ha_discovery', 'similar_tracks', 'stems_weights', 'deep_analysis_kinds'] as $key) {
             $this->assertArrayNotHasKey($key, $features, $key);
         }
     }

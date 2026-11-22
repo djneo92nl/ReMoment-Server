@@ -15,6 +15,8 @@ final class HomeAssistant
 
     public const PREFIX = 'ha_discovery_prefix';
 
+    public const COMMANDS = 'ha_commands_enabled';
+
     /** Retained availability of every entity: `online` while discovery runs, `offline` after a removal. */
     public const STATUS_TOPIC = 'remoment/ha/status';
 
@@ -50,5 +52,32 @@ final class HomeAssistant
     public static function setPrefix(string $prefix): void
     {
         Setting::set(self::PREFIX, trim($prefix, '/'));
+    }
+
+    /**
+     * The opt-in command path (docs/architecture/home-assistant.md, "Commands from Home Assistant"): off by default and
+     * separate from discovery, because it is the one place where a message on the broker makes the server do something.
+     * Read fresh each time (the subscriber asks every few seconds).
+     */
+    public static function commandsEnabled(): bool
+    {
+        try {
+            $value = Setting::get(self::COMMANDS);
+
+            return $value === null ? (bool) config('mqtt.ha_commands_enabled') : $value === '1';
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    public static function setCommandsEnabled(bool $enabled): void
+    {
+        Setting::set(self::COMMANDS, $enabled ? '1' : '0');
+    }
+
+    /** Commands are served only while discovery is on too: the buttons and the results live in it, and the profile has the feature. */
+    public static function commandsActive(): bool
+    {
+        return \App\Domain\Profile\Profile::allows('home_assistant') && self::enabled() && self::commandsEnabled();
     }
 }

@@ -24,7 +24,7 @@ return [
         // MQTT topic filters that may not be triggers because the server publishes there itself (a scene's steps
         // change these topics, so a trigger on them could start the scene over and over). A trigger filter is
         // refused when any topic could match both it and one of these.
-        'blocked_topics' => ['remoment/player/#'],
+        'blocked_topics' => ['remoment/player/#', 'remoment/ha/command/#'],
 
         // How often the subscriber (`scenes:listen`) looks for changed trigger filters, in seconds.
         'refresh_seconds' => 5,

@@ -6,7 +6,9 @@ use App\Domain\Analysis\Stages\AcoustIdStage;
 use App\Domain\Analysis\Stages\EssentiaStage;
 use App\Domain\Analysis\Stages\FingerprintStage;
 use App\Domain\Analysis\Stages\LoudnessStage;
+use App\Domain\Analysis\Stages\MoodStage;
 use App\Domain\Analysis\Stages\QualityStage;
+use App\Domain\Analysis\Stages\SectionSoundStage;
 use App\Domain\Analysis\Stages\StemAudioStage;
 use App\Domain\Analysis\Stages\StemsStage;
 use App\Domain\Analysis\Stages\StructureStage;
@@ -51,7 +53,7 @@ class AudioAnalysis
      */
     public static function onDemandStages(): array
     {
-        $stages = [new StructureStage, new StemsStage, new StemAudioStage];
+        $stages = [new StructureStage, new StemsStage, new StemAudioStage, new MoodStage, new SectionSoundStage];
 
         return array_combine(array_map(fn (OnDemandStage $s) => $s->key(), $stages), $stages);
     }

@@ -79,12 +79,13 @@ One class builds it, `App\Domain\System\ServerFeatures::all()` (workstream 8.7).
 | `media_servers` | at least one enabled media server has complete credentials | [media-servers.md](media-servers.md) |
 | `sleep_timer` | the server-side sleep timer `POST /api/devices/{id}/sleep` (all profiles; needs a real queue) | [scenes.md](scenes.md) |
 | `nodes` | nodes (clients with `kind: node`) can register and take jobs (all profiles) | [node-agent.md](../architecture/node-agent.md) |
+| `podcasts` | the profile has podcasts (Standard and Full): `GET /api/podcasts`, episodes played on a `stream_url` device | [podcasts.md](podcasts.md) |
 | `line_in` | an approved node has the `line-in` role switched on, so `GET /api/line-ins` lists something | [line-in.md](../architecture/line-in.md) |
 | `sub_devices` | `host` and `sub_devices` in the device detail, the admin link routes (all profiles) | [sub-devices.md](sub-devices.md) |
 | `push` | the server holds a VAPID key pair, so `POST /api/push/subscribe` can deliver a Web Push for warning and critical alerts (a native app does not use it) | [pwa.md](../frontend/pwa.md) |
 | `ha_discovery` | Home Assistant MQTT discovery is switched on | [home-assistant.md](../architecture/home-assistant.md) |
 
-Not built yet, so never present: `podcasts` (workstream 8.2). It will appear as `podcasts: true` when it ships; a client that already checks for it needs no change. To add a key, add it to `ServerFeatures`, to this table, to the `ServerInfo` schema of `openapi.yaml` and to `tests/Feature/Api/ServerFeaturesTest.php`.
+`deezer` and `tidal` are not built and never present until workstream 5. To add a key, add it to `ServerFeatures`, to this table, to the `ServerInfo` schema of `openapi.yaml` and to `tests/Feature/Api/ServerFeaturesTest.php`.
 
 ### Why the MQTT host isn't `MQTT_HOST`
 

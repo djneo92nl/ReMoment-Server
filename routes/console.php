@@ -26,6 +26,8 @@ Schedule::command('artwork:backfill')->daily()->when(fn () => Profile::allows('l
 Schedule::command('artwork:measure-covers')->daily()->when(fn () => Profile::allows('library'));
 Schedule::command('artwork:prerender')->daily()->when(fn () => Profile::allows('library'));
 Schedule::command('library:enrich')->daily()->when(fn () => Profile::allows('enrichment'));
+Schedule::command('library:lyrics-analysis')->dailyAt('03:20')->when(fn () => Profile::allows('enrichment'));
+Schedule::command('concerts:sync')->dailyAt('03:10')->when(fn () => Profile::allows('enrichment') && \App\Domain\Concerts\ConcertSettings::enabled());
 Schedule::command('playlists:refresh-smart')->daily()->when(fn () => Profile::allows('library'));
 // Plays older than the retention setting (default: keep forever, so a no-op); only rows of `plays` go.
 // Players that stopped reporting (reinstalls, unsigned builds) are hidden, never deleted (docs/api/players.md)
@@ -100,3 +102,6 @@ Schedule::call(fn () => app(\App\Domain\Scenes\SceneRunner::class)->runDue())->e
 // Line-in (docs/architecture/line-in.md): stop a node's capture when nobody listens to its mount any more. Only while something is wanted.
 Schedule::call(fn () => \App\Domain\LineIn\LineIns::sweep())->everyMinute()->name('line-in-sweep')
     ->when(fn () => Profile::allows('line_in') && \App\Domain\LineIn\LineIns::anyWanted());
+
+// Podcasts (workstream 8.2, docs/api/podcasts.md): queue the feeds that are due; each is a conditional GET, spaced out.
+Schedule::command('podcasts:refresh')->everyThirtyMinutes()->withoutOverlapping(30)->when(fn () => Profile::allows('podcasts'));

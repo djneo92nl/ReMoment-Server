@@ -76,10 +76,7 @@ Route::put('/devices/{device}/sound-adjustment', [DeviceSettingsController::clas
 Route::get('/devices/{device}/bluetooth', [DeviceSettingsController::class, 'getBluetooth']);
 Route::put('/devices/{device}/bluetooth', [DeviceSettingsController::class, 'setBluetooth']);
 Route::delete('/devices/{device}/bluetooth/devices/{deviceId}', [DeviceSettingsController::class, 'removeBluetoothDevice'])->where('deviceId', '.+');
-Route::get('/devices/{device}/network', [DeviceSettingsController::class, 'getNetwork']);
-Route::put('/devices/{device}/network/interface', [DeviceSettingsController::class, 'setNetworkInterface']);
-Route::put('/devices/{device}/network/wired', [DeviceSettingsController::class, 'setWiredNetwork']);
-Route::put('/devices/{device}/network/wifi', [DeviceSettingsController::class, 'joinWifi']);
+// Network settings (read and write) need the admin token: a wrong value can lock a device out. They are in the admin.token group below.
 Route::get('/devices/{device}/wired-speakers', [DeviceSettingsController::class, 'getWiredSpeakers']);
 Route::put('/devices/{device}/wired-speakers/{speakerId}', [DeviceSettingsController::class, 'setWiredSpeaker'])->where('speakerId', '[A-Za-z0-9_]+');
 Route::get('/devices/{device}/wireless-speakers', [DeviceSettingsController::class, 'getWirelessSpeakers']);
@@ -149,6 +146,10 @@ Route::post('/devices/{device}/library/play-tracks', [DeviceController::class, '
 Route::post('/devices/{device}/library/play-listening-mode', [DeviceController::class, 'libraryPlayListeningMode']);
 Route::post('/devices/{device}/library/play-similar', [DeviceController::class, 'libraryPlaySimilar']);
 Route::post('/devices/{device}/library/play-daily-mix', [DeviceController::class, 'libraryPlayDailyMix']);
+Route::post('/devices/{device}/library/play-journey', [DeviceController::class, 'libraryPlayJourney']);
+Route::post('/devices/{device}/library/play-artist-tour', [DeviceController::class, 'libraryPlayArtistTour']);
+Route::get('/library/journey', [\App\Http\Controllers\Api\LibraryTourController::class, 'journey']);
+Route::get('/library/artists/{artist}/tour', [\App\Http\Controllers\Api\LibraryTourController::class, 'artistTour']);
 Route::post('/devices/{device}/library/play-album', [DeviceController::class, 'libraryPlayAlbum']);
 Route::post('/devices/{device}/library/play-artist', [DeviceController::class, 'libraryPlayArtist']);
 Route::post('/devices/{device}/library/play-external', [DeviceController::class, 'libraryPlayExternal']);
@@ -188,11 +189,29 @@ Route::get('/library/albums/{album}/spotify', [LibraryController::class, 'albumS
 Route::put('/library/albums/{album}/favorite', [LibraryController::class, 'favoriteAlbum']);
 Route::put('/library/tracks/{track}/favorite', [LibraryController::class, 'favoriteTrack']);
 Route::get('/library/tracks/{track}/mixes-with', [LibraryController::class, 'mixesWith']);
+Route::get('/library/tracks/{track}/related', [\App\Http\Controllers\Api\TrackRelatedController::class, 'show']);
+// Upcoming concerts of library artists from MusicBrainz events, opt-in (docs/api/concerts.md)
+Route::get('/library/concerts', [\App\Http\Controllers\Api\ConcertController::class, 'index']);
+Route::get('/library/artists/{artist}/concerts', [\App\Http\Controllers\Api\ConcertController::class, 'artist']);
 Route::get('/library/tracks/{track}/similar', [LibraryController::class, 'similar']);
+Route::get('/library/tracks/{track}/similar-sections', [\App\Http\Controllers\Api\SectionSimilarityController::class, 'show']);
 Route::get('/library/tracks/{track}/waveform', [LibraryController::class, 'waveform']);
 Route::get('/library/listening-modes', [LibraryController::class, 'listeningModes']);
 Route::get('/library/discover', [\App\Http\Controllers\Api\DiscoverController::class, 'index']);
 Route::get('/library/history', [\App\Http\Controllers\Api\PlayHistoryController::class, 'index']);
+// Resume positions of long tracks and podcast episodes (docs/api/playback-positions.md)
+Route::get('/library/positions', [\App\Http\Controllers\Api\PlaybackPositionController::class, 'index']);
+Route::put('/library/positions/{kind}/{id}', [\App\Http\Controllers\Api\PlaybackPositionController::class, 'update'])->whereIn('kind', \App\Models\PlaybackPosition::KINDS)->whereNumber('id');
+Route::delete('/library/positions/{kind}/{id}', [\App\Http\Controllers\Api\PlaybackPositionController::class, 'destroy'])->whereIn('kind', \App\Models\PlaybackPosition::KINDS)->whereNumber('id');
+// Podcasts (docs/api/podcasts.md): reading, playing and marking played are open; subscriptions are in the admin group below
+Route::get('/podcasts', [\App\Http\Controllers\Api\PodcastController::class, 'index']);
+Route::get('/podcasts/{podcast}', [\App\Http\Controllers\Api\PodcastController::class, 'show'])->whereNumber('podcast');
+Route::get('/podcasts/{podcast}/episodes', [\App\Http\Controllers\Api\PodcastController::class, 'episodes'])->whereNumber('podcast');
+Route::post('/podcasts/{podcast}/mark-played', [\App\Http\Controllers\Api\PodcastController::class, 'markAllPlayed'])->whereNumber('podcast');
+Route::get('/podcast-episodes', [\App\Http\Controllers\Api\PodcastController::class, 'allEpisodes']);
+Route::get('/podcast-episodes/{episode}', [\App\Http\Controllers\Api\PodcastController::class, 'episode'])->whereNumber('episode');
+Route::put('/podcast-episodes/{episode}/played', [\App\Http\Controllers\Api\PodcastController::class, 'played'])->whereNumber('episode');
+Route::post('/devices/{device}/podcast-episodes/{episode}/play', [\App\Http\Controllers\Api\PodcastController::class, 'play'])->whereNumber('episode');
 Route::get('/devices/{device}/history', [\App\Http\Controllers\Api\PlayHistoryController::class, 'device']);
 Route::get('/library/albums/{album}/plays', [\App\Http\Controllers\Api\PlayHistoryController::class, 'album']);
 Route::get('/library/artists/{artist}/plays', [\App\Http\Controllers\Api\PlayHistoryController::class, 'artist']);
@@ -269,6 +288,35 @@ Route::get('/sync/files/{target}/{key}/{fingerprint}', [\App\Http\Controllers\Ap
 Route::middleware('admin.token')->group(function () {
     Route::get('/admin/me', [AdminAuthController::class, 'me']);
 
+    // Podcast subscriptions: add by RSS address, keep, refresh, remove (docs/api/podcasts.md)
+    Route::post('/admin/podcasts', [\App\Http\Controllers\Api\AdminPodcastController::class, 'store']);
+    Route::put('/admin/podcasts/{podcast}', [\App\Http\Controllers\Api\AdminPodcastController::class, 'update'])->whereNumber('podcast');
+    Route::delete('/admin/podcasts/{podcast}', [\App\Http\Controllers\Api\AdminPodcastController::class, 'destroy'])->whereNumber('podcast');
+    Route::post('/admin/podcasts/{podcast}/refresh', [\App\Http\Controllers\Api\AdminPodcastController::class, 'refresh'])->whereNumber('podcast');
+
+    // App sign-ins: list and revoke (docs/api/admin-tokens.md)
+    Route::get('/admin/tokens', [\App\Http\Controllers\Api\AdminTokenController::class, 'index']);
+    Route::delete('/admin/tokens', [\App\Http\Controllers\Api\AdminTokenController::class, 'destroyAll']);
+    Route::delete('/admin/tokens/{token}', [\App\Http\Controllers\Api\AdminTokenController::class, 'destroy']);
+
+    // Device network settings: admin token only (decided 2026-10-26; docs/api/device-settings.md). Renaming stays open.
+    Route::get('/devices/{device}/network', [DeviceSettingsController::class, 'getNetwork']);
+    Route::put('/devices/{device}/network/interface', [DeviceSettingsController::class, 'setNetworkInterface']);
+    Route::put('/devices/{device}/network/wired', [DeviceSettingsController::class, 'setWiredNetwork']);
+    Route::put('/devices/{device}/network/wifi', [DeviceSettingsController::class, 'joinWifi']);
+
+    // Audio analysis status and actions: the data of /settings/analysis (docs/api/admin-analysis.md)
+    Route::get('/admin/analysis', [\App\Http\Controllers\Api\AdminAnalysisController::class, 'show']);
+    Route::get('/admin/analysis/problems', [\App\Http\Controllers\Api\AdminAnalysisController::class, 'problems']);
+    Route::post('/admin/analysis/run', [\App\Http\Controllers\Api\AdminAnalysisController::class, 'run']);
+    Route::post('/admin/analysis/files/{file}/analyse', [\App\Http\Controllers\Api\AdminAnalysisController::class, 'analyse']);
+    Route::post('/admin/analysis/files/{file}/retry', [\App\Http\Controllers\Api\AdminAnalysisController::class, 'retry']);
+
+    // Library settings and maintenance (docs/api/admin-library.md)
+    Route::get('/admin/library/settings', [\App\Http\Controllers\Api\AdminLibraryController::class, 'settings']);
+    Route::put('/admin/library/settings', [\App\Http\Controllers\Api\AdminLibraryController::class, 'updateSettings']);
+    Route::post('/admin/library/maintenance/{action}', [\App\Http\Controllers\Api\AdminLibraryController::class, 'maintenance']);
+
     // Sync to offline targets: a USB stick on a node, the iOS app's offline library (docs/api/sync.md)
     Route::get('/admin/sync/targets', [\App\Http\Controllers\Api\SyncTargetController::class, 'index']);
     Route::post('/admin/sync/targets', [\App\Http\Controllers\Api\SyncTargetController::class, 'store']);
@@ -278,6 +326,7 @@ Route::middleware('admin.token')->group(function () {
     Route::post('/admin/sync/targets/{target}/estimate', [\App\Http\Controllers\Api\SyncTargetController::class, 'estimate']);
     Route::post('/admin/sync/targets/{target}/plan', [\App\Http\Controllers\Api\SyncTargetController::class, 'plan']);
     Route::post('/admin/sync/targets/{target}/report', [\App\Http\Controllers\Api\SyncTargetController::class, 'report']);
+    Route::post('/admin/sync/targets/{target}/plays', [\App\Http\Controllers\Api\SyncTargetController::class, 'plays']);
     Route::post('/admin/sync/targets/{target}/run', [\App\Http\Controllers\Api\SyncTargetController::class, 'run']);
     Route::post('/admin/sync/targets/{target}/volume', [\App\Http\Controllers\Api\SyncTargetController::class, 'volume']);
     Route::delete('/admin/sync/targets/{target}/run', [\App\Http\Controllers\Api\SyncTargetController::class, 'cancel']);
@@ -287,6 +336,14 @@ Route::middleware('admin.token')->group(function () {
     Route::get('/admin/health', [\App\Http\Controllers\Api\AdminHealthController::class, 'show']);
     Route::get('/admin/health/services', [\App\Http\Controllers\Api\AdminHealthController::class, 'services']);
     Route::post('/admin/health/services/check', [\App\Http\Controllers\Api\AdminHealthController::class, 'check']);
+
+    // The optional second copy of every backup: a directory path, a test-write, the last copy (docs/api/admin-backup.md)
+    Route::get('/admin/backup/copy-path', [\App\Http\Controllers\Api\AdminBackupController::class, 'show']);
+    Route::put('/admin/backup/copy-path', [\App\Http\Controllers\Api\AdminBackupController::class, 'update']);
+    Route::post('/admin/backup/copy-path/test', [\App\Http\Controllers\Api\AdminBackupController::class, 'test']);
+
+    // The Home Assistant rest_command package as a YAML download, the file `ha:package` writes (docs/api/admin-ha.md)
+    Route::get('/admin/ha/package', [\App\Http\Controllers\Api\AdminHaController::class, 'package']);
 
     // Client registrations: list, approve, reject, edit, new token, remove (docs/api/admin-clients.md)
     Route::get('/admin/clients', [\App\Http\Controllers\Api\AdminClientController::class, 'index']);
@@ -367,6 +424,9 @@ Route::middleware('admin.token')->group(function () {
     Route::get('/admin/tracks/{track}/files', [StorageController::class, 'trackFiles']);
     Route::delete('/admin/tracks/{track}/files', [StorageController::class, 'destroyTrack']);
     Route::delete('/admin/files/{file}', [StorageController::class, 'destroyFile']);
+    // Tag and cover suggestions: accept (writes the tag into the file / fetches the cover) or dismiss (docs/api/suggestions.md)
+    Route::post('/admin/suggestions/{id}/accept', [\App\Http\Controllers\Api\SuggestionController::class, 'accept']);
+    Route::post('/admin/suggestions/{id}/dismiss', [\App\Http\Controllers\Api\SuggestionController::class, 'dismiss']);
     // Device source visibility (the web UI's DeviceSourceManager)
     Route::post('/admin/announcements/clips', [AnnouncementController::class, 'upload']);
     Route::delete('/admin/announcements/clips/{name}', [AnnouncementController::class, 'destroy']);
@@ -384,6 +444,15 @@ Route::middleware('admin.token')->group(function () {
     Route::put('/admin/device-links/{link}', [\App\Http\Controllers\Api\DeviceLinkController::class, 'update']);
     Route::delete('/admin/device-links/{link}', [\App\Http\Controllers\Api\DeviceLinkController::class, 'destroy']);
     Route::post('/admin/files/{file}/move', [StorageController::class, 'move']);
-    Route::put('/admin/files/{file}/tags', [StorageController::class, 'tags']);
+    // Tag editor for own files and albums (docs/api/tag-editor.md): tags, cover, batch per album, undo of the last edit
+    Route::get('/admin/files/{file}/tags', [\App\Http\Controllers\Api\TagEditorController::class, 'show']);
+    Route::put('/admin/files/{file}/tags', [\App\Http\Controllers\Api\TagEditorController::class, 'update']);
+    Route::post('/admin/files/{file}/tags/undo', [\App\Http\Controllers\Api\TagEditorController::class, 'undo']);
+    Route::post('/admin/files/{file}/cover', [\App\Http\Controllers\Api\TagEditorController::class, 'setCover']);
+    Route::delete('/admin/files/{file}/cover', [\App\Http\Controllers\Api\TagEditorController::class, 'removeCover']);
+    Route::get('/admin/albums/{album}/tags', [\App\Http\Controllers\Api\TagEditorController::class, 'album']);
+    Route::put('/admin/albums/{album}/tags', [\App\Http\Controllers\Api\TagEditorController::class, 'updateAlbum']);
+    Route::post('/admin/albums/{album}/tags/undo', [\App\Http\Controllers\Api\TagEditorController::class, 'undoAlbum']);
+    Route::post('/admin/albums/{album}/cover', [\App\Http\Controllers\Api\TagEditorController::class, 'setAlbumCover']);
     Route::post('/admin/files/{file}/verify', [StorageController::class, 'verify']);
 });

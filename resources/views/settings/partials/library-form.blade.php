@@ -4,6 +4,8 @@
     $addPlayed = \App\Domain\Library\LibrarySettings::addPlayedTracks();
     $levelOn = \App\Domain\Storage\PlaybackLoudness::enabled();
     $ntsOn = \App\Domain\Radio\RadioSettings::ntsEnabled();
+    $concertsOn = \App\Domain\Concerts\ConcertSettings::enabled();
+    $concertsLocation = \App\Domain\Concerts\ConcertSettings::location();
 @endphp
 <div class="space-y-6">
         @if(session('success'))
@@ -52,6 +54,23 @@
                     <span class="mt-1 block text-xs text-gray-500">Disclaimer: this reads NTS' unofficial, undocumented website data and plays its public streams. ReMoment is not affiliated with NTS, and NTS has not published terms that allow this. It can change or stop working at any time, and you are responsible for using it in line with NTS' terms. Off by default.</span>
                 </span>
             </label>
+
+            @if(\App\Domain\Profile\Profile::allows('enrichment'))
+            <div class="pt-5 border-t border-gray-100 dark:border-stone-800 space-y-3" data-test="concerts-setting">
+                <label class="flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" name="concerts_enabled" value="1" @checked($concertsOn) class="mt-1 rounded text-gray-900 dark:text-stone-500 focus:ring-gray-400">
+                    <span>
+                        <span class="block text-sm font-medium text-gray-900 dark:text-gray-100">Upcoming concerts</span>
+                        <span class="block text-xs text-gray-500">Shows upcoming concerts of the artists in your library on their page. Once a day the server asks MusicBrainz (no key needed) for the events of each artist, which tells MusicBrainz which artists you own. MusicBrainz events are added by volunteers, so small artists often have none. Off by default.</span>
+                    </span>
+                </label>
+                <div class="pl-7">
+                    <label for="concerts_location" class="block text-xs text-gray-500">Only near me (cities or countries, comma separated, empty = everywhere)</label>
+                    <x-text-input id="concerts_location" name="concerts_location" type="text" class="mt-1 block w-full" maxlength="200" placeholder="Netherlands, Amsterdam" :value="$concertsLocation" />
+                    <p class="mt-1 text-xs text-gray-500">Matched against the venue, city and address MusicBrainz has. A country only matches when its name is in the venue's address, so add the big cities too.</p>
+                </div>
+            </div>
+            @endif
 
             <x-primary-button>Save</x-primary-button>
             </form>

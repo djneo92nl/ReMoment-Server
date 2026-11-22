@@ -245,6 +245,27 @@ class SimilarTracksTest extends TestCase
         $this->getJson('/api/library/tracks/1/similar')->assertStatus(422)->assertJsonPath('error', 'not_available_in_profile');
     }
 
+    public function test_discover_has_a_because_you_played_shelf_from_the_track_played_last(): void
+    {
+        config(['profile.current' => 'full']);
+        $seed = $this->track('Seed', self::at(0));
+        $this->track('Near', self::at(10));
+        $this->track('Far', self::at(80));
+
+        $this->assertNull(collect(\App\Domain\Library\Discover::sections([], ['similar_tracks']))->first(), 'no play yet, no shelf');
+
+        $device = $this->device();
+        \App\Models\Play::create(['device_id' => $device->id, 'track_id' => $seed->id, 'source_type' => 'dlna', 'played_at' => now()->subDay()]);
+        Cache::flush();
+
+        $section = \App\Domain\Library\Discover::sections([], ['similar_tracks'])[0];
+
+        $this->assertSame('Because you played Seed', $section['title']);
+        $this->assertSame(['Near', 'Far'], array_column($section['items'], 'name'));
+        $this->assertSame('Sounds like Seed by Band', $section['items'][0]['reason']);
+        $this->assertSame($seed->id, $section['seed']['id']);
+    }
+
     public function test_info_lists_the_feature_only_once_an_embedding_exists(): void
     {
         $this->getJson('/api/info')->assertOk()->assertJsonMissingPath('features.similar_tracks');

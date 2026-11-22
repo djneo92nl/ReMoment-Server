@@ -5,9 +5,11 @@ The stored sections of a track (`file_analyses.sections`, see [../api/deep-analy
 - **Player bar** (`livewire/player-bar.blade.php`): a 6 px strip under the waveform of the playing track, from `NowPlayingSections::for()` (cached a minute, so a result shows up within a minute of the job finishing). Display and seek only; no button. A click on a block calls `seekToSeconds(start)` of `progressTicker` (`public/js/remoment-live.js`), which uses the same `seek` Livewire action as the waveform; a click elsewhere on the waveform still seeks by fraction. Shown only when the device has `seek`.
 - **Album page**, "Track details" panel of a track with an own file and a waveform: Livewire `TrackSections` (`app/Livewire/TrackSections.php`), an 18 px strip with letters, plus the state and the admin's request.
 
-## `<x-section-strip :sections :duration :height :labels :seek>`
+The mood over time sits under the same strip in the player bar and in Track details: [mood-strip.md](mood-strip.md). Tracks with section sound vectors also get a "Sections like" row (matching sections of other analysed tracks).
 
-Blocks are `currentColor` at opacities: the same repetition letter shares a shade, no letter is a faint block. Never "verse"/"chorus". A letter is printed only with `labels` and `confidence >= 0.5`. Each block has a time-range tooltip.
+## `<x-section-strip :sections :duration :height :labels :seek :highlight>`
+
+Blocks are `currentColor` at opacities: the same repetition letter shares a shade, no letter is a faint block. Never "verse"/"chorus". A letter is printed only with `labels` and `confidence >= 0.5`. Each block has a time-range tooltip. With `highlight` a block is tappable and sets `sel` of the surrounding Alpine scope (the stem lanes' section marker).
 
 ## `TrackSections` states
 

@@ -116,6 +116,7 @@ class SettingsController extends Controller
     {
         $validated = $request->validate([
             'leading_source' => ['required', 'in:'.implode(',', LeadingSource::MODES)],
+            'concerts_location' => ['nullable', 'string', 'max:200'],
         ]);
 
         app(\App\Domain\Library\LibrarySettingsAdmin::class)->save([
@@ -123,6 +124,8 @@ class SettingsController extends Controller
             'add_played_tracks' => $request->boolean('add_played_tracks'),
             'playback_loudness' => $request->boolean('playback_loudness'),
             'nts_enabled' => $request->boolean('nts_enabled'),
+            'concerts_enabled' => $request->boolean('concerts_enabled'),
+            'concerts_location' => $request->input('concerts_location'),
         ]);
 
         return redirect()->route('settings.storage', ['tab' => 'library'])->with('success', 'Library settings saved.');

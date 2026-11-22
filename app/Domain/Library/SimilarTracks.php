@@ -13,7 +13,6 @@ use App\Models\Media\Track;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 
 /**
  * "Similar tracks" (workstream 4, docs/architecture/similar-tracks.md): the tracks of the scope whose sound embedding
@@ -42,16 +41,7 @@ final class SimilarTracks
     /** The seed's packed vector, null while its primary file has no (current) embedding. */
     private function vector(): ?string
     {
-        $vector = DB::table('track_files')
-            ->join('file_embeddings', 'file_embeddings.file_id', '=', 'track_files.file_id')
-            ->join('file_analyses', 'file_analyses.file_id', '=', 'track_files.file_id')
-            ->where('track_files.track_id', $this->track->id)
-            ->where('track_files.is_primary', true)
-            ->where('file_embeddings.model', Embeddings::MODEL)
-            ->where(fn ($q) => $q->whereNull('file_embeddings.content_hash')->orWhereColumn('file_embeddings.content_hash', 'file_analyses.content_hash'))
-            ->value('file_embeddings.vector');
-
-        return is_resource($vector) ? stream_get_contents($vector) : $vector;
+        return Embeddings::ofTrack($this->track->id);
     }
 
     /** What the answer is made from, null when the track has no embedding yet. @return array{model: string, dimensions: int}|null */

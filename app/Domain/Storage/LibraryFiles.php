@@ -227,60 +227,33 @@ class LibraryFiles
     }
 
     /**
-     * Writes tags into the file (title, artist, album, album_artist, year, track_number, disc_number, genre),
-     * stores it back, re-reads it and, when it is in the library, re-files it. Needs the tag tool of the
-     * format (mp3 works without one; flac needs metaflac, ogg vorbiscomment).
+     * Writes tags into the file (title, artist, album, album_artist, year, track_number, disc_number, genre), re-reads it and,
+     * when it is in the library, re-files it. Delegates to TagEditor, the one write path: a safe copy-and-rename with ffmpeg,
+     * every other tag and the cover kept, an undo snapshot stored. Empty values leave a field alone here (the editor's own
+     * `edit()` removes a field given as '').
      *
      * @param  array<string, string|int>  $tags
      */
     public function writeTags(File $file, array $tags): File
     {
-        $formats = match ($file->extension) {
-            'mp3' => ['id3v2.3'],
-            'flac' => ['metaflac'],
-            'ogg', 'oga', 'opus' => ['vorbiscomment'],
-            default => throw new \InvalidArgumentException("Writing tags to .{$file->extension} files is not supported."),
-        };
-
-        $map = ['title' => 'title', 'artist' => 'artist', 'album' => 'album', 'album_artist' => 'band', 'year' => 'year',
-            'track_number' => 'track_number', 'disc_number' => 'part_of_a_set', 'genre' => 'genre'];
-        $data = [];
-        foreach ($map as $key => $id3) {
-            if (isset($tags[$key]) && $tags[$key] !== '') {
-                $data[$id3] = [(string) $tags[$key]];
-            }
-        }
-        if ($data === []) {
+        $tags = array_filter($tags, fn ($v) => $v !== null && $v !== '');
+        if ($tags === []) {
             throw new \InvalidArgumentException('No tags given.');
         }
 
-        $store = new FileStore($file->location);
-        $oldTrackIds = $file->trackFiles()->pluck('track_id')->all();
+        return app(TagEditor::class)->edit($file, $tags);
+    }
 
-        $store->withLocalPath($file->path, function (string $tmp) use ($formats, $data, $store, $file) {
-            $writer = new \getid3_writetags;
-            $writer->filename = $tmp;
-            $writer->tagformats = $formats;
-            $writer->overwrite_tags = true;
-            $writer->remove_other_tags = false;
-            $writer->tag_encoding = 'UTF-8';
-            $writer->tag_data = $data;
-
-            if (!$writer->WriteTags()) {
-                throw new \RuntimeException('Writing tags failed: '.implode('; ', $writer->errors));
-            }
-
-            $in = fopen($tmp, 'rb');
-            $store->put($file->path, $in);
-            fclose($in);
-        }, writable: true);
-
-        [$file] = $this->indexer->index($file->location, $file->path, $store);
-        $this->releaseTracks(array_diff($oldTrackIds, $file?->trackFiles()->pluck('track_id')->all() ?? []));
-
-        if ($file && $file->location->role === StorageLocation::ROLE_LIBRARY) {
-            $file = $this->organizer->organize($file, $file->location);
-        }
+    /**
+     * The tag editor's own write for the API and the web editor: `''` removes a field, missing ones stay, the file is laid
+     * out for its new tags when `$organize`, and enrichment is queued for the track it now matches.
+     *
+     * @param  array<string, string|int|null>  $tags
+     */
+    public function retagKeepingEmpty(File $file, array $tags, bool $organize = true): File
+    {
+        $file = app(TagEditor::class)->edit($file, $tags, organize: $organize);
+        $this->enrich($file);
 
         return $file;
     }
@@ -396,7 +369,7 @@ class LibraryFiles
      *
      * @param  iterable<int>  $trackIds
      */
-    private function releaseTracks(iterable $trackIds): void
+    public function releaseTracks(iterable $trackIds): void
     {
         foreach (Track::whereIn('id', $trackIds)->get() as $track) {
             if ($track->trackFiles()->exists()) {

@@ -79,6 +79,26 @@ return [
     'essentia_timeout' => (int) env('ANALYSIS_ESSENTIA_TIMEOUT', 600),
 
     /*
+    | Mood over time and sound of the sections (workstream 16.3 and 16.5): two on-demand kinds of ONE track, computed by
+    | the Essentia sidecar's ML build (`POST /curve`, `POST /section-embeddings`), never part of the nightly run.
+    | docs/architecture/mood-curve.md, docs/architecture/section-similarity.md.
+    */
+    /** Seconds per point of the mood curve (the sidecar averages the network's patches into windows this long; 1-30). */
+    'mood_window_seconds' => (float) env('MOOD_WINDOW_SECONDS', 3),
+
+    /** Sample rate of the WAV sent for both kinds (the sidecar loads audio at 16 kHz anyway). */
+    'ml_decode_rate' => (int) env('ANALYSIS_ML_DECODE_RATE', 16000),
+
+    /** Estimates shown before a run: seconds per second of audio plus a fixed part (the ML models on CPU; not measured, calibrate on your machine). */
+    'mood_seconds_per_second' => (float) env('MOOD_SECONDS_PER_SECOND', 0.05),
+    'mood_seconds_fixed' => (float) env('MOOD_SECONDS_FIXED', 4),
+    'section_sound_seconds_per_second' => (float) env('SECTION_SOUND_SECONDS_PER_SECOND', 0.04),
+    'section_sound_seconds_fixed' => (float) env('SECTION_SOUND_SECONDS_FIXED', 4),
+
+    /** How many matching sections `GET /api/library/tracks/{id}/similar-sections` returns at most. */
+    'section_matches_max' => (int) env('SECTION_MATCHES_MAX', 25),
+
+    /*
     | The structure service (docker/structure, compose profile "structure"): sections of ONE track, on demand
     | only (AnalyzeTrackDeep), never part of the nightly run. Unset = deep analysis is not available.
     | docs/architecture/structure-service.md.

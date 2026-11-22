@@ -130,4 +130,54 @@ class FileStore
             @unlink($tmp);
         }
     }
+
+    /**
+     * Replaces the file with what `$produce(sourcePath, outputPath)` writes, safely: the new content is made next to the
+     * original (a hidden file scans skip) on a local disk and renamed over it, so a failure or a crash leaves the original
+     * as it was and a reader never sees half a file; on a remote disk it is made in the temp directory and uploaded in one
+     * put. The output has the original's extension (tools pick the format from it) and, locally, its permissions.
+     *
+     * @param  callable(string, string): void  $produce
+     */
+    public function rewrite(string $path, callable $produce): void
+    {
+        $extension = pathinfo($path, PATHINFO_EXTENSION);
+
+        $this->withLocalPath($path, function (string $source) use ($path, $produce, $extension) {
+            $local = $this->location->isLocal();
+            $base = $local ? null : tempnam(sys_get_temp_dir(), 'remoment-');
+            $output = $local
+                ? dirname($source).'/.'.pathinfo($source, PATHINFO_FILENAME).'.edit-'.bin2hex(random_bytes(4)).'.'.$extension
+                : $base.'.'.$extension;
+
+            try {
+                $produce($source, $output);
+
+                if (!is_file($output) || filesize($output) === 0) {
+                    throw new \RuntimeException('The new version of the file was not written; the original was kept.');
+                }
+
+                if ($local) {
+                    @chmod($output, fileperms($source) & 0777);
+                    if (!rename($output, $source)) {
+                        throw new \RuntimeException('The new version could not replace the file; the original was kept.');
+                    }
+
+                    return;
+                }
+
+                $in = fopen($output, 'rb');
+                try {
+                    $this->put($path, $in);
+                } finally {
+                    fclose($in);
+                }
+            } finally {
+                @unlink($output);
+                if ($base !== null) {
+                    @unlink($base);
+                }
+            }
+        });
+    }
 }

@@ -31,6 +31,12 @@ class AudioTags
         $pictures = array_values(array_filter($info['comments']['picture'] ?? [], fn ($p) => !empty($p['data'])));
         $front = collect($pictures)->first(fn ($p) => stripos((string) ($p['picturetype'] ?? ''), 'front') !== false) ?? ($pictures[0] ?? null);
         $gain = fn ($v) => isset($v) && is_numeric($v) ? round((float) $v, 2) : null;
+        // A user text frame (TXXX) of an ID3v2 tag: getID3 gives one value as a string and several as a list.
+        $txxx = function (string $description) use ($info) {
+            $value = $info['tags']['id3v2']['text'][$description] ?? null;
+
+            return is_array($value) ? ($value[0] ?? null) : $value;
+        };
 
         return [
             'artist' => $tag('artist'),
@@ -41,10 +47,10 @@ class AudioTags
             'track_number' => ((int) $tag('track_number')) ?: null,
             'disc_number' => ((int) ($tag('part_of_a_set') ?? $tag('discnumber'))) ?: null, // ID3 TPOS or Vorbis DISCNUMBER ("1" or "1/2")
             'genres' => array_values(array_filter($info['comments']['genre'] ?? [])),
-            'mbid' => $info['tags']['id3v2']['text']['MusicBrainz Release Track Id'][0] ?? $tag('musicbrainz_trackid'),
+            'mbid' => $txxx('MusicBrainz Release Track Id') ?? $tag('musicbrainz_trackid'),
             // The release the disc was ripped as (Vorbis MUSICBRAINZ_ALBUMID, ID3 TXXX "MusicBrainz Album Id") and its barcode: they link a rip to the physical collection.
-            'release_mbid' => strtolower(trim((string) ($info['tags']['id3v2']['text']['MusicBrainz Album Id'][0] ?? $tag('musicbrainz_albumid') ?? ''))) ?: null,
-            'barcode' => preg_replace('/\D/', '', (string) ($info['tags']['id3v2']['text']['BARCODE'][0] ?? $tag('barcode') ?? '')) ?: null,
+            'release_mbid' => strtolower(trim((string) ($txxx('MusicBrainz Album Id') ?? $tag('musicbrainz_albumid') ?? ''))) ?: null,
+            'barcode' => preg_replace('/\D/', '', (string) ($txxx('BARCODE') ?? $tag('barcode') ?? '')) ?: null,
             'duration' => $int($info['playtime_seconds'] ?? null),
             'mime_type' => $info['mime_type'] ?? null,
             'codec' => $audio['dataformat'] ?? null,

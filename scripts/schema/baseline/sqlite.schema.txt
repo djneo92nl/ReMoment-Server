@@ -166,6 +166,26 @@ TABLE clients [autoincrement]
   check status in ('pending', 'approved')
   check type in ('single', 'multi')
 
+TABLE concerts [autoincrement]
+  col address varchar NULL default=-
+  col artist_id integer NOT NULL default=-
+  col city varchar NULL default=-
+  col created_at datetime NULL default=-
+  col ends_on date NULL default=-
+  col event_mbid varchar NOT NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col latitude numeric NULL default=-
+  col longitude numeric NULL default=-
+  col name varchar NOT NULL default=-
+  col starts_at varchar NULL default=-
+  col starts_on date NOT NULL default=-
+  col type varchar NULL default=-
+  col updated_at datetime NULL default=-
+  col venue varchar NULL default=-
+  idx concerts_artist_id_event_mbid_unique UNIQUE (artist_id,event_mbid)
+  idx concerts_starts_on_index INDEX (starts_on)
+  fk (artist_id) -> artists(id) ON DELETE CASCADE ON UPDATE NO ACTION
+
 TABLE device_links [autoincrement]
   col created_at datetime NULL default=-
   col device_id integer NOT NULL default=-
@@ -330,10 +350,12 @@ TABLE file_analyses [autoincrement]
   col loudness_range float NULL default=-
   col measured_bit_depth integer NULL default=-
   col mode varchar NULL default=-
+  col mood_curve text NULL default=-
   col mood_tags text NULL default=-
   col phase_issue tinyint(1) NULL default=-
   col replaygain_album_gain float NULL default=-
   col replaygain_track_gain float NULL default=-
+  col section_sound text NULL default=-
   col sections text NULL default=-
   col spectral_cutoff_hz integer NULL default=-
   col stages text NULL default=-
@@ -359,6 +381,19 @@ TABLE file_embeddings
   col model varchar NOT NULL default=-
   col updated_at datetime NULL default=-
   col vector blob NOT NULL default=-
+  fk (file_id) -> files(id) ON DELETE CASCADE ON UPDATE NO ACTION
+
+TABLE file_tag_snapshots [autoincrement]
+  col cover_changed tinyint(1) NOT NULL default='0'
+  col created_at datetime NULL default=-
+  col file_id integer NOT NULL default=-
+  col had_cover tinyint(1) NOT NULL default='0'
+  col hash_after varchar NOT NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col path_before varchar NOT NULL default=-
+  col tags text NOT NULL default=-
+  col updated_at datetime NULL default=-
+  idx file_tag_snapshots_file_id_unique UNIQUE (file_id)
   fk (file_id) -> files(id) ON DELETE CASCADE ON UPDATE NO ACTION
 
 TABLE files [autoincrement]
@@ -548,6 +583,18 @@ TABLE play_tags [autoincrement]
   idx play_tags_uid_unique UNIQUE (uid)
   fk (device_id) -> devices(id) ON DELETE SET NULL ON UPDATE NO ACTION
 
+TABLE playback_positions [autoincrement]
+  col created_at datetime NULL default=-
+  col device_id integer NULL default=-
+  col duration integer NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col item_id integer NOT NULL default=-
+  col kind varchar NOT NULL default=-
+  col position integer NOT NULL default=-
+  col updated_at datetime NULL default=-
+  idx playback_positions_kind_item_id_unique UNIQUE (kind,item_id)
+  idx playback_positions_updated_at_index INDEX (updated_at)
+
 TABLE playlist_track [autoincrement]
   col created_at datetime NULL default=-
   col id integer NOT NULL default=- pk=1
@@ -600,6 +647,52 @@ TABLE plays [autoincrement]
   fk (device_id) -> devices(id) ON DELETE CASCADE ON UPDATE NO ACTION
   fk (radio_station_id) -> radio_stations(id) ON DELETE SET NULL ON UPDATE NO ACTION
   fk (track_id) -> tracks(id) ON DELETE SET NULL ON UPDATE NO ACTION
+
+TABLE podcast_episodes [autoincrement]
+  col created_at datetime NULL default=-
+  col description text NULL default=-
+  col duration integer NULL default=-
+  col enclosure_url text NOT NULL default=-
+  col guid text NOT NULL default=-
+  col guid_hash varchar NOT NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col image_url text NULL default=-
+  col mime varchar NULL default=-
+  col number integer NULL default=-
+  col played_at datetime NULL default=-
+  col podcast_id integer NOT NULL default=-
+  col published_at datetime NULL default=-
+  col season integer NULL default=-
+  col size integer NULL default=-
+  col title varchar NOT NULL default=-
+  col updated_at datetime NULL default=-
+  idx podcast_episodes_played_at_index INDEX (played_at)
+  idx podcast_episodes_podcast_id_guid_hash_unique UNIQUE (podcast_id,guid_hash)
+  idx podcast_episodes_podcast_id_published_at_index INDEX (podcast_id,published_at)
+  fk (podcast_id) -> podcasts(id) ON DELETE CASCADE ON UPDATE NO ACTION
+
+TABLE podcasts [autoincrement]
+  col author varchar NULL default=-
+  col created_at datetime NULL default=-
+  col description text NULL default=-
+  col etag varchar NULL default=-
+  col failures integer NOT NULL default='0'
+  col feed_hash varchar NOT NULL default=-
+  col feed_url text NOT NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col image_url text NULL default=-
+  col keep_episodes integer NULL default=-
+  col language varchar NULL default=-
+  col last_checked_at datetime NULL default=-
+  col last_error varchar NULL default=-
+  col last_modified varchar NULL default=-
+  col last_success_at datetime NULL default=-
+  col next_check_at datetime NULL default=-
+  col site_url text NULL default=-
+  col title varchar NOT NULL default=-
+  col updated_at datetime NULL default=-
+  idx podcasts_feed_hash_unique UNIQUE (feed_hash)
+  idx podcasts_next_check_at_index INDEX (next_check_at)
 
 TABLE push_subscriptions [autoincrement]
   col auth varchar NOT NULL default=-
@@ -663,6 +756,19 @@ TABLE scenes [autoincrement]
   col updated_at datetime NULL default=-
   idx scenes_name_index INDEX (name)
   idx scenes_schedule_enabled_schedule_time_index INDEX (schedule_enabled,schedule_time)
+
+TABLE section_embeddings [autoincrement]
+  col content_hash varchar NULL default=-
+  col end float NOT NULL default=-
+  col file_id integer NOT NULL default=-
+  col id integer NOT NULL default=- pk=1
+  col label varchar NULL default=-
+  col model varchar NOT NULL default=-
+  col position integer NOT NULL default=-
+  col start float NOT NULL default=-
+  col vector blob NOT NULL default=-
+  idx section_embeddings_file_id_position_unique UNIQUE (file_id,position)
+  fk (file_id) -> files(id) ON DELETE CASCADE ON UPDATE NO ACTION
 
 TABLE sessions
   col id varchar NOT NULL default=- pk=1

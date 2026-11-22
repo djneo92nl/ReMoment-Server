@@ -14,7 +14,7 @@ ReMoment can serve its own music files instead of relying on a DLNA server. File
 - `AudioTags` — tags and audio properties of a local file (getID3).
 - `FileIndexer` — `index($location, $path)`: hash + tags → `files` row → track through `LibraryIdentity` (track external id `local:file:{file id}`) → `track_files`. A file whose hash exists at another path whose old file is gone is a **move**: the row, and so the track, is kept. Unchanged files (size + mtime) are skipped.
 - `LibraryOrganizer` — layout `{album artist}/{album} ({year})/{disc}-{track} {title}.{ext}` (illegal characters cleaned, `(2)` on collisions). Moves within a location use the disk's move; across locations or drivers the file is copied, the copy's hash verified, then the source removed.
-- `LibraryFiles` — management: `upload` (inbox → index → library layout), `importInbox`, `reorganize`, `deleteFile`, `deleteTrack`, `move` (rename), `retag` (writeTags + queue enrichment), `rematch` (re-read the tags and tie the file to its track again; the one place to change how songs are matched is `FileIndexer::attach`), `setHidden` / `setFolderHidden`, `enrich`, `writeTags` (getID3, mp3 pure PHP; flac needs `metaflac`, ogg `vorbiscomment`; re-reads the file and re-files the track), `verify` (re-hash, flag missing), `duplicates` (same hash).
+- `LibraryFiles` — management: `upload` (inbox → index → library layout), `importInbox`, `reorganize`, `deleteFile`, `deleteTrack`, `move` (rename), `retag` (writeTags + queue enrichment), both through `TagEditor` ([tag-editor.md](tag-editor.md): safe copy-and-rename write with ffmpeg, cover and other tags kept, undo snapshot, batch per album), `rematch` (re-read the tags and tie the file to its track again; the one place to change how songs are matched is `FileIndexer::attach`), `setHidden` / `setFolderHidden`, `enrich`, `writeTags` (delegates to `TagEditor`, which writes with ffmpeg; re-reads the file and re-files the track), `verify` (re-hash, flag missing), `duplicates` (same hash).
 - `App\Services\Local\LocalLibraryScanner` — scans a location through the indexer and marks files that disappeared `missing`.
 
 A track made from a file gets source `files` and a `dlna_url` (metadata source `files`) of `{APP_URL}/stream/{track}`, so playback, library scopes and `library:merge-duplicates` work unchanged. The Local library is the `files` entry of `LibrarySources::LIBRARIES` (kind `local`); a real DLNA server is the separate `dlna` library (kind `streaming`). A track available from both counts for both, and plays from the file. `APP_URL` must be an address the speakers can reach.
@@ -91,7 +91,7 @@ POST            /api/admin/files                          multipart `file` → {
 GET|DELETE      /api/admin/tracks/{id}/files              files of a track / delete the track and its files
 DELETE          /api/admin/files/{id}                     delete a file (and its track if it was the last)
 POST            /api/admin/files/{id}/move                { path, storage_location_id? }
-PUT             /api/admin/files/{id}/tags                { title, artist, album, album_artist, year, track_number, disc_number, genre }
+PUT             /api/admin/files/{id}/tags                { title, artist, album, album_artist, year, track_number, disc_number, genre, clear?, organize? } (more routes: cover, undo and per-album batch in docs/api/tag-editor.md)
 POST            /api/admin/files/{id}/verify              → { result: ok | missing | changed }
 ```
 

@@ -133,6 +133,9 @@
                                     <div x-show="open" x-cloak @click="open = false" style="position: absolute; right: 0; z-index: 40; min-width: 14rem;"
                                          class="mt-1 py-1 text-left bg-white dark:bg-stone-800 rounded-xl shadow-xl border border-gray-200 dark:border-stone-700">
                                         <button wire:click="startEdit({{ $file->id }})" class="{{ $menuItem }}"><i class="fa-solid fa-tags w-5"></i>Edit tags…</button>
+                                        @if($track?->album_id)
+                                            <a href="{{ route('settings.storage.album', $track->album_id) }}" class="{{ $menuItem }}" data-test="edit-album-{{ $file->id }}"><i class="fa-solid fa-compact-disc w-5"></i>Edit the whole album…</a>
+                                        @endif
                                         <button wire:click="toggleHidden({{ $file->id }})" class="{{ $menuItem }}"><i class="fa-regular {{ $file->isHidden() ? 'fa-eye' : 'fa-eye-slash' }} w-5"></i>{{ $file->isHidden() ? 'Show in library' : 'Hide from library' }}</button>
                                         <button wire:click="rematch({{ $file->id }})" class="{{ $menuItem }}"><i class="fa-solid fa-link w-5"></i>Match to track again</button>
                                         <button wire:click="enrich({{ $file->id }})" class="{{ $menuItem }}"><i class="fa-solid fa-wand-magic-sparkles w-5"></i>Fetch metadata again</button>
@@ -155,8 +158,11 @@
             <div class="w-full max-w-xl max-h-full overflow-y-auto bg-white dark:bg-stone-900 rounded-3xl shadow-2xl border border-gray-200 dark:border-stone-700 p-6 space-y-4">
                 <div>
                     <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Edit tags</h3>
-                    <p class="text-xs text-gray-500 mt-0.5">The tags are written into the file, which is then matched to its track again, moved to its new path and looked up again by the metadata sources.</p>
+                    <p class="text-xs text-gray-500 mt-0.5">The tags are written into the file (a copy is made and swapped in, so a failure leaves the file as it was), which is then matched to its track again, moved to its new path and looked up again by the metadata sources. Clear a field to remove it from the file.</p>
                 </div>
+                @unless($state['editable'])
+                    <x-alert type="warning" data-test="not-editable">This file cannot be edited: it is in the inbox (the inbox is never changed; import it into the library first), in a format whose tags cannot be written, or ffmpeg is missing.</x-alert>
+                @endunless
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     @foreach(['title' => 'Title', 'artist' => 'Artist', 'album' => 'Album', 'album_artist' => 'Album artist', 'year' => 'Year', 'genre' => 'Genre', 'track_number' => 'Track number', 'disc_number' => 'Disc number'] as $key => $label)
                         <div class="{{ in_array($key, ['title']) ? 'sm:col-span-2' : '' }}">
@@ -164,6 +170,29 @@
                             <x-text-input size="sm" type="text" wire:model="tags.{{ $key }}" wire:keydown.enter="saveTags" data-test="tag-{{ $key }}" class="w-full" />
                         </div>
                     @endforeach
+                </div>
+                <div class="rounded-2xl border border-gray-200 dark:border-stone-700 p-4 space-y-3" data-test="cover-editor">
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100">Cover</h4>
+                        <p class="text-xs text-gray-500 mt-0.5" data-test="cover-state">{{ $state['has_cover'] ? 'This file has an embedded cover.' : 'This file has no embedded cover.' }}@unless($state['cover_editable']) A cover cannot be written into this kind of file.@endunless</p>
+                    </div>
+                    @if($state['cover_editable'])
+                        <div class="flex flex-wrap items-center gap-3">
+                            @if($cover && !$errors->has('cover'))
+                                <img src="{{ $cover->temporaryUrl() }}" alt="The new cover" class="h-16 w-16 rounded-xl object-cover" data-test="cover-preview">
+                            @endif
+                            <label class="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 px-4 py-2.5 text-sm text-gray-500 transition hover:border-gray-400 hover:text-gray-700 dark:border-stone-700 dark:hover:border-stone-500 dark:hover:text-gray-300">
+                                <i class="fa-solid fa-arrow-up-from-bracket text-xs"></i>
+                                <span wire:loading.remove wire:target="cover">{{ $cover ? 'Pick another picture' : 'Pick a JPEG or PNG' }}</span>
+                                <span wire:loading wire:target="cover">Uploading…</span>
+                                <input type="file" wire:model="cover" accept="image/jpeg,image/png" class="sr-only" data-test="cover-input">
+                            </label>
+                            @if($state['has_cover'])
+                                <x-secondary-button size="sm" wire:click="removeCover" wire:confirm="Take the cover out of this file?" data-test="remove-cover"><i class="fa-solid fa-trash mr-2"></i>Remove the cover</x-secondary-button>
+                            @endif
+                        </div>
+                        @error('cover')<p class="text-xs text-red-500" data-test="cover-error">{{ $message }}</p>@enderror
+                    @endif
                 </div>
                 <div class="rounded-2xl border border-gray-200 dark:border-stone-700 p-4 space-y-3" data-test="suggestions">
                     <div>
@@ -199,8 +228,11 @@
                     @endif
                 </div>
                 <div class="flex items-center justify-end gap-2 pt-2">
+                    @if($state['can_undo'])
+                        <x-secondary-button size="md" wire:click="undoEdit" wire:confirm="Put this file back as it was before its last edit?" class="mr-auto" data-test="undo-edit"><i class="fa-solid fa-rotate-left mr-2"></i>Undo the last edit</x-secondary-button>
+                    @endif
                     <button wire:click="cancelEdit" class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-200">Cancel</button>
-                    <x-primary-button size="md" wire:click="saveTags" wire:loading.attr="disabled">Write tags</x-primary-button>
+                    <x-primary-button size="md" wire:click="saveTags" wire:loading.attr="disabled" :disabled="!$state['editable']" data-test="write-tags">Write tags</x-primary-button>
                 </div>
             </div>
         </div>
