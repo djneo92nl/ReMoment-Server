@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Domain\Storage\AlbumSuggestions;
 use App\Domain\Storage\TagEditor;
 use App\Models\Media\Album;
 use Livewire\Component;
@@ -43,6 +44,21 @@ class AlbumTagEditor extends Component
 
     public bool $anyEditable = false;
 
+    /** Hint for the lookup (what the album could be) and its answer; a picked cover is a Cover Art Archive URL fetched on save. */
+    public string $cueArtist = '';
+
+    public string $cueAlbum = '';
+
+    public ?string $coverUrl = null;
+
+    /** @var list<array<string, mixed>>|null releases found by the cover search (null: not searched yet) */
+    public ?array $coverResults = null;
+
+    public ?string $coverSearchError = null;
+
+    /** @var array{releases: list<array<string, mixed>>, artist: ?array<string, mixed>, searched: bool, error: ?string} */
+    public array $suggestions = ['releases' => [], 'artist' => null, 'searched' => false, 'error' => null];
+
     public ?string $notice = null;
 
     public ?string $error = null;
@@ -50,7 +66,73 @@ class AlbumTagEditor extends Component
     public function mount(Album $album): void
     {
         $this->albumId = $album->id;
+        $this->cueArtist = (string) $album->artist?->name;
+        $this->cueAlbum = $album->name;
         $this->load();
+    }
+
+    /** Looks up the artist's albums and matching releases online (started by the page after it rendered). */
+    public function lookup(AlbumSuggestions $suggestions): void
+    {
+        abort_unless(auth()->check(), 403);
+        try {
+            $this->suggestions = $suggestions->lookup(trim($this->fields['album_artist'] ?? '') ?: $this->cueArtist, $this->cueAlbum) + ['searched' => true, 'error' => null];
+        } catch (\Throwable $e) {
+            $this->suggestions = ['releases' => [], 'artist' => null, 'searched' => true, 'error' => 'MusicBrainz did not answer: '.$e->getMessage()];
+        }
+    }
+
+    /** Fills the form from a candidate (`releases` or `albums`); `what` is tags, cover or both. Nothing is written until save. */
+    public function use(string $kind, int $index, string $what = 'both'): void
+    {
+        $candidate = $kind === 'albums' ? ($this->suggestions['artist']['albums'][$index] ?? null) : ($this->suggestions['releases'][$index] ?? null);
+        if ($candidate === null) {
+            return;
+        }
+        if ($what !== 'cover') {
+            $this->fields['album'] = (string) $candidate['title'];
+            if ($kind === 'releases' && $candidate['artist'] !== '') {
+                $this->fields['album_artist'] = (string) $candidate['artist'];
+            } elseif ($kind === 'albums') {
+                $this->fields['album_artist'] = (string) $this->suggestions['artist']['name'];
+            }
+            if ($candidate['year']) {
+                $this->fields['year'] = (string) $candidate['year'];
+            }
+        }
+        if ($what !== 'tags') {
+            $this->cover = null;
+            $this->coverUrl = $candidate['cover'];
+        }
+    }
+
+    /** Searches covers for what the form says now (album and album artist as typed, else the hints), so no reload is needed after an edit. */
+    public function searchCovers(AlbumSuggestions $suggestions): void
+    {
+        abort_unless(auth()->check(), 403);
+        $this->coverSearchError = null;
+        $artist = trim($this->fields['album_artist'] ?? '') ?: trim($this->cueArtist);
+        $album = trim($this->fields['album'] ?? '') ?: trim($this->cueAlbum);
+
+        try {
+            $this->coverResults = $suggestions->searchReleases($artist, $album);
+        } catch (\Throwable $e) {
+            $this->coverResults = [];
+            $this->coverSearchError = 'The search failed: '.$e->getMessage();
+        }
+    }
+
+    public function useCover(int $index): void
+    {
+        if ($url = $this->coverResults[$index]['cover'] ?? null) {
+            $this->cover = null;
+            $this->coverUrl = $url;
+        }
+    }
+
+    public function clearCoverUrl(): void
+    {
+        $this->coverUrl = null;
     }
 
     public function updatedCover(): void
@@ -80,6 +162,13 @@ class AlbumTagEditor extends Component
 
         try {
             $cover = $this->cover ? $editor->coverFrom((string) file_get_contents($this->cover->getRealPath())) : null;
+            if ($cover === null && $this->coverUrl) {
+                $bytes = app(AlbumSuggestions::class)->coverBytes($this->coverUrl);
+                if ($bytes === null) {
+                    throw new \RuntimeException('The Cover Art Archive has no picture for that release; pick another or upload one.');
+                }
+                $cover = $editor->coverFrom($bytes);
+            }
             $result = $editor->editAlbum($this->album(), $tags, $perFile, $cover, $this->organize);
         } catch (\Throwable $e) {
             $this->error = $e->getMessage();
@@ -108,7 +197,7 @@ class AlbumTagEditor extends Component
 
     public function render()
     {
-        return view('livewire.album-tag-editor', ['albumName' => $this->album()->name]);
+        return view('livewire.album-tag-editor', ['albumName' => $this->album()->name, 'artworkReasons' => \App\Domain\Library\AlbumArtworkDiagnosis::reasons($this->album())]);
     }
 
     /** Reports what happened and reloads: the album may be another record now (a new name), so the page follows it. */
@@ -124,6 +213,8 @@ class AlbumTagEditor extends Component
         }
 
         $this->cover = null;
+        $this->coverUrl = null;
+        $this->coverResults = null;
         $this->albumId = (int) $result['album_id'];
         $this->load();
     }

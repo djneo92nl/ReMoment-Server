@@ -97,9 +97,15 @@
                 <button type="button" class="{{ $secondary }}" title="Add to playlist" data-test="album-add-to-playlist"
                         @click="$dispatch('add-to-playlist', {{ \Illuminate\Support\Js::from(['album_id' => $album->id, 'source' => $page->source, 'label' => $album->name]) }})"><i class="fa-solid fa-list-ul text-sm"></i>Add to playlist</button>
 
-                @php $canRemove = auth()->check() && $page->removable; @endphp
-                @if($canRemove)
+                @php
+                    $canRemove = auth()->check() && $page->removable;
+                    $canEditTags = auth()->check() && \App\Domain\Profile\Profile::allows('file_storage');
+                @endphp
+                @if($canRemove || $canEditTags)
                     <x-menu label="More" :button="$round">
+                        @if($canEditTags)
+                            <a href="{{ route('settings.storage.album', $album) }}" role="menuitem" data-test="album-edit-tags" class="flex w-full items-center gap-2.5 px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-stone-700"><i class="fa-solid fa-pen-to-square w-4 text-xs text-gray-400"></i>Edit tags &amp; cover…</a>
+                        @endif
                         @if($canRemove)
                             <form method="POST" action="{{ route('albums.destroy', $album) }}" onsubmit="return confirm('Remove this album and its tracks from the library? Your play history is kept.')">
                                 @csrf
